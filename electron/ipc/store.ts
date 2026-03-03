@@ -3,7 +3,7 @@ import log from "electron-log";
 
 import { StoreNameMap } from "@shared/store";
 
-import { appSettingsStore, lyricsCacheStore, shortcutKeyStore, userStore } from "../store";
+import { appSettingsStore, localFavItemsStore, localFavoritesStore, lyricsCacheStore, shortcutKeyStore, tagsStore, userStore } from "../store";
 import { channel } from "./channel";
 
 export function registerStoreHandlers() {
@@ -22,6 +22,18 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.LyricsCache) {
       return lyricsCacheStore.store;
+    }
+
+    if (name === StoreNameMap.LocalFavorites) {
+      return localFavoritesStore.store;
+    }
+
+    if (name === StoreNameMap.LocalFavItems) {
+      return localFavItemsStore.store;
+    }
+
+    if (name === StoreNameMap.Tags) {
+      return tagsStore.store;
     }
   });
 
@@ -48,6 +60,18 @@ export function registerStoreHandlers() {
       if (name === StoreNameMap.LyricsCache) {
         lyricsCacheStore.set(value);
       }
+
+      if (name === StoreNameMap.LocalFavorites) {
+        localFavoritesStore.set(value);
+      }
+
+      if (name === StoreNameMap.LocalFavItems) {
+        localFavItemsStore.set(value);
+      }
+
+      if (name === StoreNameMap.Tags) {
+        tagsStore.set(value);
+      }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
     }
@@ -68,6 +92,18 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.LyricsCache) {
       lyricsCacheStore.clear();
+    }
+
+    if (name === StoreNameMap.LocalFavorites) {
+      localFavoritesStore.clear();
+    }
+
+    if (name === StoreNameMap.LocalFavItems) {
+      localFavItemsStore.clear();
+    }
+
+    if (name === StoreNameMap.Tags) {
+      tagsStore.clear();
     }
 
     return true;

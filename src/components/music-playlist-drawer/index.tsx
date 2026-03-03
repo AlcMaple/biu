@@ -38,9 +38,16 @@ const PlayListDrawer = () => {
     switch (key) {
       case "favorite":
         useModalStore.getState().onOpenFavSelectModal({
-          rid: item.id,
+          rid: item.type === "mv" ? (item.aid ?? item.bvid ?? item.id) : (item.sid ?? item.id),
           type: item.type === "mv" ? 2 : 12,
           title: item.title,
+          itemInfo: {
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+            ownerName: item.ownerName,
+            ownerMid: item.ownerMid,
+          },
         });
         break;
       case "download-audio":

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import clx from "classnames";
 
+import ShazamModal from "@/components/shazam-modal";
 import { useUser } from "@/store/user";
 
 import WindowAction from "../../components/window-action";
@@ -33,6 +34,7 @@ const LayoutNavbar = () => {
         <Search onFocusChange={setIsSearchFocused} />
       </div>
       <div className="window-no-drag flex items-center justify-center space-x-4">
+        <ShazamModal />
         <AppUpdateNotify />
         <Dev />
         {Boolean(user?.isLogin) && <UserFeed />}

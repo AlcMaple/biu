@@ -14,7 +14,7 @@ const RightControl = () => {
       <MusicPlayMode />
       {Boolean(playId) && getPlayItem()?.source !== "local" && <MusicDownloadButton />}
       <OpenPlaylistDrawerButton />
-      <MusicVolume />
+<MusicVolume />
       <MusicRate />
     </div>
   );

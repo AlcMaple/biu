@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { addToast, Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { addToast, Button, Checkbox, Chip, Divider, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { RiCheckLine } from "@remixicon/react";
 import { useRequest } from "ahooks";
 
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
+import { useFavoritesStore } from "@/store/favorite";
+import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
 import AsyncButton from "../async-button";
@@ -29,9 +33,23 @@ const FavoritesSelectModal = () => {
   const isFavSelectModalOpen = useModalStore(s => s.isFavSelectModalOpen);
   const onFavSelectModalOpenChange = useModalStore(s => s.onFavSelectModalOpenChange);
   const favSelectModalData = useModalStore(s => s.favSelectModalData);
-  const { rid, type = 2, title, onSuccess } = favSelectModalData || {};
+  const { rid, type = 2, title, itemInfo, onSuccess } = favSelectModalData || {};
+
+  // 用 createdFavorites（引用稳定）再在 render 里 filter，避免 selector 每次返回新数组引用导致无限渲染
+  const createdFavorites = useFavoritesStore(s => s.createdFavorites);
+  const localFolders = createdFavorites.filter(f => f.isLocal);
+
+  // 用具体 selector 避免订阅整个 store 导致不必要的重渲染
+  const folderItems = useLocalFavItemsStore(s => s.folderItems);
+  const addLocalItem = useLocalFavItemsStore(s => s.addItem);
+  const removeLocalItem = useLocalFavItemsStore(s => s.removeItem);
+
+  const allTags = useTagStore(s => s.tags);
+  const getItemTagIds = useTagStore(s => s.getItemTagIds);
+  const setItemTagsInStore = useTagStore(s => s.setItemTags);
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const prevSelectedRef = useRef<number[]>([]);
@@ -39,9 +57,28 @@ const FavoritesSelectModal = () => {
   useEffect(() => {
     if (!isFavSelectModalOpen) {
       setSelectedIds([]);
+      setSelectedTagIds([]);
       prevSelectedRef.current = [];
+    } else if (rid) {
+      setSelectedTagIds(getItemTagIds(rid));
     }
-  }, [isFavSelectModalOpen]);
+  }, [isFavSelectModalOpen, rid, getItemTagIds]);
+
+  // 本地收藏夹的初始选中状态
+  useEffect(() => {
+    if (!isFavSelectModalOpen || !rid) return;
+    const localSelectedIds = localFolders
+      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(rid)))
+      .map(f => f.id);
+    if (localSelectedIds.length) {
+      setSelectedIds(prev => {
+        const merged = Array.from(new Set([...prev, ...localSelectedIds]));
+        prevSelectedRef.current = Array.from(new Set([...prevSelectedRef.current, ...localSelectedIds]));
+        return merged;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFavSelectModalOpen, rid]);
 
   const { data } = useRequest(
     async () => {
@@ -68,11 +105,9 @@ const FavoritesSelectModal = () => {
 
       const selectedFavs = list.filter(item => item.fav_state === 1) || [];
       if (selectedFavs?.length) {
-        prevSelectedRef.current = selectedFavs.map(item => item.id);
-        setSelectedIds(prevSelectedRef.current);
-      } else {
-        prevSelectedRef.current = [];
-        setSelectedIds([]);
+        const biliSelectedIds = selectedFavs.map(item => item.id);
+        prevSelectedRef.current = Array.from(new Set([...prevSelectedRef.current, ...biliSelectedIds]));
+        setSelectedIds(prev => Array.from(new Set([...prev, ...biliSelectedIds])));
       }
 
       return list;
@@ -93,72 +128,122 @@ const FavoritesSelectModal = () => {
 
   const handleConfirm = async () => {
     if (!rid) return;
-    const prevSelectedFolderIds = data?.filter(item => item.fav_state === 1)?.map(item => item.id) || [];
-    const delMediaIds = prevSelectedFolderIds.filter(id => !selectedIds.includes(id)).join(",");
-    const addMediaIds = selectedIds.filter(id => !prevSelectedFolderIds.includes(id)).join(",");
+
+    // 区分 B站 收藏夹 ID（正数）和本地收藏夹 ID（负数）
+    const localFolderIdSet = new Set(localFolders.map(f => f.id));
+
+    const biliPrevIds = (data ?? []).filter(item => item.fav_state === 1).map(item => item.id as number);
+    const localPrevIds = localFolders
+      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(rid)))
+      .map(f => f.id);
+
+    const biliSelectedIds = selectedIds.filter(id => !localFolderIdSet.has(id));
+    const localSelectedIds = selectedIds.filter(id => localFolderIdSet.has(id));
+
+    const biliDelIds = biliPrevIds.filter(id => !biliSelectedIds.includes(id)).join(",");
+    const biliAddIds = biliSelectedIds.filter(id => !biliPrevIds.includes(id)).join(",");
+
+    const localToAdd = localSelectedIds.filter(id => !localPrevIds.includes(id));
+    const localToDel = localPrevIds.filter(id => !localSelectedIds.includes(id));
 
     try {
       setSubmitting(true);
 
-      let res: any;
-      if (type === 12) {
-        res = await postCollResourceDeal({
-          rid,
-          type: 12,
-          add_media_ids: addMediaIds,
-          del_media_ids: delMediaIds,
-        });
-      } else {
-        res = await postFavFolderDeal({
-          rid,
-          add_media_ids: addMediaIds,
-          del_media_ids: delMediaIds,
-          type,
-          platform: "web",
-          ga: 1,
-          gaia_source: "web_normal",
-        });
-      }
-
-      if (res.code === 0) {
-        onFavSelectModalOpenChange(false);
-        if (prevSelectedRef.current.length === 0 && selectedIds.length) {
-          addToast({
-            title: "已添加到收藏夹",
-            color: "success",
-          });
-        } else if (!selectedIds.length) {
-          addToast({
-            title: "已从收藏夹中移除",
-            color: "success",
+      // 处理 B站 收藏夹
+      if (biliAddIds || biliDelIds) {
+        let res: any;
+        if (type === 12) {
+          res = await postCollResourceDeal({
+            rid,
+            type: 12,
+            add_media_ids: biliAddIds,
+            del_media_ids: biliDelIds,
           });
         } else {
-          addToast({
-            title: "修改成功",
-            color: "success",
+          res = await postFavFolderDeal({
+            rid,
+            add_media_ids: biliAddIds,
+            del_media_ids: biliDelIds,
+            type,
+            platform: "web",
+            ga: 1,
+            gaia_source: "web_normal",
           });
         }
-
-        // 刷新当前播放项的收藏状态
-        const playItem = usePlayList.getState().getPlayItem();
-        if (
-          (playItem?.type === "audio" && String(playItem?.sid) === String(rid)) ||
-          (playItem?.type === "mv" && String(playItem?.aid) === String(rid))
-        ) {
-          useMusicFavStore.getState().refreshIsFav();
+        if (res.code !== 0) {
+          addToast({ title: res.message, color: "danger" });
+          return;
         }
-
-        onSuccess?.(selectedIds);
-      } else {
-        addToast({
-          title: res.message,
-          color: "danger",
-        });
       }
+
+      // 处理本地收藏夹
+      for (const folderId of localToAdd) {
+        if (itemInfo) {
+          addLocalItem(folderId, {
+            rid,
+            type,
+            title: itemInfo.title,
+            cover: itemInfo.cover,
+            bvid: itemInfo.bvid,
+            ownerName: itemInfo.ownerName,
+            ownerMid: itemInfo.ownerMid,
+            duration: itemInfo.duration,
+            playCount: itemInfo.playCount,
+          });
+          // 更新收藏夹封面为最新添加的内容封面
+          if (itemInfo.cover) {
+            const folder = useFavoritesStore.getState().createdFavorites.find(f => f.id === folderId);
+            if (folder) {
+              useFavoritesStore.getState().modifyCreatedFavorite({ ...folder, cover: itemInfo.cover });
+            }
+          }
+        }
+      }
+      for (const folderId of localToDel) {
+        removeLocalItem(folderId, rid);
+      }
+
+      // 保存标签
+      if (rid) {
+        setItemTagsInStore(rid, selectedTagIds);
+      }
+
+      onFavSelectModalOpenChange(false);
+
+      const totalPrevCount = biliPrevIds.length + localPrevIds.length;
+      const totalSelectedCount = selectedIds.length;
+      if (totalPrevCount === 0 && totalSelectedCount) {
+        addToast({ title: "已添加到收藏夹", color: "success" });
+      } else if (!totalSelectedCount) {
+        addToast({ title: "已从收藏夹中移除", color: "success" });
+      } else {
+        addToast({ title: "修改成功", color: "success" });
+      }
+
+      // 刷新当前播放项的收藏状态
+      const playItem = usePlayList.getState().getPlayItem();
+      if (
+        (playItem?.type === "audio" && String(playItem?.sid) === String(rid)) ||
+        (playItem?.type === "mv" && String(playItem?.aid) === String(rid))
+      ) {
+        useMusicFavStore.getState().refreshIsFav();
+      }
+
+      onSuccess?.(selectedIds);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const allItems = [
+    ...(data ?? []).map(item => ({ ...item, isLocal: false })),
+    ...localFolders.map(f => ({
+      id: f.id,
+      title: f.title,
+      media_count: (folderItems[f.id] ?? []).length,
+      isLocal: true,
+    })),
+  ];
 
   return (
     <Modal
@@ -182,7 +267,7 @@ const FavoritesSelectModal = () => {
         <ModalBody className="px-0">
           <ScrollContainer style={{ height: "100%" }}>
             <div className="flex flex-col gap-1 overflow-auto px-4">
-              {data?.map(item => {
+              {allItems.map(item => {
                 const checked = selectedIds.includes(item.id);
                 return (
                   <div
@@ -199,17 +284,54 @@ const FavoritesSelectModal = () => {
                       onChange={() => toggle(item.id)}
                       onClick={e => e.stopPropagation()}
                       aria-label={item.title}
+                      isDisabled={item.isLocal && !itemInfo}
                     />
                     <div className="flex min-w-0 flex-1 items-center justify-between">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{item.title}</div>
-                        <div className="mt-0.5 text-xs text-zinc-500">{item.media_count ?? 0} 个内容</div>
+                        <div className="mt-0.5 text-xs text-zinc-500">
+                          {item.media_count ?? 0} 个内容
+                          {item.isLocal && (
+                            <span className="ml-1 rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-700">本地</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
+            {allTags.length > 0 && (
+              <div className="px-4 pt-3">
+                <Divider className="mb-3" />
+                <div className="mb-2 text-sm font-medium text-zinc-500">标签</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {allTags.map(tag => {
+                    const selected = selectedTagIds.includes(tag.id);
+                    return (
+                      <Chip
+                        key={tag.id}
+                        variant={selected ? "flat" : "bordered"}
+                        style={
+                          selected
+                            ? { backgroundColor: tag.color + "22", color: tag.color }
+                            : { borderColor: tag.color + "66", color: tag.color }
+                        }
+                        className="cursor-pointer"
+                        startContent={selected ? <RiCheckLine size={12} /> : undefined}
+                        onClick={() =>
+                          setSelectedTagIds(prev =>
+                            prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
+                          )
+                        }
+                      >
+                        {tag.name}
+                      </Chip>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </ScrollContainer>
         </ModalBody>
         <ModalFooter>
@@ -219,7 +341,10 @@ const FavoritesSelectModal = () => {
           <AsyncButton
             color="primary"
             onPress={handleConfirm}
-            isDisabled={hasSameIds(selectedIds, prevSelectedRef.current)}
+            isDisabled={
+              hasSameIds(selectedIds, prevSelectedRef.current) &&
+              hasSameIds(selectedTagIds, rid ? getItemTagIds(rid) : [])
+            }
           >
             确认
           </AsyncButton>

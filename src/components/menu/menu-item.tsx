@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
-import { useLocation, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 
-import { Avatar, Button, Link as HeroLink, Tooltip } from "@heroui/react";
+import { Avatar, Button, Tooltip } from "@heroui/react";
 import clx from "classnames";
 import { twMerge } from "tailwind-merge";
 
@@ -39,6 +39,12 @@ const MenuItem: React.FC<MenuItemProps> = ({
 }) => {
   const location = useLocation();
   const { id } = useParams();
+  const navigate = useNavigate();
+
+  const handlePress = () => {
+    if (href) navigate(href);
+    onPress?.();
+  };
 
   const isActive = useMemo(() => {
     return location.pathname === href || (id && href?.split("?")[0].includes(id));
@@ -77,12 +83,10 @@ const MenuItem: React.FC<MenuItemProps> = ({
     return (
       <Tooltip closeDelay={0} content={title} placement="right" offset={-3}>
         <Button
-          as={href ? HeroLink : "button"}
-          href={href}
           fullWidth
           variant={isActive ? "flat" : "light"}
           color={isActive ? "primary" : "default"}
-          onPress={onPress}
+          onPress={handlePress}
           className={clx("w-full min-w-0 justify-center rounded-md px-0 py-1", className, dndClassName, {
             "h-auto": collapsed,
             "text-primary": isActive,
@@ -97,13 +101,11 @@ const MenuItem: React.FC<MenuItemProps> = ({
 
   return (
     <Button
-      as={href ? HeroLink : "button"}
-      href={href}
       fullWidth
       disableRipple
       variant={isActive ? "flat" : "light"}
       color={isActive ? "primary" : "default"}
-      onPress={onPress}
+      onPress={handlePress}
       startContent={iconContent}
       className={twMerge("justify-start px-2 text-inherit", className, dndClassName)}
       {...(dndRest as any)}

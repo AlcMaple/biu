@@ -1,5 +1,6 @@
 import { app } from "electron";
 import Store from "electron-store";
+import path from "node:path";
 
 import { defaultAppSettings } from "@shared/settings/app-settings";
 import { defaultShortcutSettings } from "@shared/settings/shortcut-settings";
@@ -43,4 +44,21 @@ export const lyricsCacheStore = new Store<Record<string, MusicLyrics>>({
   name: StoreNameMap.LyricsCache,
   cwd: getUserDataPath(),
   defaults: {},
+});
+
+const localDataPath = path.join(app.getPath("documents"), "Biu");
+
+export const localFavoritesStore = new Store<Record<string, any>>({
+  name: StoreNameMap.LocalFavorites,
+  cwd: localDataPath,
+});
+
+export const localFavItemsStore = new Store<Record<string, any>>({
+  name: StoreNameMap.LocalFavItems,
+  cwd: localDataPath,
+});
+
+export const tagsStore = new Store<Record<string, any>>({
+  name: StoreNameMap.Tags,
+  cwd: localDataPath,
 });

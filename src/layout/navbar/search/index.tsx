@@ -75,8 +75,8 @@ const SearchInput: React.FC<SearchInputProps> = ({ onFocusChange }) => {
         ref={inputRef}
         value={value}
         onValueChange={setValue}
-        onKeyDown={e => {
-          if (e.key === "Enter") {
+        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             submitSearch(e.currentTarget.value);
             inputRef.current?.blur();
             setOpen(false);
