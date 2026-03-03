@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { StoreNameMap } from "@shared/store";
+
 import { getFavFolderCollectedList } from "@/service/fav-folder-collected-list";
 import { getFavFolderCreatedList } from "@/service/fav-folder-created-list";
 import { getSpaceNavnum } from "@/service/space-navnum";
@@ -11,6 +13,9 @@ export interface FavoriteItem {
   cover?: string;
   type?: number;
   mid?: number;
+  /** 本地创建 */
+  isLocal?: boolean;
+  intro?: string;
 }
 
 interface State {
@@ -68,7 +73,10 @@ export const useFavoritesStore = create<State & Action>()(
       collectedOrder: [],
       updateCreatedFavorites: async (userMid: number | string) => {
         const favorites = await getAllCreatedFavorites(userMid);
-        const ordered = applySavedOrder(favorites, get().createdOrder);
+        // 保留本地创建的收藏夹
+        const localItems = get().createdFavorites.filter(item => item.isLocal);
+        const combined = [...localItems, ...favorites];
+        const ordered = applySavedOrder(combined, get().createdOrder);
 
         set(() => ({
           createdFavorites: ordered,
@@ -160,7 +168,22 @@ export const useFavoritesStore = create<State & Action>()(
     }),
     {
       name: "favorites-order",
+      storage: {
+        getItem: async () => {
+          const store = await window.electron.getStore(StoreNameMap.LocalFavorites);
+          return store ? { state: store } : null;
+        },
+        setItem: async (_, value) => {
+          if (value.state) {
+            await window.electron.setStore(StoreNameMap.LocalFavorites, value.state);
+          }
+        },
+        removeItem: async () => {
+          await window.electron.clearStore(StoreNameMap.LocalFavorites);
+        },
+      },
       partialize: state => ({
+        createdFavorites: state.createdFavorites.filter(item => item.isLocal),
         createdOrder: state.createdOrder,
         collectedOrder: state.collectedOrder,
       }),

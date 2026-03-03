@@ -26,21 +26,21 @@ const SideNav = () => {
     onOpen: onOpenFavoritesEditModal,
     onOpenChange: onOpenChangeFavoritesEditModal,
   } = useDisclosure();
-  const [editingFavoriteId, setEditingFavoriteId] = useState<number>();
+  const [editingFavorite, setEditingFavorite] = useState<{ id: number; isLocal?: boolean }>();
 
   const handleOpenAddFavorite = () => {
-    setEditingFavoriteId(undefined);
+    setEditingFavorite(undefined);
     onOpenFavoritesEditModal();
   };
 
-  const handleOpenEditFavorite = (id: number) => {
-    setEditingFavoriteId(id);
+  const handleOpenEditFavorite = (id: number, isLocal?: boolean) => {
+    setEditingFavorite({ id, isLocal });
     onOpenFavoritesEditModal();
   };
 
   const handleFavoritesEditModalChange = (isOpen: boolean) => {
     if (!isOpen) {
-      setEditingFavoriteId(undefined);
+      setEditingFavorite(undefined);
     }
 
     onOpenChangeFavoritesEditModal();
@@ -178,7 +178,8 @@ const SideNav = () => {
         />
       </div>
       <FavoritesEditModal
-        mid={editingFavoriteId}
+        mid={editingFavorite?.id}
+        isLocal={editingFavorite?.isLocal}
         isOpen={isFavoritesEditModalOpen}
         onOpenChange={handleFavoritesEditModalChange}
       />

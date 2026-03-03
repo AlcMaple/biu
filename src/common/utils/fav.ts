@@ -2,6 +2,7 @@ import { chunk } from "es-toolkit/array";
 
 import { getFavResourceIds } from "@/service/fav-resource";
 import { getFavResourceInfos, type FavResourceInfo } from "@/service/fav-resource-infos";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 
 /** 是否个人私密收藏夹 */
 export const isPrivateFav = (attr: number) => {
@@ -12,6 +13,34 @@ export const isPrivateFav = (attr: number) => {
 export const isDefaultFav = (attr?: number) => {
   if (attr === undefined || attr === null) return false;
   return ((attr >> 1) & 1) === 0;
+};
+
+/** 获取本地收藏夹的所有媒体（转为 PlayItem 格式） */
+export const getLocalFavMedia = (folderId: number) => {
+  const items = useLocalFavItemsStore.getState().getItems(folderId);
+  return items
+    .map(item => {
+      if (item.type === 2) {
+        if (!item.bvid) return null;
+        return {
+          type: "mv" as const,
+          bvid: item.bvid,
+          title: item.title,
+          cover: item.cover,
+          ownerMid: item.ownerMid,
+          ownerName: item.ownerName,
+        };
+      }
+      return {
+        type: "audio" as const,
+        sid: Number(item.rid),
+        title: item.title,
+        cover: item.cover,
+        ownerMid: item.ownerMid,
+        ownerName: item.ownerName,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 };
 
 export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {

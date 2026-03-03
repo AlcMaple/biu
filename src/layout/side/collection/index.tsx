@@ -23,7 +23,7 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
-import { getAllFavMedia } from "@/common/utils/fav";
+import { getAllFavMedia, getLocalFavMedia } from "@/common/utils/fav";
 import { type ContextMenuItem } from "@/components/context-menu";
 import MenuGroup from "@/components/menu/menu-group";
 import SortableMenuItem from "@/layout/side/collection/sortable-menu-item";
@@ -31,6 +31,7 @@ import { postFavFolderDel } from "@/service/fav-folder-del";
 import { postFavFolderUnfav } from "@/service/fav-folder-unfav";
 import { getUserVideoArchivesList } from "@/service/user-video-archives-list";
 import { useFavoritesStore, type FavoriteItem } from "@/store/favorite";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -39,7 +40,7 @@ import { useUser } from "@/store/user";
 interface Props {
   isCollapsed?: boolean;
   onOpenAddFavorite?: () => void;
-  onOpenEditFavorite?: (id: number) => void;
+  onOpenEditFavorite?: (id: number, isLocal?: boolean) => void;
 }
 
 interface CollectionMenuItem {
@@ -50,9 +51,11 @@ interface CollectionMenuItem {
   className: string;
   type?: number;
   mid?: number;
+  isLocal?: boolean;
 }
 
 const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Props) => {
+  const clearLocalFolder = useLocalFavItemsStore(s => s.clearFolder);
   const user = useUser(state => state.user);
   const createdFavorites = useFavoritesStore(state => state.createdFavorites);
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
@@ -139,9 +142,9 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
     updateCollectedFavorites(user.mid);
   }, [updateCreatedFavorites, updateCollectedFavorites, user?.mid]);
 
-  const handlePlayFavorite = useCallback(async (favoriteId: number, title?: string) => {
+  const handlePlayFavorite = useCallback(async (favoriteId: number, title?: string, isLocal?: boolean) => {
     try {
-      const medias = await getAllFavMedia({ id: String(favoriteId) });
+      const medias = isLocal ? getLocalFavMedia(favoriteId) : await getAllFavMedia({ id: String(favoriteId) });
 
       if (!medias.length) {
         addToast({ title: title ? `「${title}」暂无可播放内容` : "暂无可播放内容", color: "warning" });
@@ -155,9 +158,9 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
     }
   }, []);
 
-  const handleAddFavoriteToPlaylist = useCallback(async (favoriteId: number, title?: string) => {
+  const handleAddFavoriteToPlaylist = useCallback(async (favoriteId: number, title?: string, isLocal?: boolean) => {
     try {
-      const medias = await getAllFavMedia({ id: String(favoriteId) });
+      const medias = isLocal ? getLocalFavMedia(favoriteId) : await getAllFavMedia({ id: String(favoriteId) });
 
       if (!medias.length) {
         addToast({ title: title ? `「${title}」暂无可播放内容` : "暂无可播放内容", color: "warning" });
@@ -248,6 +251,13 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
         title: favorite.title ? `确认删除「${favorite.title}」吗？` : "确认删除该收藏夹吗？",
         type: "danger",
         onConfirm: async () => {
+          if (favorite.isLocal) {
+            rmCreatedFavorite(Number(favorite.id));
+            clearLocalFolder(Number(favorite.id));
+            addToast({ title: "删除成功", color: "success" });
+            return true;
+          }
+
           try {
             const res = await postFavFolderDel({ media_ids: String(favorite.id) });
 
@@ -299,13 +309,13 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
     async (action: string, item: FavoriteItem) => {
       switch (action) {
         case "play":
-          await handlePlayFavorite(item.id, item.title);
+          await handlePlayFavorite(item.id, item.title, item.isLocal);
           break;
         case "add-to-playlist":
-          await handleAddFavoriteToPlaylist(item.id, item.title);
+          await handleAddFavoriteToPlaylist(item.id, item.title, item.isLocal);
           break;
         case "edit":
-          onOpenEditFavorite?.(Number(item.id));
+          onOpenEditFavorite?.(Number(item.id), item.isLocal);
           break;
         case "hide":
           handleHideMenu(String(item.id));
@@ -475,11 +485,12 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
     const items = filteredCreatedFavorites.map(item => ({
       id: item.id,
       title: item.title,
-      href: `/collection/${item.id}?mid=${item?.mid}`,
+      href: item.isLocal ? `/local-collection/${item.id}` : `/collection/${item.id}?mid=${item?.mid}`,
       cover: item.cover,
       className: "px-2 py-1 h-auto",
       type: item.type,
       mid: item.mid,
+      isLocal: item.isLocal,
     }));
 
     const titleExtra = onOpenAddFavorite ? (
@@ -510,6 +521,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
         handleCreatedMenuAction(action, {
           id: item.id,
           title: item.title,
+          isLocal: item.isLocal,
         }),
     });
   };

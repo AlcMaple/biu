@@ -8,6 +8,17 @@ export interface FavSelectModalData {
   /** 2:视频稿件 12:音频 21:视频合集 24:电影/纪录片等 */
   type?: number;
   title?: ReactNode;
+  /** 媒体基本信息，用于保存到本地收藏夹 */
+  itemInfo?: {
+    title: string;
+    cover?: string;
+    /** 视频 bvid（type=2 时用于播放） */
+    bvid?: string;
+    ownerName?: string;
+    ownerMid?: number;
+    duration?: number | string;
+    playCount?: number;
+  };
   /** 选择收藏夹后的回调函数, selectedFolderIds 为选中的收藏夹id数组 */
   onSuccess?: (selectedFolderIds: number[]) => void;
 }

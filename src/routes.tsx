@@ -15,6 +15,7 @@ import Search from "./pages/search";
 import Settings from "./pages/settings";
 import UserProfile from "./pages/user-profile";
 import Folder from "./pages/video-collection";
+import LocalFavorites from "./pages/video-collection/local-favorites";
 
 const routes: RouteObject[] = [
   {
@@ -40,6 +41,10 @@ const routes: RouteObject[] = [
       {
         path: "collection/:id",
         element: <Folder />,
+      },
+      {
+        path: "local-collection/:id",
+        element: <LocalFavorites />,
       },
       {
         path: "user/:id",

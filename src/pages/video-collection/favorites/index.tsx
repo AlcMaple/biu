@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { addToast, useDisclosure } from "@heroui/react";
@@ -18,6 +18,7 @@ import { postFavResourceClean } from "@/service/fav-resource-clean";
 import { useFavFolderItemsStore } from "@/store/fav-folder-items";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
+import { useTagStore } from "@/store/tags";
 import { useMusicFavStore } from "@/store/music-fav";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -49,6 +50,18 @@ const Favorites = () => {
   const [order, setOrder] = useState("mtime");
   const [hasMore, setHasMore] = useState(false);
   const [listLoading, setListLoading] = useState(false);
+  const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
+
+  const allTags = useTagStore(s => s.tags);
+  const itemTags = useTagStore(s => s.itemTags);
+
+  const filteredItems = useMemo(() => {
+    if (!activeTagIds.length) return items;
+    return items.filter(item => {
+      const tags = itemTags[String(item.id)] ?? [];
+      return activeTagIds.some(tid => tags.includes(tid));
+    });
+  }, [items, activeTagIds, itemTags]);
 
   const pageRef = useRef(1);
   const scrollRef = useRef<ScrollRefObject>(null);
@@ -320,6 +333,13 @@ const Favorites = () => {
             rid: item.id,
             type: item.type,
             title: item.title,
+            itemInfo: {
+              title: item.title,
+              cover: item.cover,
+              bvid: item.bvid,
+              ownerName: item.upper?.name,
+              ownerMid: item.upper?.mid,
+            },
             onSuccess: selectedIds => {
               if (isCreatedBySelf && !selectedIds.includes(Number(favFolderId))) {
                 handleRemoveItem(item.id);
@@ -466,9 +486,36 @@ const Favorites = () => {
         onClearInvalid={clearInvalid}
       />
 
+      {allTags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {allTags.map(tag => {
+            const active = activeTagIds.includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() =>
+                  setActiveTagIds(prev =>
+                    prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
+                  )
+                }
+                className="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+                style={
+                  active
+                    ? { backgroundColor: tag.color + "22", color: tag.color, borderColor: tag.color + "88" }
+                    : { color: tag.color, borderColor: tag.color + "44" }
+                }
+              >
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {displayMode === "card" ? (
         <FavoriteGridList
-          items={items}
+          items={filteredItems}
           hasMore={hasMore}
           loading={listLoading}
           getScrollElement={() => (scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null}
@@ -479,7 +526,7 @@ const Favorites = () => {
         />
       ) : (
         <FavoriteList
-          items={items}
+          items={filteredItems}
           hasMore={hasMore}
           loading={listLoading}
           onLoadMore={handleLoadMore}

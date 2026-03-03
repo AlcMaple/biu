@@ -129,6 +129,15 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
               <span dangerouslySetInnerHTML={{ __html: item.title }} />
             </div>
           ),
+          itemInfo: {
+            title: item.title,
+            cover: formatUrlProtocol(item.pic),
+            bvid: item.bvid,
+            ownerName: item.author,
+            ownerMid: item.mid,
+            duration: item.duration,
+            playCount: item.play,
+          },
         });
         break;
       case "download-audio":

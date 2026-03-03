@@ -237,6 +237,14 @@ const api: ElectronAPI = {
   clearMediaDownloadTaskList: () => ipcRenderer.invoke(channel.download.clear),
   // 切换开发者工具
   toggleDevTools: () => ipcRenderer.send(channel.window.toggleDevTools),
+  // 检查 Python 和 ShazamIO 是否可用
+  checkShazamDeps: () => ipcRenderer.invoke(channel.shazam.checkPython),
+  // 自动安装 ShazamIO
+  installShazamio: () => ipcRenderer.invoke(channel.shazam.installShazamio),
+  // 识别音频
+  recognizeSong: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke(channel.shazam.recognize, audioBuffer),
+  // 获取桌面捕获源
+  getDesktopSources: () => ipcRenderer.invoke(channel.shazam.getDesktopSources),
 };
 
 contextBridge.exposeInMainWorld("electron", api);

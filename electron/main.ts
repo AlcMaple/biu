@@ -68,6 +68,13 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  // 阻止渲染层发起的任何真实页面跳转（非 hash 变化）。
+  // HashRouter 的路由切换只改变 hash，不触发 will-navigate，因此不受影响。
+  // 这里拦截的是 <a href="/path"> 意外触发的 file:// 跳转，防止 Windows 下白屏。
+  mainWindow.webContents.on("will-navigate", event => {
+    event.preventDefault();
+  });
+
   // 禁止 Ctrl+R / Cmd+R 刷新页面
   mainWindow.webContents.on("before-input-event", (event, input) => {
     if ((input.control || input.meta) && input.key.toLowerCase() === "r") {

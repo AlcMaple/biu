@@ -25,7 +25,10 @@ export async function buildElectron() {
       directories: {
         output: "dist/artifacts",
       },
-      extraResources: [{ from: ELECTRON_ICON_BASE_PATH, to: ELECTRON_ICON_BASE_PATH }],
+      extraResources: [
+        { from: ELECTRON_ICON_BASE_PATH, to: ELECTRON_ICON_BASE_PATH },
+        { from: "electron/python/shazam_recognize.py", to: "electron/python/shazam_recognize.py" },
+      ],
       files: [`${ELECTRON_OUT_DIRNAME}/**`, "dist/web/**"],
       win: {
         target: [
@@ -53,7 +56,7 @@ export async function buildElectron() {
           { target: "zip", arch: ["x64", "arm64"] },
         ],
         category: "public.app-category.music",
-        icon: `${ELECTRON_ICON_BASE_PATH}/biu.icon`,
+        icon: `${ELECTRON_ICON_BASE_PATH}/logo.png`,
         hardenedRuntime: true,
         gatekeeperAssess: false,
         darkModeSupport: true,

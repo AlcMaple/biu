@@ -31,6 +31,7 @@ import UpdateCheckButton from "@/components/update-check-button";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
+import TagSettings from "./tag-settings";
 
 type SystemSettingsTabProps = {
   appVersion: string;
@@ -400,6 +401,7 @@ export const SystemSettingsTab = ({
         <UpdateCheckButton />
       </div>
       <ImportExport />
+      <TagSettings />
     </Form>
   );
 };

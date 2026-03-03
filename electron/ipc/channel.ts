@@ -77,6 +77,12 @@ export const channel = {
     scan: "local-music:scan",
     deleteFile: "local-music:delete-file",
   },
+  shazam: {
+    checkPython: "shazam:check-python",
+    installShazamio: "shazam:install-shazamio",
+    recognize: "shazam:recognize",
+    getDesktopSources: "shazam:get-desktop-sources",
+  },
   window: {
     toggleMini: "window:toggle-mini",
     minimize: "window:minimize",
