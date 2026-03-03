@@ -1051,8 +1051,11 @@ usePlayList.subscribe(async (state, prevState) => {
 
     if (audio && !audio.paused) {
       audio.pause();
+    }
+    if (audio) {
       audio.currentTime = 0;
     }
+    usePlayProgress.getState().setCurrentTime(0);
     // 切换歌曲
     if (state.playId) {
       const playItem = state.list.find(item => item.id === state.playId);
