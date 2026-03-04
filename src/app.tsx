@@ -95,13 +95,6 @@ export function App() {
         return;
       }
 
-      // 空格键始终切换播放/暂停
-      if (e.code === "Space") {
-        e.preventDefault();
-        usePlayList.getState().togglePlay();
-        return;
-      }
-
       const shortcut = mapKeyToElectronAccelerator(e);
       if (!shortcut) return;
 
