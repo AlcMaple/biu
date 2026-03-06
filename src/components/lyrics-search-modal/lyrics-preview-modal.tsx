@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
+import { lyricsSyncCache } from "@/store/lyrics-sync-cache";
 import { usePlayList } from "@/store/play-list";
 
 import ScrollContainer from "../scroll-container";
@@ -31,10 +32,23 @@ const LyricsPreviewModal = ({
   const [syncedLyrics, setSyncedLyrics] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Reset synced state whenever a new set of lyrics is shown
+  // Reset synced state whenever a new set of lyrics is shown; restore from cache if available
   useEffect(() => {
-    setSyncedLyrics(null);
     setActiveTab("original");
+    const cached = lyricsSyncCache.get(lyrics);
+    setSyncedLyrics(cached ?? null);
+  }, [isOpen, lyrics]);
+
+  // Subscribe to background sync results while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    return window.electron.onSyncLyricsWithWhisperXDone(({ syncedLrc, originalLrc, error }) => {
+      if (originalLrc !== lyrics) return;
+      setIsSyncing(false);
+      if (!error && syncedLrc) {
+        setSyncedLyrics(syncedLrc);
+      }
+    });
   }, [isOpen, lyrics]);
 
   const displayedLyrics = syncedLyrics ?? lyrics;
@@ -43,7 +57,7 @@ const LyricsPreviewModal = ({
     onAdopt(displayedLyrics?.trim(), tlyrics);
   };
 
-  const handleSync = async () => {
+  const handleSync = () => {
     const playItem = getPlayItem();
     const audioUrl = playItem?.audioUrl;
 
@@ -57,18 +71,8 @@ const LyricsPreviewModal = ({
     }
 
     setIsSyncing(true);
-    try {
-      const synced = await window.electron.syncLyricsWithWhisperX({ audioUrl, lrc: lyrics });
-      setSyncedLyrics(synced);
-      addToast({ title: "时间轴同步成功", color: "success" });
-    } catch (err) {
-      addToast({
-        title: `同步失败: ${err instanceof Error ? err.message : "未知错误"}`,
-        color: "danger",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
+    window.electron.startSyncLyricsWithWhisperX({ audioUrl, lrc: lyrics });
+    addToast({ title: "歌词时间轴同步已在后台启动，完成后将通知您", color: "primary", timeout: 4000 });
   };
 
   return (
@@ -95,7 +99,7 @@ const LyricsPreviewModal = ({
             关闭
           </Button>
           {syncedLyrics && (
-            <Button variant="flat" onPress={() => setSyncedLyrics(null)} isDisabled={isSyncing}>
+            <Button variant="flat" onPress={() => setSyncedLyrics(null)}>
               恢复原歌词
             </Button>
           )}
@@ -107,7 +111,7 @@ const LyricsPreviewModal = ({
           >
             {syncedLyrics ? "重新同步" : "同步时间轴"}
           </Button>
-          <Button color="primary" onPress={handleAdopt} isDisabled={loading || isSyncing}>
+          <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
             采用歌词
           </Button>
         </ModalFooter>

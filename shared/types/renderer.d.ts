@@ -146,11 +146,12 @@ declare global {
     recognizeSong: (audioBuffer: ArrayBuffer) => Promise<ShazamMatchResult>;
     /** 获取桌面捕获源列表（用于系统音频采集） */
     getDesktopSources: () => Promise<Array<{ id: string; name: string }>>;
-    /**
-     * 用 demucs 提取人声、whisperx 对齐，将歌词时间轴同步到当前播放的 B 站音频。
-     * 返回重新打时间戳的 LRC 字符串。
-     */
-    syncLyricsWithWhisperX: (params: { audioUrl: string; lrc: string; language?: string }) => Promise<string>;
+    /** 后台启动 demucs + whisperx 歌词时间轴对齐（fire-and-forget，完成后通过 onSyncLyricsWithWhisperXDone 通知） */
+    startSyncLyricsWithWhisperX: (params: { audioUrl: string; lrc: string; language?: string }) => void;
+    /** 订阅歌词同步完成事件（主进程推送） */
+    onSyncLyricsWithWhisperXDone: (
+      cb: (result: { syncedLrc: string | null; originalLrc: string; error: string | null }) => void,
+    ) => VoidFunction;
   }
 
   interface Window {

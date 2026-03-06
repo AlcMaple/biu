@@ -23,7 +23,21 @@ export function registerLyricsHandlers() {
     return getLyricsByLrclib(params);
   });
 
-  ipcMain.handle(channel.lyrics.syncWithWhisperX, async (_, params: WhisperXSyncParams) => {
-    return syncLyricsWithWhisperX(params);
+  ipcMain.on(channel.lyrics.syncWithWhisperXStart, (event, params: WhisperXSyncParams) => {
+    syncLyricsWithWhisperX(params)
+      .then(syncedLrc => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send(channel.lyrics.syncWithWhisperXDone, { syncedLrc, originalLrc: params.lrc, error: null });
+        }
+      })
+      .catch(err => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send(channel.lyrics.syncWithWhisperXDone, {
+            syncedLrc: null,
+            originalLrc: params.lrc,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
   });
 }
