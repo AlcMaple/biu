@@ -17,7 +17,7 @@ import {
   Tabs,
 } from "@heroui/react";
 import {
-  RiArrowRightLongLine,
+  // RiArrowRightLongLine,
   RiComputerLine,
   RiFileListLine,
   RiLayoutGridFill,
@@ -27,27 +27,27 @@ import {
 } from "@remixicon/react";
 
 import FontSelect from "@/components/font-select";
-import UpdateCheckButton from "@/components/update-check-button";
+// import UpdateCheckButton from "@/components/update-check-button";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
 import TagSettings from "./tag-settings";
 
 type SystemSettingsTabProps = {
-  appVersion: string;
+  // appVersion: string;
   audioQuality: AudioQuality;
   control: Control<AppSettings>;
-  isUpdateAvailable: boolean;
-  latestVersion?: string;
+  // isUpdateAvailable: boolean;
+  // latestVersion?: string;
   setValue: UseFormSetValue<AppSettings>;
 };
 
 export const SystemSettingsTab = ({
-  appVersion,
+  // appVersion,
   audioQuality,
   control,
-  isUpdateAvailable,
-  latestVersion,
+  // isUpdateAvailable,
+  // latestVersion,
   setValue,
 }: SystemSettingsTabProps) => {
   return (
@@ -386,7 +386,7 @@ export const SystemSettingsTab = ({
         </div>
       </div>
 
-      <Divider />
+      {/* <Divider />
       <h2>关于应用</h2>
       <div className="flex w-full items-center justify-between">
         <div className="mr-6 flex items-center space-x-1">
@@ -399,7 +399,7 @@ export const SystemSettingsTab = ({
           )}
         </div>
         <UpdateCheckButton />
-      </div>
+      </div> */}
       <ImportExport />
       <TagSettings />
     </Form>

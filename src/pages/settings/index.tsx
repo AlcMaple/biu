@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect /*, useState*/ } from "react";
 import { useForm } from "react-hook-form";
 
 import { Tab, Tabs } from "@heroui/react";
 import { useShallow } from "zustand/react/shallow";
 
 import ScrollContainer from "@/components/scroll-container";
-import { useAppUpdateStore } from "@/store/app-update";
+// import { useAppUpdateStore } from "@/store/app-update";
 import { useSettings } from "@/store/settings";
 
 import MenuSettings from "./menu-settings";
@@ -14,7 +14,7 @@ import ShortcutSettingsPage from "./shortcut-settings";
 import { SystemSettingsTab } from "./system-settings";
 
 const useSystemSettingsForm = () => {
-  const [appVersion, setAppVersion] = useState<string>("");
+  // const [appVersion, setAppVersion] = useState<string>("");
   const {
     fontFamily,
     primaryColor,
@@ -53,12 +53,12 @@ const useSystemSettingsForm = () => {
     })),
   );
   const updateSettings = useSettings(s => s.update);
-  const { isUpdateAvailable, latestVersion } = useAppUpdateStore(
-    useShallow(s => ({
-      isUpdateAvailable: s.isUpdateAvailable ?? false,
-      latestVersion: s.latestVersion,
-    })),
-  );
+  // const { isUpdateAvailable, latestVersion } = useAppUpdateStore(
+  //   useShallow(s => ({
+  //     isUpdateAvailable: s.isUpdateAvailable ?? false,
+  //     latestVersion: s.latestVersion,
+  //   })),
+  // );
 
   const { control, watch, setValue } = useForm<AppSettings>({
     defaultValues: {
@@ -99,16 +99,16 @@ const useSystemSettingsForm = () => {
     return () => subscription.unsubscribe();
   }, [watch, updateSettings]);
 
-  useEffect(() => {
-    window.electron.getAppVersion().then(v => setAppVersion(v));
-  }, []);
+  // useEffect(() => {
+  //   window.electron.getAppVersion().then(v => setAppVersion(v));
+  // }, []);
 
   return {
-    appVersion,
+    // appVersion,
     audioQuality,
     control,
-    isUpdateAvailable,
-    latestVersion,
+    // isUpdateAvailable,
+    // latestVersion,
     setValue,
   };
 };
