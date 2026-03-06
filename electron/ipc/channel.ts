@@ -36,6 +36,7 @@ export const channel = {
     searchNeteaseSongs: "lyrics:netease-search",
     getNeteaseLyrics: "lyrics:netease-lyrics",
     searchLrclib: "lyrics:lrclib-search",
+    syncWithWhisperX: "lyrics:sync-whisperx",
   },
   router: {
     navigate: "router:navigate",

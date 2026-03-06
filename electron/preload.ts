@@ -245,6 +245,8 @@ const api: ElectronAPI = {
   recognizeSong: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke(channel.shazam.recognize, audioBuffer),
   // 获取桌面捕获源
   getDesktopSources: () => ipcRenderer.invoke(channel.shazam.getDesktopSources),
+  // 使用 demucs + whisperx 将歌词时间轴对齐到当前播放音频
+  syncLyricsWithWhisperX: params => ipcRenderer.invoke(channel.lyrics.syncWithWhisperX, params),
 };
 
 contextBridge.exposeInMainWorld("electron", api);

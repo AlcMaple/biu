@@ -36,13 +36,17 @@ const LrclibTab = ({ songs, loading, onAdoptLyrics }: LrclibTabProps) => {
     setIsPreviewOpen(true);
   }, []);
 
-  const handleAdopt = useCallback(async () => {
-    if (!lyrics) return;
-    const ok = await onAdoptLyrics(lyrics);
-    if (ok) {
-      setIsPreviewOpen(false);
-    }
-  }, [onAdoptLyrics, lyrics]);
+  const handleAdopt = useCallback(
+    async (lyricsText?: string) => {
+      const text = lyricsText || lyrics;
+      if (!text) return;
+      const ok = await onAdoptLyrics(text);
+      if (ok) {
+        setIsPreviewOpen(false);
+      }
+    },
+    [onAdoptLyrics, lyrics],
+  );
 
   return (
     <div className="h-[340px] overflow-auto">
