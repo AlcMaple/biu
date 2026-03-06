@@ -7,6 +7,7 @@ import {
   type GetLyricsByNeteaseParams,
   type SearchSongByNeteaseParams,
 } from "./api/netease-lyric";
+import { syncLyricsWithWhisperX, type WhisperXSyncParams } from "./api/whisperx-sync";
 import { channel } from "./channel";
 
 export function registerLyricsHandlers() {
@@ -20,5 +21,9 @@ export function registerLyricsHandlers() {
 
   ipcMain.handle(channel.lyrics.searchLrclib, async (_, params: SeachSongByLrclibParams) => {
     return getLyricsByLrclib(params);
+  });
+
+  ipcMain.handle(channel.lyrics.syncWithWhisperX, async (_, params: WhisperXSyncParams) => {
+    return syncLyricsWithWhisperX(params);
   });
 }
