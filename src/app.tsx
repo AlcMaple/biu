@@ -88,6 +88,24 @@ export function App() {
   }, []);
 
   // 监听应用内快捷键
+  // 窗口重新激活时，将焦点从按钮等交互元素上移走，避免空格触发上次操作
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active &&
+        active !== document.body &&
+        active.tagName !== "INPUT" &&
+        active.tagName !== "TEXTAREA" &&
+        !active.isContentEditable
+      ) {
+        active.blur();
+      }
+    };
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 忽略在输入框中的按键
