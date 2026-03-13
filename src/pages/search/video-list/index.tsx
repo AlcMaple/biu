@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { addToast, Spinner } from "@heroui/react";
 
+import { stripHtml } from "@/common/utils/str";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Empty from "@/components/empty";
 import { getWebInterfaceWbiSearchType, type SearchVideoItem } from "@/service/web-interface-search-type";
@@ -90,13 +91,13 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
     const items = list.map(item => ({
       type: "mv" as const,
       bvid: item.bvid,
-      title: item.title,
+      title: stripHtml(item.title),
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
     }));
 
-    await usePlayList.getState().addList(items);
+    usePlayList.getState().addList(items);
     addToast({ title: `已添加 ${items.length} 首到播放列表`, color: "success" });
   }, [list]);
 
@@ -104,7 +105,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
     const musicItem = {
       type: "mv" as const,
       bvid: item.bvid,
-      title: item.title,
+      title: stripHtml(item.title),
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
@@ -130,7 +131,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
             </div>
           ),
           itemInfo: {
-            title: item.title,
+            title: stripHtml(item.title),
             cover: formatUrlProtocol(item.pic),
             bvid: item.bvid,
             ownerName: item.author,
@@ -143,7 +144,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       case "download-audio":
         await window.electron.addMediaDownloadTask({
           outputFileType: "audio",
-          title: item.title,
+          title: stripHtml(item.title),
           cover: formatUrlProtocol(item.pic),
           bvid: item.bvid,
         });
@@ -155,7 +156,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       case "download-video":
         await window.electron.addMediaDownloadTask({
           outputFileType: "video",
-          title: item.title,
+          title: stripHtml(item.title),
           cover: formatUrlProtocol(item.pic),
           bvid: item.bvid,
         });
