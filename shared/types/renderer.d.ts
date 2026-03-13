@@ -151,7 +151,12 @@ declare global {
     /** 自动安装 demucs + whisperx（需要 Python 已存在） */
     installWhisperXDeps: () => Promise<{ ok: boolean; error?: string }>;
     /** 后台启动 demucs + whisperx 歌词时间轴对齐（fire-and-forget，完成后通过 onSyncLyricsWithWhisperXDone 通知） */
-    startSyncLyricsWithWhisperX: (params: { audioUrl: string; lrc: string; language?: string }) => void;
+    startSyncLyricsWithWhisperX: (params: {
+      audioUrl: string;
+      lrc: string;
+      language?: string;
+      localFilePath?: string;
+    }) => void;
     /** 订阅歌词同步完成事件（主进程推送） */
     onSyncLyricsWithWhisperXDone: (
       cb: (result: { syncedLrc: string | null; originalLrc: string; error: string | null }) => void,

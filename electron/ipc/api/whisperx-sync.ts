@@ -17,6 +17,8 @@ export interface WhisperXSyncParams {
   audioUrl: string;
   lrc: string;
   language?: string;
+  /** 本地已下载的音频文件路径，提供时跳过 CDN 下载 */
+  localFilePath?: string;
 }
 
 function scriptPath(name: string): string {
@@ -241,20 +243,21 @@ export async function installWhisperXDeps(): Promise<{ ok: boolean; error?: stri
 
 /**
  * Full pipeline:
- *   1. Download Bilibili CDN audio → temp file  (skipped if vocals already cached)
- *   2. demucs: extract vocals                   (skipped if vocals already cached)
+ *   1. Use local file or download Bilibili CDN audio (skipped if vocals already cached)
+ *   2. demucs: extract vocals                        (skipped if vocals already cached)
  *   3. whisperx: transcribe + word-level align
  *   4. Map lyric lines to word timestamps
  *   5. Return synced LRC string
  */
 export async function syncLyricsWithWhisperX(params: WhisperXSyncParams): Promise<string> {
-  const { audioUrl, lrc } = params;
+  const { audioUrl, lrc, localFilePath } = params;
 
   const python = await findPython();
   if (!python) throw new Error("Python 未安装，请先安装 Python 3");
 
-  // ── Vocals cache ─────────────────────────────────────────────────────────
-  const cacheDir = path.join(vocalsCacheDir(), urlHash(audioUrl));
+  // ── Vocals cache (keyed by local file path if provided, else audioUrl) ───
+  const cacheKey = localFilePath ?? audioUrl;
+  const cacheDir = path.join(vocalsCacheDir(), urlHash(cacheKey));
   const cachedVocals = path.join(cacheDir, "vocals.wav");
 
   // ── Strip LRC + detect language (needed regardless of cache) ─────────────
@@ -266,28 +269,36 @@ export async function syncLyricsWithWhisperX(params: WhisperXSyncParams): Promis
   let vocalsPath: string;
 
   if (fs.existsSync(cachedVocals)) {
-    log.info("[whisperx-sync] Cache hit — skipping download + demucs:", cachedVocals);
+    log.info("[whisperx-sync] Cache hit — skipping demucs:", cachedVocals);
     vocalsPath = cachedVocals;
   } else {
     const tmpDir = path.join(os.tmpdir(), `biu-whisperx-${Date.now()}`);
     await fsp.mkdir(tmpDir, { recursive: true });
-    const audioPath = path.join(tmpDir, "audio.m4a");
 
     try {
-      // 1. Download audio from Bilibili CDN
-      log.info("[whisperx-sync] Downloading:", audioUrl.slice(0, 80));
-      const cookie = await getCookieString();
-      await pipeline(
-        got.stream(audioUrl, {
-          headers: {
-            Cookie: cookie,
-            Referer: "https://www.bilibili.com/",
-            Origin: "https://www.bilibili.com",
-            "User-Agent": UserAgent,
-          },
-        }),
-        fs.createWriteStream(audioPath),
-      );
+      let audioPath: string;
+
+      if (localFilePath) {
+        // 1a. Use already-downloaded local file — skip CDN download
+        log.info("[whisperx-sync] Using local file:", localFilePath);
+        audioPath = localFilePath;
+      } else {
+        // 1b. Download audio from Bilibili CDN
+        audioPath = path.join(tmpDir, "audio.m4a");
+        log.info("[whisperx-sync] Downloading:", audioUrl.slice(0, 80));
+        const cookie = await getCookieString();
+        await pipeline(
+          got.stream(audioUrl, {
+            headers: {
+              Cookie: cookie,
+              Referer: "https://www.bilibili.com/",
+              Origin: "https://www.bilibili.com",
+              "User-Agent": UserAgent,
+            },
+          }),
+          fs.createWriteStream(audioPath),
+        );
+      }
 
       // 2. Vocal separation via demucs
       const tmpVocals = await runDemucs(python, audioPath, tmpDir);
