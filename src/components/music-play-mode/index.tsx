@@ -34,6 +34,8 @@ const MusicPlayMode = () => {
     }, 150);
   };
 
+  const currentMode = PlayModeList.find(item => item.value === playMode);
+
   if (playMode === PlayMode.Random) {
     return (
       <Tooltip
@@ -42,7 +44,8 @@ const MusicPlayMode = () => {
         placement="top"
         closeDelay={150}
         content={
-          <div onMouseEnter={openPopover} onMouseLeave={closePopoverWithDelay}>
+          <div className="flex flex-col gap-1" onMouseEnter={openPopover} onMouseLeave={closePopoverWithDelay}>
+            <span className="text-default-500 text-xs">{currentMode?.desc}</span>
             <Switch
               size="sm"
               disableAnimation
@@ -56,21 +59,23 @@ const MusicPlayMode = () => {
       >
         <IconButton
           className="flex-none"
-          aria-label="播放模式"
+          aria-label={currentMode?.desc ?? "播放模式"}
           onPress={togglePlayMode}
           onMouseEnter={openPopover}
           onMouseLeave={closePopoverWithDelay}
         >
-          {PlayModeList.find(item => item.value === playMode)?.icon}
+          {currentMode?.icon}
         </IconButton>
       </Tooltip>
     );
   }
 
   return (
-    <IconButton className="flex-none" aria-label="播放模式" onPress={togglePlayMode}>
-      {PlayModeList.find(item => item.value === playMode)?.icon}
-    </IconButton>
+    <Tooltip placement="top" content={currentMode?.desc}>
+      <IconButton className="flex-none" aria-label={currentMode?.desc ?? "播放模式"} onPress={togglePlayMode}>
+        {currentMode?.icon}
+      </IconButton>
+    </Tooltip>
   );
 };
 
