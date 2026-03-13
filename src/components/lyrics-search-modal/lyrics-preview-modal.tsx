@@ -31,6 +31,7 @@ const LyricsPreviewModal = ({
   const [activeTab, setActiveTab] = useState<"original" | "translation">("original");
   const [syncedLyrics, setSyncedLyrics] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncOptions, setShowSyncOptions] = useState(false);
 
   // Reset synced state whenever a new set of lyrics is shown; restore from cache if available
   useEffect(() => {
@@ -59,11 +60,9 @@ const LyricsPreviewModal = ({
     onAdopt(displayedLyrics?.trim(), tlyrics);
   };
 
-  const handleSync = async () => {
+  const handleSync = () => {
     const playItem = getPlayItem();
-    const audioUrl = playItem?.audioUrl;
-
-    if (!audioUrl) {
+    if (!playItem?.audioUrl) {
       addToast({ title: "无法获取当前播放音频链接，请确保正在播放中", color: "warning" });
       return;
     }
@@ -71,7 +70,15 @@ const LyricsPreviewModal = ({
       addToast({ title: "歌词内容为空", color: "warning" });
       return;
     }
+    setShowSyncOptions(true);
+  };
 
+  const doSync = async (localFilePath?: string) => {
+    const playItem = getPlayItem();
+    const audioUrl = playItem?.audioUrl;
+    if (!audioUrl) return;
+
+    setShowSyncOptions(false);
     setIsSyncing(true);
 
     const check = await window.electron.checkWhisperXDeps();
@@ -101,8 +108,14 @@ const LyricsPreviewModal = ({
       }
     }
 
-    window.electron.startSyncLyricsWithWhisperX({ audioUrl, lrc: lyrics });
+    window.electron.startSyncLyricsWithWhisperX({ audioUrl: audioUrl, lrc: lyrics, localFilePath });
     addToast({ title: "歌词时间轴同步已在后台启动，完成后将通知您", color: "primary", timeout: 4000 });
+  };
+
+  const handleSelectLocalFile = async () => {
+    const filePath = await window.electron.selectFile();
+    if (!filePath) return;
+    doSync(filePath);
   };
 
   return (
@@ -124,26 +137,47 @@ const LyricsPreviewModal = ({
             </pre>
           </ScrollContainer>
         </ModalBody>
-        <ModalFooter className="justify-end gap-2">
-          <Button variant="light" onPress={() => onOpenChange(false)}>
-            关闭
-          </Button>
-          {syncedLyrics && (
-            <Button variant="flat" onPress={() => setSyncedLyrics(null)}>
-              恢复原歌词
-            </Button>
+        <ModalFooter className="flex-col gap-3">
+          {showSyncOptions ? (
+            <>
+              <p className="text-foreground-500 w-full text-center text-sm">
+                CDN 下载受网络影响较大且速度较慢，建议优先使用本地已下载的音频文件
+              </p>
+              <div className="flex w-full justify-center gap-2">
+                <Button variant="flat" color="primary" onPress={handleSelectLocalFile}>
+                  选择本地音频
+                </Button>
+                <Button variant="flat" onPress={() => setShowSyncOptions(false)}>
+                  取消
+                </Button>
+                <Button variant="flat" onPress={() => doSync()}>
+                  直接 CDN 下载
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex w-full justify-end gap-2">
+              <Button variant="light" onPress={() => onOpenChange(false)}>
+                关闭
+              </Button>
+              {syncedLyrics && (
+                <Button variant="flat" onPress={() => setSyncedLyrics(null)}>
+                  恢复原歌词
+                </Button>
+              )}
+              <Button
+                variant="flat"
+                onPress={handleSync}
+                isDisabled={loading || isSyncing || !lyrics}
+                isLoading={isSyncing}
+              >
+                {syncedLyrics ? "重新同步" : "同步时间轴"}
+              </Button>
+              <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
+                采用歌词
+              </Button>
+            </div>
           )}
-          <Button
-            variant="flat"
-            onPress={handleSync}
-            isDisabled={loading || isSyncing || !lyrics}
-            isLoading={isSyncing}
-          >
-            {syncedLyrics ? "重新同步" : "同步时间轴"}
-          </Button>
-          <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
-            采用歌词
-          </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
