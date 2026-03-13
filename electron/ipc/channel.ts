@@ -38,6 +38,8 @@ export const channel = {
     searchLrclib: "lyrics:lrclib-search",
     syncWithWhisperXStart: "lyrics:sync-whisperx-start",
     syncWithWhisperXDone: "lyrics:sync-whisperx-done",
+    checkWhisperXDeps: "lyrics:check-whisperx-deps",
+    installWhisperXDeps: "lyrics:install-whisperx-deps",
   },
   router: {
     navigate: "router:navigate",

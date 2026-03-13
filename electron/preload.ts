@@ -245,6 +245,10 @@ const api: ElectronAPI = {
   recognizeSong: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke(channel.shazam.recognize, audioBuffer),
   // 获取桌面捕获源
   getDesktopSources: () => ipcRenderer.invoke(channel.shazam.getDesktopSources),
+  // 检查 demucs + whisperx 依赖是否已安装
+  checkWhisperXDeps: () => ipcRenderer.invoke(channel.lyrics.checkWhisperXDeps),
+  // 自动安装 demucs + whisperx
+  installWhisperXDeps: () => ipcRenderer.invoke(channel.lyrics.installWhisperXDeps),
   // 后台启动 demucs + whisperx 歌词时间轴对齐（fire-and-forget）
   startSyncLyricsWithWhisperX: params => ipcRenderer.send(channel.lyrics.syncWithWhisperXStart, params),
   // 订阅歌词同步完成事件（主进程推送）
