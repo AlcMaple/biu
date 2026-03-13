@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { addToast, Button, Checkbox, Chip, Divider, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import {
+  addToast,
+  Button,
+  Checkbox,
+  Chip,
+  Divider,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/react";
 import { RiCheckLine } from "@remixicon/react";
 import { useRequest } from "ahooks";
 
@@ -8,11 +19,11 @@ import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-al
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
+import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
-import { useFavoritesStore } from "@/store/favorite";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
@@ -132,7 +143,7 @@ const FavoritesSelectModal = () => {
     // 区分 B站 收藏夹 ID（正数）和本地收藏夹 ID（负数）
     const localFolderIdSet = new Set(localFolders.map(f => f.id));
 
-    const biliPrevIds = (data ?? []).filter(item => item.fav_state === 1).map(item => item.id as number);
+    const biliPrevIds = prevSelectedRef.current.filter(id => !localFolderIdSet.has(id));
     const localPrevIds = localFolders
       .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(rid)))
       .map(f => f.id);

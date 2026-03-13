@@ -148,6 +148,13 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
           rid: item.aid,
           type: 2,
           title: item.title,
+          itemInfo: {
+            title: item.title,
+            cover: item.pic,
+            bvid: item.bvid,
+            ownerName: item.author,
+            ownerMid: item.mid,
+          },
         });
         break;
     }
