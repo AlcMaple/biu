@@ -179,6 +179,13 @@ const Series = () => {
           rid: item.id,
           type: 2,
           title: item.title,
+          itemInfo: {
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+            ownerName: item.upper?.name,
+            ownerMid: item.upper?.mid,
+          },
         });
         break;
       case "download-audio":

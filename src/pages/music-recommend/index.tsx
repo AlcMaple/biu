@@ -199,6 +199,11 @@ const MusicRecommend = () => {
           rid: Number(item.aid),
           type: 2,
           title: item.title,
+          itemInfo: {
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+          },
         });
         break;
       case "play-next":
