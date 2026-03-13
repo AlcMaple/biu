@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 
+import { stripHtml } from "@/common/utils/str";
 import { formatSecondsToDate } from "@/common/utils/time";
 import { formatUrlProtocol } from "@/common/utils/url";
 import MusicListItem from "@/components/music-list-item";
@@ -28,7 +29,7 @@ const List: React.FC<ListProps> = ({ items, getScrollElement, onMenuAction, load
     usePlayList.getState().play({
       type: "mv",
       bvid: item.bvid,
-      title: item.title,
+      title: stripHtml(item.title),
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
