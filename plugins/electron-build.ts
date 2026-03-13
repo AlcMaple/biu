@@ -82,10 +82,8 @@ export async function buildElectron() {
         extraResources: [{ from: "electron/ffmpeg/ffmpeg-linux", to: "electron/ffmpeg/ffmpeg-linux" }],
       },
       publish: {
-        provider: "github",
-        owner: "wood3n",
-        repo: "biu",
-        releaseType: null,
+        provider: "generic",
+        url: "http://8.163.0.99/biu/updates/",
       },
     },
   })

@@ -1,3 +1,2 @@
-provider: github
-owner: wood3n
-repo: biu
+provider: generic
+url: http://8.163.0.99/biu/updates/
