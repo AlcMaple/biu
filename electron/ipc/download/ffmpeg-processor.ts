@@ -76,12 +76,24 @@ export const convert = async ({
     }
 
     command.on("progress", progress => {
-      if (onProgress && progress.percent) {
-        onProgress(Math.round(progress.percent));
+      if (onProgress && progress.percent != null) {
+        onProgress(Math.min(100, Math.max(0, Math.round(progress.percent))));
       }
     });
 
     command.on("error", err => {
+      // Windows 中文系统 ffmpeg 错误信息可能是 GBK 编码，检测替换字符密度后给出友好提示
+      if (process.platform === "win32") {
+        const replacements = (err.message.match(/\uFFFD/g) ?? []).length;
+        if (replacements > 3) {
+          reject(
+            new Error(
+              "FFmpeg 转换失败（Windows 编码问题，请在系统区域设置中开启 Unicode UTF-8 支持，或手动配置 ffmpeg 路径）",
+            ),
+          );
+          return;
+        }
+      }
       reject(err);
     });
 

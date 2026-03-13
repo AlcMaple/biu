@@ -30,9 +30,10 @@ export class DownloadQueue {
       if (this.pendingUpdates.size > 0) {
         const updates = Array.from(this.pendingUpdates.values());
         this.broadcast({ type: "update", data: updates });
+        this.updateTaskbarProgress();
         this.pendingUpdates.clear();
       }
-    }, 500);
+    }, 200);
 
     this.restoreQueue();
   }
@@ -42,6 +43,31 @@ export class DownloadQueue {
     if (window) {
       const payload = type === "full" ? { type: "full", data: this.getTaskList() } : { type: "update", data };
       window.webContents.send(channel.download.sync, payload);
+      if (type === "full") this.updateTaskbarProgress();
+    }
+  }
+
+  /** 更新任务栏/Dock 原生进度条。所有活跃任务完成后隐藏。 */
+  private updateTaskbarProgress() {
+    const win = this.getMainWindow();
+    if (!win) return;
+
+    let totalBytes = 0;
+    let downloadedBytes = 0;
+    let hasActive = false;
+
+    for (const core of this.taskMap.values()) {
+      if (core.status === "downloading" || core.status === "merging" || core.status === "converting") {
+        hasActive = true;
+        totalBytes += core.totalBytes || 0;
+        downloadedBytes += core.downloadedBytes || 0;
+      }
+    }
+
+    if (!hasActive) {
+      win.setProgressBar(-1);
+    } else if (totalBytes > 0) {
+      win.setProgressBar(Math.min(1, downloadedBytes / totalBytes));
     }
   }
 
