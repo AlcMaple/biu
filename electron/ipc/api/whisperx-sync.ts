@@ -176,6 +176,69 @@ function runWhisperXAlign(
   });
 }
 
+/** Cached Python path to avoid re-probing on every call. */
+let cachedPython: string | null = null;
+
+function checkModule(python: string, module: string): Promise<boolean> {
+  return new Promise(resolve => {
+    const child = spawn(python, ["-c", `import ${module}; print('ok')`], { timeout: 10000 });
+    let stdout = "";
+    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
+    child.on("close", code => resolve(code === 0 && stdout.trim() === "ok"));
+    child.on("error", () => resolve(false));
+  });
+}
+
+export async function checkWhisperXDeps(): Promise<{ ok: boolean; missingDep?: string; error?: string }> {
+  const python = await findPython();
+  if (!python) {
+    return { ok: false, missingDep: "python", error: "Python 未安装，请先安装 Python 3" };
+  }
+  cachedPython = python;
+
+  if (!(await checkModule(python, "demucs"))) {
+    return { ok: false, missingDep: "demucs", error: "demucs 未安装" };
+  }
+  if (!(await checkModule(python, "whisperx"))) {
+    return { ok: false, missingDep: "whisperx", error: "whisperx 未安装" };
+  }
+  return { ok: true };
+}
+
+export async function installWhisperXDeps(): Promise<{ ok: boolean; error?: string }> {
+  const python = cachedPython ?? (await findPython());
+  if (!python) {
+    return { ok: false, error: "Python 未安装，无法自动安装依赖" };
+  }
+  cachedPython = python;
+
+  function runPipInstall(py: string, extraArgs: string[], timeoutMs: number): Promise<{ ok: boolean; stderr: string }> {
+    return new Promise(resolve => {
+      const args = ["-m", "pip", "install", "demucs", "whisperx", ...extraArgs];
+      log.info("[whisperx-deps] pip install:", py, args.join(" "));
+      const child = spawn(py, args, { timeout: timeoutMs });
+      let stderr = "";
+      child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+      child.on("close", (code: number | null) => resolve({ ok: code === 0, stderr }));
+      child.on("error", (err: Error) => resolve({ ok: false, stderr: err.message }));
+    });
+  }
+
+  const r1 = await runPipInstall(python, [], 600_000);
+  if (r1.ok) return { ok: true };
+
+  log.warn("[whisperx-deps] default PyPI failed, retrying with Tsinghua mirror...", r1.stderr);
+  const r2 = await runPipInstall(
+    python,
+    ["-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "--trusted-host", "pypi.tuna.tsinghua.edu.cn"],
+    600_000,
+  );
+  if (r2.ok) return { ok: true };
+
+  log.error("[whisperx-deps] pip install failed:", r2.stderr);
+  return { ok: false, error: r2.stderr || "安装依赖失败，请检查网络连接后重试" };
+}
+
 /**
  * Full pipeline:
  *   1. Download Bilibili CDN audio → temp file  (skipped if vocals already cached)

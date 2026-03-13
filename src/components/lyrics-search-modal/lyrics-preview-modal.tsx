@@ -45,7 +45,9 @@ const LyricsPreviewModal = ({
     return window.electron.onSyncLyricsWithWhisperXDone(({ syncedLrc, originalLrc, error }) => {
       if (originalLrc !== lyrics) return;
       setIsSyncing(false);
-      if (!error && syncedLrc) {
+      if (error) {
+        addToast({ title: `同步失败: ${error}`, color: "danger" });
+      } else if (syncedLrc) {
         setSyncedLyrics(syncedLrc);
       }
     });
@@ -57,7 +59,7 @@ const LyricsPreviewModal = ({
     onAdopt(displayedLyrics?.trim(), tlyrics);
   };
 
-  const handleSync = () => {
+  const handleSync = async () => {
     const playItem = getPlayItem();
     const audioUrl = playItem?.audioUrl;
 
@@ -71,6 +73,34 @@ const LyricsPreviewModal = ({
     }
 
     setIsSyncing(true);
+
+    const check = await window.electron.checkWhisperXDeps();
+    if (!check.ok) {
+      if (check.missingDep && check.missingDep !== "python") {
+        addToast({
+          title: `正在安装 ${check.missingDep} 等依赖，请稍候（可能需要数分钟）...`,
+          color: "primary",
+          timeout: 0,
+        });
+        const install = await window.electron.installWhisperXDeps();
+        if (!install.ok) {
+          addToast({ title: install.error ?? "安装依赖失败", color: "danger" });
+          setIsSyncing(false);
+          return;
+        }
+        const recheck = await window.electron.checkWhisperXDeps();
+        if (!recheck.ok) {
+          addToast({ title: recheck.error ?? "依赖验证失败", color: "danger" });
+          setIsSyncing(false);
+          return;
+        }
+      } else {
+        addToast({ title: check.error ?? "依赖检查失败", color: "danger" });
+        setIsSyncing(false);
+        return;
+      }
+    }
+
     window.electron.startSyncLyricsWithWhisperX({ audioUrl, lrc: lyrics });
     addToast({ title: "歌词时间轴同步已在后台启动，完成后将通知您", color: "primary", timeout: 4000 });
   };

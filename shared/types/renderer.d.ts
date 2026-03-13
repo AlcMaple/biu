@@ -146,6 +146,10 @@ declare global {
     recognizeSong: (audioBuffer: ArrayBuffer) => Promise<ShazamMatchResult>;
     /** 获取桌面捕获源列表（用于系统音频采集） */
     getDesktopSources: () => Promise<Array<{ id: string; name: string }>>;
+    /** 检查 demucs + whisperx 依赖是否已安装 */
+    checkWhisperXDeps: () => Promise<{ ok: boolean; missingDep?: string; error?: string }>;
+    /** 自动安装 demucs + whisperx（需要 Python 已存在） */
+    installWhisperXDeps: () => Promise<{ ok: boolean; error?: string }>;
     /** 后台启动 demucs + whisperx 歌词时间轴对齐（fire-and-forget，完成后通过 onSyncLyricsWithWhisperXDone 通知） */
     startSyncLyricsWithWhisperX: (params: { audioUrl: string; lrc: string; language?: string }) => void;
     /** 订阅歌词同步完成事件（主进程推送） */
