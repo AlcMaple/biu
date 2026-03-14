@@ -99,5 +99,7 @@ export const channel = {
     leaveFullScreen: "window:leave-full-screen",
     isFullScreen: "window:is-full-screen",
     toggleDevTools: "window:toggle-dev-tools",
+    toggleDesktopLyrics: "window:toggle-desktop-lyrics",
+    desktopLyricsVisibilityChanged: "window:desktop-lyrics-visibility-changed",
   },
 };

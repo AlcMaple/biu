@@ -100,6 +100,10 @@ declare global {
     quitAndInstall: () => Promise<void>;
     /** 切换 mini/主窗口 */
     toggleMiniPlayer: () => Promise<void>;
+    /** 显示/隐藏桌面歌词窗口，返回新的可见状态 */
+    toggleDesktopLyrics: () => Promise<boolean>;
+    /** 订阅桌面歌词窗口可见性变化（窗口被内部关闭时主进程推送） */
+    onDesktopLyricsVisibilityChange: (cb: (visible: boolean) => void) => VoidFunction;
     /** 最小化窗口 */
     minimizeWindow: () => void;
     /** 最大化/还原窗口 */

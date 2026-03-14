@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from "electron";
 
+import { createDesktopLyricsWindow, destroyDesktopLyricsWindow, isDesktopLyricsVisible } from "../desktop-lyrics";
 import { createMiniPlayer, destroyMiniPlayer, miniPlayer } from "../mini-player";
 import { channel } from "./channel";
 
@@ -49,5 +50,19 @@ export function registerWindowHandlers({ getMainWindow }) {
   ipcMain.on(channel.window.toggleDevTools, event => {
     const win = BrowserWindow.fromWebContents(event.sender);
     win?.webContents.toggleDevTools();
+  });
+
+  ipcMain.handle(channel.window.toggleDesktopLyrics, () => {
+    if (isDesktopLyricsVisible()) {
+      destroyDesktopLyricsWindow();
+      getMainWindow()?.webContents.send(channel.window.desktopLyricsVisibilityChanged, false);
+      return false;
+    } else {
+      createDesktopLyricsWindow(() => {
+        // 窗口被用户从内部关闭时通知主窗口
+        getMainWindow()?.webContents.send(channel.window.desktopLyricsVisibilityChanged, false);
+      });
+      return true;
+    }
   });
 }
