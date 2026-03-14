@@ -119,26 +119,46 @@ function runDemucs(python: string, audioPath: string, outputDir: string): Promis
     log.info("[demucs] Note: first run downloads the htdemucs model (~80 MB) — may take a few minutes");
     const child = spawn(python, args, { timeout: 600_000, env: sslEnv });
     let stderr = "";
-    let lastLoggedPct = -1;
+    // Track last percentage for dedup: terminal updates every 1%, log file every 10%
+    let lastTermPct = -1;
+    let lastLogPct = -1;
+
     child.stderr?.on("data", (d: Buffer) => {
+      // Use UTF-8; digits/punctuation are ASCII so the percentage regex works even if
+      // block-element chars (█▏▎…) come out garbled on Windows GBK consoles.
       const text = d.toString("utf-8");
       stderr += text;
-      for (const line of text.split(/[\r\n]+/)) {
-        const trimmed = line.trim();
+
+      // Split on \r or \n — tqdm uses bare \r to overwrite the current terminal line
+      for (const raw of text.split(/\r|\n/)) {
+        const trimmed = raw.trim();
         if (!trimmed) continue;
-        // tqdm progress lines (e.g. " 42%|████ | ...") — only log on integer % change
-        const pctMatch = trimmed.match(/^\s*(\d+)%\|/);
+
+        // tqdm format: "  42%|████ | 140.1/333.4 [00:50<03:30,  2.8s/s]"
+        const pctMatch = trimmed.match(/^\s*(\d+)%/);
         if (pctMatch) {
           const pct = parseInt(pctMatch[1]);
-          if (pct !== lastLoggedPct) {
-            lastLoggedPct = pct;
-            log.info("[demucs]", trimmed);
+
+          // ── Terminal: overwrite the same line with a clean ASCII-safe bar ──
+          if (pct !== lastTermPct) {
+            lastTermPct = pct;
+            const filled = Math.round(pct / 2); // 0-50
+            const bar = "█".repeat(filled) + "░".repeat(50 - filled);
+            process.stdout.write(`\r[demucs] |${bar}| ${String(pct).padStart(3)}%`);
+            if (pct === 100) process.stdout.write("\n");
+          }
+
+          // ── Log file: only at every 10% boundary to avoid log spam ──────
+          if (pct % 10 === 0 && pct !== lastLogPct) {
+            lastLogPct = pct;
+            log.info(`[demucs] ${pct}%`);
           }
         } else {
           log.info("[demucs]", trimmed);
         }
       }
     });
+
     child.on("close", code => {
       if (code === 0) {
         resolve(path.join(outputDir, "htdemucs", stem, "vocals.wav"));
@@ -171,11 +191,26 @@ function runWhisperXAlign(
     let stdout = "";
     let stderr = "";
     child.stdout?.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
+    let lastWxPct = -1;
     child.stderr?.on("data", (d: Buffer) => {
       const text = d.toString("utf-8");
       stderr += text;
-      for (const line of text.split(/[\r\n]+/)) {
-        if (line.trim()) log.info("[whisperx]", line.trimEnd());
+      for (const raw of text.split(/\r|\n/)) {
+        const trimmed = raw.trim();
+        if (!trimmed) continue;
+        const pctMatch = trimmed.match(/^\s*(\d+)%/);
+        if (pctMatch) {
+          const pct = parseInt(pctMatch[1]);
+          if (pct !== lastWxPct) {
+            lastWxPct = pct;
+            const filled = Math.round(pct / 2);
+            const bar = "█".repeat(filled) + "░".repeat(50 - filled);
+            process.stdout.write(`\r[whisperx] |${bar}| ${String(pct).padStart(3)}%`);
+            if (pct === 100) process.stdout.write("\n");
+          }
+        } else {
+          log.info("[whisperx]", trimmed);
+        }
       }
     });
     child.on("close", code => {
