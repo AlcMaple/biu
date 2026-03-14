@@ -26,12 +26,18 @@ function scriptPath(name: string): string {
   return path.join(base, "electron", "python", name);
 }
 
-/** Environment overrides that bypass SSL cert verification for model downloads. */
+/** Environment overrides that bypass SSL cert verification and fix Windows encoding. */
 const sslEnv = {
   ...process.env,
   PYTHONHTTPSVERIFY: "0",
   CURL_CA_BUNDLE: "",
   REQUESTS_CA_BUNDLE: "",
+  // Fix garbled Chinese output on Windows (GBK → UTF-8)
+  PYTHONIOENCODING: "utf-8",
+  PYTHONUTF8: "1",
+  // HuggingFace mirror for faster model downloads in China
+  HF_ENDPOINT: "https://hf-mirror.com",
+  HUGGINGFACE_HUB_URL: "https://hf-mirror.com",
 };
 
 /** Auto-detect spoken language from plain-text lyric content. */
@@ -110,13 +116,27 @@ function runDemucs(python: string, audioPath: string, outputDir: string): Promis
   return new Promise((resolve, reject) => {
     const args = [scriptPath("demucs_separate.py"), "--two-stems=vocals", "-o", outputDir, audioPath];
     log.info("[demucs] start:", args.join(" "));
+    log.info("[demucs] Note: first run downloads the htdemucs model (~80 MB) — may take a few minutes");
     const child = spawn(python, args, { timeout: 600_000, env: sslEnv });
     let stderr = "";
+    let lastLoggedPct = -1;
     child.stderr?.on("data", (d: Buffer) => {
-      const text = d.toString();
+      const text = d.toString("utf-8");
       stderr += text;
-      for (const line of text.split("\n")) {
-        if (line.trim()) log.info("[demucs]", line.trimEnd());
+      for (const line of text.split(/[\r\n]+/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        // tqdm progress lines (e.g. " 42%|████ | ...") — only log on integer % change
+        const pctMatch = trimmed.match(/^\s*(\d+)%\|/);
+        if (pctMatch) {
+          const pct = parseInt(pctMatch[1]);
+          if (pct !== lastLoggedPct) {
+            lastLoggedPct = pct;
+            log.info("[demucs]", trimmed);
+          }
+        } else {
+          log.info("[demucs]", trimmed);
+        }
       }
     });
     child.on("close", code => {
@@ -150,11 +170,11 @@ function runWhisperXAlign(
     });
     let stdout = "";
     let stderr = "";
-    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
+    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
     child.stderr?.on("data", (d: Buffer) => {
-      const text = d.toString();
+      const text = d.toString("utf-8");
       stderr += text;
-      for (const line of text.split("\n")) {
+      for (const line of text.split(/[\r\n]+/)) {
         if (line.trim()) log.info("[whisperx]", line.trimEnd());
       }
     });
