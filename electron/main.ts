@@ -4,6 +4,7 @@ import log from "electron-log";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { destroyDesktopLyricsWindow } from "./desktop-lyrics";
 import { applyProxySettings } from "./ipc/app";
 import { channel } from "./ipc/channel";
 import { quitAndSaveTasks } from "./ipc/download";
@@ -194,6 +195,7 @@ if (!gotTheLock) {
       log.warn("[main] destroyTray failed:", err);
     }
 
+    destroyDesktopLyricsWindow();
     destroyMiniPlayer();
 
     stopCheckForUpdates();

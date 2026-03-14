@@ -7,6 +7,7 @@ import { debounce } from "es-toolkit";
 
 import type { WebPlayerParams } from "@/service/web-player";
 
+import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 import { StoreNameMap } from "@shared/store";
@@ -16,6 +17,8 @@ import LyricsSearchModal from "../lyrics-search-modal";
 import FontSizeControl from "./font-size-control";
 import { getLyricsByBili } from "./get-lyrics";
 import OffsetControl from "./offset-control";
+
+const desktopLyricsBC = new BroadcastChannel(DESKTOP_LYRICS_CHANNEL);
 
 type LyricLine = {
   time: number; // milliseconds
@@ -185,6 +188,14 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     }
     return 0;
   }, [currentMs, lyrics]);
+
+  // 广播当前歌词行到桌面歌词窗口
+  useEffect(() => {
+    desktopLyricsBC.postMessage({
+      line: activeIndex >= 0 ? (lyrics[activeIndex]?.text ?? "") : "",
+      nextLine: activeIndex >= 0 ? (lyrics[activeIndex + 1]?.text ?? "") : "",
+    });
+  }, [activeIndex, lyrics]);
 
   const persistLyricsCache = useMemo(
     () =>
