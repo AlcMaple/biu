@@ -72,6 +72,7 @@ const LyricsPreviewModal = ({
         addToast({ title: `同步失败: ${error}`, color: "danger" });
       } else if (syncedLrc) {
         setSyncedLyrics(syncedLrc);
+        onAdopt(syncedLrc.trim(), tlyrics);
       }
     });
     const unsubProgress = window.electron.onSyncLyricsWithWhisperXProgress(progress => {
