@@ -11,6 +11,7 @@ import {
   checkWhisperXDeps,
   installWhisperXDeps,
   syncLyricsWithWhisperX,
+  type WhisperXProgressEvent,
   type WhisperXSyncParams,
 } from "./api/whisperx-sync";
 import { channel } from "./channel";
@@ -32,7 +33,12 @@ export function registerLyricsHandlers() {
   ipcMain.handle(channel.lyrics.installWhisperXDeps, async () => installWhisperXDeps());
 
   ipcMain.on(channel.lyrics.syncWithWhisperXStart, (event, params: WhisperXSyncParams) => {
-    syncLyricsWithWhisperX(params)
+    const onProgress = (progress: WhisperXProgressEvent) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(channel.lyrics.syncWithWhisperXProgress, progress);
+      }
+    };
+    syncLyricsWithWhisperX(params, onProgress)
       .then(syncedLrc => {
         if (!event.sender.isDestroyed()) {
           event.sender.send(channel.lyrics.syncWithWhisperXDone, { syncedLrc, originalLrc: params.lrc, error: null });

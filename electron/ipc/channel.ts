@@ -37,6 +37,7 @@ export const channel = {
     getNeteaseLyrics: "lyrics:netease-lyrics",
     searchLrclib: "lyrics:lrclib-search",
     syncWithWhisperXStart: "lyrics:sync-whisperx-start",
+    syncWithWhisperXProgress: "lyrics:sync-whisperx-progress",
     syncWithWhisperXDone: "lyrics:sync-whisperx-done",
     checkWhisperXDeps: "lyrics:check-whisperx-deps",
     installWhisperXDeps: "lyrics:install-whisperx-deps",

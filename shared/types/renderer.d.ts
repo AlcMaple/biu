@@ -165,6 +165,10 @@ declare global {
     onSyncLyricsWithWhisperXDone: (
       cb: (result: { syncedLrc: string | null; originalLrc: string; error: string | null }) => void,
     ) => VoidFunction;
+    /** 订阅歌词同步进度事件（主进程推送，fire-and-forget 期间持续推送） */
+    onSyncLyricsWithWhisperXProgress: (
+      cb: (progress: { stage: "download" | "demucs" | "whisperx"; pct: number }) => void,
+    ) => VoidFunction;
   }
 
   interface Window {

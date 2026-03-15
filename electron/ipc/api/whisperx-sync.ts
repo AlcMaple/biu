@@ -21,6 +21,13 @@ export interface WhisperXSyncParams {
   localFilePath?: string;
 }
 
+export interface WhisperXProgressEvent {
+  /** 当前所处阶段 */
+  stage: "download" | "demucs" | "whisperx";
+  /** 0-100 的整数进度 */
+  pct: number;
+}
+
 function scriptPath(name: string): string {
   const base = isDev ? process.cwd() : process.resourcesPath;
   return path.join(base, "electron", "python", name);
@@ -111,7 +118,12 @@ function urlHash(url: string): string {
  * Run demucs vocal separation via the SSL-patched wrapper script.
  * Returns the path to the extracted vocals.wav.
  */
-function runDemucs(python: string, audioPath: string, outputDir: string): Promise<string> {
+function runDemucs(
+  python: string,
+  audioPath: string,
+  outputDir: string,
+  onProgress?: (e: WhisperXProgressEvent) => void,
+): Promise<string> {
   const stem = path.basename(audioPath, path.extname(audioPath));
   return new Promise((resolve, reject) => {
     const args = [scriptPath("demucs_separate.py"), "--two-stems=vocals", "-o", outputDir, audioPath];
@@ -119,13 +131,12 @@ function runDemucs(python: string, audioPath: string, outputDir: string): Promis
     log.info("[demucs] Note: first run downloads the htdemucs model (~80 MB) — may take a few minutes");
     const child = spawn(python, args, { timeout: 600_000, env: sslEnv });
     let stderr = "";
-    // Track last percentage for dedup: terminal updates every 1%, log file every 10%
-    let lastTermPct = -1;
+    let lastPct = -1;
     let lastLogPct = -1;
 
     child.stderr?.on("data", (d: Buffer) => {
-      // Use UTF-8; digits/punctuation are ASCII so the percentage regex works even if
-      // block-element chars (█▏▎…) come out garbled on Windows GBK consoles.
+      // tqdm outputs UTF-8 bytes; digits/punctuation are ASCII so the regex works
+      // regardless of how block-element chars (█▏▎…) are rendered in the log viewer.
       const text = d.toString("utf-8");
       stderr += text;
 
@@ -139,13 +150,10 @@ function runDemucs(python: string, audioPath: string, outputDir: string): Promis
         if (pctMatch) {
           const pct = parseInt(pctMatch[1]);
 
-          // ── Terminal: overwrite the same line with a clean ASCII-safe bar ──
-          if (pct !== lastTermPct) {
-            lastTermPct = pct;
-            const filled = Math.round(pct / 2); // 0-50
-            const bar = "█".repeat(filled) + "░".repeat(50 - filled);
-            process.stdout.write(`\r[demucs] |${bar}| ${String(pct).padStart(3)}%`);
-            if (pct === 100) process.stdout.write("\n");
+          // ── IPC progress push (every 1%, deduped) ────────────────────────
+          if (pct !== lastPct) {
+            lastPct = pct;
+            onProgress?.({ stage: "demucs", pct });
           }
 
           // ── Log file: only at every 10% boundary to avoid log spam ──────
@@ -180,6 +188,7 @@ function runWhisperXAlign(
   vocalsPath: string,
   lyricsPath: string,
   language: string,
+  onProgress?: (e: WhisperXProgressEvent) => void,
 ): Promise<Array<{ start: number; text: string }>> {
   return new Promise((resolve, reject) => {
     const alignScript = scriptPath("whisperx_align.py");
@@ -191,7 +200,7 @@ function runWhisperXAlign(
     let stdout = "";
     let stderr = "";
     child.stdout?.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
-    let lastWxPct = -1;
+    let lastPct = -1;
     child.stderr?.on("data", (d: Buffer) => {
       const text = d.toString("utf-8");
       stderr += text;
@@ -201,12 +210,9 @@ function runWhisperXAlign(
         const pctMatch = trimmed.match(/^\s*(\d+)%/);
         if (pctMatch) {
           const pct = parseInt(pctMatch[1]);
-          if (pct !== lastWxPct) {
-            lastWxPct = pct;
-            const filled = Math.round(pct / 2);
-            const bar = "█".repeat(filled) + "░".repeat(50 - filled);
-            process.stdout.write(`\r[whisperx] |${bar}| ${String(pct).padStart(3)}%`);
-            if (pct === 100) process.stdout.write("\n");
+          if (pct !== lastPct) {
+            lastPct = pct;
+            onProgress?.({ stage: "whisperx", pct });
           }
         } else {
           log.info("[whisperx]", trimmed);
@@ -304,7 +310,10 @@ export async function installWhisperXDeps(): Promise<{ ok: boolean; error?: stri
  *   4. Map lyric lines to word timestamps
  *   5. Return synced LRC string
  */
-export async function syncLyricsWithWhisperX(params: WhisperXSyncParams): Promise<string> {
+export async function syncLyricsWithWhisperX(
+  params: WhisperXSyncParams,
+  onProgress?: (e: WhisperXProgressEvent) => void,
+): Promise<string> {
   const { audioUrl, lrc, localFilePath } = params;
 
   const python = await findPython();
@@ -342,21 +351,27 @@ export async function syncLyricsWithWhisperX(params: WhisperXSyncParams): Promis
         audioPath = path.join(tmpDir, "audio.m4a");
         log.info("[whisperx-sync] Downloading:", audioUrl.slice(0, 80));
         const cookie = await getCookieString();
-        await pipeline(
-          got.stream(audioUrl, {
-            headers: {
-              Cookie: cookie,
-              Referer: "https://www.bilibili.com/",
-              Origin: "https://www.bilibili.com",
-              "User-Agent": UserAgent,
-            },
-          }),
-          fs.createWriteStream(audioPath),
-        );
+        const downloadStream = got.stream(audioUrl, {
+          headers: {
+            Cookie: cookie,
+            Referer: "https://www.bilibili.com/",
+            Origin: "https://www.bilibili.com",
+            "User-Agent": UserAgent,
+          },
+        });
+        let lastDownloadPct = -1;
+        downloadStream.on("downloadProgress", ({ percent }: { percent: number }) => {
+          const pct = Math.round(percent * 100);
+          if (pct !== lastDownloadPct) {
+            lastDownloadPct = pct;
+            onProgress?.({ stage: "download", pct });
+          }
+        });
+        await pipeline(downloadStream, fs.createWriteStream(audioPath));
       }
 
       // 2. Vocal separation via demucs
-      const tmpVocals = await runDemucs(python, audioPath, tmpDir);
+      const tmpVocals = await runDemucs(python, audioPath, tmpDir, onProgress);
 
       // 3. Persist vocals to cache
       await fsp.mkdir(cacheDir, { recursive: true });
@@ -372,7 +387,7 @@ export async function syncLyricsWithWhisperX(params: WhisperXSyncParams): Promis
   const tmpLyrics = path.join(os.tmpdir(), `biu-lyrics-${Date.now()}.txt`);
   await fsp.writeFile(tmpLyrics, plainLines.join("\n"), "utf-8");
   try {
-    const segments = await runWhisperXAlign(python, vocalsPath, tmpLyrics, language);
+    const segments = await runWhisperXAlign(python, vocalsPath, tmpLyrics, language, onProgress);
     if (segments.length === 0) throw new Error("对齐结果为空");
     return segments.map(seg => `${toTimestamp(seg.start)}${seg.text}`).join("\n");
   } finally {
