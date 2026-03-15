@@ -1,12 +1,29 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useState } from "react";
 
-import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Progress,
+  Tab,
+  Tabs,
+  addToast,
+} from "@heroui/react";
 
 import { lyricsSyncCache } from "@/store/lyrics-sync-cache";
 import { usePlayList } from "@/store/play-list";
 
 import ScrollContainer from "../scroll-container";
+
+const stageLabel = (stage: "download" | "demucs" | "whisperx") => {
+  if (stage === "download") return "下载音频";
+  if (stage === "demucs") return "人声分离";
+  return "歌词对齐";
+};
 
 interface LyricsPreviewModalProps {
   isOpen: boolean;
@@ -32,10 +49,14 @@ const LyricsPreviewModal = ({
   const [syncedLyrics, setSyncedLyrics] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncOptions, setShowSyncOptions] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ stage: "download" | "demucs" | "whisperx"; pct: number } | null>(
+    null,
+  );
 
   // Reset synced state whenever a new set of lyrics is shown; restore from cache if available
   useEffect(() => {
     setActiveTab("original");
+    setSyncProgress(null);
     const cached = lyricsSyncCache.get(lyrics);
     setSyncedLyrics(cached ?? null);
   }, [isOpen, lyrics]);
@@ -43,15 +64,23 @@ const LyricsPreviewModal = ({
   // Subscribe to background sync results while modal is open
   useEffect(() => {
     if (!isOpen) return;
-    return window.electron.onSyncLyricsWithWhisperXDone(({ syncedLrc, originalLrc, error }) => {
+    const unsubDone = window.electron.onSyncLyricsWithWhisperXDone(({ syncedLrc, originalLrc, error }) => {
       if (originalLrc !== lyrics) return;
       setIsSyncing(false);
+      setSyncProgress(null);
       if (error) {
         addToast({ title: `同步失败: ${error}`, color: "danger" });
       } else if (syncedLrc) {
         setSyncedLyrics(syncedLrc);
       }
     });
+    const unsubProgress = window.electron.onSyncLyricsWithWhisperXProgress(progress => {
+      setSyncProgress(progress);
+    });
+    return () => {
+      unsubDone();
+      unsubProgress();
+    };
   }, [isOpen, lyrics]);
 
   const displayedLyrics = syncedLyrics ?? lyrics;
@@ -156,26 +185,37 @@ const LyricsPreviewModal = ({
               </div>
             </>
           ) : (
-            <div className="flex w-full justify-end gap-2">
-              <Button variant="light" onPress={() => onOpenChange(false)}>
-                关闭
-              </Button>
-              {syncedLyrics && (
-                <Button variant="flat" onPress={() => setSyncedLyrics(null)}>
-                  恢复原歌词
-                </Button>
+            <div className="flex w-full flex-col gap-2">
+              {isSyncing && syncProgress && (
+                <Progress
+                  size="sm"
+                  value={syncProgress.pct}
+                  label={stageLabel(syncProgress.stage)}
+                  showValueLabel
+                  classNames={{ label: "text-xs text-foreground-500", value: "text-xs text-foreground-500" }}
+                />
               )}
-              <Button
-                variant="flat"
-                onPress={handleSync}
-                isDisabled={loading || isSyncing || !lyrics}
-                isLoading={isSyncing}
-              >
-                {syncedLyrics ? "重新同步" : "同步时间轴"}
-              </Button>
-              <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
-                采用歌词
-              </Button>
+              <div className="flex w-full justify-end gap-2">
+                <Button variant="light" onPress={() => onOpenChange(false)}>
+                  关闭
+                </Button>
+                {syncedLyrics && (
+                  <Button variant="flat" onPress={() => setSyncedLyrics(null)}>
+                    恢复原歌词
+                  </Button>
+                )}
+                <Button
+                  variant="flat"
+                  onPress={handleSync}
+                  isDisabled={loading || isSyncing || !lyrics}
+                  isLoading={isSyncing}
+                >
+                  {syncedLyrics ? "重新同步" : "同步时间轴"}
+                </Button>
+                <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
+                  采用歌词
+                </Button>
+              </div>
             </div>
           )}
         </ModalFooter>

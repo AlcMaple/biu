@@ -268,6 +268,15 @@ const api: ElectronAPI = {
     ipcRenderer.on(channel.lyrics.syncWithWhisperXDone, handler);
     return () => ipcRenderer.removeListener(channel.lyrics.syncWithWhisperXDone, handler);
   },
+  // 订阅歌词同步进度事件（主进程推送）
+  onSyncLyricsWithWhisperXProgress: cb => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      progress: { stage: "download" | "demucs" | "whisperx"; pct: number },
+    ) => cb(progress);
+    ipcRenderer.on(channel.lyrics.syncWithWhisperXProgress, handler);
+    return () => ipcRenderer.removeListener(channel.lyrics.syncWithWhisperXProgress, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("electron", api);
