@@ -5,9 +5,8 @@ import { RiTBoxLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
-import type { WebPlayerParams } from "@/service/web-player";
-
-import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
+import { parseLrc } from "@/components/lyrics/parse-lrc";
+import { useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 import { StoreNameMap } from "@shared/store";
@@ -15,24 +14,13 @@ import { StoreNameMap } from "@shared/store";
 import IconButton from "../icon-button";
 import LyricsSearchModal from "../lyrics-search-modal";
 import FontSizeControl from "./font-size-control";
-import { getLyricsByBili } from "./get-lyrics";
 import OffsetControl from "./offset-control";
-
-const desktopLyricsBC = new BroadcastChannel(DESKTOP_LYRICS_CHANNEL);
-
-type LyricLine = {
-  time: number; // milliseconds
-  text: string;
-};
 
 type PlayItem = ReturnType<ReturnType<typeof usePlayList.getState>["getPlayItem"]>;
 
 const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
-const timeTagPattern = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
-
 const DEFAULT_FONT_SIZE = 20;
-const DEFAULT_OFFSET = 0;
 
 const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: boolean; showControls?: boolean }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -40,13 +28,38 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [centerPadding, setCenterPadding] = useState(0);
   const playId = usePlayList(s => s.playId);
-  const [lyrics, setLyrics] = useState<LyricLine[]>([]);
-  const [translatedLyrics, setTranslatedLyrics] = useState<LyricLine[]>([]);
-  const [offset, setOffset] = useState<number>(DEFAULT_OFFSET);
   const [fontSize, setFontSize] = useState<number>(DEFAULT_FONT_SIZE);
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Read lyrics state from shared store (owned by LyricsBroadcaster)
+  const lyrics = useLyricsState(s => s.lyrics);
+  const translatedLyrics = useLyricsState(s => s.translatedLyrics);
+  const offset = useLyricsState(s => s.offset);
+  const isLoading = useLyricsState(s => s.isLoading);
+
   const { currentTime } = usePlayProgress();
   const currentMs = currentTime * 1000 + offset;
+
+  // Reset fontSize when track changes
+  useEffect(() => {
+    setFontSize(DEFAULT_FONT_SIZE);
+  }, [playId]);
+
+  // Restore fontSize from cache when track changes
+  useEffect(() => {
+    let canceled = false;
+    const playItem = usePlayList.getState().getPlayItem();
+    if (!playItem?.bvid || !playItem?.cid) return;
+    window.electron.getStore(StoreNameMap.LyricsCache).then(store => {
+      if (canceled || !store || typeof store !== "object") return;
+      const cached = store[`${playItem.bvid}-${playItem.cid}`];
+      if (cached && typeof cached.fontSize === "number") {
+        setFontSize(cached.fontSize);
+      }
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [playId]);
 
   const {
     isOpen: isSearchOpen,
@@ -55,129 +68,10 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     onOpenChange: setIsSearchOpen,
   } = useDisclosure();
 
-  const parseLrc = useCallback((raw?: string | null) => {
-    if (!raw) return [] as LyricLine[];
-
-    const result: LyricLine[] = [];
-    const lines = raw.split(/\r?\n/);
-
-    lines.forEach(line => {
-      const text = line.replace(timeTagPattern, "").trim();
-      if (!text) return;
-
-      let match: RegExpExecArray | null;
-      while ((match = timeTagPattern.exec(line)) !== null) {
-        const minutes = Number(match[1]);
-        const seconds = Number(match[2]);
-        const millis = match[3] ? Number(match[3].padEnd(3, "0")) : 0;
-
-        if (Number.isNaN(minutes) || Number.isNaN(seconds) || Number.isNaN(millis)) continue;
-
-        const time = Math.max(0, minutes * 60 * 1000 + seconds * 1000 + millis);
-        result.push({ time, text });
-      }
-
-      timeTagPattern.lastIndex = 0;
-    });
-
-    return result.toSorted((a, b) => a.time - b.time);
-  }, []);
-
-  const tryLoadCachedLyrics = useCallback(async () => {
-    const playItem = usePlayList.getState().getPlayItem();
-    if (!playItem?.bvid || !playItem?.cid) return null;
-
-    const store = await window.electron.getStore(StoreNameMap.LyricsCache);
-    if (!store || typeof store !== "object") return null;
-
-    return store[`${playItem.bvid}-${playItem.cid}`] ?? null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playId]);
-
-  useEffect(() => {
-    let canceled = false;
-    setOffset(DEFAULT_OFFSET);
-    setFontSize(DEFAULT_FONT_SIZE);
-
-    const playItem = usePlayList.getState().getPlayItem();
-    const fetchLyrics = async () => {
-      if (!playItem?.cid) {
-        setLyrics([]);
-        setTranslatedLyrics([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const cidAsNumber = Number(playItem.cid);
-      if (Number.isNaN(cidAsNumber)) {
-        setLyrics([]);
-        setTranslatedLyrics([]);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const cached = await tryLoadCachedLyrics();
-        if (canceled) return;
-
-        if (cached) {
-          setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
-          setFontSize(typeof cached.fontSize === "number" ? cached.fontSize : DEFAULT_FONT_SIZE);
-          const hasLyrics = Boolean(cached.lyrics);
-          const hasTranslated = Boolean(cached.tLyrics);
-          if (hasLyrics || hasTranslated) {
-            setLyrics(parseLrc(cached.lyrics));
-            setTranslatedLyrics(parseLrc(cached.tLyrics));
-            return;
-          }
-        }
-
-        const params: WebPlayerParams = { cid: cidAsNumber };
-
-        if (playItem.bvid) params.bvid = playItem.bvid;
-
-        const aidAsNumber = playItem.aid ? Number(playItem.aid) : undefined;
-        if (aidAsNumber && !Number.isNaN(aidAsNumber)) {
-          params.aid = aidAsNumber;
-        }
-
-        const body = await getLyricsByBili(params);
-
-        if (canceled) return;
-
-        if (!body?.length) {
-          setLyrics([]);
-          setTranslatedLyrics([]);
-          return;
-        }
-
-        setLyrics(body);
-        setTranslatedLyrics([]);
-      } catch {
-        if (canceled) return;
-        setLyrics([]);
-        setTranslatedLyrics([]);
-      } finally {
-        if (!canceled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void fetchLyrics();
-
-    return () => {
-      canceled = true;
-    };
-  }, [parseLrc, playId, tryLoadCachedLyrics]);
-
   const translationMap = useMemo(() => {
     if (!translatedLyrics?.length) return new Map<number, string>();
     const map = new Map<number, string>();
-    translatedLyrics.forEach(item => {
-      map.set(item.time, item.text);
-    });
+    translatedLyrics.forEach(item => map.set(item.time, item.text));
     return map;
   }, [translatedLyrics]);
 
@@ -188,14 +82,6 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     }
     return 0;
   }, [currentMs, lyrics]);
-
-  // 广播当前歌词行到桌面歌词窗口
-  useEffect(() => {
-    desktopLyricsBC.postMessage({
-      line: activeIndex >= 0 ? (lyrics[activeIndex]?.text ?? "") : "",
-      nextLine: activeIndex >= 0 ? (lyrics[activeIndex + 1]?.text ?? "") : "",
-    });
-  }, [activeIndex, lyrics]);
 
   const persistLyricsCache = useMemo(
     () =>
@@ -223,7 +109,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
 
   const handleOffsetChange = useCallback(
     (next: number) => {
-      setOffset(next);
+      useLyricsState.getState().setOffset(next);
 
       const playItem = usePlayList.getState().getPlayItem();
       const cid = playItem?.cid ? Number(playItem.cid) : undefined;
@@ -281,11 +167,10 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     (nextLyrics?: string, nextTLyrics?: string) => {
       onCloseSearch();
       if (nextLyrics) {
-        setLyrics(parseLrc(nextLyrics));
-        setTranslatedLyrics(nextTLyrics ? parseLrc(nextTLyrics) : []);
+        useLyricsState.getState().setLyrics(parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
       }
     },
-    [onCloseSearch, parseLrc],
+    [onCloseSearch],
   );
 
   useEffect(() => {
@@ -316,9 +201,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
 
   useEffect(() => {
     const wrapper = containerRef.current;
-
     if (activeIndex < 0) return;
-
     const el = lineRefs.current[activeIndex];
     if (el && wrapper) {
       const top = el.offsetTop - wrapper.clientHeight / 2 + el.clientHeight / 2;
@@ -326,7 +209,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     }
   }, [activeIndex, centerPadding]);
 
-  const renderLine = (line: LyricLine, index: number) => {
+  const renderLine = (line: { time: number; text: string }, index: number) => {
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
     const activeWeight = isActive ? "font-extrabold" : "font-normal";

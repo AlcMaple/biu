@@ -8,6 +8,7 @@ import ConfirmModal from "@/components/confirm-modal";
 import Fallback from "@/components/error-fallback";
 import FavoritesSelectModal from "@/components/favorites-select-modal";
 import FullScreenPlayer from "@/components/full-screen-player";
+import LyricsBroadcaster from "@/components/lyrics/broadcaster";
 import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
@@ -55,6 +56,7 @@ const Layout = () => {
       <ReleaseNoteModal />
       <PlayListDrawer />
       <FullScreenPlayer />
+      <LyricsBroadcaster />
     </ErrorBoundary>
   );
 };
