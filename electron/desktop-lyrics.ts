@@ -17,7 +17,7 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
     title: "Biu Desktop Lyrics",
     show: true,
     width: winWidth,
-    height: 100,
+    height: 120,
     x: Math.round((width - winWidth) / 2),
     y: height - 140,
     frame: false,
