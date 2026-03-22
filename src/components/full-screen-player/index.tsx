@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Drawer, DrawerBody, DrawerContent, Image, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
-import { RiArrowDownSLine, RiArrowLeftSLine, RiSettings3Line } from "@remixicon/react";
+import { Drawer, DrawerBody, DrawerContent, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
+import { RiArrowDownSLine, RiArrowLeftSLine, RiMusic2Line, RiSettings3Line } from "@remixicon/react";
 import { useClickAway } from "ahooks";
 import clsx from "classnames";
 import { readableColor } from "color2k";
@@ -10,6 +10,7 @@ import { useShallow } from "zustand/shallow";
 import { Themes } from "@/common/constants/theme";
 import { hexToHsl, resolveTheme, isHex } from "@/common/utils/color";
 import AudioWaveform from "@/components/audio-waveform";
+import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
@@ -53,7 +54,6 @@ const FullScreenPlayer = () => {
       })),
     );
   const playItem = list.find(item => item.id === playId);
-  const isLocal = playItem?.source === "local";
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1000);
   const [windowHeight, setWindowHeight] = useState(typeof window !== "undefined" ? window.innerHeight : 800);
@@ -325,7 +325,7 @@ const FullScreenPlayer = () => {
               </div>
 
               <div className="flex h-full w-full items-center justify-center">
-                {!isLocal && showCover && (
+                {showCover && (
                   <div
                     className={clsx(
                       "flex h-full w-full items-center px-12",
@@ -334,24 +334,21 @@ const FullScreenPlayer = () => {
                   >
                     <Image
                       src={coverSrc}
-                      radius="lg"
-                      className="transition-shadow ease-out"
-                      classNames={{
-                        wrapper: "pointer-events-none",
-                        img: "w-full h-full object-cover select-none pointer-events-none",
-                      }}
+                      width={coverWidth}
+                      height={coverHeight}
+                      emptyPlaceholder={<RiMusic2Line size="40%" className="text-default-400" />}
+                      className="rounded-xl transition-shadow ease-out select-none"
                       style={{
-                        width: coverWidth,
-                        height: coverHeight,
-                        boxShadow: `0 28px 90px -35px rgb(var(--glow-rgb) / 0.55), 0 10px 32px -18px rgb(0 0 0 / 0.55)`,
+                        boxShadow: coverSrc
+                          ? `0 28px 90px -35px rgb(var(--glow-rgb) / 0.55), 0 10px 32px -18px rgb(0 0 0 / 0.55)`
+                          : undefined,
                         transition: `box-shadow ${effectsProfile.transitionMs}ms ease`,
-                        aspectRatio: "4 / 3",
                       }}
                     />
                   </div>
                 )}
 
-                {!isLocal && showLyrics && (
+                {showLyrics && (
                   <div
                     className={clsx(
                       "h-full w-full overflow-hidden px-12 py-24",

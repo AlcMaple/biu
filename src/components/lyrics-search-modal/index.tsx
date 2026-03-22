@@ -104,11 +104,21 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
       if (!lyricsText && !tLyricsText) return false;
 
       const current = getPlayItem();
-      const cid = current?.cid ? Number(current.cid) : undefined;
-
-      if (!current?.bvid || cid === undefined || Number.isNaN(cid)) {
+      if (!current) {
         addToast({ title: "当前播放信息缺失，无法保存歌词", color: "warning" });
         return false;
+      }
+
+      let key: string;
+      if (current.source === "local") {
+        key = `local-${current.id}`;
+      } else {
+        const cid = current.cid ? Number(current.cid) : undefined;
+        if (!current.bvid || cid === undefined || Number.isNaN(cid)) {
+          addToast({ title: "当前播放信息缺失，无法保存歌词", color: "warning" });
+          return false;
+        }
+        key = `${current.bvid}-${current.cid}`;
       }
 
       const nextLyrics: MusicLyrics = {
@@ -118,7 +128,6 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
 
       try {
         const store = await window.electron.getStore(StoreNameMap.LyricsCache);
-        const key = `${current.bvid}-${current.cid}`;
         const prev = store?.[key] || {};
         const nextStore = { ...(store ?? {}), [key]: { ...prev, ...nextLyrics } };
         await window.electron.setStore(StoreNameMap.LyricsCache, nextStore);
