@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aetheris - The Liquid Archive</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&amp;family=Manrope:wght@300;400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#ffffff",
+              secondary: "#576066",
+              "outline-variant": "#c2c7cf",
+              "primary-fixed-dim": "#9ecbf7",
+              "on-tertiary": "#ffffff",
+              "inverse-surface": "#2c3134",
+              "primary-container": "#7daad4",
+              "on-secondary-container": "#5d666c",
+              "on-tertiary-fixed-variant": "#4b4169",
+              "secondary-fixed": "#dbe4ec",
+              error: "#ba1a1a",
+              "surface-tint": "#336289",
+              "on-tertiary-fixed": "#1f153b",
+              "tertiary-container": "#ac9fcd",
+              "on-surface-variant": "#42474e",
+              "on-primary-container": "#003e63",
+              "surface-dim": "#d6dbdd",
+              "surface-container-low": "#f0f4f7",
+              "surface-bright": "#f6fafd",
+              tertiary: "#635882",
+              "on-secondary-fixed-variant": "#3f484e",
+              "on-secondary": "#ffffff",
+              "secondary-container": "#dbe4ec",
+              "inverse-on-surface": "#edf1f4",
+              "primary-fixed": "#cee5ff",
+              "on-secondary-fixed": "#141d22",
+              "on-primary": "#ffffff",
+              "on-background": "#171c1f",
+              background: "#f6fafd",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-high": "#e5e9ec",
+              outline: "#72777f",
+              "on-error-container": "#93000a",
+              "secondary-fixed-dim": "#bfc8cf",
+              "tertiary-fixed-dim": "#cdbff0",
+              "error-container": "#ffdad6",
+              "on-primary-fixed-variant": "#154a70",
+              "on-tertiary-container": "#3f355d",
+              "surface-container-highest": "#dfe3e6",
+              "on-primary-fixed": "#001d32",
+              surface: "#f6fafd",
+              "surface-container": "#eaeef1",
+              "inverse-primary": "#9ecbf7",
+              primary: "#336289",
+              "tertiary-fixed": "#e8ddff",
+              "surface-variant": "#dfe3e6",
+              "on-surface": "#171c1f",
+            },
+            fontFamily: {
+              headline: ["Noto Serif"],
+              body: ["Manrope"],
+              label: ["Manrope"],
+            },
+            borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+          },
+        },
+      };
+    </script>
+<style>
+      .tategaki {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+      }
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+      }
+      .lyric-gradient {
+        mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+      }
+      .album-glow {
+        box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.5);
+      }
+      .bg-player {
+        background-image: url(https://lh3.googleusercontent.com/aida/ADBb0ujuVwhd15bF7xUronqOfwc-kcdJ9naYjxWW5O3eXlcvJoBBBlRH9V7yzNpPXz_xjdftTWmWDiz2WS16YnB7utWqKrHpkgIO9CzM71NaKP5mByFvPsg5zo8m605wrohWn7y8apULuTREDU1YhBzgUcScta2Kpqvp_6lQ14Pnd7Qxu5Cb9KSb7_gcfVNcrTIQCIKvgQPDMdomqEW7zNaSsoGKBRezahvFiNckpjqvR4AHoS9o6iZ8hvRaEMqbjSIU7hTTHGkh3P-G78E);
+        background-size: cover;
+        background-position: center;
+      }
+    </style>
+<style>
+      @keyframes sakura-fall {
+        0% {
+          transform: translateY(-10vh) translateX(0) rotate(0deg);
+          opacity: 0;
+        }
+        10% {
+          opacity: 0.8;
+        }
+        90% {
+          opacity: 0.8;
+        }
+        100% {
+          transform: translateY(110vh) translateX(100px) rotate(360deg);
+          opacity: 0;
+        }
+      }
+      @keyframes sakura-sway {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        50% {
+          transform: translateX(50px);
+        }
+      }
+      .sakura-petal {
+        position: absolute;
+        top: -50px;
+        background: linear-gradient(135deg, #ffd1dc 0%, #ffb7c5 100%);
+        border-radius: 90% 0% 90% 50%;
+        pointer-events: none;
+        filter: drop-shadow(0 0 2px rgba(255, 183, 197, 0.4));
+        z-index: 5;
+      }
+    </style>
+<style>
+@keyframes breathing-glow {
+  0%, 100% { text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4); }
+  50% { text-shadow: 0 0 20px rgba(255, 255, 255, 0.9), 0 0 40px rgba(255, 255, 255, 0.6); }
+}
+.active-lyric-glow {
+  animation: breathing-glow 3s ease-in-out infinite;
+  color: #ffffff !important;
+}
+.neon-text-strong {
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.4);
+}
+</style></head>
+<body class="font-body m-0 h-screen w-screen overflow-hidden bg-black p-0 text-white select-none text-white/90 drop-shadow-[0_0_2px_rgba(255,255,255,0.3)]">
+<!-- Immersive Background Layer -->
+<div class="bg-player fixed inset-0 z-0 scale-110"></div>
+<div class="fixed inset-0 z-1 bg-black/20"></div>
+<!-- Main Container Shell -->
+<div class="relative z-10 flex h-screen w-full flex-col px-[5%] pt-8">
+<!-- Top Navigation -->
+<header class="mb-4 flex items-center justify-between">
+<div class="font-serif text-2xl tracking-widest text-white/90 italic">Aetheris</div>
+<div class="flex items-center gap-8">
+<!-- Reserved for future top nav elements -->
+</div>
+</header>
+<!-- Main Content Canvas (Flexible Middle) -->
+<main class="flex min-h-0 flex-grow items-center justify-between">
+<!-- Left: Album Card -->
+<div class="flex w-1/2 items-center justify-start">
+<div class="group relative">
+<!-- Floating Decorative Lines -->
+<div class="absolute -top-12 -left-12 hidden h-[1px] w-24 bg-white/30 lg:block"></div>
+<div class="absolute -right-12 -bottom-12 hidden h-24 w-[1px] bg-white/30 lg:block"></div>
+<!-- Responsive Album Art Size -->
+<div class="album-glow h-[24rem] w-[24rem] transform overflow-hidden rounded-[3rem] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02] xl:h-[32rem] xl:w-[32rem] xl:rounded-[4rem]">
+<img alt="Detailed anime style album art" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ujuVwhd15bF7xUronqOfwc-kcdJ9naYjxWW5O3eXlcvJoBBBlRH9V7yzNpPXz_xjdftTWmWDiz2WS16YnB7utWqKrHpkgIO9CzM71NaKP5mByFvPsg5zo8m605wrohWn7y8apULuTREDU1YhBzgUcScta2Kpqvp_6lQ14Pnd7Qxu5Cb9KSb7_gcfVNcrTIQCIKvgQPDMdomqEW7zNaSsoGKBRezahvFiNckpjqvR4AHoS9o6iZ8hvRaEMqbjSIU7hTTHGkh3P-G78E"/>
+</div>
+<!-- Vertical Tategaki Detail -->
+<div class="tategaki absolute top-1/2 -right-12 flex -translate-y-1/2 flex-col items-center xl:-right-16">
+<span class="font-label mb-4 text-[9px] tracking-[0.4em] text-white/50 uppercase xl:text-[10px]">Sequence</span>
+<span class="font-serif text-xl italic xl:text-2xl">012 / 2024</span>
+</div>
+</div>
+</div>
+<!-- Right: Lyric & Info Content -->
+<div class="flex h-full min-h-0 w-1/2 flex-col justify-center pl-8 xl:pl-12">
+<!-- Metadata Area -->
+<div class="mb-8 xl:mb-12">
+<h1 class="font-headline mb-2 text-4xl leading-tight tracking-tight text-white italic drop-shadow-md xl:text-6xl neon-text-strong text-white">
+              Sakura Whisper
+            </h1>
+<div class="flex items-center gap-4">
+<div class="h-[1px] w-8 bg-white/40"></div>
+<p class="font-headline text-lg xl:text-xl">Aisaka Yuina</p>
+</div>
+</div>
+<!-- Lyrics Display - Restricted height to prevent overflow -->
+<div class="lyric-gradient h-auto max-h-[30vh] space-y-6 overflow-hidden pr-12 xl:max-h-[350px] xl:space-y-8">
+<div class="opacity-60">
+<p class="font-headline text-xl text-white xl:text-2xl">君がくれた言葉の欠片を</p>
+<p class="font-body mt-1 text-[10px] tracking-widest text-white/60 uppercase xl:text-xs">
+                Collecting the fragments of words you gave me
+              </p>
+</div>
+<div class="translate-x-4 transform active-lyric-glow">
+<p class="font-headline text-2xl font-bold text-white drop-shadow-lg xl:text-3xl">
+                透き通る空の果てに投げた
+              </p>
+<p class="font-body mt-2 text-xs tracking-widest text-white uppercase xl:text-sm">
+                I threw them towards the end of the transparent sky
+              </p>
+</div>
+<div class="opacity-60">
+<p class="font-headline text-xl text-white xl:text-2xl">繋ぎ止める术も知らないまま</p>
+<p class="font-body mt-1 text-[10px] tracking-widest text-white/60 uppercase xl:text-xs">
+                Without knowing how to hold them back
+              </p>
+</div>
+<div class="opacity-60">
+<p class="font-headline text-xl text-white xl:text-2xl">淡い记忆は溶けてゆく</p>
+<p class="font-body mt-1 text-[10px] tracking-widest text-white/60 uppercase xl:text-xs">
+                The faint memories are melting away
+              </p>
+</div>
+</div>
+</div>
+</main>
+<!-- Playback Controls Bar (Fixed Bottom Space) -->
+<footer class="mt-auto flex flex-col pb-2 xl:pb-4">
+<!-- Progress Bar -->
+<div class="mb-4 flex w-full items-center gap-6 xl:mb-6">
+<span class="font-label text-[10px] tracking-widest text-white/60">02:14</span>
+<div class="relative h-[2px] flex-grow rounded-full bg-white/20">
+<div class="absolute top-0 left-0 h-full w-[45%] bg-white">
+<div class="absolute -top-1 -right-1.5 h-3 w-3 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)]"></div>
+</div>
+</div>
+<span class="font-label text-[10px] tracking-widest text-white/60">04:32</span>
+</div>
+<!-- Navigation Cluster -->
+<div class="glass-panel mx-auto mb-2 flex w-full max-w-md items-center justify-center rounded-full border border-white/20 px-12 py-2 shadow-xl xl:py-3">
+<div class="flex items-center gap-8">
+<button class="material-symbols-outlined text-3xl text-white/70 transition-all hover:text-white active:scale-90">
+              skip_previous
+            </button>
+<button class="text-primary flex h-12 w-12 transform items-center justify-center rounded-full bg-white shadow-lg transition-all hover:shadow-white/40 active:scale-95 xl:h-14 xl:w-14">
+<span class="material-symbols-outlined text-3xl xl:text-4xl" style='font-variation-settings: "FILL" 1'>pause</span>
+</button>
+<button class="material-symbols-outlined text-3xl text-white/70 transition-all hover:text-white active:scale-90">
+              skip_next
+            </button>
+</div>
+</div>
+</footer>
+</div>
+<!-- Decorative Corner Element -->
+<div class="pointer-events-none fixed right-12 bottom-20 z-0 flex flex-col items-end xl:bottom-24 opacity-50">
+<div class="tategaki font-serif text-5xl leading-none text-white xl:text-6xl">记忆の欠片</div>
+<div class="mt-4 h-[80px] w-[1px] bg-white xl:h-[100px]"></div>
+</div>
+</body>
+</html>
