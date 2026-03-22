@@ -1,10 +1,34 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { addToast, Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "@heroui/react";
-import { RiCheckLine, RiDeleteBinLine, RiEraserLine, RiMoreLine, RiPencilLine, RiPlayFill, RiPlayListAddLine, RiStarLine } from "@remixicon/react";
+import {
+  addToast,
+  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  useDisclosure,
+} from "@heroui/react";
+import {
+  RiCheckLine,
+  RiDeleteBinLine,
+  RiEraserLine,
+  RiMoreLine,
+  RiPencilLine,
+  RiPlayFill,
+  RiPlayListAddLine,
+  RiStarLine,
+} from "@remixicon/react";
 import { chunk } from "es-toolkit/array";
 
+import { CollectionType } from "@/common/constants/collection";
 import { formatMillisecond } from "@/common/utils/time";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
@@ -12,7 +36,6 @@ import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
-import { CollectionType } from "@/common/constants/collection";
 import { getFavResourceInfos } from "@/service/fav-resource-infos";
 import { useFavoritesStore } from "@/store/favorite";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -79,7 +102,34 @@ const LocalFavorites = () => {
     return result;
   }, [rawItems, keyword, order, activeTagIds, itemTags]);
 
+  // 判断是否为本地歌曲（含兼容旧数据：source 字段存入前的本地歌曲）
+  const isLocalItem = useCallback(
+    (item: LocalFavItem) => item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName),
+    [],
+  );
+
   const itemToPlayItem = useCallback((item: LocalFavItem) => {
+    if (item.source === "local") {
+      return {
+        type: "audio" as const,
+        source: "local" as const,
+        id: String(item.rid),
+        title: item.title,
+        cover: item.cover,
+        audioUrl: item.audioUrl,
+      };
+    }
+    // 兼容旧数据：type=12 且无 ownerMid/ownerName 的项是添加 source 字段前存入的本地歌曲
+    if (item.type === 12 && !item.ownerMid && !item.ownerName) {
+      return {
+        type: "audio" as const,
+        source: "local" as const,
+        id: String(item.rid),
+        title: item.title,
+        cover: item.cover,
+        audioUrl: item.audioUrl, // 旧数据无 audioUrl，播放时会提示重新收藏
+      };
+    }
     if (item.type === 2) {
       return {
         type: "mv" as const,
@@ -102,13 +152,18 @@ const LocalFavorites = () => {
 
   const handleItemPress = useCallback(
     (item: LocalFavItem) => {
-      usePlayList.getState().play(itemToPlayItem(item));
+      const playItem = itemToPlayItem(item);
+      if (playItem.source === "local" && !playItem.audioUrl) {
+        addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
+        return;
+      }
+      usePlayList.getState().play(playItem);
     },
     [itemToPlayItem],
   );
 
   const handlePlayAll = useCallback(async () => {
-    const medias = items.map(itemToPlayItem);
+    const medias = items.map(itemToPlayItem).filter(m => !(m.source === "local" && !m.audioUrl));
     if (!medias.length) {
       addToast({ title: "暂无可播放内容", color: "warning" });
       return;
@@ -117,7 +172,7 @@ const LocalFavorites = () => {
   }, [items, itemToPlayItem]);
 
   const handleAddToPlayList = useCallback(() => {
-    const medias = items.map(itemToPlayItem);
+    const medias = items.map(itemToPlayItem).filter(m => !(m.source === "local" && !m.audioUrl));
     if (!medias.length) {
       addToast({ title: "暂无可播放内容", color: "warning" });
       return;
@@ -175,6 +230,7 @@ const LocalFavorites = () => {
   const handleMenuAction = useCallback(
     (key: string, item: LocalFavItem) => {
       const playItem = itemToPlayItem(item);
+      const isUnplayableLocal = playItem.source === "local" && !playItem.audioUrl;
       switch (key) {
         case "favorite":
           useModalStore.getState().onOpenFavSelectModal({
@@ -193,11 +249,19 @@ const LocalFavorites = () => {
           });
           break;
         case "play-next":
-          usePlayList.getState().addToNext(playItem);
+          if (isUnplayableLocal) {
+            addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
+          } else {
+            usePlayList.getState().addToNext(playItem);
+          }
           break;
         case "add-to-playlist":
-          usePlayList.getState().addList([playItem]);
-          addToast({ title: "已添加到播放列表", color: "success" });
+          if (isUnplayableLocal) {
+            addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
+          } else {
+            usePlayList.getState().addList([playItem]);
+            addToast({ title: "已添加到播放列表", color: "success" });
+          }
           break;
         case "rename":
           setRenameTarget(item);
@@ -273,7 +337,13 @@ const LocalFavorites = () => {
           <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={handleAddToPlayList}>
             <RiPlayListAddLine size={18} />
           </IconButton>
-          <Dropdown disableAnimation placement="bottom-start" shouldBlockScroll={false} trigger="press" classNames={{ content: "min-w-[120px]" }}>
+          <Dropdown
+            disableAnimation
+            placement="bottom-start"
+            shouldBlockScroll={false}
+            trigger="press"
+            classNames={{ content: "min-w-[120px]" }}
+          >
             <DropdownTrigger>
               <Button isIconOnly variant="flat" className="hover:text-primary">
                 <RiMoreLine />
@@ -339,10 +409,12 @@ const LocalFavorites = () => {
             title={item.title}
             type={item.type === 2 ? "mv" : "audio"}
             bvid={item.type === 2 ? item.bvid : undefined}
-            sid={item.type === 12 ? Number(item.rid) : undefined}
+            sid={isLocalItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
+            itemId={isLocalItem(item) ? String(item.rid) : undefined}
+            source={isLocalItem(item) ? "local" : item.source}
             cover={item.cover}
-            upName={item.ownerName}
-            upMid={item.ownerMid}
+            upName={isLocalItem(item) ? undefined : item.ownerName}
+            upMid={isLocalItem(item) ? undefined : item.ownerMid}
             playCount={item.playCount}
             duration={item.duration}
             pubTime={formatMillisecond(item.fav_time)}
@@ -368,7 +440,6 @@ const LocalFavorites = () => {
           </ModalHeader>
           <ModalBody>
             <Input
-              autoFocus
               value={renameValue}
               onValueChange={setRenameValue}
               onKeyDown={(e: React.KeyboardEvent) => {
@@ -385,7 +456,9 @@ const LocalFavorites = () => {
             />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={onRenameClose}>取消</Button>
+            <Button variant="light" onPress={onRenameClose}>
+              取消
+            </Button>
             <Button
               color="primary"
               isDisabled={!renameValue.trim() || renameValue.trim() === renameTarget?.title}

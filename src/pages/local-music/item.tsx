@@ -1,7 +1,14 @@
 import React from "react";
 
 import { Button } from "@heroui/react";
-import { RiDeleteBinLine, RiFileMusicLine, RiPlayCircleLine, RiPlayFill, RiPlayListAddLine } from "@remixicon/react";
+import {
+  RiDeleteBinLine,
+  RiFileMusicLine,
+  RiPlayCircleLine,
+  RiPlayFill,
+  RiPlayListAddLine,
+  RiStarLine,
+} from "@remixicon/react";
 import clsx from "classnames";
 import { filesize } from "filesize";
 
@@ -19,11 +26,13 @@ interface Props {
   onPlay: () => void;
   onOpen: () => void;
   onDelete: () => void;
+  onFav: () => void;
 }
 
 const menus: LocalOperationItem[] = [
   { key: "nextplay", label: "下一首播放", icon: <RiPlayCircleLine size={18} /> },
   { key: "play", label: "添加到播放列表", icon: <RiPlayListAddLine size={18} /> },
+  { key: "fav", label: "收藏", icon: <RiStarLine size={18} /> },
   { key: "open", label: "打开文件", icon: <RiFileMusicLine size={18} /> },
   { key: "delete", label: "删除文件", color: "danger", className: "text-danger", icon: <RiDeleteBinLine size={18} /> },
 ];
@@ -37,6 +46,7 @@ const LocalMusicItemRow = ({
   onPlay,
   onOpen,
   onDelete,
+  onFav,
 }: Props) => {
   const [isOpOpen, setIsOpOpen] = React.useState(false);
   const items = isPlaying ? menus.filter(m => m.key !== "delete") : menus;
@@ -44,6 +54,7 @@ const LocalMusicItemRow = ({
   const onAction = (key: string) => {
     if (key === "nextplay") onAddToNext();
     if (key === "play") onAddToPlayList();
+    if (key === "fav") onFav();
     if (key === "open") onOpen();
     if (key === "delete") onDelete();
   };

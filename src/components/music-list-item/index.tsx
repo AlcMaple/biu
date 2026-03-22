@@ -22,6 +22,9 @@ interface Props {
   type: "audio" | "mv";
   bvid?: string;
   sid?: number;
+  /** 本地歌曲 id（source=local 时用于判断是否正在播放） */
+  itemId?: string;
+  source?: "local" | "online";
   cover?: string;
   upName?: string;
   upMid?: number;
@@ -40,6 +43,8 @@ const MusicListItem = ({
   type,
   bvid,
   sid,
+  itemId,
+  source,
   cover,
   upName,
   upMid,
@@ -56,7 +61,7 @@ const MusicListItem = ({
   const playId = usePlayList(state => state.playId);
   const list = usePlayList(state => state.list);
   const playItem = list.find(item => item.id === playId);
-  const isPlay = isSame(playItem, { type, bvid, sid });
+  const isPlay = isSame(playItem, { type, bvid, sid, source, id: itemId });
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
