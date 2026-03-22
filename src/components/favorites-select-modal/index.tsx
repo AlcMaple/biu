@@ -44,7 +44,7 @@ const FavoritesSelectModal = () => {
   const isFavSelectModalOpen = useModalStore(s => s.isFavSelectModalOpen);
   const onFavSelectModalOpenChange = useModalStore(s => s.onFavSelectModalOpenChange);
   const favSelectModalData = useModalStore(s => s.favSelectModalData);
-  const { rid, type = 2, title, itemInfo, onSuccess } = favSelectModalData || {};
+  const { rid, type = 2, title, itemInfo, isLocal, onSuccess } = favSelectModalData || {};
 
   // 用 createdFavorites（引用稳定）再在 render 里 filter，避免 selector 每次返回新数组引用导致无限渲染
   const createdFavorites = useFavoritesStore(s => s.createdFavorites);
@@ -124,7 +124,7 @@ const FavoritesSelectModal = () => {
       return list;
     },
     {
-      ready: Boolean(isFavSelectModalOpen && user?.mid && rid),
+      ready: Boolean(isFavSelectModalOpen && user?.mid && rid && !isLocal),
       refreshDeps: [isFavSelectModalOpen, rid],
     },
   );
@@ -160,8 +160,8 @@ const FavoritesSelectModal = () => {
     try {
       setSubmitting(true);
 
-      // 处理 B站 收藏夹
-      if (biliAddIds || biliDelIds) {
+      // 处理 B站 收藏夹（本地歌曲跳过）
+      if (!isLocal && (biliAddIds || biliDelIds)) {
         let res: any;
         if (type === 12) {
           res = await postCollResourceDeal({
@@ -193,9 +193,11 @@ const FavoritesSelectModal = () => {
           addLocalItem(folderId, {
             rid,
             type,
+            source: itemInfo.source,
             title: itemInfo.title,
             cover: itemInfo.cover,
             bvid: itemInfo.bvid,
+            audioUrl: itemInfo.audioUrl,
             ownerName: itemInfo.ownerName,
             ownerMid: itemInfo.ownerMid,
             duration: itemInfo.duration,
@@ -234,6 +236,7 @@ const FavoritesSelectModal = () => {
       // 刷新当前播放项的收藏状态
       const playItem = usePlayList.getState().getPlayItem();
       if (
+        (playItem?.source === "local" && String(playItem?.id) === String(rid)) ||
         (playItem?.type === "audio" && String(playItem?.sid) === String(rid)) ||
         (playItem?.type === "mv" && String(playItem?.aid) === String(rid))
       ) {

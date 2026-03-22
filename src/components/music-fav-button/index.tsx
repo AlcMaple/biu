@@ -26,14 +26,18 @@ const MusicFavButton = () => {
 
   const handleOpen = () => {
     if (!playItem) return;
+    const isLocal = playItem.source === "local";
     onOpenFavSelectModal({
-      rid: playItem.type === "mv" ? String(playItem.aid) : String(playItem.sid),
+      rid: isLocal ? String(playItem.id) : playItem.type === "mv" ? String(playItem.aid) : String(playItem.sid),
       type: playItem.type === "mv" ? 2 : 12,
+      isLocal,
       title: "收藏",
       itemInfo: {
         title: playItem.title,
         cover: playItem.cover,
         bvid: playItem.bvid,
+        audioUrl: isLocal ? playItem.audioUrl : undefined,
+        source: isLocal ? "local" : "online",
         ownerName: playItem.ownerName,
         ownerMid: playItem.ownerMid,
       },

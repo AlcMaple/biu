@@ -5,14 +5,18 @@ import { StoreNameMap } from "@shared/store";
 
 /** 本地收藏夹中的媒体项 */
 export interface LocalFavItem {
-  /** 资源 id（视频为 aid，音频为 sid） */
+  /** 资源 id（视频为 aid，音频为 sid；本地音乐为文件 id） */
   rid: string | number;
   /** 2=视频 12=音频 */
   type: number;
+  /** 来源：local=本地文件 online=B站在线资源 */
+  source?: "local" | "online";
   title: string;
   cover?: string;
-  /** 视频 bvid（type=2 时需要用于播放） */
+  /** 视频 bvid（type=2 且 online 时用于播放） */
   bvid?: string;
+  /** 本地音频文件 URL（source=local 时用于播放） */
+  audioUrl?: string;
   ownerName?: string;
   ownerMid?: number;
   fav_time: number;
@@ -44,8 +48,12 @@ export const useLocalFavItemsStore = create<State & Action>()(
       addItem: (folderId, item) =>
         set(state => {
           const current = state.folderItems[folderId] ?? [];
-          if (current.some(i => String(i.rid) === String(item.rid))) {
-            return state;
+          const existingIndex = current.findIndex(i => String(i.rid) === String(item.rid));
+          if (existingIndex !== -1) {
+            // 已存在时，更新 source/audioUrl 等可能缺失的字段（兼容旧数据）
+            const updated = [...current];
+            updated[existingIndex] = { ...updated[existingIndex], source: item.source, audioUrl: item.audioUrl };
+            return { folderItems: { ...state.folderItems, [folderId]: updated } };
           }
           return {
             folderItems: {

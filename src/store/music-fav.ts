@@ -2,6 +2,8 @@ import { create } from "zustand";
 
 import { getCollResourceCheck } from "@/service/medialist-gateway-coll-resource-check";
 import { getWebInterfaceArchiveRelation } from "@/service/web-interface-archive-relation";
+import { useFavoritesStore } from "@/store/favorite";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList } from "@/store/play-list";
 import { useUser } from "@/store/user";
 
@@ -29,7 +31,23 @@ export const useMusicFavStore = create<State & Action>()(set => ({
     const user = useUser.getState().user;
     const playItem = usePlayList.getState().getPlayItem();
 
-    if (!user?.isLogin || !playItem) {
+    if (!playItem) {
+      set({ isFav: false, isThumb: false });
+      return;
+    }
+
+    // 本地歌曲：检查是否已在任意本地收藏夹中
+    if (playItem.source === "local") {
+      const localFolders = useFavoritesStore.getState().createdFavorites.filter(f => f.isLocal);
+      const folderItems = useLocalFavItemsStore.getState().folderItems;
+      const isInAnyFolder = localFolders.some(f =>
+        (folderItems[f.id] ?? []).some(i => String(i.rid) === String(playItem.id)),
+      );
+      set({ isFav: isInAnyFolder, isThumb: false });
+      return;
+    }
+
+    if (!user?.isLogin) {
       set({ isFav: false, isThumb: false });
       return;
     }

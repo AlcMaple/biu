@@ -19,7 +19,7 @@ const rowHeight = 42;
 const LocalMusicPage = () => {
   const localDirs = useSettings(s => s.localMusicDirs);
   const updateSettings = useSettings(s => s.update);
-  const { onOpenConfirmModal } = useModalStore();
+  const { onOpenConfirmModal, onOpenFavSelectModal } = useModalStore();
   const [list, setList] = useState<LocalMusicItem[]>([]);
   const [selectedDir, setSelectedDir] = useState<string>("all");
   const [keyword, setKeyword] = useState<string>("");
@@ -164,6 +164,16 @@ const LocalMusicPage = () => {
     });
   };
 
+  const favSong = (song: LocalMusicItem) => {
+    onOpenFavSelectModal({
+      rid: song.id,
+      type: 12,
+      isLocal: true,
+      title: "收藏",
+      itemInfo: { title: song.title, audioUrl: toFileUrl(song.path), source: "local" },
+    });
+  };
+
   const deleteFile = (filePath: string) => {
     onOpenConfirmModal({
       title: "删除文件",
@@ -294,6 +304,7 @@ const LocalMusicPage = () => {
                     onPlay={() => playFile(song)}
                     onOpen={() => openFile(song.path)}
                     onDelete={() => deleteFile(song.path)}
+                    onFav={() => favSong(song)}
                   />
                 </div>
               );

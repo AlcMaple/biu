@@ -84,6 +84,7 @@ const LeftControl = () => {
       </div>
       <div className="flex items-center">
         {Boolean(playItem?.hasMultiPart) && <PageListDrawer />}
+        {Boolean(playItem) && playItem?.source === "local" && <MusicFavButton />}
         {Boolean(user?.isLogin) && Boolean(playItem) && playItem?.source !== "local" && (
           <>
             <MusicFavButton />
