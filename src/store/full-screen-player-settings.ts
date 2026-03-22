@@ -9,6 +9,8 @@ export interface FullScreenPlayerSettingsState {
   backgroundColor?: string;
   spectrumColor?: string;
   lyricsColor?: string;
+  /** 是否使用精美全屏播放器 */
+  useFancyPlayer: boolean;
 }
 
 interface Actions {
@@ -24,6 +26,7 @@ const defaultSettings: FullScreenPlayerSettingsState = {
   backgroundColor: undefined,
   spectrumColor: "currentColor",
   lyricsColor: "#ffffff",
+  useFancyPlayer: false,
 };
 
 export const useFullScreenPlayerSettings = create<FullScreenPlayerSettingsState & Actions>()(
@@ -43,6 +46,7 @@ export const useFullScreenPlayerSettings = create<FullScreenPlayerSettingsState 
         backgroundColor: state.backgroundColor,
         spectrumColor: state.spectrumColor,
         lyricsColor: state.lyricsColor,
+        useFancyPlayer: state.useFancyPlayer,
       }),
     },
   ),

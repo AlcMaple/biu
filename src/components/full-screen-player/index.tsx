@@ -10,6 +10,7 @@ import { useShallow } from "zustand/shallow";
 import { Themes } from "@/common/constants/theme";
 import { hexToHsl, resolveTheme, isHex } from "@/common/utils/color";
 import AudioWaveform from "@/components/audio-waveform";
+import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
@@ -41,18 +42,27 @@ const FullScreenPlayer = () => {
   );
   const primaryColor = useSettings(s => s.primaryColor);
   const themeMode = useSettings(s => s.themeMode);
-  const { showLyrics, showSpectrum, showCover, showBlurredBackground, backgroundColor, spectrumColor, lyricsColor } =
-    useFullScreenPlayerSettings(
-      useShallow(s => ({
-        showLyrics: s.showLyrics,
-        showSpectrum: s.showSpectrum,
-        showCover: s.showCover,
-        showBlurredBackground: s.showBlurredBackground,
-        backgroundColor: s.backgroundColor,
-        spectrumColor: s.spectrumColor,
-        lyricsColor: s.lyricsColor,
-      })),
-    );
+  const {
+    showLyrics,
+    showSpectrum,
+    showCover,
+    showBlurredBackground,
+    backgroundColor,
+    spectrumColor,
+    lyricsColor,
+    useFancyPlayer,
+  } = useFullScreenPlayerSettings(
+    useShallow(s => ({
+      showLyrics: s.showLyrics,
+      showSpectrum: s.showSpectrum,
+      showCover: s.showCover,
+      showBlurredBackground: s.showBlurredBackground,
+      backgroundColor: s.backgroundColor,
+      spectrumColor: s.spectrumColor,
+      lyricsColor: s.lyricsColor,
+      useFancyPlayer: s.useFancyPlayer,
+    })),
+  );
   const playItem = list.find(item => item.id === playId);
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1000);
@@ -183,6 +193,8 @@ const FullScreenPlayer = () => {
   const appTheme = useMemo(() => resolveTheme(themeMode), [themeMode]);
 
   if (!playItem) return null;
+
+  if (useFancyPlayer) return <FancyFullScreenPlayer />;
 
   const coverWidth = Math.max(260, Math.min(windowWidth * 0.7, windowHeight * 0.48, 520));
   const coverHeight = coverWidth * 0.75;

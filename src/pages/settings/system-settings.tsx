@@ -31,6 +31,7 @@ import UpdateCheckButton from "@/components/update-check-button";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
+import FancyPlayerImageAlbum from "./fancy-player-image-album";
 import TagSettings from "./tag-settings";
 
 type SystemSettingsTabProps = {
@@ -278,6 +279,14 @@ export const SystemSettingsTab = ({
           name="reportPlayHistory"
           render={({ field }) => <Switch disableAnimation isSelected={field.value} onValueChange={field.onChange} />}
         />
+      </div>
+
+      <Divider />
+      <h2>全屏播放器</h2>
+      {/* 精美播放器图片册 */}
+      <div className="w-full space-y-1">
+        <div className="text-medium font-medium">精美播放器背景图片册</div>
+        <FancyPlayerImageAlbum />
       </div>
 
       <Divider />
