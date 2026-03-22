@@ -104,6 +104,12 @@ declare global {
     toggleDesktopLyrics: () => Promise<boolean>;
     /** 订阅桌面歌词窗口可见性变化（窗口被内部关闭时主进程推送） */
     onDesktopLyricsVisibilityChange: (cb: (visible: boolean) => void) => VoidFunction;
+    /** 设置桌面歌词窗口鼠标穿透（锁定模式） */
+    setDesktopLyricsIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
+    /** 获取桌面歌词窗口当前位置和大小 */
+    getDesktopLyricsBounds: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
+    /** 设置桌面歌词窗口位置和大小 */
+    setDesktopLyricsBounds: (bounds: Partial<{ x: number; y: number; width: number; height: number }>) => Promise<void>;
     /** 最小化窗口 */
     minimizeWindow: () => void;
     /** 最大化/还原窗口 */

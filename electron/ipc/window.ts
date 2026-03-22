@@ -52,6 +52,25 @@ export function registerWindowHandlers({ getMainWindow }) {
     win?.webContents.toggleDevTools();
   });
 
+  ipcMain.on(channel.window.desktopLyricsSetIgnoreMouseEvents, (event, ignore: boolean, options?: object) => {
+    BrowserWindow.fromWebContents(event.sender)?.setIgnoreMouseEvents(ignore, options);
+  });
+
+  ipcMain.handle(channel.window.desktopLyricsGetBounds, event => {
+    return BrowserWindow.fromWebContents(event.sender)?.getBounds() ?? null;
+  });
+
+  ipcMain.handle(channel.window.desktopLyricsSetBounds, (event, bounds: Partial<Electron.Rectangle>) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const current = win.getBounds();
+    const next = { ...current, ...bounds };
+    // enforce minimum size
+    next.width = Math.max(next.width, 300);
+    next.height = Math.max(next.height, 80);
+    win.setBounds(next);
+  });
+
   ipcMain.handle(channel.window.toggleDesktopLyrics, () => {
     if (isDesktopLyricsVisible()) {
       destroyDesktopLyricsWindow();
