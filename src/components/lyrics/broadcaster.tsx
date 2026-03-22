@@ -36,30 +36,40 @@ const LyricsBroadcaster = () => {
     reset();
 
     const playItem = usePlayList.getState().getPlayItem();
-    if (!playItem?.cid) return;
+    if (!playItem) return;
 
-    const cidAsNumber = Number(playItem.cid);
-    if (Number.isNaN(cidAsNumber)) return;
+    const isLocal = playItem.source === "local";
+
+    if (!isLocal) {
+      if (!playItem.cid) return;
+      const cidAsNumber = Number(playItem.cid);
+      if (Number.isNaN(cidAsNumber)) return;
+    }
 
     setIsLoading(true);
 
     const load = async () => {
       try {
-        if (playItem.bvid) {
-          const store = await window.electron.getStore(StoreNameMap.LyricsCache);
-          if (canceled) return;
-          if (store && typeof store === "object") {
-            const cached = store[`${playItem.bvid}-${playItem.cid}`];
-            if (cached) {
-              setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
-              if (cached.lyrics || cached.tLyrics) {
-                setLyrics(parseLrc(cached.lyrics), parseLrc(cached.tLyrics));
-                return;
-              }
+        const cacheKey = isLocal ? `local-${playItem.id}` : `${playItem.bvid}-${playItem.cid}`;
+        const store = await window.electron.getStore(StoreNameMap.LyricsCache);
+        if (canceled) return;
+        if (store && typeof store === "object") {
+          const cached = store[cacheKey];
+          if (cached) {
+            setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
+            if (cached.lyrics || cached.tLyrics) {
+              setLyrics(parseLrc(cached.lyrics), parseLrc(cached.tLyrics));
+              return;
             }
           }
         }
 
+        if (isLocal) {
+          if (!canceled) setLyrics([]);
+          return;
+        }
+
+        const cidAsNumber = Number(playItem.cid);
         const params: WebPlayerParams = { cid: cidAsNumber };
         if (playItem.bvid) params.bvid = playItem.bvid;
         const aidAsNumber = playItem.aid ? Number(playItem.aid) : undefined;

@@ -48,10 +48,16 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
   useEffect(() => {
     let canceled = false;
     const playItem = usePlayList.getState().getPlayItem();
-    if (!playItem?.bvid || !playItem?.cid) return;
+    const cacheKey =
+      playItem?.source === "local"
+        ? `local-${playItem.id}`
+        : playItem?.bvid && playItem?.cid
+          ? `${playItem.bvid}-${playItem.cid}`
+          : null;
+    if (!cacheKey) return;
     window.electron.getStore(StoreNameMap.LyricsCache).then(store => {
       if (canceled || !store || typeof store !== "object") return;
-      const cached = store[`${playItem.bvid}-${playItem.cid}`];
+      const cached = store[cacheKey];
       if (cached && typeof cached.fontSize === "number") {
         setFontSize(cached.fontSize);
       }
@@ -87,9 +93,14 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     () =>
       debounce(async (playItem: PlayItem, nextOffset?: number, nextFontSize?: number) => {
         try {
-          if (!playItem?.bvid || !playItem?.cid) return;
+          const key =
+            playItem?.source === "local"
+              ? `local-${playItem?.id}`
+              : playItem?.bvid && playItem?.cid
+                ? `${playItem.bvid}-${playItem.cid}`
+                : null;
+          if (!key) return;
           const store = await window.electron.getStore(StoreNameMap.LyricsCache);
-          const key = `${playItem.bvid}-${playItem.cid}`;
           const prev = store?.[key] || {};
 
           await window.electron.setStore(StoreNameMap.LyricsCache, {
@@ -112,8 +123,8 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
       useLyricsState.getState().setOffset(next);
 
       const playItem = usePlayList.getState().getPlayItem();
-      const cid = playItem?.cid ? Number(playItem.cid) : undefined;
-      if (!playItem?.bvid || cid === undefined || Number.isNaN(cid)) return;
+      const hasCacheKey = playItem?.source === "local" ? !!playItem.id : !!(playItem?.bvid && playItem?.cid);
+      if (!hasCacheKey) return;
 
       persistLyricsCache(playItem, next, fontSize);
     },
@@ -126,8 +137,8 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
       setFontSize(next);
 
       const playItem = usePlayList.getState().getPlayItem();
-      const cid = playItem?.cid ? Number(playItem.cid) : undefined;
-      if (!playItem?.bvid || cid === undefined || Number.isNaN(cid)) return;
+      const hasCacheKey = playItem?.source === "local" ? !!playItem.id : !!(playItem?.bvid && playItem?.cid);
+      if (!hasCacheKey) return;
 
       persistLyricsCache(playItem, offset, next);
     },
