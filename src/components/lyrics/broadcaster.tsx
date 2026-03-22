@@ -19,6 +19,7 @@ const DEFAULT_OFFSET = 0;
  */
 const LyricsBroadcaster = () => {
   const playId = usePlayList(s => s.playId);
+  const isPlaying = usePlayList(s => s.isPlaying);
   const { currentTime } = usePlayProgress();
   const lyrics = useLyricsState(s => s.lyrics);
   const offset = useLyricsState(s => s.offset);
@@ -44,7 +45,6 @@ const LyricsBroadcaster = () => {
 
     const load = async () => {
       try {
-        // Check cache first
         if (playItem.bvid) {
           const store = await window.electron.getStore(StoreNameMap.LyricsCache);
           if (canceled) return;
@@ -93,18 +93,31 @@ const LyricsBroadcaster = () => {
   const line = activeIndex >= 0 ? (lyrics[activeIndex]?.text ?? "") : "";
   const nextLine = activeIndex >= 0 ? (lyrics[activeIndex + 1]?.text ?? "") : "";
 
+  // Broadcast current state whenever it changes
   useEffect(() => {
-    bc.postMessage({ type: "update", line, nextLine });
-  }, [bc, line, nextLine]);
+    bc.postMessage({ type: "update", line, nextLine, isPlaying });
+  }, [bc, line, nextLine, isPlaying]);
 
+  // Handle messages from desktop lyrics window
   useEffect(() => {
-    const handleRequest = (ev: MessageEvent<{ type?: string }>) => {
-      if (ev.data?.type !== "request") return;
-      bc.postMessage({ type: "update", line, nextLine });
+    const handleMessage = (ev: MessageEvent<{ type?: string; cmd?: string }>) => {
+      const { type, cmd } = ev.data ?? {};
+      // Respond to handshake requests
+      if (type === "request") {
+        bc.postMessage({ type: "update", line, nextLine, isPlaying });
+        return;
+      }
+      // Handle player control commands from the desktop lyrics toolbar
+      if (type === "cmd") {
+        const store = usePlayList.getState();
+        if (cmd === "toggle") store.togglePlay();
+        if (cmd === "next") void store.next();
+        if (cmd === "prev") void store.prev();
+      }
     };
-    bc.addEventListener("message", handleRequest);
-    return () => bc.removeEventListener("message", handleRequest);
-  }, [bc, line, nextLine]);
+    bc.addEventListener("message", handleMessage);
+    return () => bc.removeEventListener("message", handleMessage);
+  }, [bc, line, nextLine, isPlaying]);
 
   return null;
 };

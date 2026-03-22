@@ -102,5 +102,8 @@ export const channel = {
     toggleDevTools: "window:toggle-dev-tools",
     toggleDesktopLyrics: "window:toggle-desktop-lyrics",
     desktopLyricsVisibilityChanged: "window:desktop-lyrics-visibility-changed",
+    desktopLyricsSetIgnoreMouseEvents: "window:desktop-lyrics-set-ignore-mouse-events",
+    desktopLyricsGetBounds: "window:desktop-lyrics-get-bounds",
+    desktopLyricsSetBounds: "window:desktop-lyrics-set-bounds",
   },
 };

@@ -179,6 +179,14 @@ const api: ElectronAPI = {
   toggleMiniPlayer: () => ipcRenderer.invoke(channel.window.toggleMini),
   // 显示/隐藏桌面歌词窗口，返回新的可见状态
   toggleDesktopLyrics: () => ipcRenderer.invoke(channel.window.toggleDesktopLyrics),
+  // 设置桌面歌词窗口鼠标穿透
+  setDesktopLyricsIgnoreMouseEvents: (ignore, options) => {
+    ipcRenderer.send(channel.window.desktopLyricsSetIgnoreMouseEvents, ignore, options);
+  },
+  // 获取桌面歌词窗口位置和大小
+  getDesktopLyricsBounds: () => ipcRenderer.invoke(channel.window.desktopLyricsGetBounds),
+  // 设置桌面歌词窗口位置和大小
+  setDesktopLyricsBounds: bounds => ipcRenderer.invoke(channel.window.desktopLyricsSetBounds, bounds),
   // 订阅桌面歌词窗口可见性变化（窗口被内部关闭时通知）
   onDesktopLyricsVisibilityChange: cb => {
     const handler = (_: Electron.IpcRendererEvent, visible: boolean) => cb(visible);
