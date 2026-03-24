@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Drawer, DrawerBody, DrawerContent, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { RiArrowDownSLine, RiSettings3Line } from "@remixicon/react";
@@ -41,36 +41,87 @@ const FancyFullScreenPlayer = () => {
   const { showLyrics } = useFullScreenPlayerSettings(useShallow(s => ({ showLyrics: s.showLyrics })));
   const { getRandomImage } = useFancyPlayerImages(useShallow(s => ({ getRandomImage: s.getRandomImage })));
 
-  // 当前显示的图片（背景 + 卡片共用同一张）
-  const [currentImg, setCurrentImg] = useState("");
-  const [prevImg, setPrevImg] = useState("");
+  /**
+   * 双缓冲背景：imgA / imgB 各自持有一张图片，activeBg 决定哪层可见。
+   * 切歌时将新图写入非活跃层，再切换 activeBg，实现无缝交叉淡入淡出。
+   * 背景层与卡片共用同一套 A/B 状态，保证完全同步。
+   */
+  const [imgA, setImgA] = useState("");
+  const [imgB, setImgB] = useState("");
   const [activeBg, setActiveBg] = useState<"a" | "b">("a");
+
+  // Refs 保证 effect 中始终读到最新值，避免 stale closure
+  const imgARef = useRef("");
+  const imgBRef = useRef("");
+  const activeBgRef = useRef<"a" | "b">("a");
+  imgARef.current = imgA;
+  imgBRef.current = imgB;
+  activeBgRef.current = activeBg;
+
   const [isUiVisible, setIsUiVisible] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const hideUiTimeoutRef = useRef<number | null>(null);
   const prevPlayIdRef = useRef<string | null>(null);
+  const preloaderRef = useRef<HTMLImageElement | null>(null);
 
-  /** 切歌时从图片册随机取一张 */
+  /** 预加载图片，加载完成后再执行回调，避免切换时出现空白或屏闪 */
+  const preloadThenSwitch = useCallback((nextPath: string, onReady: () => void) => {
+    // 取消上一次未完成的预加载
+    if (preloaderRef.current) {
+      preloaderRef.current.onload = null;
+      preloaderRef.current.onerror = null;
+      preloaderRef.current = null;
+    }
+    const src = toImgSrc(nextPath);
+    const img = new window.Image();
+    img.onload = () => {
+      preloaderRef.current = null;
+      onReady();
+    };
+    img.onerror = () => {
+      preloaderRef.current = null;
+      onReady(); // 加载失败也执行切换，不卡住
+    };
+    preloaderRef.current = img;
+    img.src = src;
+  }, []);
+
+  /** 切歌时预加载新图，加载完成后写入非活跃层再切换 */
   useEffect(() => {
     if (!playId || playId === prevPlayIdRef.current) return;
     prevPlayIdRef.current = playId;
 
-    const next = getRandomImage(currentImg || undefined) ?? "";
+    const currentActive = activeBgRef.current;
+    const activeImage = currentActive === "a" ? imgARef.current : imgBRef.current;
+    const next = getRandomImage(activeImage || undefined) ?? "";
     if (!next) return;
 
-    setPrevImg(currentImg);
-    setCurrentImg(next);
-    setActiveBg(prev => (prev === "a" ? "b" : "a"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playId]);
+    preloadThenSwitch(next, () => {
+      if (currentActive === "a") {
+        setImgB(next);
+        imgBRef.current = next;
+        setActiveBg("b");
+        activeBgRef.current = "b";
+      } else {
+        setImgA(next);
+        imgARef.current = next;
+        setActiveBg("a");
+        activeBgRef.current = "a";
+      }
+    });
+  }, [playId, getRandomImage, preloadThenSwitch]);
 
-  /** 首次打开时若还没有图片则立即设置 */
+  /** 首次打开时预加载并设置到活跃层 A */
   useEffect(() => {
-    if (isOpen && !currentImg) {
+    if (isOpen && !imgARef.current && !imgBRef.current) {
       const img = getRandomImage() ?? "";
-      if (img) setCurrentImg(img);
+      if (!img) return;
+      preloadThenSwitch(img, () => {
+        setImgA(img);
+        imgARef.current = img;
+      });
     }
-  }, [isOpen, currentImg, getRandomImage]);
+  }, [isOpen, getRandomImage, preloadThenSwitch]);
 
   useEffect(() => {
     if (isOpen) setIsUiVisible(true);
@@ -102,10 +153,6 @@ const FancyFullScreenPlayer = () => {
   };
 
   if (!playItem) return null;
-
-  // 当前展示图（背景与卡片都用这一张）
-  const displayImg = currentImg;
-  const displayImgSrc = toImgSrc(displayImg);
 
   return (
     <Drawer
@@ -168,7 +215,7 @@ const FancyFullScreenPlayer = () => {
                 <div
                   className="absolute inset-0 bg-cover bg-center"
                   style={{
-                    backgroundImage: toBgUrl(prevImg || displayImg),
+                    backgroundImage: toBgUrl(imgA),
                     animation: "fancy-bg-drift 20s ease-in-out infinite",
                     willChange: "transform",
                   }}
@@ -184,7 +231,7 @@ const FancyFullScreenPlayer = () => {
                 <div
                   className="absolute inset-0 bg-cover bg-center"
                   style={{
-                    backgroundImage: toBgUrl(displayImg),
+                    backgroundImage: toBgUrl(imgB),
                     animation: "fancy-bg-drift 20s ease-in-out infinite",
                     willChange: "transform",
                   }}
@@ -255,18 +302,28 @@ const FancyFullScreenPlayer = () => {
                       <div className="absolute -top-12 -left-12 hidden h-px w-24 bg-white/30 lg:block" />
                       <div className="absolute -right-12 -bottom-12 hidden h-24 w-px bg-white/30 lg:block" />
 
-                      {/* 卡片本体 —— 固定尺寸，与 HTML 一致 */}
+                      {/* 卡片本体 —— 与背景共用同一套 A/B 双缓冲，保证同步过渡 */}
                       <div
                         className="h-[24rem] w-[24rem] transform overflow-hidden rounded-[3rem] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02] xl:h-[32rem] xl:w-[32rem] xl:rounded-[4rem]"
                         style={{ boxShadow: "0 40px 100px -20px rgba(0,0,0,0.5)" }}
                       >
-                        {displayImgSrc ? (
-                          <img
-                            alt="背景图"
-                            src={displayImgSrc}
-                            className="h-full w-full object-cover"
-                            draggable={false}
-                          />
+                        {imgA || imgB ? (
+                          <div className="relative h-full w-full">
+                            <img
+                              alt=""
+                              src={toImgSrc(imgA)}
+                              className="absolute inset-0 h-full w-full object-cover"
+                              style={{ opacity: activeBg === "a" ? 1 : 0, transition: "opacity 1200ms ease" }}
+                              draggable={false}
+                            />
+                            <img
+                              alt="背景图"
+                              src={toImgSrc(imgB)}
+                              className="absolute inset-0 h-full w-full object-cover"
+                              style={{ opacity: activeBg === "b" ? 1 : 0, transition: "opacity 1200ms ease" }}
+                              draggable={false}
+                            />
+                          </div>
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-white/10 text-6xl text-white/30">
                             ♪
