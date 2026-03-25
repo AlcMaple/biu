@@ -128,6 +128,7 @@
     "rollup": "^4.55.1",
     "rollup-plugin-esbuild": "^6.2.1",
     "rollup-plugin-tsconfig-paths": "^1.5.2",
+    "ssh2": "^1.17.0",
     "stylelint": "^16.26.1",
     "stylelint-config-standard": "^39.0.1",
     "tailwindcss": "^4.1.18",
