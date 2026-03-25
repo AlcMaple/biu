@@ -15,14 +15,16 @@
  *   （不传参数则上传所有平台）
  */
 
-import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import readline from "readline";
+import { Client } from "ssh2";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const SERVER = "root@8.163.0.99";
+const HOST = "8.163.0.99";
+const USER = "root";
 const REMOTE_DIR = "/var/www/html/biu/updates/";
 const ROOT_DIR = path.join(__dirname, "..");
 const ARTIFACTS_DIR = path.join(ROOT_DIR, "dist", "artifacts");
@@ -61,27 +63,97 @@ const fileGroups = {
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
-function scp(localFile) {
-  // Windows 下路径分隔符转为正斜杠，避免 scp 解析错误
-  const localPath = localFile.replace(/\\/g, "/");
-  execSync(`scp -o StrictHostKeyChecking=no "${localPath}" ${SERVER}:${REMOTE_DIR}`, {
-    stdio: "inherit",
+function log(msg) {
+  console.log(msg);
+}
+
+/** 提示输入密码（不回显）*/
+function askPassword() {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    // 关闭回显，密码不显示在终端
+    rl._writeToOutput = str => {
+      if (str.endsWith("\n") || str.endsWith("\r")) rl.output.write("\n");
+    };
+    process.stdout.write("请输入服务器密码：");
+    rl.question("", answer => {
+      rl.close();
+      resolve(answer);
+    });
   });
 }
 
-function cleanOldVersions(platforms) {
+/** 建立 SSH 连接 */
+function connect(password) {
+  return new Promise((resolve, reject) => {
+    const client = new Client();
+    client
+      .on("ready", () => resolve(client))
+      .on("error", reject)
+      .connect({ host: HOST, port: 22, username: USER, password, readyTimeout: 10000 });
+  });
+}
+
+/** 在远端执行命令，输出打印到终端 */
+function exec(client, cmd) {
+  return new Promise((resolve, reject) => {
+    client.exec(cmd, (err, stream) => {
+      if (err) return reject(err);
+      let out = "";
+      stream.on("data", d => {
+        out += d;
+        process.stdout.write(d);
+      });
+      stream.stderr.on("data", d => process.stderr.write(d));
+      stream.on("close", code => {
+        if (code !== 0) reject(new Error(`命令退出码 ${code}`));
+        else resolve(out);
+      });
+    });
+  });
+}
+
+/** 通过 SFTP 上传单个文件，显示进度 */
+function upload(client, localPath, remoteDir) {
+  const filename = path.basename(localPath);
+  const remotePath = remoteDir + filename;
+  const total = fs.statSync(localPath).size;
+
+  return new Promise((resolve, reject) => {
+    client.sftp((err, sftp) => {
+      if (err) return reject(err);
+      sftp.fastPut(
+        localPath,
+        remotePath,
+        {
+          step: (transferred, _chunk, total) => {
+            const pct = Math.round((transferred / total) * 100);
+            process.stdout.write(
+              `\r  ${pct}%  (${(transferred / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB)`,
+            );
+          },
+          concurrency: 4,
+          chunkSize: 1024 * 512,
+        },
+        err => {
+          if (err) return reject(err);
+          process.stdout.write(`\r  100%  (${(total / 1024 / 1024).toFixed(1)} MB)         \n`);
+          resolve();
+        },
+      );
+    });
+  });
+}
+
+/** 删除旧版本安装包 */
+async function cleanOldVersions(client, platforms) {
   const patterns = [];
   if (platforms.win) patterns.push("Biu-*-win-*.exe", "Biu-*-win-*.exe.blockmap");
   if (platforms.mac) patterns.push("Biu-*-mac-*.dmg", "Biu-*-mac-*.dmg.blockmap");
   if (platforms.linux) patterns.push("Biu-*-linux-*.AppImage");
   if (patterns.length === 0) return;
-
   const cmd = patterns.map(p => `find ${REMOTE_DIR} -maxdepth 1 -name '${p}' -delete`).join(" && ");
-  execSync(`ssh -o StrictHostKeyChecking=no ${SERVER} "${cmd}"`, { stdio: "inherit" });
-}
-
-function log(msg) {
-  console.log(msg);
+  await exec(client, cmd);
 }
 
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
@@ -117,7 +189,7 @@ if (filesToUpload.length === 0) {
 }
 
 // 显示待上传列表
-log(`\n服务器：${SERVER}`);
+log(`\n服务器：${USER}@${HOST}`);
 log(`目标路径：${REMOTE_DIR}`);
 log(`\n找到 ${filesToUpload.length} 个文件待上传：`);
 for (const { platform, filename } of filesToUpload) {
@@ -126,35 +198,49 @@ for (const { platform, filename } of filesToUpload) {
 }
 log("");
 
-// 清理旧版本安装包
-log("清理服务器旧版本安装包...");
-cleanOldVersions(platforms);
+// 提示输入密码（一次性，后续所有操作复用同一连接）
+const password = await askPassword();
+log("");
 
-// 逐个上传
-let successCount = 0;
-for (const { filename, fullPath } of filesToUpload) {
-  process.stdout.write(`上传 ${filename} ... `);
-  try {
-    scp(fullPath);
-    successCount++;
-    log("✅");
-  } catch (e) {
-    log("❌ 失败");
-    log(`\n错误：${e.message}`);
-    log("\n排查建议：");
-    log("  1. 确认服务器 IP 和密码正确");
-    log("  2. 确认已运行过 node dev_tools/server-setup.js 完成服务器初始化");
-    log("  3. 确认本机已安装 OpenSSH（Windows 10+ 已内置，macOS 已内置）");
-    process.exit(1);
-  }
+let client;
+try {
+  process.stdout.write("连接服务器...");
+  client = await connect(password);
+  log(" ✅");
+} catch (e) {
+  log("\n❌ 连接失败：" + e.message);
+  log("   请确认 IP、用户名和密码是否正确。");
+  process.exit(1);
 }
 
-log(`\n╔══════════════════════════════════════╗`);
-log(`║  ✅ 上传完成（${successCount}/${filesToUpload.length} 个文件）            ║`);
-log(`╚══════════════════════════════════════╝`);
-log("\n验证地址：");
+try {
+  // 清理旧版本安装包
+  log("\n▶ 清理服务器旧版本安装包");
+  await cleanOldVersions(client, platforms);
 
-if (uploadWin) log("  Windows: http://8.163.0.99/biu/updates/latest.yml");
-if (uploadMac) log("  macOS:   http://8.163.0.99/biu/updates/latest-mac.yml");
-if (uploadLinux) log("  Linux:   http://8.163.0.99/biu/updates/latest-linux.yml");
-log("");
+  // 逐个上传
+  let successCount = 0;
+  for (const { filename, fullPath } of filesToUpload) {
+    log(`\n▶ 上传 ${filename}`);
+    try {
+      await upload(client, fullPath, REMOTE_DIR);
+      successCount++;
+      log("  ✅ 完成");
+    } catch (e) {
+      log(`  ❌ 失败：${e.message}`);
+      client.end();
+      process.exit(1);
+    }
+  }
+
+  log(`\n╔══════════════════════════════════════╗`);
+  log(`║  ✅ 上传完成（${successCount}/${filesToUpload.length} 个文件）            ║`);
+  log(`╚══════════════════════════════════════╝`);
+  log("\n验证地址：");
+  if (uploadWin) log("  Windows: http://8.163.0.99/biu/updates/latest.yml");
+  if (uploadMac) log("  macOS:   http://8.163.0.99/biu/updates/latest-mac.yml");
+  if (uploadLinux) log("  Linux:   http://8.163.0.99/biu/updates/latest-linux.yml");
+  log("");
+} finally {
+  client.end();
+}

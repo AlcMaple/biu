@@ -7,47 +7,90 @@
  *   node dev_tools/server-setup.js
  */
 
-import { execSync } from "child_process";
+import readline from "readline";
+import { Client } from "ssh2";
 
-const SERVER = "root@8.163.0.99";
+const HOST = "8.163.0.99";
+const USER = "root";
 const REMOTE_DIR = "/var/www/html/biu/updates";
-const CONF_PATH = "/etc/apache2/conf-available/biu-updates.conf";
+const CONF_PATH = "/etc/apache2/sites-available/biu-ip.conf";
 const VERIFY_URL = "http://8.163.0.99/biu/updates/";
 
-// Apache 配置内容：
-// - ProxyPassMatch ! 确保此路径不被 ProxyPass 代理拦截（必须放在最前面生效）
-// - Directory 块允许访问并禁止目录列表
-const APACHE_CONF = `# Biu 自动更新文件目录 - 静态访问配置
-# ProxyPassMatch ! 使此路径绕过所有 ProxyPass 代理规则
-ProxyPassMatch ^/biu/updates/(.*)$ !
+// Apache VirtualHost 配置：为 IP 直接访问提供静态文件服务
+const APACHE_CONF = `<VirtualHost *:80>
+    ServerName ${HOST}
 
-Alias /biu/updates/ /var/www/html/biu/updates/
-
-<Directory /var/www/html/biu/updates/>
-    Options -Indexes
-    AllowOverride None
-    Require all granted
-</Directory>
+    Alias /biu/updates/ ${REMOTE_DIR}/
+    <Directory ${REMOTE_DIR}/>
+        Options -Indexes
+        AllowOverride None
+        Require all granted
+    </Directory>
+</VirtualHost>
 `;
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
-function ssh(desc, cmd) {
-  console.log(`\n▶ ${desc}`);
-  execSync(`ssh -o StrictHostKeyChecking=no ${SERVER} "${cmd}"`, { stdio: "inherit" });
+function log(msg) {
+  console.log(msg);
 }
 
-// 将文件内容通过 base64 安全地写入远程文件，避免 shell 特殊字符转义问题
-function sshWriteFile(desc, content, remotePath) {
-  console.log(`\n▶ ${desc}`);
-  const encoded = Buffer.from(content).toString("base64");
-  execSync(`ssh -o StrictHostKeyChecking=no ${SERVER} "echo '${encoded}' | base64 -d > ${remotePath}"`, {
-    stdio: "inherit",
+/** 提示输入密码（不回显）*/
+function askPassword() {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl._writeToOutput = str => {
+      if (str.endsWith("\n") || str.endsWith("\r")) rl.output.write("\n");
+    };
+    process.stdout.write("请输入服务器密码：");
+    rl.question("", answer => {
+      rl.close();
+      resolve(answer);
+    });
   });
 }
 
-function log(msg) {
-  console.log(msg);
+/** 建立 SSH 连接 */
+function connect(password) {
+  return new Promise((resolve, reject) => {
+    const client = new Client();
+    client
+      .on("ready", () => resolve(client))
+      .on("error", reject)
+      .connect({ host: HOST, port: 22, username: USER, password, readyTimeout: 10000 });
+  });
+}
+
+/** 在远端执行命令，输出打印到终端 */
+function exec(client, cmd) {
+  return new Promise((resolve, reject) => {
+    client.exec(cmd, (err, stream) => {
+      if (err) return reject(err);
+      let out = "";
+      stream.on("data", d => {
+        out += d;
+        process.stdout.write(d);
+      });
+      stream.stderr.on("data", d => process.stderr.write(d));
+      stream.on("close", code => {
+        if (code !== 0) reject(new Error(`命令退出码 ${code}`));
+        else resolve(out);
+      });
+    });
+  });
+}
+
+/** 通过 SFTP 写入远端文件 */
+function writeFile(client, content, remotePath) {
+  return new Promise((resolve, reject) => {
+    client.sftp((err, sftp) => {
+      if (err) return reject(err);
+      const stream = sftp.createWriteStream(remotePath);
+      stream.on("error", reject);
+      stream.on("close", resolve);
+      stream.end(content);
+    });
+  });
 }
 
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
@@ -55,28 +98,41 @@ function log(msg) {
 log("╔══════════════════════════════════════════╗");
 log("║      Biu 更新服务器初始化（一次性）       ║");
 log("╚══════════════════════════════════════════╝");
-log(`\n服务器：${SERVER}`);
+log(`\n服务器：${USER}@${HOST}`);
 log(`目标目录：${REMOTE_DIR}`);
+log("");
+
+const password = await askPassword();
+log("");
+
+let client;
+try {
+  process.stdout.write("连接服务器...");
+  client = await connect(password);
+  log(" ✅");
+} catch (e) {
+  log("\n❌ 连接失败：" + e.message);
+  log("   请确认 IP、用户名和密码是否正确。");
+  process.exit(1);
+}
 
 try {
-  // 1. 创建目录并设置权限
-  ssh("创建更新目录", `mkdir -p ${REMOTE_DIR} && chmod 755 ${REMOTE_DIR} && echo "目录已就绪：${REMOTE_DIR}"`);
+  log("\n▶ 创建更新目录");
+  await exec(client, `mkdir -p ${REMOTE_DIR} && chmod 755 ${REMOTE_DIR} && echo "目录已就绪：${REMOTE_DIR}"`);
 
-  // 2. 写入 Apache 配置文件（base64 传输，避免特殊字符转义问题）
-  sshWriteFile("写入 Apache 配置", APACHE_CONF, CONF_PATH);
+  log("\n▶ 写入 Apache 配置");
+  await writeFile(client, APACHE_CONF, CONF_PATH);
+  log("  配置文件已写入：" + CONF_PATH);
 
-  // 3. 启用配置（Ubuntu/Debian 的 a2enconf 工具）
-  ssh(
-    "启用 Apache 配置",
-    `a2enconf biu-updates 2>/dev/null && echo '配置已启用' || echo '跳过 a2enconf（非 Debian 系）'`,
-  );
+  log("\n▶ 启用 Apache 站点配置");
+  await exec(client, `a2ensite biu-ip 2>/dev/null && echo '配置已启用' || echo '跳过（非 Debian 系）'`);
 
-  // 4. 验证 Apache 配置语法
-  ssh("验证 Apache 配置语法", "apachectl configtest 2>&1 && echo 'Syntax OK'");
+  log("\n▶ 验证 Apache 配置语法");
+  await exec(client, "apachectl configtest 2>&1 && echo 'Syntax OK'");
 
-  // 5. 重载 Apache（兼容 Ubuntu/Debian 和 CentOS/AliyunLinux）
-  ssh(
-    "重载 Apache",
+  log("\n▶ 重载 Apache");
+  await exec(
+    client,
     "systemctl reload apache2 2>/dev/null || systemctl reload httpd 2>/dev/null || true && echo 'Apache 已重载'",
   );
 
@@ -84,15 +140,11 @@ try {
   log("║           ✅ 初始化完成！              ║");
   log("╚══════════════════════════════════════╝");
   log(`\n验证地址：${VERIFY_URL}`);
-  log("（浏览器访问该地址，显示 Forbidden / You don't have permission 均表示正常）");
-  log("（若显示 Service Unavailable，说明配置未生效，请重新运行本脚本）\n");
+  log("（浏览器访问该地址，显示 Forbidden / You don't have permission 均表示正常）\n");
   log("下一步：运行 pnpm build 打包，然后执行 node dev_tools/upload-update.js 上传。");
 } catch (e) {
-  log("\n❌ 初始化失败，错误信息：");
-  log(e.message);
-  log("\n排查建议：");
-  log("  1. 确认服务器 IP 和密码正确");
-  log("  2. 确认服务器已安装 Apache（httpd 或 apache2）");
-  log("  3. 确认本机已安装 OpenSSH（Windows 10+ 已内置，macOS 已内置）");
+  log("\n❌ 初始化失败：" + e.message);
   process.exit(1);
+} finally {
+  client.end();
 }
