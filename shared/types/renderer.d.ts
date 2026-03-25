@@ -46,6 +46,8 @@ declare global {
     showFileInFolder: (filePath: string) => Promise<boolean>;
     /** 打开系统文件选择对话框，返回选中的文件路径 */
     selectFile: () => Promise<string | null>;
+    /** 打开系统图片多选对话框，返回选中的文件路径数组 */
+    selectImages: () => Promise<string[]>;
     /** 打开本地目录（默认打开下载目录） */
     openDirectory: (path?: string) => Promise<boolean>;
     /** 在外部浏览器打开链接 */
