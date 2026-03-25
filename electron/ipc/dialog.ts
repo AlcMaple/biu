@@ -54,4 +54,14 @@ export function registerDialogHandlers() {
     if (result.canceled) return null;
     return result.filePaths?.[0] ?? null;
   });
+
+  ipcMain.handle(channel.dialog.selectImages, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"],
+      title: "选择图片",
+      filters: [{ name: "图片", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "avif"] }],
+    });
+    if (result.canceled) return [];
+    return result.filePaths;
+  });
 }

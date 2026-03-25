@@ -1,6 +1,6 @@
 import { useRef } from "react";
 
-import { Button, Image, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { RiAddLine, RiCloseLine, RiImageLine } from "@remixicon/react";
 import { useShallow } from "zustand/shallow";
 
@@ -22,11 +22,9 @@ const FancyPlayerImageAlbum = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectFiles = async () => {
-    // 优先用 Electron 文件选择对话框（多选）
-    if (window.electron?.selectFile) {
-      // 逐一选择（electron API 当前只支持单文件，循环调用）
-      const path = await window.electron.selectFile();
-      if (path) addImages([path]);
+    if (window.electron?.selectImages) {
+      const paths = await window.electron.selectImages();
+      if (paths.length > 0) addImages(paths);
       return;
     }
     inputRef.current?.click();
@@ -53,31 +51,30 @@ const FancyPlayerImageAlbum = () => {
       </div>
 
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {images.map(img => (
-            <div key={img} className="group relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl">
-              <Image
+            <div key={img} className="group relative h-20 w-20 flex-shrink-0">
+              {/* 图片 */}
+              <img
                 src={toImgSrc(img)}
                 alt="背景图"
-                className="h-full w-full object-cover"
-                radius="lg"
-                fallbackSrc={undefined}
+                className="h-full w-full rounded-xl object-cover shadow-sm transition-transform duration-200 group-hover:scale-[1.03]"
+                draggable={false}
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
-                <Tooltip content="移除">
-                  <button
-                    className="hidden rounded-full bg-black/60 p-1 text-white transition-opacity group-hover:flex"
-                    onClick={() => removeImage(img)}
-                  >
-                    <RiCloseLine size={14} />
-                  </button>
-                </Tooltip>
-              </div>
+              {/* 删除按钮 —— 右上角圆形 badge，hover 时显示 */}
+              <button
+                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 scale-75 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 shadow transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 hover:bg-red-500"
+                onClick={() => removeImage(img)}
+                title="移除"
+              >
+                <RiCloseLine size={12} />
+              </button>
             </div>
           ))}
-          {/* 添加更多按钮 */}
+
+          {/* 添加更多 */}
           <button
-            className="border-default flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-zinc-400 transition-colors hover:text-zinc-600"
+            className="border-default flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-zinc-400 transition-colors hover:border-zinc-400 hover:text-zinc-600"
             onClick={handleSelectFiles}
           >
             <RiImageLine size={20} />
