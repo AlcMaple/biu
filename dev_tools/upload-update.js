@@ -69,6 +69,17 @@ function scp(localFile) {
   });
 }
 
+function cleanOldVersions(platforms) {
+  const patterns = [];
+  if (platforms.win) patterns.push("Biu-*-win-*.exe", "Biu-*-win-*.exe.blockmap");
+  if (platforms.mac) patterns.push("Biu-*-mac-*.dmg", "Biu-*-mac-*.dmg.blockmap");
+  if (platforms.linux) patterns.push("Biu-*-linux-*.AppImage");
+  if (patterns.length === 0) return;
+
+  const cmd = patterns.map(p => `find ${REMOTE_DIR} -maxdepth 1 -name '${p}' -delete`).join(" && ");
+  execSync(`ssh -o StrictHostKeyChecking=no ${SERVER} "${cmd}"`, { stdio: "inherit" });
+}
+
 function log(msg) {
   console.log(msg);
 }
@@ -114,6 +125,10 @@ for (const { platform, filename } of filesToUpload) {
   log(`  [${tag}] ${filename}`);
 }
 log("");
+
+// 清理旧版本安装包
+log("清理服务器旧版本安装包...");
+cleanOldVersions(platforms);
 
 // 逐个上传
 let successCount = 0;
