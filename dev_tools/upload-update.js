@@ -71,15 +71,22 @@ function log(msg) {
 function askPassword() {
   return new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    // 关闭回显，密码不显示在终端
+    let muted = false;
+    // 先允许输出（显示提示语），输入阶段再屏蔽回显
     rl._writeToOutput = str => {
-      if (str.endsWith("\n") || str.endsWith("\r")) rl.output.write("\n");
+      if (!muted) {
+        rl.output.write(str);
+      } else if (str.endsWith("\n") || str.endsWith("\r\n")) {
+        rl.output.write("\n");
+      }
     };
-    process.stdout.write("请输入服务器密码：");
-    rl.question("", answer => {
+    rl.question("请输入服务器密码：", answer => {
+      muted = false;
       rl.close();
-      resolve(answer);
+      resolve(answer.replace(/\r/g, ""));
     });
+    // question() 写完提示语后才执行这行，之后的字符输入才被屏蔽
+    muted = true;
   });
 }
 
