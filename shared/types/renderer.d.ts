@@ -2,26 +2,6 @@ declare global {
   type AppPlatForm = "macos" | "windows" | "linux";
 
   type StoreName = keyof StoreDataMap;
-
-  interface ShazamCheckResult {
-    ok: boolean;
-    /** "python" = Python not found; "shazamio" = Python found but shazamio not installed */
-    missingDep?: "python" | "shazamio";
-    error?: string;
-  }
-
-  interface ShazamTrack {
-    key: string;
-    title: string;
-    subtitle: string;
-    images?: { coverart?: string; background?: string };
-    url?: string;
-  }
-
-  interface ShazamMatchResult {
-    track?: ShazamTrack;
-    error?: string;
-  }
   interface LocalMusicItem {
     id: string;
     path: string;
@@ -150,12 +130,8 @@ declare global {
     scanLocalMusic: (dirs: string[]) => Promise<LocalMusicItem[]>;
     /** 删除本地音乐文件 */
     deleteLocalMusicFile: (filePath: string) => Promise<boolean>;
-    /** 检查 Python 和 ShazamIO 是否可用 */
-    checkShazamDeps: () => Promise<ShazamCheckResult>;
-    /** 自动安装 ShazamIO（需要 Python 已存在） */
-    installShazamio: () => Promise<{ ok: boolean; error?: string }>;
-    /** 识别音频（传入 ArrayBuffer，返回识别结果） */
-    recognizeSong: (audioBuffer: ArrayBuffer) => Promise<ShazamMatchResult>;
+    /** 识别音频（传入 ArrayBuffer，返回 node-shazam 识别结果） */
+    recognizeSong: (audioBuffer: ArrayBuffer) => Promise<Record<string, unknown>>;
     /** 获取桌面捕获源列表（用于系统音频采集） */
     getDesktopSources: () => Promise<Array<{ id: string; name: string }>>;
     /** 检查 demucs + whisperx 依赖是否已安装 */

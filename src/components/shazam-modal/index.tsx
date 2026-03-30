@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 import IconButton from "@/components/icon-button";
 
-type RecordState = "idle" | "checking" | "installing" | "recording" | "processing" | "success" | "error";
+type RecordState = "idle" | "recording" | "processing" | "success" | "error";
 
 interface ShazamResult {
   title: string;
@@ -62,34 +62,6 @@ const ShazamModal = () => {
   const startRecording = useCallback(
     async (source: "mic" | "system") => {
       chunksRef.current = [];
-      setState("checking");
-
-      const check = await window.electron.checkShazamDeps();
-      if (!check.ok) {
-        if (check.missingDep === "shazamio") {
-          // Python found but shazamio missing — auto-install it
-          pendingSourceRef.current = source;
-          setState("installing");
-          const install = await window.electron.installShazamio();
-          if (!install.ok) {
-            setError(install.error ?? "安装 ShazamIO 失败");
-            setState("error");
-            return;
-          }
-          // Re-verify after install
-          const recheck = await window.electron.checkShazamDeps();
-          if (!recheck.ok) {
-            setError(recheck.error ?? "依赖检查失败");
-            setState("error");
-            return;
-          }
-        } else {
-          setError(check.error ?? "依赖检查失败");
-          setState("error");
-          return;
-        }
-      }
-
       setState("recording");
       setCountdown(RECORD_DURATION);
 
@@ -119,10 +91,24 @@ const ShazamModal = () => {
               mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId, maxWidth: 1, maxHeight: 1 },
             },
           });
-          stream.getVideoTracks().forEach(t => { try { t.stop(); } catch {} });
+          stream.getVideoTracks().forEach(t => {
+            try {
+              t.stop();
+            } catch {
+              /* ignore */
+            }
+          });
           if (stream.getAudioTracks().length === 0) {
-            stream.getTracks().forEach(t => { try { t.stop(); } catch {} });
-            throw new Error("未获取到系统音频轨道。macOS 不支持直接捕获系统音频，请改用麦克风，或安装虚拟音频设备（如 BlackHole）后将系统输出路由到麦克风输入");
+            stream.getTracks().forEach(t => {
+              try {
+                t.stop();
+              } catch {
+                /* ignore */
+              }
+            });
+            throw new Error(
+              "未获取到系统音频轨道。macOS 不支持直接捕获系统音频，请改用麦克风，或安装虚拟音频设备（如 BlackHole）后将系统输出路由到麦克风输入",
+            );
           }
         }
       } catch (err) {
@@ -159,22 +145,26 @@ const ShazamModal = () => {
           const raw = await window.electron.recognizeSong(arrayBuffer);
 
           if (raw.error) {
-            setError(raw.error);
+            setError(String(raw.error));
             setState("error");
             return;
           }
 
-          if (!raw.track) {
-            setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风，或确保 ffmpeg 已安装）");
+          const track = raw.track as
+            | { title?: string; subtitle?: string; images?: { coverart?: string }; url?: string }
+            | undefined;
+
+          if (!track) {
+            setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风）");
             setState("error");
             return;
           }
 
           setResult({
-            title: raw.track.title,
-            artist: raw.track.subtitle,
-            cover: raw.track.images?.coverart,
-            url: raw.track.url,
+            title: track.title ?? "",
+            artist: track.subtitle ?? "",
+            cover: track.images?.coverart,
+            url: track.url,
           });
           setState("success");
         } catch (err) {
@@ -231,7 +221,11 @@ const ShazamModal = () => {
               <div className="flex flex-col items-center gap-5 py-4">
                 <p className="text-foreground-400 text-sm">选择声音来源，录制约 {RECORD_DURATION} 秒后自动识别</p>
                 <div className="flex gap-3">
-                  <Button variant="bordered" startContent={<RiMicLine size={18} />} onPress={() => startRecording("mic")}>
+                  <Button
+                    variant="bordered"
+                    startContent={<RiMicLine size={18} />}
+                    onPress={() => startRecording("mic")}
+                  >
                     麦克风
                   </Button>
                   <Button
@@ -242,20 +236,6 @@ const ShazamModal = () => {
                     系统声音
                   </Button>
                 </div>
-              </div>
-            )}
-
-            {state === "checking" && (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <Spinner size="md" />
-                <p className="text-foreground-400 text-sm">检查依赖...</p>
-              </div>
-            )}
-
-            {state === "installing" && (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <Spinner size="md" />
-                <p className="text-foreground-400 text-sm">正在安装 ShazamIO，请稍候...</p>
               </div>
             )}
 
