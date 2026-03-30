@@ -92,6 +92,9 @@ importers:
       music-metadata:
         specifier: ^11.10.6
         version: 11.10.6
+      node-shazam:
+        specifier: ^1.2.7
+        version: 1.2.7
       overlayscrollbars:
         specifier: ^2.13.0
         version: 2.13.0
@@ -994,6 +997,49 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@ffmpeg-installer/darwin-arm64@4.1.5':
+    resolution: {integrity: sha512-hYqTiP63mXz7wSQfuqfFwfLOfwwFChUedeCVKkBtl/cliaTM7/ePI9bVzfZ2c+dWu3TqCwLDRWNSJ5pqZl8otA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@ffmpeg-installer/darwin-x64@4.1.0':
+    resolution: {integrity: sha512-Z4EyG3cIFjdhlY8wI9aLUXuH8nVt7E9SlMVZtWvSPnm2sm37/yC2CwjUzyCQbJbySnef1tQwGG2Sx+uWhd9IAw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@ffmpeg-installer/ffmpeg@1.1.0':
+    resolution: {integrity: sha512-Uq4rmwkdGxIa9A6Bd/VqqYbT7zqh1GrT5/rFwCwKM70b42W5gIjWeVETq6SdcL0zXqDtY081Ws/iJWhr1+xvQg==}
+
+  '@ffmpeg-installer/linux-arm64@4.1.4':
+    resolution: {integrity: sha512-dljEqAOD0oIM6O6DxBW9US/FkvqvQwgJ2lGHOwHDDwu/pX8+V0YsDL1xqHbj1DMX/+nP9rxw7G7gcUvGspSoKg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@ffmpeg-installer/linux-arm@4.1.3':
+    resolution: {integrity: sha512-NDf5V6l8AfzZ8WzUGZ5mV8O/xMzRag2ETR6+TlGIsMHp81agx51cqpPItXPib/nAZYmo55Bl2L6/WOMI3A5YRg==}
+    cpu: [arm]
+    os: [linux]
+
+  '@ffmpeg-installer/linux-ia32@4.1.0':
+    resolution: {integrity: sha512-0LWyFQnPf+Ij9GQGD034hS6A90URNu9HCtQ5cTqo5MxOEc7Rd8gLXrJvn++UmxhU0J5RyRE9KRYstdCVUjkNOQ==}
+    cpu: [ia32]
+    os: [linux]
+
+  '@ffmpeg-installer/linux-x64@4.1.0':
+    resolution: {integrity: sha512-Y5BWhGLU/WpQjOArNIgXD3z5mxxdV8c41C+U15nsE5yF8tVcdCGet5zPs5Zy3Ta6bU7haGpIzryutqCGQA/W8A==}
+    cpu: [x64]
+    os: [linux]
+
+  '@ffmpeg-installer/win32-ia32@4.1.0':
+    resolution: {integrity: sha512-FV2D7RlaZv/lrtdhaQ4oETwoFUsUjlUiasiZLDxhEUPdNDWcH1OU9K1xTvqz+OXLdsmYelUDuBS/zkMOTtlUAw==}
+    cpu: [ia32]
+    os: [win32]
+
+  '@ffmpeg-installer/win32-x64@4.1.0':
+    resolution: {integrity: sha512-Drt5u2vzDnIONf4ZEkKtFlbvwj6rI3kxw1Ck9fpudmtgaZIHD4ucsWB2lCZBXRxJgXR+2IMSti+4rtM4C4rXgg==}
+    cpu: [x64]
+    os: [win32]
 
   '@formatjs/ecma402-abstract@2.3.6':
     resolution: {integrity: sha512-HJnTFeRM2kVFVr5gr5kH1XP6K0JcJtE7Lzvtr3FS/so5f1kpsqqqxy5JF+FRaO6H2qmcMfAUIox7AJteieRtVw==}
@@ -3281,6 +3327,9 @@ packages:
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
+  buffer@6.0.3:
+    resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
+
   buildcheck@0.0.7:
     resolution: {integrity: sha512-lHblz4ahamxpTmnsk+MNTRWsjYKv965MwOrSJyeD588rR3Jcu7swE+0wN5F+PbL5cjgu/9ObkhfzEPuofEMwLA==}
     engines: {node: '>=10.0.0'}
@@ -3624,6 +3673,10 @@ packages:
   dargs@8.1.0:
     resolution: {integrity: sha512-wAV9QHOsNbwnWdNW2FYvE1P56wtgSbM+3SZcdGiWQILwVjACCXDCI3Ai8QlCjMDB8YK5zySiXZYBiwGmNY3lnw==}
     engines: {node: '>=12'}
+
+  data-uri-to-buffer@4.0.1:
+    resolution: {integrity: sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==}
+    engines: {node: '>= 12'}
 
   data-urls@6.0.0:
     resolution: {integrity: sha512-BnBS08aLUM+DKamupXs3w2tJJoqU+AkaE/+6vQxi/G/DPmIZFJJp9Dkb1kM03AZx8ADehDUZgsNxju3mPXZYIA==}
@@ -4221,6 +4274,10 @@ packages:
       picomatch:
         optional: true
 
+  fetch-blob@3.2.0:
+    resolution: {integrity: sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==}
+    engines: {node: ^12.20 || >= 14.13}
+
   file-entry-cache@11.1.1:
     resolution: {integrity: sha512-TPVFSDE7q91Dlk1xpFLvFllf8r0HyOMOlnWy7Z2HBku5H3KhIeOGInexrIeg2D64DosVB/JXkrrk6N/7Wriq4A==}
 
@@ -4302,6 +4359,10 @@ packages:
     resolution: {integrity: sha512-9XNj/o4wrRFyhSMJOvsuyMwy8aUfBaZ1VrqHVfohyXf0Sw0e+yfKG+xZaY3arGCOMdwFsqObtzVOc1gU9KiT9w==}
     engines: {node: '>=18.3.0'}
     hasBin: true
+
+  formdata-polyfill@4.0.10:
+    resolution: {integrity: sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==}
+    engines: {node: '>=12.20.0'}
 
   framer-motion@12.23.24:
     resolution: {integrity: sha512-HMi5HRoRCTou+3fb3h9oTLyJGBxHfW+HnNE25tAXOvVx/IvwMHK0cx7IR4a2ZU6sh3IX1Z+4ts32PcYBOqka8w==}
@@ -5339,11 +5400,23 @@ packages:
   node-api-version@0.2.1:
     resolution: {integrity: sha512-2xP/IGGMmmSQpI1+O/k72jF/ykvZ89JeuKX3TLJAYPDVLUalrshrLHkeVcCCZqG/eEa635cr8IBYzgnDvM2O8Q==}
 
+  node-domexception@1.0.0:
+    resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
+    engines: {node: '>=10.5.0'}
+    deprecated: Use your platform's native DOMException instead
+
   node-fetch-native@1.6.7:
     resolution: {integrity: sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==}
 
+  node-fetch@3.3.2:
+    resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
+
+  node-shazam@1.2.7:
+    resolution: {integrity: sha512-GZJDPos+7KifZ2yAR6DyTeT55kE3tGXtI6sXQ8NwTgJ9v/0pwaXW/adPLLHapXbzaZ5QRNpTpbqPsj/+OUVzBg==}
 
   nopt@6.0.0:
     resolution: {integrity: sha512-ZwLpbTgdhuZUnZzjd7nb1ZV+4DoiC6/sfiVKok72ym/4Tlf+DFdlHYmT2JPmcNNWV6Pi3SDf1kT+A4r9RTuT9g==}
@@ -5966,6 +6039,9 @@ packages:
     resolution: {integrity: sha512-RJRdvCo6IAnPdsvP/7m6bsQqNnn1FCBX5ZNtFL98MmFF/4xAIJTIg1YbHW5DC2W5SKZanrC6i4HsJqlajw/dZw==}
     engines: {node: '>= 0.4'}
 
+  shazamio-core@1.3.1:
+    resolution: {integrity: sha512-wzYxaL+Tzj4hv5UO1kCbJSjnL02rfcPqxtklf2vg1ykwE1U/FXpB83SRTS4/0OU2uTcVcvQN+xTqzwZQl4CIMg==}
+
   shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
     engines: {node: '>=8'}
@@ -6378,6 +6454,11 @@ packages:
     peerDependencies:
       typescript: ^4.7.2 || ^5
 
+  typescript@5.5.3:
+    resolution: {integrity: sha512-/hreyEujaB0w76zKo6717l3L0o/qEUtRgdvUBvlkhoWeOVMjMuHNHk0BRBzikzuGDqNmPQbg5ifMEqsHLiIUcQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -6562,6 +6643,10 @@ packages:
 
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
+
+  web-streams-polyfill@3.3.3:
+    resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
+    engines: {node: '>= 8'}
 
   webidl-conversions@8.0.0:
     resolution: {integrity: sha512-n4W4YFyz5JzOfQeA8oN7dUYpR+MBP3PIUsn2jLjWXwK5ASUzt0Jc/A5sAUZoCYFJRGF0FBKJ+1JjN43rNdsQzA==}
@@ -7469,6 +7554,41 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@ffmpeg-installer/darwin-arm64@4.1.5':
+    optional: true
+
+  '@ffmpeg-installer/darwin-x64@4.1.0':
+    optional: true
+
+  '@ffmpeg-installer/ffmpeg@1.1.0':
+    optionalDependencies:
+      '@ffmpeg-installer/darwin-arm64': 4.1.5
+      '@ffmpeg-installer/darwin-x64': 4.1.0
+      '@ffmpeg-installer/linux-arm': 4.1.3
+      '@ffmpeg-installer/linux-arm64': 4.1.4
+      '@ffmpeg-installer/linux-ia32': 4.1.0
+      '@ffmpeg-installer/linux-x64': 4.1.0
+      '@ffmpeg-installer/win32-ia32': 4.1.0
+      '@ffmpeg-installer/win32-x64': 4.1.0
+
+  '@ffmpeg-installer/linux-arm64@4.1.4':
+    optional: true
+
+  '@ffmpeg-installer/linux-arm@4.1.3':
+    optional: true
+
+  '@ffmpeg-installer/linux-ia32@4.1.0':
+    optional: true
+
+  '@ffmpeg-installer/linux-x64@4.1.0':
+    optional: true
+
+  '@ffmpeg-installer/win32-ia32@4.1.0':
+    optional: true
+
+  '@ffmpeg-installer/win32-x64@4.1.0':
+    optional: true
 
   '@formatjs/ecma402-abstract@2.3.6':
     dependencies:
@@ -10517,6 +10637,11 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
+  buffer@6.0.3:
+    dependencies:
+      base64-js: 1.5.1
+      ieee754: 1.2.1
+
   buildcheck@0.0.7:
     optional: true
 
@@ -10916,6 +11041,8 @@ snapshots:
   damerau-levenshtein@1.0.8: {}
 
   dargs@8.1.0: {}
+
+  data-uri-to-buffer@4.0.1: {}
 
   data-urls@6.0.0:
     dependencies:
@@ -11753,6 +11880,11 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.3
 
+  fetch-blob@3.2.0:
+    dependencies:
+      node-domexception: 1.0.0
+      web-streams-polyfill: 3.3.3
+
   file-entry-cache@11.1.1:
     dependencies:
       flat-cache: 6.1.19
@@ -11837,6 +11969,10 @@ snapshots:
   formatly@0.3.0:
     dependencies:
       fd-package-json: 2.0.0
+
+  formdata-polyfill@4.0.10:
+    dependencies:
+      fetch-blob: 3.2.0
 
   framer-motion@12.23.24(react-dom@19.1.1(react@19.1.1))(react@19.1.1):
     dependencies:
@@ -12875,9 +13011,27 @@ snapshots:
     dependencies:
       semver: 7.7.3
 
+  node-domexception@1.0.0: {}
+
   node-fetch-native@1.6.7: {}
 
+  node-fetch@3.3.2:
+    dependencies:
+      data-uri-to-buffer: 4.0.1
+      fetch-blob: 3.2.0
+      formdata-polyfill: 4.0.10
+
   node-releases@2.0.27: {}
+
+  node-shazam@1.2.7:
+    dependencies:
+      '@ffmpeg-installer/ffmpeg': 1.1.0
+      '@types/fluent-ffmpeg': 2.1.28
+      buffer: 6.0.3
+      fluent-ffmpeg: 2.1.3
+      node-fetch: 3.3.2
+      shazamio-core: 1.3.1
+      typescript: 5.5.3
 
   nopt@6.0.0:
     dependencies:
@@ -13490,6 +13644,8 @@ snapshots:
       es-errors: 1.3.0
       es-object-atoms: 1.1.1
 
+  shazamio-core@1.3.1: {}
+
   shebang-command@2.0.0:
     dependencies:
       shebang-regex: 3.0.0
@@ -13975,6 +14131,8 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
+  typescript@5.5.3: {}
+
   typescript@5.9.3: {}
 
   ufo@1.6.1: {}
@@ -14141,6 +14299,8 @@ snapshots:
   wcwidth@1.0.1:
     dependencies:
       defaults: 1.0.4
+
+  web-streams-polyfill@3.3.3: {}
 
   webidl-conversions@8.0.0: {}
 

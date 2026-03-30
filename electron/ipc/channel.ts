@@ -84,8 +84,6 @@ export const channel = {
     deleteFile: "local-music:delete-file",
   },
   shazam: {
-    checkPython: "shazam:check-python",
-    installShazamio: "shazam:install-shazamio",
     recognize: "shazam:recognize",
     getDesktopSources: "shazam:get-desktop-sources",
   },
