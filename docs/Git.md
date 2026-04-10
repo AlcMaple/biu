@@ -23,4 +23,9 @@
 
 ## 示例
 
-初始化项目：Initial commit
+- 初始化项目：Initial commit
+- build(deps): 新增 qtawesome 依赖
+- chore: 忽略 macOS 系统文件
+- refactor: 重命名 base 为 example 示例
+- v2.0.0
+- refactor(db): 替换数据库初始化方案，使用 Alembic 接管建库与建表逻辑
