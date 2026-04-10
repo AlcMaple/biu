@@ -1,8 +1,5 @@
 import { useEffect, useMemo } from "react";
 
-import type { WebPlayerParams } from "@/service/web-player";
-
-import { getLyricsByBili } from "@/components/lyrics/get-lyrics";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import { useLyricsState } from "@/store/lyrics-state";
@@ -64,19 +61,7 @@ const LyricsBroadcaster = () => {
           }
         }
 
-        if (isLocal) {
-          if (!canceled) setLyrics([]);
-          return;
-        }
-
-        const cidAsNumber = Number(playItem.cid);
-        const params: WebPlayerParams = { cid: cidAsNumber };
-        if (playItem.bvid) params.bvid = playItem.bvid;
-        const aidAsNumber = playItem.aid ? Number(playItem.aid) : undefined;
-        if (aidAsNumber && !Number.isNaN(aidAsNumber)) params.aid = aidAsNumber;
-
-        const body = await getLyricsByBili(params);
-        if (!canceled) setLyrics(body ?? []);
+        if (!canceled) setLyrics([]);
       } catch {
         if (!canceled) setLyrics([]);
       } finally {
