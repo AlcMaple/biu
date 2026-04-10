@@ -32,23 +32,40 @@ export const useMusicFavStore = create<State & Action>()(set => ({
     const playItem = usePlayList.getState().getPlayItem();
 
     if (!playItem) {
-      set({ isFav: false, isThumb: false });
       return;
     }
 
-    // 本地歌曲：检查是否已在任意本地收藏夹中
+    // 无论是本地歌曲还是在线歌曲，首先检查是否已在任意本地收藏夹中
+    const localFolders = useFavoritesStore.getState().createdFavorites.filter(f => f.isLocal);
+    const folderItems = useLocalFavItemsStore.getState().folderItems;
+    const targetRid =
+      playItem.source === "local"
+        ? playItem.id
+        : playItem.type === "mv"
+          ? playItem.aid || playItem.bvid || playItem.id
+          : playItem.sid;
+
+    // 加强判断，兼容播放列表中的 item 可能丢失 aid 的情况，通过 bvid 兜底匹配
+    const isInAnyLocalFolder = localFolders.some(f =>
+      (folderItems[f.id] ?? []).some(
+        i => String(i.rid) === String(targetRid) || (playItem.bvid && i.bvid === playItem.bvid),
+      ),
+    );
+
+    // 如果此首（无论是本地还是在线资源）被发现存在于本地歌单中，我们直接先行点亮高亮，以实现真正的零延迟视觉效果。
+    // 但是不要在这里把 isFav 或 isThumb 强行设置回 false，否则对于那些实际在线收藏/点赞的资源来说，会产生从无高亮到高亮的闪动。
+    if (isInAnyLocalFolder) {
+      set({ isFav: true });
+    }
+
+    // 本地歌曲全部直接根据本地判断，即刻结算并中断后续线上请求
     if (playItem.source === "local") {
-      const localFolders = useFavoritesStore.getState().createdFavorites.filter(f => f.isLocal);
-      const folderItems = useLocalFavItemsStore.getState().folderItems;
-      const isInAnyFolder = localFolders.some(f =>
-        (folderItems[f.id] ?? []).some(i => String(i.rid) === String(playItem.id)),
-      );
-      set({ isFav: isInAnyFolder, isThumb: false });
+      set({ isFav: isInAnyLocalFolder, isThumb: false });
       return;
     }
 
     if (!user?.isLogin) {
-      set({ isFav: false, isThumb: false });
+      set({ isFav: isInAnyLocalFolder, isThumb: false });
       return;
     }
 
@@ -57,9 +74,10 @@ export const useMusicFavStore = create<State & Action>()(set => ({
         const res = await getWebInterfaceArchiveRelation({ bvid: playItem.bvid });
 
         if (res.code === 0) {
-          set({ isFav: Boolean(res.data.favorite), isThumb: Boolean(res.data.like) });
+          set({ isFav: isInAnyLocalFolder || Boolean(res.data.favorite), isThumb: Boolean(res.data.like) });
         } else {
-          set({ isFav: false, isThumb: false });
+          // 不再强制重置为 false，仅保底为真正的底层客观依据 isInAnyLocalFolder
+          set({ isFav: isInAnyLocalFolder });
         }
       } else if (playItem.type === "audio" && playItem.sid) {
         const res = await getCollResourceCheck({
@@ -68,15 +86,15 @@ export const useMusicFavStore = create<State & Action>()(set => ({
         });
 
         if (res.code === 0) {
-          set({ isFav: Boolean(res.data), isThumb: false });
+          set({ isFav: isInAnyLocalFolder || Boolean(res.data), isThumb: false });
         } else {
-          set({ isFav: false, isThumb: false });
+          set({ isFav: isInAnyLocalFolder });
         }
       } else {
-        set({ isFav: false, isThumb: false });
+        set({ isFav: isInAnyLocalFolder });
       }
     } catch {
-      set({ isFav: false, isThumb: false });
+      set({ isFav: isInAnyLocalFolder });
     }
   },
 }));
