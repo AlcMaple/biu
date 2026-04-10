@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useHref, useNavigate, useRoutes } from "react-router";
 
-import { HeroUIProvider, ToastProvider, addToast } from "@heroui/react";
+import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import moment from "moment";
 
 import { getCookitFromBSite } from "./common/utils/cookie";
@@ -10,7 +10,6 @@ import { mapKeyToElectronAccelerator } from "./common/utils/shortcut";
 import Theme from "./components/theme";
 import routes from "./routes";
 import { useAppUpdateStore } from "./store/app-update";
-import { lyricsSyncCache } from "./store/lyrics-sync-cache";
 import { usePlayList } from "./store/play-list";
 import { usePlayProgress } from "./store/play-progress";
 import { useShortcutSettings } from "./store/shortcuts";
@@ -150,18 +149,6 @@ export function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // 全局监听歌词后台同步结果，完成后弹出通知
-  useEffect(() => {
-    return window.electron.onSyncLyricsWithWhisperXDone(({ syncedLrc, originalLrc, error }) => {
-      if (error) {
-        addToast({ title: `歌词同步失败: ${error}`, color: "danger", timeout: 6000 });
-      } else if (syncedLrc) {
-        lyricsSyncCache.set(originalLrc, syncedLrc);
-        addToast({ title: "歌词时间轴同步完成，可在预览中查看", color: "success", timeout: 5000 });
-      }
-    });
   }, []);
 
   useEffect(() => {
