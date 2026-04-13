@@ -1,11 +1,28 @@
 import { desktopCapturer, ipcMain } from "electron";
 import log from "electron-log";
+import ffmpeg from "fluent-ffmpeg";
 import { Shazam } from "node-shazam";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { fixFfmpegPath } from "../utils";
 import { channel } from "./channel";
+
+/** WebM → WAV (16 kHz mono PCM) 转换，供 shazamio-core WASM 解码 */
+function convertToWav(inputPath: string, outputPath: string): Promise<void> {
+  fixFfmpegPath();
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .audioCodec("pcm_s16le")
+      .format("wav")
+      .on("error", reject)
+      .on("end", () => resolve())
+      .save(outputPath);
+  });
+}
 
 /** 单例 Shazam 实例（复用内部 WASM 模块，避免重复初始化） */
 const shazam = new Shazam();
@@ -16,14 +33,19 @@ export function registerShazamHandlers() {
    * node-shazam v1.2+ 内部使用 shazamio-core (WASM) 生成音频指纹，无需 Python 或外部 ffmpeg。
    */
   ipcMain.handle(channel.shazam.recognize, async (_, audioBuffer: ArrayBuffer) => {
-    const tempFile = path.join(os.tmpdir(), `biu-shazam-${Date.now()}.webm`);
+    const ts = Date.now();
+    const webmFile = path.join(os.tmpdir(), `biu-shazam-${ts}.webm`);
+    const wavFile = path.join(os.tmpdir(), `biu-shazam-${ts}.wav`);
 
     try {
-      await fsp.writeFile(tempFile, Buffer.from(audioBuffer));
+      await fsp.writeFile(webmFile, Buffer.from(audioBuffer));
 
-      log.info("[shazam] recognising:", tempFile);
+      // shazamio-core WASM 不支持 WebM/Opus，先用 ffmpeg 转为 WAV PCM
+      await convertToWav(webmFile, wavFile);
 
-      const result = await shazam.recognise(tempFile, "zh-CN");
+      log.info("[shazam] recognising:", wavFile);
+
+      const result = await shazam.recognise(wavFile, "zh-CN");
 
       if (!result) {
         return { error: "未能识别到歌曲，请确保音乐声音足够大后重试" };
@@ -35,7 +57,8 @@ export function registerShazamHandlers() {
       log.error("[shazam] recognise error:", err);
       return { error: String(err) };
     } finally {
-      fsp.unlink(tempFile).catch(() => {});
+      fsp.unlink(webmFile).catch(() => {});
+      fsp.unlink(wavFile).catch(() => {});
     }
   });
 
