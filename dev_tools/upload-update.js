@@ -23,6 +23,11 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ─── 读取更新说明 ─────────────────────────────────────────────────────────────
+
+const RELEASE_NOTES_FILE = path.join(__dirname, "release-notes.md");
+const releaseNotes = fs.existsSync(RELEASE_NOTES_FILE) ? fs.readFileSync(RELEASE_NOTES_FILE, "utf8").trim() : "";
+
 const HOST = "8.163.0.99";
 const USER = "root";
 const REMOTE_DIR = "/var/www/html/biu/updates/";
@@ -120,9 +125,9 @@ function exec(client, cmd) {
   });
 }
 
-/** 通过 SFTP 上传单个文件，显示进度 */
-function upload(client, localPath, remoteDir) {
-  const filename = path.basename(localPath);
+/** 通过 SFTP 上传单个文件，显示进度。remoteFilename 可覆盖远端文件名（用于临时文件） */
+function upload(client, localPath, remoteDir, remoteFilename) {
+  const filename = remoteFilename ?? path.basename(localPath);
   const remotePath = remoteDir + filename;
   const total = fs.statSync(localPath).size;
 
@@ -229,14 +234,35 @@ try {
   let successCount = 0;
   for (const { filename, fullPath } of filesToUpload) {
     log(`\n▶ 上传 ${filename}`);
+
+    // 对 YAML 元数据文件注入 releaseNotes 后上传临时副本
+    const isYml = filename.endsWith(".yml");
+    let uploadPath = fullPath;
+    let tempYml = null;
+    if (isYml && releaseNotes) {
+      const original = fs.readFileSync(fullPath, "utf8");
+      // 移除旧的 releaseNotes 字段（如有），再追加新内容
+      const stripped = original.replace(/^releaseNotes:[\s\S]*?(?=^\w|\Z)/m, "").trimEnd();
+      const indented = releaseNotes
+        .split("\n")
+        .map(l => `  ${l}`)
+        .join("\n");
+      const patched = `${stripped}\nreleaseNotes: |\n${indented}\n`;
+      tempYml = fullPath + ".tmp";
+      fs.writeFileSync(tempYml, patched, "utf8");
+      uploadPath = tempYml;
+    }
+
     try {
-      await upload(client, fullPath, REMOTE_DIR);
+      await upload(client, uploadPath, REMOTE_DIR, filename);
       successCount++;
       log("  ✅ 完成");
     } catch (e) {
       log(`  ❌ 失败：${e.message}`);
       client.end();
       process.exit(1);
+    } finally {
+      if (tempYml) fs.rmSync(tempYml, { force: true });
     }
   }
 
