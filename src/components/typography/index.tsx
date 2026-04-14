@@ -1,3 +1,5 @@
+import { marked } from "marked";
+
 import ScrollContainer from "../scroll-container";
 
 interface Props {
@@ -14,12 +16,14 @@ const Typography = ({ content }: Props) => {
     }
   };
 
+  const html = marked.parse(content, { async: false }) as string;
+
   return (
     <ScrollContainer>
       <div
         className="prose dark:prose-invert px-6"
         onClick={handleLinkClick}
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     </ScrollContainer>
   );
