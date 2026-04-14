@@ -24,6 +24,7 @@ import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
+import { useSettings } from "@/store/settings";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
@@ -48,7 +49,8 @@ const FavoritesSelectModal = () => {
 
   // 用 createdFavorites（引用稳定）再在 render 里 filter，避免 selector 每次返回新数组引用导致无限渲染
   const createdFavorites = useFavoritesStore(s => s.createdFavorites);
-  const localFolders = createdFavorites.filter(f => f.isLocal);
+  const hiddenMenuKeys = useSettings(s => s.hiddenMenuKeys);
+  const localFolders = createdFavorites.filter(f => f.isLocal && !hiddenMenuKeys.includes(String(f.id)));
 
   // 用具体 selector 避免订阅整个 store 导致不必要的重渲染
   const folderItems = useLocalFavItemsStore(s => s.folderItems);
@@ -250,7 +252,9 @@ const FavoritesSelectModal = () => {
   };
 
   const allItems = [
-    ...(data ?? []).map(item => ({ ...item, isLocal: false })),
+    ...(data ?? [])
+      .filter(item => !hiddenMenuKeys.includes(String(item.id)))
+      .map(item => ({ ...item, isLocal: false })),
     ...localFolders.map(f => ({
       id: f.id,
       title: f.title,
