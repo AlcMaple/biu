@@ -24,9 +24,11 @@ import {
   RiFileMusicLine,
   RiMoreLine,
   RiPencilLine,
+  RiPlayCircleLine,
   RiPlayFill,
   RiPlayListAddLine,
   RiStarLine,
+  RiStarOffLine,
 } from "@remixicon/react";
 import { chunk } from "es-toolkit/array";
 
@@ -54,18 +56,13 @@ const ORDER_OPTIONS = [
 ];
 
 const getLocalItemMenus = (isBiliItem: boolean) => [
-  { key: "favorite", label: "收藏", icon: <RiStarLine size={18} /> },
-  { key: "play-next", label: "下一首播放" },
-  { key: "add-to-playlist", label: "添加到播放列表" },
+  { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
+  { key: "remove", label: "取消收藏", icon: <RiStarOffLine size={18} /> },
+  { key: "play-next", label: "下一首播放", icon: <RiPlayCircleLine size={18} /> },
+  { key: "add-to-playlist", label: "添加到播放列表", icon: <RiPlayListAddLine size={18} /> },
   { key: "download-audio", label: "下载音频", icon: <RiFileMusicLine size={18} />, hidden: !isBiliItem },
-  {
-    key: "bililink",
-    label: "在 B 站打开",
-    icon: <RiExternalLinkLine size={18} />,
-    hidden: !isBiliItem,
-  },
-  { key: "rename", label: "重命名" },
-  { key: "remove", label: "从收藏夹中移除", color: "danger" as const, className: "text-danger" },
+  { key: "rename", label: "重命名", icon: <RiPencilLine size={18} /> },
+  { key: "bililink", label: "在 B 站打开", icon: <RiExternalLinkLine size={18} />, hidden: !isBiliItem },
 ];
 
 const LocalFavorites = () => {
@@ -297,11 +294,10 @@ const LocalFavorites = () => {
           break;
         case "remove":
           onOpenConfirmModal({
-            title: `确认从收藏夹中移除「${item.title}」吗？`,
-            type: "danger",
+            title: `确认取消收藏${item.title}？`,
             onConfirm: async () => {
               removeItem(folderId, item.rid);
-              addToast({ title: "已移除", color: "success" });
+              addToast({ title: "已取消收藏", color: "success" });
               return true;
             },
           });
