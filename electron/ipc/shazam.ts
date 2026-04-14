@@ -1,4 +1,4 @@
-import { desktopCapturer, ipcMain } from "electron";
+import { desktopCapturer, ipcMain, systemPreferences } from "electron";
 import log from "electron-log";
 import ffmpeg from "fluent-ffmpeg";
 import { Shazam } from "node-shazam";
@@ -68,6 +68,18 @@ export function registerShazamHandlers() {
     } catch (err) {
       log.error("[shazam] desktopCapturer error:", err);
       return [];
+    }
+  });
+
+  /** macOS 首次使用前向系统申请麦克风权限，非 macOS 平台直接返回 true */
+  ipcMain.handle(channel.shazam.requestMicPermission, async () => {
+    if (process.platform !== "darwin") return true;
+    try {
+      const granted = await systemPreferences.askForMediaAccess("microphone");
+      return granted;
+    } catch (err) {
+      log.error("[shazam] requestMicPermission error:", err);
+      return false;
     }
   });
 }

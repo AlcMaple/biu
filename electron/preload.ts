@@ -258,6 +258,8 @@ const api: ElectronAPI = {
   recognizeSong: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke(channel.shazam.recognize, audioBuffer),
   // 获取桌面捕获源
   getDesktopSources: () => ipcRenderer.invoke(channel.shazam.getDesktopSources),
+  // 申请麦克风权限（macOS 首次使用时触发系统授权弹窗）
+  requestMicPermission: () => ipcRenderer.invoke(channel.shazam.requestMicPermission),
   // 检查 demucs + whisperx 依赖是否已安装
   checkWhisperXDeps: () => ipcRenderer.invoke(channel.lyrics.checkWhisperXDeps),
   // 自动安装 demucs + whisperx
