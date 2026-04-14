@@ -20,6 +20,8 @@ import {
   RiCheckLine,
   RiDeleteBinLine,
   RiEraserLine,
+  RiExternalLinkLine,
+  RiFileMusicLine,
   RiMoreLine,
   RiPencilLine,
   RiPlayFill,
@@ -30,6 +32,7 @@ import { chunk } from "es-toolkit/array";
 
 import { CollectionType } from "@/common/constants/collection";
 import { formatMillisecond } from "@/common/utils/time";
+import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
 import MusicListItem from "@/components/music-list-item";
@@ -50,10 +53,17 @@ const ORDER_OPTIONS = [
   { key: "title", label: "按标题" },
 ];
 
-const localItemMenus = [
+const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "favorite", label: "收藏", icon: <RiStarLine size={18} /> },
   { key: "play-next", label: "下一首播放" },
   { key: "add-to-playlist", label: "添加到播放列表" },
+  { key: "download-audio", label: "下载音频", icon: <RiFileMusicLine size={18} />, hidden: !isBiliItem },
+  {
+    key: "bililink",
+    label: "在 B 站打开",
+    icon: <RiExternalLinkLine size={18} />,
+    hidden: !isBiliItem,
+  },
   { key: "rename", label: "重命名" },
   { key: "remove", label: "从收藏夹中移除", color: "danger" as const, className: "text-danger" },
 ];
@@ -228,7 +238,7 @@ const LocalFavorites = () => {
   }, [clearFolder, folder?.title, folderId, navigate, onOpenConfirmModal, rmCreatedFavorite]);
 
   const handleMenuAction = useCallback(
-    (key: string, item: LocalFavItem) => {
+    async (key: string, item: LocalFavItem) => {
       const playItem = itemToPlayItem(item);
       const isUnplayableLocal = playItem.source === "local" && !playItem.audioUrl;
       switch (key) {
@@ -267,6 +277,23 @@ const LocalFavorites = () => {
           setRenameTarget(item);
           setRenameValue(item.title);
           onRenameOpen();
+          break;
+        case "download-audio":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+            sid: item.type === 12 ? Number(item.rid) : undefined,
+          });
+          addToast({ title: "已添加下载任务", color: "success" });
+          break;
+        case "bililink":
+          openBiliVideoLink({
+            type: item.type === 2 ? "mv" : "audio",
+            bvid: item.bvid,
+            sid: item.type === 12 ? Number(item.rid) : undefined,
+          });
           break;
         case "remove":
           onOpenConfirmModal({
@@ -418,7 +445,7 @@ const LocalFavorites = () => {
             playCount={item.playCount}
             duration={item.duration}
             pubTime={formatMillisecond(item.fav_time)}
-            menus={localItemMenus}
+            menus={getLocalItemMenus(!isLocalItem(item))}
             onMenuAction={key => handleMenuAction(key, item)}
             onPress={() => handleItemPress(item)}
           />
