@@ -13,11 +13,10 @@ import { channel } from "./channel";
 function convertToWav(inputPath: string, outputPath: string): Promise<void> {
   fixFfmpegPath();
   return new Promise((resolve, reject) => {
+    // 用 outputOptions 直接传参，跳过 fluent-ffmpeg 的 capability 检查
+    // 避免 "Output format wav is not available" 误报（路径设置与缓存不同步所致）
     ffmpeg(inputPath)
-      .audioChannels(1)
-      .audioFrequency(16000)
-      .audioCodec("pcm_s16le")
-      .format("wav")
+      .outputOptions(["-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "wav"])
       .on("error", reject)
       .on("end", () => resolve())
       .save(outputPath);
