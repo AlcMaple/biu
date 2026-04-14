@@ -134,6 +134,8 @@ declare global {
     recognizeSong: (audioBuffer: ArrayBuffer) => Promise<Record<string, unknown>>;
     /** 获取桌面捕获源列表（用于系统音频采集） */
     getDesktopSources: () => Promise<Array<{ id: string; name: string }>>;
+    /** 申请麦克风权限（macOS 首次使用时触发系统授权弹窗），返回是否已授权 */
+    requestMicPermission: () => Promise<boolean>;
     /** 检查 demucs + whisperx 依赖是否已安装 */
     checkWhisperXDeps: () => Promise<{ ok: boolean; missingDep?: string; error?: string }>;
     /** 自动安装 demucs + whisperx（需要 Python 已存在） */

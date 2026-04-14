@@ -86,6 +86,7 @@ export const channel = {
   shazam: {
     recognize: "shazam:recognize",
     getDesktopSources: "shazam:get-desktop-sources",
+    requestMicPermission: "shazam:request-mic-permission",
   },
   window: {
     toggleMini: "window:toggle-mini",

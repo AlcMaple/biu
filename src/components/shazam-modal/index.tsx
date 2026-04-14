@@ -5,6 +5,7 @@ import { RiComputerLine, RiExternalLinkLine, RiFingerprintLine, RiMicLine, RiMus
 import { motion } from "framer-motion";
 
 import IconButton from "@/components/icon-button";
+import { usePlayList } from "@/store/play-list";
 
 type RecordState = "idle" | "recording" | "processing" | "success" | "error";
 
@@ -43,6 +44,11 @@ const ShazamModal = () => {
   const [result, setResult] = useState<ShazamResult | null>(null);
   const [error, setError] = useState("");
 
+  const isPlaying = usePlayList(s => s.isPlaying);
+  const togglePlay = usePlayList(s => s.togglePlay);
+  // 记录识别开始前是否正在播放，识别结束后恢复
+  const wasPlayingRef = useRef(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,9 +71,17 @@ const ShazamModal = () => {
       setState("recording");
       setCountdown(RECORD_DURATION);
 
+      // 识别前暂停播放
+      wasPlayingRef.current = isPlaying;
+      if (isPlaying) {
+        togglePlay();
+      }
+
       let stream: MediaStream;
       try {
         if (source === "mic") {
+          // macOS 首次使用需向系统申请麦克风权限，授权后 getUserMedia 才能成功
+          await window.electron.requestMicPermission();
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: false,
@@ -114,6 +128,8 @@ const ShazamModal = () => {
       } catch (err) {
         setError(String(err));
         setState("error");
+        // getUserMedia 失败时也需要恢复播放
+        if (wasPlayingRef.current) togglePlay();
         return;
       }
 
@@ -137,6 +153,7 @@ const ShazamModal = () => {
         if (blob.size === 0) {
           setError("未录制到音频数据，请检查麦克风权限后重试");
           setState("error");
+          if (wasPlayingRef.current) togglePlay();
           return;
         }
         const arrayBuffer = await blob.arrayBuffer();
@@ -147,6 +164,7 @@ const ShazamModal = () => {
           if (raw.error) {
             setError(String(raw.error));
             setState("error");
+            if (wasPlayingRef.current) togglePlay();
             return;
           }
 
@@ -157,6 +175,7 @@ const ShazamModal = () => {
           if (!track) {
             setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风）");
             setState("error");
+            if (wasPlayingRef.current) togglePlay();
             return;
           }
 
@@ -167,9 +186,11 @@ const ShazamModal = () => {
             url: track.url,
           });
           setState("success");
+          if (wasPlayingRef.current) togglePlay();
         } catch (err) {
           setError(String(err));
           setState("error");
+          if (wasPlayingRef.current) togglePlay();
         }
       };
 
@@ -188,7 +209,7 @@ const ShazamModal = () => {
         }
       }, 1000);
     },
-    [cleanup],
+    [cleanup, isPlaying, togglePlay],
   );
 
   const handleClose = () => {
