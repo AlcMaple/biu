@@ -433,6 +433,7 @@ const LocalFavorites = () => {
             title={item.title}
             type={item.type === 2 ? "mv" : "audio"}
             bvid={item.type === 2 ? item.bvid : undefined}
+            cid={item.type === 2 ? item.cid : undefined}
             sid={isLocalItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
             itemId={isLocalItem(item) ? String(item.rid) : undefined}
             source={isLocalItem(item) ? "local" : item.source}
