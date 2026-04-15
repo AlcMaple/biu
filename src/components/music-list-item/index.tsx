@@ -21,6 +21,8 @@ interface Props {
   title: ReactNode;
   type: "audio" | "mv";
   bvid?: string;
+  /** 分集 cid（传入后高亮判断会精确匹配分集，避免同视频多集同时高亮） */
+  cid?: string;
   sid?: number;
   /** 本地歌曲 id（source=local 时用于判断是否正在播放） */
   itemId?: string;
@@ -42,6 +44,7 @@ const MusicListItem = ({
   title,
   type,
   bvid,
+  cid,
   sid,
   itemId,
   source,
@@ -61,7 +64,10 @@ const MusicListItem = ({
   const playId = usePlayList(state => state.playId);
   const list = usePlayList(state => state.list);
   const playItem = list.find(item => item.id === playId);
-  const isPlay = isSame(playItem, { type, bvid, sid, source, id: itemId });
+  const isPlay =
+    isSame(playItem, { type, bvid, sid, source, id: itemId }) &&
+    // 有 cid 时精确匹配分集，防止同视频不同分集同时高亮
+    (!cid || !playItem?.cid || cid === playItem.cid);
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
