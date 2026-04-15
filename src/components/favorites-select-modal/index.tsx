@@ -80,6 +80,9 @@ const FavoritesSelectModal = () => {
   // step 0: 选集 step 1: 选收藏夹
   const [step, setStep] = useState<0 | 1>(1);
   const showPagePicker = step === 0;
+  // 正在请求分集数据时为 true，避免先闪现收藏夹列表再切换到选集步骤
+  const needsFetchPages = Boolean(type === 2 && !isLocal && itemInfo?.bvid);
+  const [isPagesLoading, setIsPagesLoading] = useState(false);
 
   useEffect(() => {
     if (!isFavSelectModalOpen) {
@@ -88,11 +91,18 @@ const FavoritesSelectModal = () => {
       setVideoPages([]);
       setPickedCid("whole");
       setStep(1);
+      setIsPagesLoading(false);
       prevSelectedRef.current = [];
-    } else if (rid) {
-      setSelectedTagIds(getItemTagIds(rid));
+    } else {
+      if (rid) {
+        setSelectedTagIds(getItemTagIds(rid));
+      }
+      // 对多P视频提前进入加载态，防止收藏夹列表闪现
+      if (needsFetchPages) {
+        setIsPagesLoading(true);
+      }
     }
-  }, [isFavSelectModalOpen, rid, getItemTagIds]);
+  }, [isFavSelectModalOpen, rid, getItemTagIds, needsFetchPages]);
 
   // 获取多P视频分集列表，决定是否显示选集步骤
   useRequest(
@@ -106,12 +116,16 @@ const FavoritesSelectModal = () => {
       ready: Boolean(isFavSelectModalOpen && type === 2 && !isLocal && itemInfo?.bvid),
       refreshDeps: [isFavSelectModalOpen, itemInfo?.bvid],
       onSuccess: pages => {
+        setIsPagesLoading(false);
         if (pages && pages.length > 1) {
           setVideoPages(pages);
           // 若调用方传入了当前分集 cid，预选该分集；否则默认"整个视频"
           setPickedCid(itemInfo?.cid ?? "whole");
           setStep(0);
         }
+      },
+      onError: () => {
+        setIsPagesLoading(false);
       },
     },
   );
@@ -336,7 +350,10 @@ const FavoritesSelectModal = () => {
       <ModalContent>
         <ModalHeader className="text-base font-medium">{title}</ModalHeader>
         <ModalBody className="px-0">
-          {showPagePicker ? (
+          {isPagesLoading ? (
+            /* 等待分集数据，避免收藏夹列表闪现 */
+            <div className="flex items-center justify-center py-10 text-sm text-zinc-400">加载中…</div>
+          ) : showPagePicker ? (
             /* 选集步骤 */
             <ScrollContainer style={{ height: "100%" }}>
               <div className="flex flex-col gap-1 px-4">
@@ -449,7 +466,11 @@ const FavoritesSelectModal = () => {
           <Button variant="light" onPress={handleCancel} isDisabled={submitting}>
             取消
           </Button>
-          {showPagePicker ? (
+          {isPagesLoading ? (
+            <Button color="primary" isDisabled>
+              下一步
+            </Button>
+          ) : showPagePicker ? (
             <Button color="primary" onPress={() => setStep(1)}>
               下一步
             </Button>
