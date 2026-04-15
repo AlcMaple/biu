@@ -647,9 +647,14 @@ export const usePlayList = create<State & Action>()(
             id: item.source === "local" && item.id ? item.id : idGenerator(),
           }));
 
+          const initialId =
+            get().playMode === PlayMode.Random && newList.length > 1
+              ? newList[Math.floor(Math.random() * newList.length)].id
+              : newList[0].id;
+
           set(state => {
             state.list = newList;
-            state.playId = newList[0].id;
+            state.playId = initialId;
           });
         },
         next: async () => {
