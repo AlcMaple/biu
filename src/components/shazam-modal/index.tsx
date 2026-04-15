@@ -18,6 +18,32 @@ interface ShazamResult {
 
 const RECORD_DURATION = 8;
 
+const isWindows = typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
+
+const formatMediaError = (err: unknown, source: "mic" | "system") => {
+  const name = err instanceof Error ? err.name : "";
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (source === "mic" && name === "NotAllowedError") {
+    if (/system/i.test(message)) {
+      return isWindows
+        ? "系统拒绝了麦克风权限。请打开「Windows 设置 → 隐私和安全性 → 麦克风」，确认已开启「麦克风访问」「让应用访问你的麦克风」以及最底部的「允许桌面应用访问你的麦克风」，然后重启应用重试"
+        : "系统拒绝了麦克风权限，请在操作系统的隐私设置中为本应用开启麦克风后重试";
+    }
+    return "麦克风权限被拒绝，请允许访问后重试";
+  }
+
+  if (source === "mic" && name === "NotFoundError") {
+    return "未检测到麦克风设备，请确认已连接麦克风或在系统声音设置中启用输入设备";
+  }
+
+  if (source === "mic" && name === "NotReadableError") {
+    return "麦克风被其他应用占用或驱动异常，请关闭占用应用或重启设备后重试";
+  }
+
+  return message || String(err);
+};
+
 const WaveBars = () => (
   <div className="flex items-center justify-center gap-[3px]" style={{ height: 48 }}>
     {[0, 1, 2, 3, 4, 5, 6].map(i => (
@@ -126,7 +152,7 @@ const ShazamModal = () => {
           }
         }
       } catch (err) {
-        setError(String(err));
+        setError(formatMediaError(err, source));
         setState("error");
         // getUserMedia 失败时也需要恢复播放
         if (wasPlayingRef.current) togglePlay();
