@@ -30,6 +30,7 @@ const GridList: React.FC<GridListProps> = ({ items, hasMore, loading, onLoadMore
           time={item.view_at}
           menus={getContextMenus({
             business: item.history.business,
+            isFav: item.is_fav === 1,
           })}
           onMenuAction={key => {
             onMenuAction(key, item);
