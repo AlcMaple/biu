@@ -5,12 +5,26 @@ import {
   RiFileVideoLine,
   RiPlayCircleLine,
   RiPlayListAddLine,
+  RiStarLine,
+  RiStarOffLine,
 } from "@remixicon/react";
 
-export const getContextMenus = ({ business }: { business: string }) => {
+export const getContextMenus = ({ business, isFav }: { business: string; isFav?: boolean }) => {
   const canPlay = business === "archive";
 
   return [
+    {
+      icon: <RiStarLine size={18} />,
+      key: "favorite",
+      label: isFav ? "移动" : "收藏",
+      hidden: !canPlay,
+    },
+    {
+      icon: <RiStarOffLine size={18} />,
+      key: "cancelFavorite",
+      label: "取消收藏",
+      hidden: !canPlay || !isFav,
+    },
     {
       icon: <RiPlayCircleLine size={18} />,
       key: "play-next",

@@ -6,6 +6,8 @@ import { useShallow } from "zustand/react/shallow";
 
 import IconButton from "@/components/icon-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
+import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { postHistoryClear } from "@/service/history-clear";
 import { postHistoryDelete } from "@/service/history-delete";
 import {
@@ -16,6 +18,7 @@ import {
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useUser } from "@/store/user";
 
 import GridList from "./grid-list";
 import HistoryList from "./list";
@@ -38,6 +41,7 @@ const History = () => {
       updateSettings: state.update,
     })),
   );
+  const user = useUser(state => state.user);
 
   // 加载历史记录（只负责请求和数据合并，loading 状态由调用方管理）
   const fetchHistory = useCallback(async () => {
@@ -161,81 +165,165 @@ const History = () => {
     };
   }, [fetchHistory]);
 
-  const handleMenuAction = useCallback(async (key: string, item: HistoryListItem) => {
-    switch (key) {
-      case "play-next":
-        usePlayList.getState().addToNext({
-          type: "mv",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.history.bvid,
-          ownerName: item.author_name,
-          ownerMid: item.author_mid,
-        });
-        break;
-      case "add-to-playlist":
-        usePlayList.getState().addList([
-          {
+  const handleMenuAction = useCallback(
+    async (key: string, item: HistoryListItem) => {
+      switch (key) {
+        case "play-next":
+          usePlayList.getState().addToNext({
             type: "mv",
             title: item.title,
             cover: item.cover,
             bvid: item.history.bvid,
             ownerName: item.author_name,
             ownerMid: item.author_mid,
-          },
-        ]);
-        break;
-      case "download-audio":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "audio",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.history.bvid,
-          cid: item.history.cid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "download-video":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "video",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.history.bvid,
-          cid: item.history.cid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.history.bvid}`);
-        break;
-      case "delete":
-        useModalStore.getState().onOpenConfirmModal({
-          title: `删除记录${item.title}`,
-          confirmText: "删除",
-          onConfirm: async () => {
-            const res = await postHistoryDelete({
-              kid: `${item.history.business}_${item.kid}`,
-            });
-
-            if (res.code === 0) {
-              setList(prev => prev.filter(record => record.kid !== item.kid));
-              addToast({
-                title: "已删除记录",
-                color: "success",
+          });
+          break;
+        case "add-to-playlist":
+          usePlayList.getState().addList([
+            {
+              type: "mv",
+              title: item.title,
+              cover: item.cover,
+              bvid: item.history.bvid,
+              ownerName: item.author_name,
+              ownerMid: item.author_mid,
+            },
+          ]);
+          break;
+        case "favorite":
+          useModalStore.getState().onOpenFavSelectModal({
+            rid: item.history.oid,
+            type: 2,
+            title: (
+              <div>
+                {item.is_fav === 1 ? "移动" : "收藏"}
+                <span>{item.title}</span>
+              </div>
+            ),
+            itemInfo: {
+              title: item.title,
+              cover: item.cover,
+              bvid: item.history.bvid,
+              ownerName: item.author_name,
+              ownerMid: item.author_mid,
+              duration: item.duration,
+            },
+            onSuccess: selectedIds => {
+              setList(prev =>
+                prev.map(record =>
+                  record.kid === item.kid && record.history.oid === item.history.oid
+                    ? { ...record, is_fav: selectedIds?.length ? 1 : 0 }
+                    : record,
+                ),
+              );
+            },
+          });
+          break;
+        case "cancelFavorite":
+          useModalStore.getState().onOpenConfirmModal({
+            title: `确认取消收藏「${item.title}」？`,
+            confirmText: "取消收藏",
+            onConfirm: async () => {
+              if (!user?.mid) {
+                addToast({ title: "请先登录", color: "danger" });
+                return false;
+              }
+              const listRes = await getFavFolderCreatedListAll({
+                rid: item.history.oid,
+                type: 2,
+                up_mid: user.mid,
               });
-            }
-            return res.code === 0;
-          },
-        });
-        break;
-    }
-  }, []);
+              const delIds = (listRes.data?.list ?? [])
+                .filter(folder => folder.fav_state === 1)
+                .map(folder => folder.id)
+                .join(",");
+              if (!delIds) {
+                setList(prev =>
+                  prev.map(record =>
+                    record.kid === item.kid && record.history.oid === item.history.oid
+                      ? { ...record, is_fav: 0 }
+                      : record,
+                  ),
+                );
+                return true;
+              }
+              const res = await postFavFolderDeal({
+                rid: item.history.oid,
+                del_media_ids: delIds,
+                type: 2,
+                platform: "web",
+                ga: 1,
+                gaia_source: "web_normal",
+              });
+              if (res.code === 0) {
+                setList(prev =>
+                  prev.map(record =>
+                    record.kid === item.kid && record.history.oid === item.history.oid
+                      ? { ...record, is_fav: 0 }
+                      : record,
+                  ),
+                );
+                addToast({ title: "已取消收藏", color: "success" });
+                return true;
+              }
+              addToast({ title: res.message || "取消收藏失败", color: "danger" });
+              return false;
+            },
+          });
+          break;
+        case "download-audio":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.history.bvid,
+            cid: item.history.cid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "download-video":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "video",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.history.bvid,
+            cid: item.history.cid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "bililink":
+          window.electron.openExternal(`https://www.bilibili.com/video/${item.history.bvid}`);
+          break;
+        case "delete":
+          useModalStore.getState().onOpenConfirmModal({
+            title: `删除记录${item.title}`,
+            confirmText: "删除",
+            onConfirm: async () => {
+              const res = await postHistoryDelete({
+                kid: `${item.history.business}_${item.kid}`,
+              });
+
+              if (res.code === 0) {
+                setList(prev => prev.filter(record => record.kid !== item.kid));
+                addToast({
+                  title: "已删除记录",
+                  color: "success",
+                });
+              }
+              return res.code === 0;
+            },
+          });
+          break;
+      }
+    },
+    [user],
+  );
 
   const handleClear = useCallback(() => {
     useModalStore.getState().onOpenConfirmModal({

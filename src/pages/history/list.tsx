@@ -71,6 +71,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
               onPress={item.history.business === "pgc" ? undefined : () => handlePress(item)}
               menus={getContextMenus({
                 business: item.history.business,
+                isFav: item.is_fav === 1,
               })}
               onMenuAction={key => onMenuAction(key, item)}
               isCompact={isCompact}
