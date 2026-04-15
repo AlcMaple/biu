@@ -587,14 +587,35 @@ export const usePlayList = create<State & Action>()(
             ? list?.find(item => item.cid === targetCid)
             : list?.find(item => isSame(item, candidate));
           if (existItem) {
-            set({ playId: existItem.id });
-            try {
-              await ensureAudioSrcValid();
-              await playAudioSafely();
-            } catch (error) {
-              handlePlayError(error);
+            if (targetCid) {
+              // 指定分集时，清除同视频其他分集，避免播完后续播不属于本次收藏的集数
+              set(state => {
+                state.list = state.list.filter(item => !(item.bvid === bvid && item.cid !== targetCid));
+                state.playId = existItem.id;
+              });
+              try {
+                await ensureAudioSrcValid();
+                await playAudioSafely();
+              } catch (error) {
+                handlePlayError(error);
+              }
+              return;
+            } else {
+              // 整集播放：若多P视频的分集未全部在队列中，重新获取全集（避免只有部分分集无法续播）
+              const pagesInQueue = bvid ? list.filter(item => item.bvid === bvid).length : 1;
+              const allPagesLoaded = !existItem.hasMultiPart || pagesInQueue >= (existItem.totalPage ?? 1);
+              if (allPagesLoaded) {
+                set({ playId: existItem.id });
+                try {
+                  await ensureAudioSrcValid();
+                  await playAudioSafely();
+                } catch (error) {
+                  handlePlayError(error);
+                }
+                return;
+              }
+              // 分集不完整，跌落到下方重新获取全集数据
             }
-            return;
           }
 
           const isLocal = source === "local";
@@ -641,7 +662,13 @@ export const usePlayList = create<State & Action>()(
           }
 
           set(state => {
-            state.list = [...state.list, ...playItem];
+            // 指定了分集时只加入目标分集，避免其余分集自动续播
+            const itemsToAdd = targetCid ? [nextPlayItem] : playItem;
+            // 整集播放时，若队列中已有该视频的部分分集（如之前按分集收藏），先清理再重新入队全集
+            if (!targetCid && bvid) {
+              state.list = state.list.filter(item => item.bvid !== bvid);
+            }
+            state.list = [...state.list, ...itemsToAdd];
             state.playId = nextPlayItem.id;
           });
         },
