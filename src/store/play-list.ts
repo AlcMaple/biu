@@ -97,6 +97,8 @@ export interface PlayItem {
   cover?: string;
   ownerName?: string;
   ownerMid?: number;
+  /** 目标分集 cid（多P视频时用于直接播放指定分集） */
+  cid?: string;
 }
 
 interface Action {
@@ -553,14 +555,26 @@ export const usePlayList = create<State & Action>()(
         setShouldKeepPagesOrderInRandomPlayMode: shouldKeep => {
           set({ shouldKeepPagesOrderInRandomPlayMode: shouldKeep });
         },
-        play: async ({ type, bvid, sid, title, cover, ownerName, ownerMid, id, source, audioUrl }: PlayItem) => {
+        play: async ({
+          type,
+          bvid,
+          sid,
+          title,
+          cover,
+          ownerName,
+          ownerMid,
+          id,
+          source,
+          audioUrl,
+          cid: targetCid,
+        }: PlayItem) => {
           const { list, playId } = get();
           const currentItem = list?.find(item => item.id === playId);
           const sanitizedTitle = sanitizeTitle(title);
           const candidate = { type, bvid, sid, source, id };
 
-          // 当前正在播放，如果暂停了则播放
-          if (isSame(currentItem, candidate)) {
+          // 当前正在播放，如果暂停了则播放（指定了分集时校验 cid）
+          if (isSame(currentItem, candidate) && (!targetCid || currentItem?.cid === targetCid)) {
             if (audio.paused) {
               await ensureAudioSrcValid();
               await playAudioSafely();
@@ -568,8 +582,10 @@ export const usePlayList = create<State & Action>()(
             return;
           }
 
-          // 列表已存在
-          const existItem = list?.find(item => isSame(item, candidate));
+          // 列表已存在（指定分集时精确匹配 cid，否则按 bvid/sid 匹配）
+          const existItem = targetCid
+            ? list?.find(item => item.cid === targetCid)
+            : list?.find(item => isSame(item, candidate));
           if (existItem) {
             set({ playId: existItem.id });
             try {
@@ -606,8 +622,8 @@ export const usePlayList = create<State & Action>()(
                     ownerMid,
                   },
                 ];
-          // 补充缺失信息
-          if (!isLocal && (!cover || !ownerName || !ownerMid)) {
+          // 补充缺失信息（有 targetCid 时也需要获取完整分集列表）
+          if (!isLocal && (!cover || !ownerName || !ownerMid || targetCid)) {
             if (type === "mv" && bvid) {
               playItem = await getMVData(bvid);
             }
@@ -617,7 +633,8 @@ export const usePlayList = create<State & Action>()(
             }
           }
 
-          const nextPlayItem = playItem[0];
+          // 指定了分集时定位到目标分集，否则从第一项开始
+          const nextPlayItem = (targetCid ? playItem.find(p => p.cid === targetCid) : undefined) ?? playItem[0];
           if (!nextPlayItem) {
             toastError("播放失败：无法获取播放信息");
             return;

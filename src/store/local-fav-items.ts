@@ -5,7 +5,7 @@ import { StoreNameMap } from "@shared/store";
 
 /** 本地收藏夹中的媒体项 */
 export interface LocalFavItem {
-  /** 资源 id（视频为 aid，音频为 sid；本地音乐为文件 id） */
+  /** 资源 id（视频为 aid，音频为 sid；本地音乐为文件 id；分集收藏时为 cid） */
   rid: string | number;
   /** 2=视频 12=音频 */
   type: number;
@@ -24,6 +24,12 @@ export interface LocalFavItem {
   duration?: number | string;
   /** 播放量 */
   playCount?: number;
+  /** 分集 cid（仅当收藏的是多P视频的某一集时存在，rid 也会设为该 cid） */
+  cid?: string;
+  /** 分集序号（从 1 开始） */
+  page?: number;
+  /** 分集标题 */
+  partTitle?: string;
 }
 
 interface State {

@@ -141,7 +141,8 @@ const LocalFavorites = () => {
       return {
         type: "mv" as const,
         bvid: item.bvid!,
-        title: item.title,
+        cid: item.cid,
+        title: item.partTitle || item.title,
         cover: item.cover,
         ownerMid: item.ownerMid,
         ownerName: item.ownerName,

@@ -24,6 +24,8 @@ export interface FavSelectModalData {
     ownerMid?: number;
     duration?: number | string;
     playCount?: number;
+    /** 当前正在播放的分集 cid（用于在弹窗中预选该分集） */
+    cid?: string;
   };
   /** 选择收藏夹后的回调函数, selectedFolderIds 为选中的收藏夹id数组 */
   onSuccess?: (selectedFolderIds: number[]) => void;

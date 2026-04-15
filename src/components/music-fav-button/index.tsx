@@ -40,6 +40,7 @@ const MusicFavButton = () => {
         source: isLocal ? "local" : "online",
         ownerName: playItem.ownerName,
         ownerMid: playItem.ownerMid,
+        cid: playItem.cid,
       },
       onSuccess: selectedIds => {
         setIsFav(Boolean(selectedIds?.length));

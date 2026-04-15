@@ -11,14 +11,20 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Radio,
+  RadioGroup,
 } from "@heroui/react";
-import { RiCheckLine } from "@remixicon/react";
+import { RiCheckLine, RiTimeLine } from "@remixicon/react";
 import { useRequest } from "ahooks";
 
+import type { Page } from "@/service/web-interface-view";
+
+import { formatDuration } from "@/common/utils/time";
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
+import { getWebInterfaceView } from "@/service/web-interface-view";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
@@ -67,21 +73,56 @@ const FavoritesSelectModal = () => {
 
   const prevSelectedRef = useRef<number[]>([]);
 
+  // 分集选择状态（仅 type=2 多P视频时有效）
+  // "whole" = 收藏整个视频，数字字符串 = 收藏指定分集的 cid
+  const [videoPages, setVideoPages] = useState<Page[]>([]);
+  const [pickedCid, setPickedCid] = useState<string>("whole");
+  // step 0: 选集 step 1: 选收藏夹
+  const [step, setStep] = useState<0 | 1>(1);
+  const showPagePicker = step === 0;
+
   useEffect(() => {
     if (!isFavSelectModalOpen) {
       setSelectedIds([]);
       setSelectedTagIds([]);
+      setVideoPages([]);
+      setPickedCid("whole");
+      setStep(1);
       prevSelectedRef.current = [];
     } else if (rid) {
       setSelectedTagIds(getItemTagIds(rid));
     }
   }, [isFavSelectModalOpen, rid, getItemTagIds]);
 
-  // 本地收藏夹的初始选中状态
+  // 获取多P视频分集列表，决定是否显示选集步骤
+  useRequest(
+    async () => {
+      const bvid = itemInfo?.bvid;
+      if (!bvid || type !== 2 || isLocal) return [];
+      const res = await getWebInterfaceView({ bvid });
+      return res?.data?.pages ?? [];
+    },
+    {
+      ready: Boolean(isFavSelectModalOpen && type === 2 && !isLocal && itemInfo?.bvid),
+      refreshDeps: [isFavSelectModalOpen, itemInfo?.bvid],
+      onSuccess: pages => {
+        if (pages && pages.length > 1) {
+          setVideoPages(pages);
+          // 若调用方传入了当前分集 cid，预选该分集；否则默认"整个视频"
+          setPickedCid(itemInfo?.cid ?? "whole");
+          setStep(0);
+        }
+      },
+    },
+  );
+
+  // 本地收藏夹的初始选中状态（选集步骤完成后再初始化）
   useEffect(() => {
-    if (!isFavSelectModalOpen || !rid) return;
+    if (!isFavSelectModalOpen || !rid || showPagePicker) return;
+    // 当有选集时，使用分集 cid 作为 localRid；否则用 aid (rid)
+    const localRid = pickedCid !== "whole" ? pickedCid : rid;
     const localSelectedIds = localFolders
-      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(rid)))
+      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(localRid)))
       .map(f => f.id);
     if (localSelectedIds.length) {
       setSelectedIds(prev => {
@@ -91,7 +132,7 @@ const FavoritesSelectModal = () => {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFavSelectModalOpen, rid]);
+  }, [isFavSelectModalOpen, rid, showPagePicker, pickedCid]);
 
   const { data } = useRequest(
     async () => {
@@ -145,9 +186,14 @@ const FavoritesSelectModal = () => {
     // 区分 B站 收藏夹 ID（正数）和本地收藏夹 ID（负数）
     const localFolderIdSet = new Set(localFolders.map(f => f.id));
 
+    // 计算分集信息（选了具体分集时生效）
+    const pageInfo = pickedCid !== "whole" ? videoPages.find(p => String(p.cid) === pickedCid) : null;
+    // 本地存储用的 rid：分集收藏时用 cid，整个视频时用 aid
+    const localRid: string | number = pageInfo ? String(pageInfo.cid) : (rid as string | number);
+
     const biliPrevIds = prevSelectedRef.current.filter(id => !localFolderIdSet.has(id));
     const localPrevIds = localFolders
-      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(rid)))
+      .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(localRid)))
       .map(f => f.id);
 
     const biliSelectedIds = selectedIds.filter(id => !localFolderIdSet.has(id));
@@ -193,20 +239,24 @@ const FavoritesSelectModal = () => {
       for (const folderId of localToAdd) {
         if (itemInfo) {
           addLocalItem(folderId, {
-            rid,
+            rid: localRid,
             type,
             source: itemInfo.source,
-            title: itemInfo.title,
+            title: pageInfo ? `${itemInfo.title}-P${pageInfo.page}` : itemInfo.title,
             cover: itemInfo.cover,
             bvid: itemInfo.bvid,
             audioUrl: itemInfo.audioUrl,
             ownerName: itemInfo.ownerName,
             ownerMid: itemInfo.ownerMid,
-            duration: itemInfo.duration,
+            duration: pageInfo?.duration ?? itemInfo.duration,
             playCount: itemInfo.playCount,
+            // 分集信息
+            cid: pageInfo ? String(pageInfo.cid) : undefined,
+            page: pageInfo?.page,
+            partTitle: pageInfo?.part,
           });
           // 更新收藏夹封面为最新添加的内容封面
-          if (itemInfo.cover) {
+          if (itemInfo.cover && !pageInfo) {
             const folder = useFavoritesStore.getState().createdFavorites.find(f => f.id === folderId);
             if (folder) {
               useFavoritesStore.getState().modifyCreatedFavorite({ ...folder, cover: itemInfo.cover });
@@ -215,7 +265,7 @@ const FavoritesSelectModal = () => {
         }
       }
       for (const folderId of localToDel) {
-        removeLocalItem(folderId, rid);
+        removeLocalItem(folderId, localRid);
       }
 
       // 保存标签
@@ -252,9 +302,12 @@ const FavoritesSelectModal = () => {
   };
 
   const allItems = [
-    ...(data ?? [])
-      .filter(item => !hiddenMenuKeys.includes(String(item.id)))
-      .map(item => ({ ...item, isLocal: false })),
+    // 收藏具体分集时不显示 B站收藏夹（分集仅允许存入本地收藏夹）
+    ...(pickedCid === "whole"
+      ? (data ?? [])
+          .filter(item => !hiddenMenuKeys.includes(String(item.id)))
+          .map(item => ({ ...item, isLocal: false }))
+      : []),
     ...localFolders.map(f => ({
       id: f.id,
       title: f.title,
@@ -283,89 +336,135 @@ const FavoritesSelectModal = () => {
       <ModalContent>
         <ModalHeader className="text-base font-medium">{title}</ModalHeader>
         <ModalBody className="px-0">
-          <ScrollContainer style={{ height: "100%" }}>
-            <div className="flex flex-col gap-1 overflow-auto px-4">
-              {allItems.map(item => {
-                const checked = selectedIds.includes(item.id);
-                return (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    key={item.id}
-                    onClick={() => toggle(item.id)}
-                    onKeyDown={() => toggle(item.id)}
-                    className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  >
-                    <Checkbox
-                      color="primary"
-                      isSelected={checked}
-                      onChange={() => toggle(item.id)}
-                      onClick={e => e.stopPropagation()}
-                      aria-label={item.title}
-                      isDisabled={item.isLocal && !itemInfo}
-                    />
-                    <div className="flex min-w-0 flex-1 items-center justify-between">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{item.title}</div>
-                        <div className="mt-0.5 text-xs text-zinc-500">
-                          {item.media_count ?? 0} 个内容
-                          {item.isLocal && (
-                            <span className="ml-1 rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-700">本地</span>
-                          )}
+          {showPagePicker ? (
+            /* 选集步骤 */
+            <ScrollContainer style={{ height: "100%" }}>
+              <div className="flex flex-col gap-1 px-4">
+                <RadioGroup value={pickedCid} onValueChange={setPickedCid}>
+                  <Radio value="whole">
+                    <span className="text-sm">收藏整个视频（共 {videoPages.length} 集）</span>
+                  </Radio>
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {videoPages.map(p => {
+                      const isCurrentPage = itemInfo?.cid === String(p.cid);
+                      return (
+                        <Radio key={p.cid} value={String(p.cid)}>
+                          <div className="flex min-w-0 items-center gap-2 py-0.5">
+                            <span className="w-7 shrink-0 text-right text-xs text-zinc-400 tabular-nums">
+                              P{p.page}
+                            </span>
+                            <span className="min-w-0 truncate text-sm">{p.part || itemInfo?.title}</span>
+                            {isCurrentPage && (
+                              <span className="bg-primary/15 text-primary ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs">
+                                正在播放
+                              </span>
+                            )}
+                            <span className="ml-auto shrink-0 text-xs text-zinc-400 tabular-nums">
+                              <RiTimeLine size={11} className="mr-0.5 inline-block" />
+                              {formatDuration(p.duration)}
+                            </span>
+                          </div>
+                        </Radio>
+                      );
+                    })}
+                  </div>
+                </RadioGroup>
+              </div>
+            </ScrollContainer>
+          ) : (
+            /* 选收藏夹步骤 */
+            <ScrollContainer style={{ height: "100%" }}>
+              <div className="flex flex-col gap-1 overflow-auto px-4">
+                {allItems.map(item => {
+                  const checked = selectedIds.includes(item.id);
+                  return (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      key={item.id}
+                      onClick={() => toggle(item.id)}
+                      onKeyDown={() => toggle(item.id)}
+                      className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    >
+                      <Checkbox
+                        color="primary"
+                        isSelected={checked}
+                        onChange={() => toggle(item.id)}
+                        onClick={e => e.stopPropagation()}
+                        aria-label={item.title}
+                        isDisabled={item.isLocal && !itemInfo}
+                      />
+                      <div className="flex min-w-0 flex-1 items-center justify-between">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{item.title}</div>
+                          <div className="mt-0.5 text-xs text-zinc-500">
+                            {item.media_count ?? 0} 个内容
+                            {item.isLocal && (
+                              <span className="ml-1 rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-700">
+                                本地
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-            {allTags.length > 0 && (
-              <div className="px-4 pt-3">
-                <Divider className="mb-3" />
-                <div className="mb-2 text-sm font-medium text-zinc-500">标签</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {allTags.map(tag => {
-                    const selected = selectedTagIds.includes(tag.id);
-                    return (
-                      <Chip
-                        key={tag.id}
-                        variant={selected ? "flat" : "bordered"}
-                        style={
-                          selected
-                            ? { backgroundColor: tag.color + "22", color: tag.color }
-                            : { borderColor: tag.color + "66", color: tag.color }
-                        }
-                        className="cursor-pointer"
-                        startContent={selected ? <RiCheckLine size={12} /> : undefined}
-                        onClick={() =>
-                          setSelectedTagIds(prev =>
-                            prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
-                          )
-                        }
-                      >
-                        {tag.name}
-                      </Chip>
-                    );
-                  })}
-                </div>
+                  );
+                })}
               </div>
-            )}
-          </ScrollContainer>
+              {allTags.length > 0 && (
+                <div className="px-4 pt-3">
+                  <Divider className="mb-3" />
+                  <div className="mb-2 text-sm font-medium text-zinc-500">标签</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allTags.map(tag => {
+                      const selected = selectedTagIds.includes(tag.id);
+                      return (
+                        <Chip
+                          key={tag.id}
+                          variant={selected ? "flat" : "bordered"}
+                          style={
+                            selected
+                              ? { backgroundColor: tag.color + "22", color: tag.color }
+                              : { borderColor: tag.color + "66", color: tag.color }
+                          }
+                          className="cursor-pointer"
+                          startContent={selected ? <RiCheckLine size={12} /> : undefined}
+                          onClick={() =>
+                            setSelectedTagIds(prev =>
+                              prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
+                            )
+                          }
+                        >
+                          {tag.name}
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </ScrollContainer>
+          )}
         </ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={handleCancel} isDisabled={submitting}>
             取消
           </Button>
-          <AsyncButton
-            color="primary"
-            onPress={handleConfirm}
-            isDisabled={
-              hasSameIds(selectedIds, prevSelectedRef.current) &&
-              hasSameIds(selectedTagIds, rid ? getItemTagIds(rid) : [])
-            }
-          >
-            确认
-          </AsyncButton>
+          {showPagePicker ? (
+            <Button color="primary" onPress={() => setStep(1)}>
+              下一步
+            </Button>
+          ) : (
+            <AsyncButton
+              color="primary"
+              onPress={handleConfirm}
+              isDisabled={
+                hasSameIds(selectedIds, prevSelectedRef.current) &&
+                hasSameIds(selectedTagIds, rid ? getItemTagIds(rid) : [])
+              }
+            >
+              确认
+            </AsyncButton>
+          )}
         </ModalFooter>
       </ModalContent>
     </Modal>
