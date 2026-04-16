@@ -1,6 +1,5 @@
 import { addToast } from "@heroui/react";
 import log from "electron-log/renderer";
-import { shuffle } from "es-toolkit/array";
 import { remove } from "es-toolkit/array";
 import { uniqueId } from "es-toolkit/compat";
 import { create } from "zustand";
@@ -84,6 +83,10 @@ interface State {
   nextId?: string;
   /** 是否在随机播放模式下保持视频分集顺序 */
   shouldKeepPagesOrderInRandomPlayMode: boolean;
+  /** 随机播放历史栈：游标左侧已播放的歌曲 id 序列 */
+  randomHistory: string[];
+  /** 随机播放前向队列：游标右侧已探索过（回退后可再前进）的歌曲 id 序列 */
+  randomFuture: string[];
 }
 
 export interface PlayItem {
@@ -373,6 +376,8 @@ export const usePlayList = create<State & Action>()(
         rate: 1,
         duration: undefined,
         shouldKeepPagesOrderInRandomPlayMode: true,
+        randomHistory: [],
+        randomFuture: [],
         list: [],
         init: async () => {
           if (audio) {
@@ -677,7 +682,13 @@ export const usePlayList = create<State & Action>()(
             return;
           }
 
+          const { playMode, playId } = get();
           set(state => {
+            // 随机模式下直接点歌视为主动导航：当前歌压入历史，清空前向队列
+            if (playMode === PlayMode.Random && playId) {
+              state.randomHistory.push(playId);
+              state.randomFuture = [];
+            }
             state.playId = id;
             if (state.nextId === id) {
               state.nextId = undefined;
@@ -685,6 +696,9 @@ export const usePlayList = create<State & Action>()(
           });
         },
         playList: async items => {
+          const { playId: oldPlayId, list: oldList, playMode, randomHistory: oldHistory } = get();
+          const oldPlayItem = oldList.find(item => item.id === oldPlayId);
+
           const newList = items.map(item => ({
             ...item,
             title: sanitizeTitle(item.title),
@@ -692,11 +706,48 @@ export const usePlayList = create<State & Action>()(
           }));
 
           const initialId =
-            get().playMode === PlayMode.Random && newList.length > 1
+            playMode === PlayMode.Random && newList.length > 1
               ? newList[Math.floor(Math.random() * newList.length)].id
               : newList[0].id;
 
+          // 随机模式：重建历史栈。
+          //
+          // 陷阱 1：新 list 的 id 全部由 idGenerator() 重新生成，旧 id 在新 list 里找不到，
+          //   必须用内容匹配（mv→bvid，audio→sid，local→id）。
+          // 陷阱 2：playList 收到的 PlayItem[] 里 mv.cid 尚未 resolve（值为 undefined），
+          //   所以 mv 只能按 bvid 匹配，不能加 cid。
+          // 做法：把旧 randomHistory（上上首、更早…）+ 旧当前歌（上一首）依次映射到新 id，
+          //   保持原有顺序，跳过在新 list 里找不到的条目，去重后压入新历史。
+          const newHistory: string[] = [];
+          if (playMode === PlayMode.Random) {
+            const findNewId = (oldItem: PlayData): string | undefined => {
+              return newList.find(n => {
+                if (oldItem.source === "local") return n.id === oldItem.id;
+                if (oldItem.type === "mv") return n.bvid !== undefined && n.bvid === oldItem.bvid;
+                if (oldItem.type === "audio") return n.sid !== undefined && n.sid === oldItem.sid;
+                return false;
+              })?.id;
+            };
+
+            // 旧历史（从最早到最近）+ 旧当前歌追加到末尾
+            const oldHistoryItems = oldHistory
+              .map(id => oldList.find(item => item.id === id))
+              .filter((item): item is PlayData => item !== undefined);
+            const candidates = oldPlayItem ? [...oldHistoryItems, oldPlayItem] : oldHistoryItems;
+
+            const seen = new Set<string>([initialId]); // 排除本次随机选中的歌
+            for (const oldItem of candidates) {
+              const newId = findNewId(oldItem);
+              if (newId && !seen.has(newId)) {
+                seen.add(newId);
+                newHistory.push(newId);
+              }
+            }
+          }
+
           set(state => {
+            state.randomHistory = newHistory;
+            state.randomFuture = [];
             state.list = newList;
             state.playId = initialId;
           });
@@ -712,8 +763,13 @@ export const usePlayList = create<State & Action>()(
             return;
           }
 
+          // 指定了下一首（addToNext）：直接跳过去，视为主动导航（清空前向队列）
           if (nextId) {
             set(state => {
+              if (playMode === PlayMode.Random) {
+                state.randomHistory.push(playId);
+                state.randomFuture = [];
+              }
               state.playId = nextId;
               state.nextId = undefined;
             });
@@ -746,7 +802,7 @@ export const usePlayList = create<State & Action>()(
                 break;
               }
 
-              // 保持分集顺序，且当前为分集视频，且不是最后一集
+              // 保持分集顺序：当前为分集视频且不是最后一集，顺序播下一集（不影响前向队列）
               if (
                 shouldKeepPagesOrderInRandomPlayMode &&
                 currentPlayItem.pageIndex &&
@@ -756,23 +812,49 @@ export const usePlayList = create<State & Action>()(
                   item => item.bvid === currentPlayItem.bvid && item.pageIndex === currentPlayItem.pageIndex! + 1,
                 );
                 if (nextPage) {
-                  set({ playId: nextPage.id });
+                  set(state => {
+                    state.randomHistory.push(playId);
+                    state.playId = nextPage.id;
+                  });
                   break;
                 }
               }
 
-              const shuffledList = shuffle(list?.map(item => item.id));
-              const currentIndexInShuffled = shuffledList.findIndex(shuffled => shuffled === playId);
-              const nextShuffledIndex = (currentIndexInShuffled + 1) % shuffledList.length;
+              // 前向队列非空：复用已探索的路径（上一首→再下一首回到同一首，保证幂等）
+              const { randomFuture } = get();
+              if (randomFuture.length > 0) {
+                // 跳过已被删除的条目，直到找到有效的
+                let futureId: string | undefined;
+                set(state => {
+                  while (state.randomFuture.length > 0) {
+                    const candidate = state.randomFuture.shift()!;
+                    if (state.list.some(item => item.id === candidate)) {
+                      futureId = candidate;
+                      break;
+                    }
+                  }
+                  if (futureId) {
+                    state.randomHistory.push(playId);
+                    state.playId = futureId;
+                  }
+                });
+                if (futureId) break;
+                // 队列全部失效，跌落到随机生成
+              }
+
+              // 懒惰生成新随机歌：从非当前曲目中随机选取
+              const candidates = list.filter(item => item.id !== playId);
+              const randomIndex = Math.floor(Math.random() * candidates.length);
               set(state => {
-                state.playId = shuffledList[nextShuffledIndex];
+                state.randomHistory.push(playId);
+                state.playId = candidates[randomIndex].id;
               });
               break;
             }
           }
         },
         prev: async () => {
-          const { playId, list } = get();
+          const { playId, list, playMode, randomHistory } = get();
 
           if (!list?.length) {
             return;
@@ -782,14 +864,39 @@ export const usePlayList = create<State & Action>()(
             return;
           }
 
+          // 随机模式：游标左移——当前歌推入前向队列，从历史栈弹出上一首
+          if (playMode === PlayMode.Random && randomHistory.length > 0) {
+            set(state => {
+              while (state.randomHistory.length > 0) {
+                const candidate = state.randomHistory.pop()!;
+                if (state.list.some(item => item.id === candidate)) {
+                  state.randomFuture.unshift(playId); // 当前歌压入前向队列头部
+                  state.playId = candidate;
+                  return;
+                }
+              }
+            });
+            // 若历史栈非空但全部条目都已失效，继续跌落顺序回退
+            if (get().playId !== playId) return;
+          }
+
           const currentIndex = list.findIndex(item => item.id === playId);
           if (currentIndex === -1) return;
 
           const prevIndex = (currentIndex - 1 + list.length) % list.length;
 
-          set(state => {
-            state.playId = list[prevIndex].id;
-          });
+          // 随机模式兜底顺序回退时，也要把当前歌推入前向队列，
+          // 这样再按「下一首」还能回来，保持双向游标的完整性。
+          if (playMode === PlayMode.Random) {
+            set(state => {
+              state.randomFuture.unshift(playId);
+              state.playId = list[prevIndex].id;
+            });
+          } else {
+            set(state => {
+              state.playId = list[prevIndex].id;
+            });
+          }
         },
         addToNext: async ({ type, title, bvid, sid, cover, ownerName, ownerMid, id, source, audioUrl }) => {
           const { playId, nextId: currentNextId, list } = get();
@@ -946,6 +1053,8 @@ export const usePlayList = create<State & Action>()(
             if (removeIndex !== -1) {
               state.list.splice(removeIndex, 1);
             }
+            state.randomHistory = state.randomHistory.filter(hId => hId !== id);
+            state.randomFuture = state.randomFuture.filter(fId => fId !== id);
           });
         },
         del: async id => {
@@ -982,7 +1091,11 @@ export const usePlayList = create<State & Action>()(
           }
 
           set(state => {
+            // 先收集将被删除的 id，再执行删除
+            const removedIds = new Set(state.list.filter(item => isSame(item, removedItem)).map(item => item.id));
             remove(state.list, item => isSame(item, removedItem));
+            state.randomHistory = state.randomHistory.filter(hId => !removedIds.has(hId));
+            state.randomFuture = state.randomFuture.filter(fId => !removedIds.has(fId));
           });
         },
         clear: () => {
@@ -1002,6 +1115,8 @@ export const usePlayList = create<State & Action>()(
             state.list = [];
             state.playId = undefined;
             state.nextId = undefined;
+            state.randomHistory = [];
+            state.randomFuture = [];
           });
           usePlayProgress.getState().setCurrentTime(0);
         },
