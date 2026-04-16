@@ -1,25 +1,36 @@
 import { desktopCapturer, ipcMain, systemPreferences } from "electron";
 import log from "electron-log";
-import ffmpeg from "fluent-ffmpeg";
 import { Shazam } from "node-shazam";
+import { execFile } from "node:child_process";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { fixFfmpegPath } from "../utils";
+import { getFfmpegPath } from "../utils";
 import { channel } from "./channel";
 
 /** WebM → WAV (16 kHz mono PCM) 转换，供 shazamio-core WASM 解码 */
 function convertToWav(inputPath: string, outputPath: string): Promise<void> {
-  fixFfmpegPath();
+  // 内置 ffmpeg 是精简构建（不含 wav/pcm 编解码器），听歌识曲需要完整版
+  const ffmpegBin = getFfmpegPath(true);
+  if (!ffmpegBin) {
+    return Promise.reject(new Error("未找到 ffmpeg，请安装完整版 ffmpeg 并加入系统 PATH，或在设置中配置路径"));
+  }
   return new Promise((resolve, reject) => {
-    // 用 outputOptions 直接传参，跳过 fluent-ffmpeg 的 capability 检查
-    // 避免 "Output format wav is not available" 误报（路径设置与缓存不同步所致）
-    ffmpeg(inputPath)
-      .outputOptions(["-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "wav"])
-      .on("error", reject)
-      .on("end", () => resolve())
-      .save(outputPath);
+    // 直接调用 ffmpeg 可执行文件，绕过 fluent-ffmpeg 的 capability 检查
+    // 避免 Windows 上 "Output format wav is not available" 误报
+    execFile(
+      ffmpegBin,
+      ["-y", "-i", inputPath, "-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "wav", outputPath],
+      (error, _stdout, stderr) => {
+        if (error) {
+          log.error("[shazam] ffmpeg convert error:", stderr);
+          reject(error);
+        } else {
+          resolve();
+        }
+      },
+    );
   });
 }
 

@@ -24,59 +24,102 @@ export const getWindowIcon = () =>
         process.platform === "win32" ? (isDev ? "dev.ico" : "logo.ico") : "logo.png",
       );
 
-export const fixFfmpegPath = () => {
+/**
+ * 在系统 PATH 中查找 ffmpeg 可执行文件。
+ * Windows 内置的 ffmpeg 是精简构建（仅含 remux 所需组件），
+ * 系统安装的完整版 ffmpeg 支持 wav 等更多格式，听歌识曲等功能需要优先使用。
+ */
+const findFfmpegInPath = (): string | undefined => {
+  const exeName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const separator = process.platform === "win32" ? ";" : ":";
+  const dirs = (process.env.PATH || "").split(separator);
+  for (const dir of dirs) {
+    if (!dir) continue;
+    const p = path.join(dir, exeName);
+    if (fs.existsSync(p)) {
+      log.info(`Found ffmpeg in PATH at ${p}`);
+      return p;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * 解析 ffmpeg 可执行文件的绝对路径。
+ * @param preferSystem 优先使用系统完整版 ffmpeg（默认 false）。
+ *   内置 ffmpeg 是精简构建，不含 wav/pcm 编解码器；听歌识曲等需要转码的场景应传 true。
+ */
+export const getFfmpegPath = (preferSystem = false): string | undefined => {
+  // 1. 用户手动配置的路径，始终最高优先级
   try {
     const settings = appSettingsStore.get("appSettings");
     if (settings?.ffmpegPath && fs.existsSync(settings.ffmpegPath)) {
       log.info(`Found user configured ffmpeg at ${settings.ffmpegPath}`);
-      ffmpeg.setFfmpegPath(settings.ffmpegPath);
-      return;
+      return settings.ffmpegPath;
     }
   } catch (err) {
     log.error("Error reading ffmpeg path from settings:", err);
   }
 
-  if (process.platform === "darwin" || process.platform === "linux") {
-    const paths = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg", "/snap/bin/ffmpeg"];
-    for (const p of paths) {
-      if (fs.existsSync(p)) {
-        log.info(`Found ffmpeg at ${p}`);
-        ffmpeg.setFfmpegPath(p);
-        return;
+  // 2. 系统路径（macOS/Linux 常见位置 + 所有平台的 PATH 查找）
+  const findSystemFfmpeg = (): string | undefined => {
+    if (process.platform === "darwin" || process.platform === "linux") {
+      const paths = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg", "/snap/bin/ffmpeg"];
+      for (const p of paths) {
+        if (fs.existsSync(p)) {
+          log.info(`Found ffmpeg at ${p}`);
+          return p;
+        }
       }
     }
-  }
-
-  const getFfmpegName = () => {
-    switch (process.platform) {
-      case "win32":
-        return "ffmpeg.exe";
-      case "darwin":
-        return process.arch === "arm64" ? "ffmpeg-mac-arm64" : "ffmpeg-mac-x64";
-      case "linux":
-        return "ffmpeg-linux";
-      default:
-        return "ffmpeg";
-    }
+    return findFfmpegInPath();
   };
 
-  const localFfmpegPath = path.join(
-    isDev ? process.cwd() : process.resourcesPath,
-    "electron",
-    "ffmpeg",
-    getFfmpegName(),
-  );
-
-  if (fs.existsSync(localFfmpegPath)) {
-    if (process.platform !== "win32") {
-      try {
-        fs.chmodSync(localFfmpegPath, "755");
-      } catch (err) {
-        log.error(`Failed to chmod ffmpeg at ${localFfmpegPath}`, err);
+  // 3. 内置二进制
+  const findBundledFfmpeg = (): string | undefined => {
+    const getFfmpegName = () => {
+      switch (process.platform) {
+        case "win32":
+          return "ffmpeg.exe";
+        case "darwin":
+          return process.arch === "arm64" ? "ffmpeg-mac-arm64" : "ffmpeg-mac-x64";
+        case "linux":
+          return "ffmpeg-linux";
+        default:
+          return "ffmpeg";
       }
+    };
+
+    const localFfmpegPath = path.join(
+      isDev ? process.cwd() : process.resourcesPath,
+      "electron",
+      "ffmpeg",
+      getFfmpegName(),
+    );
+
+    if (fs.existsSync(localFfmpegPath)) {
+      if (process.platform !== "win32") {
+        try {
+          fs.chmodSync(localFfmpegPath, "755");
+        } catch (err) {
+          log.error(`Failed to chmod ffmpeg at ${localFfmpegPath}`, err);
+        }
+      }
+      return localFfmpegPath;
     }
-    ffmpeg.setFfmpegPath(localFfmpegPath);
-    return;
+    return undefined;
+  };
+
+  if (preferSystem) {
+    return findSystemFfmpeg() ?? findBundledFfmpeg();
+  }
+  return findBundledFfmpeg() ?? findSystemFfmpeg();
+};
+
+export const fixFfmpegPath = () => {
+  const p = getFfmpegPath();
+  if (p) {
+    ffmpeg.setFfmpegPath(p);
   }
 };
 
