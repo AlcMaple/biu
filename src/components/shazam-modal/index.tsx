@@ -327,7 +327,7 @@ const ShazamModal = () => {
         <RiFingerprintLine size={18} />
       </IconButton>
 
-      <Modal isOpen={isOpen} onClose={handleClose} size="sm">
+      <Modal isOpen={isOpen} onClose={handleClose} size="sm" isDismissable={state !== "listening"}>
         <ModalContent>
           <ModalHeader>听歌识曲</ModalHeader>
           <ModalBody className="pb-6">
