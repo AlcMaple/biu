@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 
-import { Button, Image, Modal, ModalBody, ModalContent, ModalHeader, Spinner, useDisclosure } from "@heroui/react";
+import { addToast, Button, Image, Modal, ModalBody, ModalContent, ModalHeader, useDisclosure } from "@heroui/react";
 import { RiComputerLine, RiExternalLinkLine, RiFingerprintLine, RiMicLine, RiMusicLine } from "@remixicon/react";
 import { motion } from "framer-motion";
 
 import IconButton from "@/components/icon-button";
 import { usePlayList } from "@/store/play-list";
 
-type RecordState = "idle" | "recording" | "processing" | "success" | "error";
+type RecordState = "idle" | "listening" | "success" | "error";
 
 interface ShazamResult {
   title: string;
@@ -16,9 +16,17 @@ interface ShazamResult {
   url?: string;
 }
 
-const RECORD_DURATION = 8;
+/** 总流程时长（秒） */
+const TOTAL_DURATION = 15;
+
+/** 各阶段发起识别的时间点（秒） */
+const RECOGNIZE_AT = [5, 8, 13] as const;
+
+/** 弹出非阻断式提示的时间点（秒） */
+const TOAST_AT = 10;
 
 const isWindows = typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
+const isMac = typeof navigator !== "undefined" && /macintosh/i.test(navigator.userAgent);
 
 const formatMediaError = (err: unknown, source: "mic" | "system") => {
   const name = err instanceof Error ? err.name : "";
@@ -41,7 +49,27 @@ const formatMediaError = (err: unknown, source: "mic" | "system") => {
     return "麦克风被其他应用占用或驱动异常，请关闭占用应用或重启设备后重试";
   }
 
+  // 系统声音捕获需要屏幕录制权限（macOS）或桌面视频源
+  if (source === "system") {
+    if (name === "NotAllowedError" || /Could not start video source/i.test(message)) {
+      return isMac
+        ? "系统拒绝了屏幕录制权限。请前往「系统设置 → 隐私与安全性 → 屏幕录制」，为本应用开启权限后重启应用重试"
+        : "无法捕获系统音频，请检查屏幕录制/音频权限设置后重试";
+    }
+    if (name === "NotReadableError") {
+      return "无法启动系统音频捕获，可能被其他应用占用，请关闭后重试";
+    }
+  }
+
   return message || String(err);
+};
+
+/** 根据已过秒数返回阶段提示文案 */
+const getPhaseText = (elapsed: number): string => {
+  if (elapsed < 5) return `录音中（${elapsed}s）`;
+  if (elapsed < 8) return `搜索中（${elapsed}s）`;
+  if (elapsed < 13) return `正在努力匹配（${elapsed}s）`;
+  return `扩大识别范围（${elapsed}s）`;
 };
 
 const WaveBars = () => (
@@ -66,21 +94,33 @@ const WaveBars = () => (
 const ShazamModal = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [state, setState] = useState<RecordState>("idle");
-  const [countdown, setCountdown] = useState(RECORD_DURATION);
+  const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<ShazamResult | null>(null);
   const [error, setError] = useState("");
 
   const isPlaying = usePlayList(s => s.isPlaying);
   const togglePlay = usePlayList(s => s.togglePlay);
-  // 记录识别开始前是否正在播放，识别结束后恢复
   const wasPlayingRef = useRef(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingSourceRef = useRef<"mic" | "system" | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cancelledRef = useRef(false);
+  const recognizedRef = useRef(false);
+  const toastShownRef = useRef(false);
 
-  const cleanup = useCallback((stream?: MediaStream) => {
+  /** 恢复播放（仅在之前暂停过的情况下），调用后清除标记防止重复触发 */
+  const restorePlayback = useCallback(() => {
+    if (wasPlayingRef.current) {
+      togglePlay();
+      wasPlayingRef.current = false;
+    }
+  }, [togglePlay]);
+
+  /** 停止录音、清理计时器和媒体流 */
+  const stopEverything = useCallback(() => {
+    cancelledRef.current = true;
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -88,25 +128,66 @@ const ShazamModal = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
-    stream?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
   }, []);
+
+  /** 收集当前已录制的 chunks 发送识别请求，识别成功立即结束流程 */
+  const sendRecognition = useCallback(async () => {
+    if (cancelledRef.current || recognizedRef.current) return;
+
+    const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
+    const blob = new Blob([...chunksRef.current], { type: mimeType });
+    if (blob.size === 0) return;
+
+    const arrayBuffer = await blob.arrayBuffer();
+
+    try {
+      const raw = await window.electron.recognizeSong(arrayBuffer);
+
+      if (cancelledRef.current || recognizedRef.current) return;
+      if (raw.error || !raw.track) return;
+
+      // 识别成功
+      recognizedRef.current = true;
+      stopEverything();
+
+      const track = raw.track as {
+        title?: string;
+        subtitle?: string;
+        images?: { coverart?: string };
+        url?: string;
+      };
+
+      setResult({
+        title: track.title ?? "",
+        artist: track.subtitle ?? "",
+        cover: track.images?.coverart,
+        url: track.url,
+      });
+      setState("success");
+      restorePlayback();
+    } catch {
+      // 网络等异常静默忽略，等待下一次识别尝试
+    }
+  }, [stopEverything, restorePlayback]);
 
   const startRecording = useCallback(
     async (source: "mic" | "system") => {
       chunksRef.current = [];
-      setState("recording");
-      setCountdown(RECORD_DURATION);
+      cancelledRef.current = false;
+      recognizedRef.current = false;
+      toastShownRef.current = false;
+      setState("listening");
+      setElapsed(0);
 
       // 识别前暂停播放
       wasPlayingRef.current = isPlaying;
-      if (isPlaying) {
-        togglePlay();
-      }
+      if (isPlaying) togglePlay();
 
       let stream: MediaStream;
       try {
         if (source === "mic") {
-          // macOS 首次使用需向系统申请麦克风权限，授权后 getUserMedia 才能成功
           await window.electron.requestMicPermission();
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -154,10 +235,11 @@ const ShazamModal = () => {
       } catch (err) {
         setError(formatMediaError(err, source));
         setState("error");
-        // getUserMedia 失败时也需要恢复播放
-        if (wasPlayingRef.current) togglePlay();
+        restorePlayback();
         return;
       }
+
+      streamRef.current = stream;
 
       const recorderOptions: MediaRecorderOptions = {};
       if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
@@ -171,84 +253,69 @@ const ShazamModal = () => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      recorder.onstop = async () => {
-        cleanup(stream);
-        setState("processing");
-
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
-        if (blob.size === 0) {
-          setError("未录制到音频数据，请检查麦克风权限后重试");
-          setState("error");
-          if (wasPlayingRef.current) togglePlay();
-          return;
-        }
-        const arrayBuffer = await blob.arrayBuffer();
-
-        try {
-          const raw = await window.electron.recognizeSong(arrayBuffer);
-
-          if (raw.error) {
-            setError(String(raw.error));
-            setState("error");
-            if (wasPlayingRef.current) togglePlay();
-            return;
-          }
-
-          const track = raw.track as
-            | { title?: string; subtitle?: string; images?: { coverart?: string }; url?: string }
-            | undefined;
-
-          if (!track) {
-            setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风）");
-            setState("error");
-            if (wasPlayingRef.current) togglePlay();
-            return;
-          }
-
-          setResult({
-            title: track.title ?? "",
-            artist: track.subtitle ?? "",
-            cover: track.images?.coverart,
-            url: track.url,
-          });
-          setState("success");
-          if (wasPlayingRef.current) togglePlay();
-        } catch (err) {
-          setError(String(err));
-          setState("error");
-          if (wasPlayingRef.current) togglePlay();
-        }
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       };
 
-      recorder.start();
+      // 每秒产出一个 chunk，以便分阶段截取不同长度的音频
+      recorder.start(1000);
 
-      let remaining = RECORD_DURATION;
+      let currentElapsed = 0;
+      const recognizeAtSet = new Set<number>(RECOGNIZE_AT);
+
       timerRef.current = setInterval(() => {
-        remaining -= 1;
-        setCountdown(remaining);
-        if (remaining <= 0) {
+        if (cancelledRef.current || recognizedRef.current) {
           clearInterval(timerRef.current!);
           timerRef.current = null;
-          if (mediaRecorderRef.current?.state === "recording") {
-            mediaRecorderRef.current.stop();
-          }
+          return;
+        }
+
+        currentElapsed += 1;
+        setElapsed(currentElapsed);
+
+        // 在指定时间点发起识别请求（异步，不阻塞录音）
+        if (recognizeAtSet.has(currentElapsed)) {
+          sendRecognition();
+        }
+
+        // 10 秒时弹出非阻断式提示
+        if (currentElapsed === TOAST_AT && !toastShownRef.current && !recognizedRef.current) {
+          toastShownRef.current = true;
+          addToast({ title: "未识别到音乐，请靠近音源再试", color: "warning" });
+        }
+
+        // 15 秒到达，结束整个流程
+        if (currentElapsed >= TOTAL_DURATION && !recognizedRef.current) {
+          stopEverything();
+          setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风）");
+          setState("error");
+          restorePlayback();
         }
       }, 1000);
     },
-    [cleanup, isPlaying, togglePlay],
+    [isPlaying, togglePlay, sendRecognition, stopEverything, restorePlayback],
   );
 
-  const handleClose = () => {
-    cleanup();
-    pendingSourceRef.current = null;
+  /** 停止按钮：取消整个流程，不触发识别 */
+  const handleCancel = useCallback(() => {
+    stopEverything();
     setState("idle");
     setResult(null);
     setError("");
+    restorePlayback();
+  }, [stopEverything, restorePlayback]);
+
+  const handleClose = () => {
+    stopEverything();
+    setState("idle");
+    setResult(null);
+    setError("");
+    restorePlayback();
     onClose();
   };
 
   const handleRetry = () => {
-    pendingSourceRef.current = null;
     setState("idle");
     setResult(null);
     setError("");
@@ -266,7 +333,7 @@ const ShazamModal = () => {
           <ModalBody className="pb-6">
             {state === "idle" && (
               <div className="flex flex-col items-center gap-5 py-4">
-                <p className="text-foreground-400 text-sm">选择声音来源，录制约 {RECORD_DURATION} 秒后自动识别</p>
+                <p className="text-foreground-400 text-sm">选择声音来源，最长录制 {TOTAL_DURATION} 秒自动识别</p>
                 <div className="flex gap-3">
                   <Button
                     variant="bordered"
@@ -286,29 +353,13 @@ const ShazamModal = () => {
               </div>
             )}
 
-            {state === "recording" && (
+            {state === "listening" && (
               <div className="flex flex-col items-center gap-4 py-4">
                 <WaveBars />
-                <p className="text-foreground-400 text-sm">正在听... {countdown}s</p>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  onPress={() => {
-                    cleanup();
-                    if (mediaRecorderRef.current?.state === "recording") {
-                      mediaRecorderRef.current.stop();
-                    }
-                  }}
-                >
+                <p className="text-foreground-400 text-sm">{getPhaseText(elapsed)}</p>
+                <Button size="sm" variant="flat" onPress={handleCancel}>
                   停止
                 </Button>
-              </div>
-            )}
-
-            {state === "processing" && (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <Spinner size="lg" />
-                <p className="text-foreground-400 text-sm">识别中...</p>
               </div>
             )}
 
