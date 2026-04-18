@@ -1,4 +1,4 @@
-import { Http } from "@capacitor/http";
+import { CapacitorHttp } from "@capacitor/core";
 
 import type { PlatformHttp, RequestConfig } from "./types";
 
@@ -10,7 +10,7 @@ const BASE_HEADERS: Record<string, string> = {
 
 const http: PlatformHttp = {
   async request<T = unknown>(config: RequestConfig): Promise<T> {
-    const response = await Http.request({
+    const response = await CapacitorHttp.request({
       url: config.url,
       method: config.method ?? "GET",
       params: config.params,
