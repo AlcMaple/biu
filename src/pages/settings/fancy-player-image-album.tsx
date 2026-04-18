@@ -53,11 +53,19 @@ const FancyPlayerImageAlbum = () => {
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map(img => (
-            <div key={img} className="group relative h-20 w-20 flex-shrink-0">
+            <div
+              key={img}
+              className="group relative h-20 w-20 flex-shrink-0"
+              style={{ contentVisibility: "auto", containIntrinsicSize: "5rem 5rem" }}
+            >
               {/* 图片 */}
               <img
                 src={toImgSrc(img)}
                 alt="背景图"
+                loading="lazy"
+                decoding="async"
+                width={80}
+                height={80}
                 className="h-full w-full rounded-xl object-cover shadow-sm transition-transform duration-200 group-hover:scale-[1.03]"
                 draggable={false}
               />
