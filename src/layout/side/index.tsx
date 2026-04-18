@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import { Button, useDisclosure } from "@heroui/react";
+import { Button, Drawer, DrawerBody, DrawerContent, useDisclosure } from "@heroui/react";
 import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from "@remixicon/react";
 import clx from "classnames";
 
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer from "@/components/scroll-container";
+import { isAndroid } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import Collection from "./collection";
@@ -16,7 +17,12 @@ const COLLAPSED_WIDTH = 72;
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 480;
 
-const SideNav = () => {
+interface SideNavProps {
+  isDrawerOpen?: boolean;
+  onDrawerOpenChange?: (open: boolean) => void;
+}
+
+const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   const sideMenuCollapsed = useSettings(state => state.sideMenuCollapsed);
   const sideMenuWidth = useSettings(state => state.sideMenuWidth);
   const updateSettings = useSettings(state => state.update);
@@ -102,6 +108,8 @@ const SideNav = () => {
   }, [isDragging]);
 
   useEffect(() => {
+    if (isAndroid) return;
+
     const onMouseMove = (event: MouseEvent) => {
       if (!isDraggingRef.current) return;
 
@@ -138,6 +146,40 @@ const SideNav = () => {
       }
     };
   }, [updateSettings]);
+
+  if (isAndroid) {
+    return (
+      <>
+        <Drawer
+          isOpen={isDrawerOpen ?? false}
+          onOpenChange={onDrawerOpenChange}
+          placement="left"
+          size="xs"
+          hideCloseButton
+        >
+          <DrawerContent>
+            <DrawerBody className="flex flex-col gap-0 p-0">
+              <Logo isCollapsed={false} />
+              <ScrollContainer className="min-h-0 flex-1 px-4 pb-2">
+                <DefaultMenus isCollapsed={false} onOpenAddFavorite={handleOpenAddFavorite} />
+                <Collection
+                  isCollapsed={false}
+                  onOpenAddFavorite={handleOpenAddFavorite}
+                  onOpenEditFavorite={handleOpenEditFavorite}
+                />
+              </ScrollContainer>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+        <FavoritesEditModal
+          mid={editingFavorite?.id}
+          isLocal={editingFavorite?.isLocal}
+          isOpen={isFavoritesEditModalOpen}
+          onOpenChange={handleFavoritesEditModalChange}
+        />
+      </>
+    );
+  }
 
   return (
     <>

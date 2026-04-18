@@ -7,6 +7,7 @@ import { useRequest, useClickAway } from "ahooks";
 import classNames from "classnames";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 
+import { isAndroid } from "@/platform";
 import { getSearchSuggestMain } from "@/service/main-suggest";
 import { useSearchHistory } from "@/store/search-history";
 import { useSettings } from "@/store/settings";
@@ -70,7 +71,7 @@ const SearchInput: React.FC<SearchInputProps> = ({ onFocusChange }) => {
   };
 
   return (
-    <div ref={containerRef} className="relative w-[280px]">
+    <div ref={containerRef} className={classNames("relative", isAndroid ? "w-full" : "w-[280px]")}>
       <Input
         ref={inputRef}
         value={value}
