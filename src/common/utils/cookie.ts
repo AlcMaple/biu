@@ -1,3 +1,4 @@
+import { isAndroid } from "@/platform/detect";
 import { postPassportLoginWebConfirmRefresh } from "@/service/passport-login-web-confirm-refresh";
 import { getPassportLoginWebCookieInfo } from "@/service/passport-login-web-cookie-info";
 import { postPassportLoginWebCookieRefresh } from "@/service/passport-login-web-cookie-refresh";
@@ -25,6 +26,7 @@ async function getPublicKey() {
 }
 
 export const refreshCookie = async () => {
+  if (isAndroid) return false;
   const res = await getPassportLoginWebCookieInfo();
   if (res?.data?.refresh) {
     const timestamp = res?.data?.timestamp;

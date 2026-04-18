@@ -1,11 +1,15 @@
 import axios, { type CreateAxiosDefaults } from "axios";
 
+import { isAndroid } from "@/platform/detect";
+
+import { androidAdapter } from "./android-adapter";
 import { requestInterceptors } from "./request-interceptors";
 import { geetestInterceptors } from "./response-interceptors";
 
 const axiosConfig: CreateAxiosDefaults = {
   timeout: 10000,
   withCredentials: true,
+  ...(isAndroid ? { adapter: androidAdapter } : {}),
 };
 
 export const axiosInstance = axios.create(axiosConfig);
