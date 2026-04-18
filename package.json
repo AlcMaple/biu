@@ -33,13 +33,17 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "test": "vitest",
+    "build:android": "rsbuild build && cap sync android",
+    "open:android": "cap open android",
     "knip": "knip --no-exit-code --max-show-issues 5 --reporter github-actions",
     "release": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail",
     "release:beta": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail --prerelease beta",
     "release:alpha": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail --prerelease alpha"
   },
   "dependencies": {
-    "@capacitor/http": "^0.0.2",
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
