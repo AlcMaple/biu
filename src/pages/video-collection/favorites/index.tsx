@@ -9,6 +9,7 @@ import { getAllFavMedia } from "@/common/utils/fav";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { postFavFolderFav } from "@/service/fav-folder-fav";
 import { getFavFolderInfo } from "@/service/fav-folder-info";
 import { postFavFolderUnfav } from "@/service/fav-folder-unfav";
@@ -18,10 +19,10 @@ import { postFavResourceClean } from "@/service/fav-resource-clean";
 import { useFavFolderItemsStore } from "@/store/fav-folder-items";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
-import { useTagStore } from "@/store/tags";
 import { useMusicFavStore } from "@/store/music-fav";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
 import Header from "../header";
@@ -414,7 +415,7 @@ const Favorites = () => {
           ]);
           break;
         case "download-audio":
-          await window.electron.addMediaDownloadTask({
+          await platform.addMediaDownloadTask({
             outputFileType: "audio",
             title: item.title,
             cover: item.cover,
@@ -427,7 +428,7 @@ const Favorites = () => {
           });
           break;
         case "download-video":
-          await window.electron.addMediaDownloadTask({
+          await platform.addMediaDownloadTask({
             outputFileType: "video",
             title: item.title,
             cover: item.cover,

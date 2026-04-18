@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, Spinner, addToast } from "@heroui/react";
 import { RiArrowLeftSLine, RiArrowRightSLine, RiMusic2Line, RiPlayFill } from "@remixicon/react";
-import log from "electron-log/renderer";
 
 import { formatNumber } from "@/common/utils/number";
 import IconButton from "@/components/icon-button";
 import Image from "@/components/image";
+import { log } from "@/platform";
 import { getNewMusic } from "@/service/web-interface-new-music";
 import { getNewMusicBanner } from "@/service/web-interface-new-music-banner";
 import { usePlayList } from "@/store/play-list";

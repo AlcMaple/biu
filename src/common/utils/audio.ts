@@ -1,6 +1,6 @@
-import log from "electron-log/renderer";
 import moment from "moment";
 
+import { log } from "@/platform";
 import { getAudioWebStreamUrl } from "@/service/audio-web-url";
 import { getPlayerPlayurl, type DashAudio } from "@/service/player-playurl";
 import { useUser } from "@/store/user";

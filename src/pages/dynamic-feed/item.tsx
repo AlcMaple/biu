@@ -10,6 +10,7 @@ import type { WebDynamicItem } from "@/service/web-dynamic";
 
 import { formatNumber } from "@/common/utils/number";
 import Image from "@/components/image";
+import platform from "@/platform";
 import { postDynamicFeedThumb } from "@/service/web-dynamic-feed-thumb";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
@@ -37,7 +38,7 @@ const DynamicItem: React.FC<DynamicItemProps> = ({ item, className }) => {
   const textContent = dynamic.desc?.text || dynamic.major?.opus?.summary?.text || "";
 
   const handleDownload = async (type: "audio" | "video") => {
-    await window.electron.addMediaDownloadTask({
+    await platform.addMediaDownloadTask({
       outputFileType: type,
       title: archive?.title as string,
       cover: archive?.cover,

@@ -4,6 +4,7 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Checkbox, Spi
 import { useRequest } from "ahooks";
 import { useShallow } from "zustand/react/shallow";
 
+import platform from "@/platform";
 import { getPlayerPagelist } from "@/service/player-pagelist";
 import { useModalStore } from "@/store/modal";
 
@@ -35,7 +36,7 @@ const VideoPagesDownloadSelectModal = () => {
         setSelectedCids(res?.data?.map(item => String(item.cid)) || []);
       } else if (res?.data?.[0]?.cid) {
         const cid = String(res.data[0].cid);
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: outputFileType!,
           cover,
           title: title!,
@@ -58,7 +59,7 @@ const VideoPagesDownloadSelectModal = () => {
   );
 
   const downloadSelected = async () => {
-    await window.electron.addMediaDownloadTaskList(
+    await platform.addMediaDownloadTaskList(
       data!
         .filter(item => selectedCids.includes(String(item.cid)))
         .map(item => ({

@@ -13,6 +13,7 @@ import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
+import platform from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -29,7 +30,7 @@ import { useGlassmorphism } from "./glassmorphism";
 import PageList from "./page-list";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
 
-const platform = window.electron.getPlatform();
+const appPlatform = platform.getPlatform();
 
 const FullScreenPlayer = () => {
   const isOpen = useModalStore(s => s.isFullScreenPlayerOpen);
@@ -332,7 +333,7 @@ const FullScreenPlayer = () => {
                   </Popover>
                 </div>
                 <div className="window-no-drag top-0 right-0">
-                  {platform === "linux" || platform === "windows" ? <WindowAction /> : null}
+                  {appPlatform === "linux" || appPlatform === "windows" ? <WindowAction /> : null}
                 </div>
               </div>
 

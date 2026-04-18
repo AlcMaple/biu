@@ -5,6 +5,7 @@ import { RiPlayFill } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
 import { useModalStore } from "@/store/modal";
@@ -229,7 +230,7 @@ const MusicRecommend = () => {
         ]);
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.cover,
@@ -241,7 +242,7 @@ const MusicRecommend = () => {
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.cover,
@@ -254,7 +255,7 @@ const MusicRecommend = () => {
         break;
       case "bililink":
         if (item.bvid) {
-          window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+          platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
         }
         break;
       default:

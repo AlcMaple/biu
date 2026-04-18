@@ -23,6 +23,7 @@ import { openBiliVideoLink } from "@/common/utils/url";
 import Empty from "@/components/empty";
 import Image from "@/components/image";
 import ScrollContainer from "@/components/scroll-container";
+import platform from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import DownloadActions from "./actions";
@@ -35,7 +36,7 @@ const DownloadList = () => {
 
   useEffect(() => {
     const initList = async () => {
-      const list = await window.electron.getMediaDownloadTaskList();
+      const list = await platform.getMediaDownloadTaskList();
       if (list.length) {
         setDownloadList(list);
       }
@@ -43,7 +44,7 @@ const DownloadList = () => {
 
     initList();
 
-    const removeListener = window.electron.syncMediaDownloadTaskList(payload => {
+    const removeListener = platform.syncMediaDownloadTaskList(payload => {
       if (payload?.type === "full") {
         setDownloadList(payload.data as MediaDownloadTask[]);
       } else if (payload?.type === "update") {
@@ -63,11 +64,11 @@ const DownloadList = () => {
   }, []);
 
   const clearDownloadList = async () => {
-    await window.electron.clearMediaDownloadTaskList();
+    await platform.clearMediaDownloadTaskList();
   };
 
   const openDownloadDir = async () => {
-    await window.electron.openDirectory(downloadPath);
+    await platform.openDirectory(downloadPath);
   };
 
   const getFileQuality = (item: MediaDownloadTask) => {

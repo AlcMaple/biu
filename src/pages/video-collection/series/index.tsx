@@ -8,6 +8,7 @@ import type { Media } from "@/service/user-video-archives-list";
 
 import { CollectionType } from "@/common/constants/collection";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { getSeriesArchives } from "@/service/series-archives";
 import { getSeriesInfo } from "@/service/series-info";
 import { useModalStore } from "@/store/modal";
@@ -189,7 +190,7 @@ const Series = () => {
         });
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.cover,
@@ -201,7 +202,7 @@ const Series = () => {
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.cover,
@@ -213,7 +214,7 @@ const Series = () => {
         });
         break;
       case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+        platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
         break;
       default:
         break;

@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import AsyncButton from "@/components/async-button";
 import ShortcutKeyInput from "@/components/shortcut-key-input";
+import platform from "@/platform";
 import { useShortcutSettings } from "@/store/shortcuts";
 
 const ShortcutSettingsPage = () => {
@@ -49,7 +50,7 @@ const ShortcutSettingsPage = () => {
         return;
       }
 
-      const registerSuccess = await window.electron.registerShortcut({
+      const registerSuccess = await platform.registerShortcut({
         id,
         accelerator: shortcut,
       });
@@ -62,7 +63,7 @@ const ShortcutSettingsPage = () => {
         return;
       }
     } else {
-      await window.electron.unregisterShortcut(id);
+      await platform.unregisterShortcut(id);
     }
     const newShortcuts = globalShortcuts.map(s =>
       s.id === id ? { ...s, shortcut, isConflict: false, error: undefined } : s,
@@ -76,9 +77,9 @@ const ShortcutSettingsPage = () => {
     });
 
     if (enabled) {
-      await window.electron.registerAllShortcuts();
+      await platform.registerAllShortcuts();
     } else {
-      await window.electron.unregisterAllShortcuts();
+      await platform.unregisterAllShortcuts();
     }
 
     await refresh();
@@ -86,7 +87,7 @@ const ShortcutSettingsPage = () => {
 
   const handleReset = async () => {
     reset();
-    await window.electron.registerAllShortcuts();
+    await platform.registerAllShortcuts();
     await refresh();
   };
 

@@ -12,12 +12,13 @@ import Lyrics from "@/components/lyrics";
 import MusicPlayControl from "@/components/music-play-control";
 import MusicPlayProgress from "@/components/music-play-progress";
 import WindowAction from "@/components/window-action";
+import platform from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 
-const platform = window.electron.getPlatform();
+const appPlatform = platform.getPlatform();
 
 /** 将路径转为 <img src> 可用的字符串 */
 const toImgSrc = (path: string) => {
@@ -289,7 +290,7 @@ const FancyFullScreenPlayer = () => {
                     </Popover>
                   </div>
                   <div className="window-no-drag">
-                    {(platform === "linux" || platform === "windows") && isUiVisible && <WindowAction />}
+                    {(appPlatform === "linux" || appPlatform === "windows") && isUiVisible && <WindowAction />}
                   </div>
                 </header>
 

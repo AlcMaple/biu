@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import clx from "classnames";
 
 import ShazamModal from "@/components/shazam-modal";
+import platform from "@/platform";
 import { useUser } from "@/store/user";
 
 import WindowAction from "../../components/window-action";
@@ -13,7 +14,7 @@ import Search from "./search";
 import UserCard from "./user";
 import UserFeed from "./user-feed";
 
-const platform = window.electron.getPlatform();
+const appPlatform = platform.getPlatform();
 
 const LayoutNavbar = () => {
   const user = useUser(s => s.user);
@@ -39,7 +40,7 @@ const LayoutNavbar = () => {
         <Dev />
         {Boolean(user?.isLogin) && <UserFeed />}
         <UserCard onDropdownOpenChange={setIsUserDropdownOpen} />
-        {["linux", "windows"].includes(platform) && <WindowAction />}
+        {["linux", "windows"].includes(appPlatform) && <WindowAction />}
       </div>
     </div>
   );

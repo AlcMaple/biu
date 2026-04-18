@@ -11,6 +11,8 @@ import {
   RiText,
 } from "@remixicon/react";
 
+import platform from "@/platform";
+
 export const DESKTOP_LYRICS_CHANNEL = "biu-desktop-lyrics";
 
 export interface DesktopLyricsMessage {
@@ -211,7 +213,7 @@ const DesktopLyrics = () => {
 
   // ── Lock / unlock ─────────────────────────────────────────────────────────
   const applyIgnoreMouse = useCallback((ignore: boolean) => {
-    window.electron.setDesktopLyricsIgnoreMouseEvents(ignore, { forward: true });
+    platform.setDesktopLyricsIgnoreMouseEvents(ignore, { forward: true });
   }, []);
 
   const handleLock = useCallback(() => {
@@ -254,7 +256,7 @@ const DesktopLyrics = () => {
 
   // ── Resize ────────────────────────────────────────────────────────────────
   const handleResizeDragStart = useCallback(async (dir: ResizeDir, startX: number, startY: number) => {
-    const bounds = await window.electron.getDesktopLyricsBounds();
+    const bounds = await platform.getDesktopLyricsBounds();
     if (!bounds) return;
     const init = { ...bounds };
     const onMove = (e: MouseEvent) => {
@@ -271,7 +273,7 @@ const DesktopLyrics = () => {
         next.y = init.y + dy;
         next.height = init.height - dy;
       }
-      void window.electron.setDesktopLyricsBounds(next);
+      void platform.setDesktopLyricsBounds(next);
     };
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
@@ -281,7 +283,7 @@ const DesktopLyrics = () => {
     window.addEventListener("mouseup", onUp);
   }, []);
 
-  const handleClose = () => window.electron.toggleDesktopLyrics();
+  const handleClose = () => platform.toggleDesktopLyrics();
 
   return (
     <>

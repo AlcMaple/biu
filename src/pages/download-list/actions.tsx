@@ -11,6 +11,7 @@ import {
 } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
+import platform from "@/platform";
 import { useModalStore } from "@/store/modal";
 
 interface Props {
@@ -81,7 +82,7 @@ const DownloadActions = ({ data }: Props) => {
         }
 
         try {
-          await window.electron.showFileInFolder(data.savePath);
+          await platform.showFileInFolder(data.savePath);
         } catch (err) {
           addToast({ title: `${err instanceof Error ? err.message : String(err)}`, color: "danger" });
         }
@@ -97,7 +98,7 @@ const DownloadActions = ({ data }: Props) => {
       onPress: async () => {
         if (pendingAction) return;
         lockAction("pause");
-        await window.electron.pauseMediaDownloadTask(data.id);
+        await platform.pauseMediaDownloadTask(data.id);
       },
     },
     {
@@ -110,7 +111,7 @@ const DownloadActions = ({ data }: Props) => {
       onPress: async () => {
         if (pendingAction) return;
         lockAction("resume");
-        await window.electron.resumeMediaDownloadTask(data.id);
+        await platform.resumeMediaDownloadTask(data.id);
       },
     },
     {
@@ -121,7 +122,7 @@ const DownloadActions = ({ data }: Props) => {
       onPress: async () => {
         if (pendingAction) return;
         lockAction("retry");
-        await window.electron.retryMediaDownloadTask(data.id);
+        await platform.retryMediaDownloadTask(data.id);
       },
     },
     {
@@ -146,7 +147,7 @@ const DownloadActions = ({ data }: Props) => {
             onConfirm: async () => {
               if (pendingAction) return false;
               lockAction("delete");
-              await window.electron.cancelMediaDownloadTask(data.id);
+              await platform.cancelMediaDownloadTask(data.id);
               return true;
             },
           });
@@ -154,7 +155,7 @@ const DownloadActions = ({ data }: Props) => {
         }
 
         lockAction("delete");
-        await window.electron.cancelMediaDownloadTask(data.id);
+        await platform.cancelMediaDownloadTask(data.id);
       },
     },
   ];

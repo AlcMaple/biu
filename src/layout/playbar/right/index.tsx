@@ -8,6 +8,7 @@ import MusicPlayMode from "@/components/music-play-mode";
 import MusicRate from "@/components/music-rate";
 import MusicVolume from "@/components/music-volume";
 import OpenPlaylistDrawerButton from "@/components/open-playlist-drawer-button";
+import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
 const RightControl = () => {
@@ -16,13 +17,13 @@ const RightControl = () => {
   const [desktopLyricsOn, setDesktopLyricsOn] = useState(false);
 
   useEffect(() => {
-    return window.electron.onDesktopLyricsVisibilityChange(visible => {
+    return platform.onDesktopLyricsVisibilityChange(visible => {
       setDesktopLyricsOn(visible);
     });
   }, []);
 
   const handleToggleDesktopLyrics = async () => {
-    const visible = await window.electron.toggleDesktopLyrics();
+    const visible = await platform.toggleDesktopLyrics();
     setDesktopLyricsOn(visible);
   };
 

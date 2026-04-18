@@ -4,6 +4,8 @@ import { useHref, useNavigate, useRoutes } from "react-router";
 import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import moment from "moment";
 
+import platform from "@/platform";
+
 import { getCookitFromBSite } from "./common/utils/cookie";
 import { toggleMiniMode } from "./common/utils/mini-player";
 import { mapKeyToElectronAccelerator } from "./common/utils/shortcut";
@@ -31,16 +33,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (window.electron && window.electron.navigate) {
-      const removeListener = window.electron.navigate(path => navigate(path));
+    if (platform && platform.navigate) {
+      const removeListener = platform.navigate(path => navigate(path));
       return removeListener;
     }
   }, [navigate]);
 
   // 订阅来自主进程的任务栏缩略按钮命令
   useEffect(() => {
-    if (window.electron && window.electron.onPlayerCommand) {
-      const removeListener = window.electron.onPlayerCommand(cmd => {
+    if (platform && platform.onPlayerCommand) {
+      const removeListener = platform.onPlayerCommand(cmd => {
         const { prev, next, togglePlay } = usePlayList.getState();
         if (cmd === "prev") {
           prev();
@@ -56,8 +58,8 @@ export function App() {
 
   // 订阅来自主进程的全局快捷键命令
   useEffect(() => {
-    if (window.electron && window.electron.onShortcutCommand) {
-      return window.electron.onShortcutCommand(cmd => {
+    if (platform && platform.onShortcutCommand) {
+      return platform.onShortcutCommand(cmd => {
         const { prev, next, togglePlay, setVolume, volume } = usePlayList.getState();
 
         switch (cmd) {
@@ -152,7 +154,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const removeListener = window.electron.onUpdateAvailable(updateInfo => {
+    const removeListener = platform.onUpdateAvailable(updateInfo => {
       setUpdate({
         isUpdateAvailable: true,
         latestVersion: updateInfo.latestVersion,

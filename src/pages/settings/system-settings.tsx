@@ -28,6 +28,7 @@ import {
 
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
+import platform from "@/platform";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
@@ -306,7 +307,7 @@ export const SystemSettingsTab = ({
                 <Button
                   variant="flat"
                   onPress={async () => {
-                    const path = await window.electron.selectDirectory();
+                    const path = await platform.selectDirectory();
                     if (path) setValue("downloadPath", path, { shouldDirty: true, shouldTouch: true });
                   }}
                 >
@@ -334,7 +335,7 @@ export const SystemSettingsTab = ({
                 <Button
                   variant="flat"
                   onPress={async () => {
-                    const path = await window.electron.selectFile();
+                    const path = await platform.selectFile();
                     if (path) setValue("ffmpegPath", path, { shouldDirty: true, shouldTouch: true });
                   }}
                 >

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import platform from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
 /** 本地收藏夹中的媒体项 */
@@ -101,16 +102,16 @@ export const useLocalFavItemsStore = create<State & Action>()(
       name: "local-fav-items",
       storage: {
         getItem: async () => {
-          const store = await window.electron.getStore(StoreNameMap.LocalFavItems);
+          const store = await platform.getStore(StoreNameMap.LocalFavItems);
           return store ? { state: store } : null;
         },
         setItem: async (_, value) => {
           if (value.state) {
-            await window.electron.setStore(StoreNameMap.LocalFavItems, value.state);
+            await platform.setStore(StoreNameMap.LocalFavItems, value.state);
           }
         },
         removeItem: async () => {
-          await window.electron.clearStore(StoreNameMap.LocalFavItems);
+          await platform.clearStore(StoreNameMap.LocalFavItems);
         },
       },
       partialize: state => ({ folderItems: state.folderItems }),

@@ -5,6 +5,7 @@ import { RiDownload2Fill, RiFileImageLine, RiFileMusicLine, RiFileVideoLine } fr
 
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
+import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
 const MusicDownloadButton = () => {
@@ -14,7 +15,7 @@ const MusicDownloadButton = () => {
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
   const downloadAudio = async () => {
-    await window.electron.addMediaDownloadTask({
+    await platform.addMediaDownloadTask({
       outputFileType: "audio",
       title: playItem?.pageTitle || playItem?.title || `audio-${Date.now()}`,
       cover: playItem?.pageCover || playItem?.cover,
@@ -30,7 +31,7 @@ const MusicDownloadButton = () => {
   };
 
   const downloadVideo = async () => {
-    await window.electron.addMediaDownloadTask({
+    await platform.addMediaDownloadTask({
       outputFileType: "video",
       title: playItem?.pageTitle || playItem?.title || `video-${Date.now()}`,
       cover: playItem?.pageCover || playItem?.cover,

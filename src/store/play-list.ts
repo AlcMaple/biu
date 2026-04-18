@@ -1,5 +1,4 @@
 import { addToast } from "@heroui/react";
-import log from "electron-log/renderer";
 import { remove } from "es-toolkit/array";
 import { uniqueId } from "es-toolkit/compat";
 import { create } from "zustand";
@@ -11,6 +10,8 @@ import { getAudioUrl, getDashUrl, isUrlValid } from "@/common/utils/audio";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
 import { stripHtml } from "@/common/utils/str";
 import { formatUrlProtocol } from "@/common/utils/url";
+import platform from "@/platform";
+import { log } from "@/platform";
 import { getAudioSongInfo } from "@/service/audio-song-info";
 import { getWebInterfaceView } from "@/service/web-interface-view";
 
@@ -217,8 +218,8 @@ const updatePlaybackState = () => {
     navigator.mediaSession.playbackState = audio.paused ? "paused" : "playing";
   }
 
-  if (window.electron && window.electron.updatePlaybackState) {
-    window.electron.updatePlaybackState(!audio.paused);
+  if (platform && platform.updatePlaybackState) {
+    platform.updatePlaybackState(!audio.paused);
   }
 };
 

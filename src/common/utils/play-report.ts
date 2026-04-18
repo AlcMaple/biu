@@ -1,6 +1,6 @@
-import log from "electron-log/renderer";
 import moment from "moment";
 
+import { log } from "@/platform";
 import { postClickInterfaceClickWebH5 } from "@/service/click-interface-click-web-h5";
 import { postClickInterfaceWebHeartbeat } from "@/service/click-interface-web-heartbeat";
 import { useSettings } from "@/store/settings";

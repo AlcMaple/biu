@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 import { Autocomplete, AutocompleteItem } from "@heroui/react";
 
+import platform from "@/platform";
 import { defaultAppSettings } from "@shared/settings/app-settings";
 
 export interface FontSelectProps {
@@ -14,7 +15,7 @@ export default function FontSelect({ value = defaultAppSettings.fontFamily, onCh
   const [fonts, setFonts] = useState<Partial<IFontInfo>[]>([]);
 
   const getFonts = async () => {
-    const fonts = await window.electron.getFonts();
+    const fonts = await platform.getFonts();
     setFonts([{ name: "系统默认", familyName: defaultAppSettings.fontFamily }, ...fonts]);
   };
 

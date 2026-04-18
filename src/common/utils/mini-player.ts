@@ -3,6 +3,7 @@ import { shallow } from "zustand/shallow";
 
 import type { PlayMode } from "@/common/constants/audio";
 
+import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
@@ -188,7 +189,7 @@ export async function toggleMiniMode() {
       startMiniPlayerMainSync();
     }
 
-    await window.electron.toggleMiniPlayer();
+    await platform.toggleMiniPlayer();
   } catch {
     addToast({
       title: "切换出错",

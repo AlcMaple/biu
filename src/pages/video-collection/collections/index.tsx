@@ -6,6 +6,7 @@ import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { postFavSeasonFav } from "@/service/fav-season-fav";
 import { postFavSeasonUnfav } from "@/service/fav-season-unfav";
 import { getUserVideoArchivesList, type Media } from "@/service/user-video-archives-list";
@@ -189,7 +190,7 @@ const VideoCollections = () => {
         });
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.cover,
@@ -201,7 +202,7 @@ const VideoCollections = () => {
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.cover,
@@ -213,7 +214,7 @@ const VideoCollections = () => {
         });
         break;
       case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+        platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
         break;
       default:
         break;

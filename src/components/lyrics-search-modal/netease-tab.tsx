@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, addToast } from "@heroui/react";
 
 import { formatDuration } from "@/common/utils/time";
+import platform from "@/platform";
 
 import LyricsPreviewModal from "./lyrics-preview-modal";
 
@@ -48,7 +49,7 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
     setPreviewLoading(true);
 
     try {
-      const res = await window.electron.getNeteaseLyrics({ id });
+      const res = await platform.getNeteaseLyrics({ id });
       const text = res?.lrc?.lyric?.trim() || res?.klyric?.lyric?.trim() || "";
       const translation = res?.tlyric?.lyric?.trim() || "";
 

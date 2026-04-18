@@ -4,6 +4,7 @@ import { Button } from "@heroui/react";
 import { RiAddLine, RiCloseLine, RiImageLine } from "@remixicon/react";
 import { useShallow } from "zustand/shallow";
 
+import platform from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 
 /** 将本地路径转为 img src */
@@ -22,8 +23,8 @@ const FancyPlayerImageAlbum = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectFiles = async () => {
-    if (window.electron?.selectImages) {
-      const paths = await window.electron.selectImages();
+    if (platform.selectImages) {
+      const paths = await platform.selectImages();
       if (paths.length > 0) addImages(paths);
       return;
     }
