@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
+import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
@@ -62,7 +63,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         setLrclibLoading(false);
         try {
           setNeteaseLoading(true);
-          const res = await window.electron.searchNeteaseSongs({
+          const res = await platform.searchNeteaseSongs({
             s: query,
             type: NETEASE_TYPE_SONG,
             limit: DEFAULT_LIMIT,
@@ -80,7 +81,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         setNeteaseLoading(false);
         try {
           setLrclibLoading(true);
-          const res = await window.electron.searchLrclibLyrics({ q: query });
+          const res = await platform.searchLrclibLyrics({ q: query });
           setLrclibSongs(res ?? []);
         } catch {
           setLrclibSongs([]);
@@ -127,10 +128,10 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
       };
 
       try {
-        const store = await window.electron.getStore(StoreNameMap.LyricsCache);
+        const store = await platform.getStore(StoreNameMap.LyricsCache);
         const prev = store?.[key] || {};
         const nextStore = { ...(store ?? {}), [key]: { ...prev, ...nextLyrics } };
-        await window.electron.setStore(StoreNameMap.LyricsCache, nextStore);
+        await platform.setStore(StoreNameMap.LyricsCache, nextStore);
         onLyricsAdopted?.(lyricsText, tLyricsText);
         return true;
       } catch {

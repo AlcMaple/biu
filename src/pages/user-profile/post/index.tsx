@@ -6,6 +6,7 @@ import { RiPlayFill } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
 import SearchWithSort from "@/components/search-with-sort";
+import platform from "@/platform";
 import { getSpaceWbiArcSearch, type SpaceArcVListItem } from "@/service/space-wbi-arc-search";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -120,7 +121,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
         ]);
         break;
       case "download-audio":
-        window.electron?.addMediaDownloadTask({
+        platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.pic,
@@ -132,7 +133,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
         });
         break;
       case "download-video":
-        window.electron?.addMediaDownloadTask({
+        platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.pic,

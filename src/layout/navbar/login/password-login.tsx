@@ -6,6 +6,7 @@ import { RiEyeLine, RiEyeOffLine, RiQuestionLine } from "@remixicon/react";
 import { JSEncrypt } from "jsencrypt";
 
 import { useGeetest } from "@/common/hooks/use-geetest";
+import platform from "@/platform";
 import { getPassportLoginWebKey } from "@/service/passport-login-web-key";
 import { postPassportLoginWebLoginPassword } from "@/service/passport-login-web-login-passport";
 
@@ -163,9 +164,7 @@ const PasswordLogin = ({ onClose, updateUserData }: PasswordLoginProps) => {
                     isIconOnly
                     size="sm"
                     variant="light"
-                    onPress={() =>
-                      window.electron.openExternal("https://passport.bilibili.com/pc/passport/findPassword")
-                    }
+                    onPress={() => platform.openExternal("https://passport.bilibili.com/pc/passport/findPassword")}
                   >
                     <RiQuestionLine size={18} />
                   </Button>

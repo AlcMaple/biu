@@ -21,6 +21,7 @@ import {
 } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
+import platform from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
@@ -48,7 +49,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
 
   const logout = async () => {
-    const csrfToken = await window.electron.getCookie("bili_jct");
+    const csrfToken = await platform.getCookie("bili_jct");
     if (!csrfToken) {
       addToast({
         title: "CSRF Token 不存在",
@@ -135,7 +136,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
       label: "问题反馈",
       startContent: <RiFeedbackLine size={18} />,
       endContent: <RiExternalLinkLine size={18} />,
-      onPress: () => window.electron.openExternal("https://github.com/wood3n/biu/issues"),
+      onPress: () => platform.openExternal("https://github.com/wood3n/biu/issues"),
     },
     {
       key: "logout",

@@ -5,6 +5,7 @@ import { Tab, Tabs } from "@heroui/react";
 import { useShallow } from "zustand/react/shallow";
 
 import ScrollContainer from "@/components/scroll-container";
+import platform from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useSettings } from "@/store/settings";
 
@@ -92,15 +93,15 @@ const useSystemSettingsForm = () => {
       if (!name) return;
       const patch = { [name]: (values as any)[name] } as Partial<AppSettings>;
       updateSettings(patch);
-      if (name === "proxySettings" && values.proxySettings && window.electron?.setProxySettings) {
-        window.electron.setProxySettings(values.proxySettings as ProxySettings);
+      if (name === "proxySettings" && values.proxySettings && platform.setProxySettings) {
+        platform.setProxySettings(values.proxySettings as ProxySettings);
       }
     });
     return () => subscription.unsubscribe();
   }, [watch, updateSettings]);
 
   useEffect(() => {
-    window.electron.getAppVersion().then(v => setAppVersion(v));
+    platform.getAppVersion().then(v => setAppVersion(v));
   }, []);
 
   return {

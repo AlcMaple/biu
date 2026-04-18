@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { twMerge } from "tailwind-merge";
 
 import { ReactComponent as LogoIcon } from "@/assets/icons/logo.svg";
+import platform from "@/platform";
 
-const isMac = window.electron?.getPlatform() === "macos";
+const isMac = platform.getPlatform() === "macos";
 
 interface LogoProps {
   isCollapsed: boolean;
@@ -16,8 +17,8 @@ const Logo = ({ isCollapsed }: LogoProps) => {
   useEffect(() => {
     if (!isMac) return;
 
-    window.electron?.isFullScreen().then(setIsFullScreen);
-    const unlisten = window.electron?.onWindowFullScreenChange(setIsFullScreen);
+    platform.isFullScreen().then(setIsFullScreen);
+    const unlisten = platform.onWindowFullScreenChange(setIsFullScreen);
 
     return () => {
       unlisten?.();

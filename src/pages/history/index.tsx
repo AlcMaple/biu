@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import IconButton from "@/components/icon-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { postHistoryClear } from "@/service/history-clear";
@@ -272,7 +273,7 @@ const History = () => {
           });
           break;
         case "download-audio":
-          await window.electron.addMediaDownloadTask({
+          await platform.addMediaDownloadTask({
             outputFileType: "audio",
             title: item.title,
             cover: item.cover,
@@ -285,7 +286,7 @@ const History = () => {
           });
           break;
         case "download-video":
-          await window.electron.addMediaDownloadTask({
+          await platform.addMediaDownloadTask({
             outputFileType: "video",
             title: item.title,
             cover: item.cover,
@@ -298,7 +299,7 @@ const History = () => {
           });
           break;
         case "bililink":
-          window.electron.openExternal(`https://www.bilibili.com/video/${item.history.bvid}`);
+          platform.openExternal(`https://www.bilibili.com/video/${item.history.bvid}`);
           break;
         case "delete":
           useModalStore.getState().onOpenConfirmModal({

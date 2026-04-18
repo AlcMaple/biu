@@ -41,6 +41,7 @@ import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
+import platform from "@/platform";
 import { getFavResourceInfos } from "@/service/fav-resource-infos";
 import { useFavoritesStore } from "@/store/favorite";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -277,7 +278,7 @@ const LocalFavorites = () => {
           onRenameOpen();
           break;
         case "download-audio":
-          await window.electron.addMediaDownloadTask({
+          await platform.addMediaDownloadTask({
             outputFileType: "audio",
             title: item.title,
             cover: item.cover,

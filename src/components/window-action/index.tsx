@@ -10,16 +10,17 @@ import {
 
 import { toggleMiniMode } from "@/common/utils/mini-player";
 import IconButton from "@/components/icon-button";
+import platform from "@/platform";
 
 const WindowAction = () => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
-    window.electron.isMaximized().then(setIsMaximized);
-    window.electron.isFullScreen().then(setIsFullScreen);
-    const unlistenMaximize = window.electron.onWindowMaximizeChange(setIsMaximized);
-    const unlistenFullScreen = window.electron.onWindowFullScreenChange(setIsFullScreen);
+    platform.isMaximized().then(setIsMaximized);
+    platform.isFullScreen().then(setIsFullScreen);
+    const unlistenMaximize = platform.onWindowMaximizeChange(setIsMaximized);
+    const unlistenFullScreen = platform.onWindowFullScreenChange(setIsFullScreen);
 
     return () => {
       unlistenMaximize();
@@ -28,15 +29,15 @@ const WindowAction = () => {
   }, []);
 
   const handleMinimize = () => {
-    window.electron.minimizeWindow();
+    platform.minimizeWindow();
   };
 
   const handleMaximize = () => {
-    window.electron.toggleMaximizeWindow();
+    platform.toggleMaximizeWindow();
   };
 
   const handleClose = () => {
-    window.electron.closeWindow();
+    platform.closeWindow();
   };
 
   return (

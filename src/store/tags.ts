@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import platform from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
 export interface Tag {
@@ -61,16 +62,16 @@ export const useTagStore = create<State & Action>()(
       name: "tags",
       storage: {
         getItem: async () => {
-          const store = await window.electron.getStore(StoreNameMap.Tags);
+          const store = await platform.getStore(StoreNameMap.Tags);
           return store ? { state: store } : null;
         },
         setItem: async (_, value) => {
           if (value.state) {
-            await window.electron.setStore(StoreNameMap.Tags, value.state);
+            await platform.setStore(StoreNameMap.Tags, value.state);
           }
         },
         removeItem: async () => {
-          await window.electron.clearStore(StoreNameMap.Tags);
+          await platform.clearStore(StoreNameMap.Tags);
         },
       },
       partialize: state => ({ tags: state.tags, itemTags: state.itemTags }),

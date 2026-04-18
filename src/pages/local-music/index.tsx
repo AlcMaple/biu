@@ -8,6 +8,7 @@ import Empty from "@/components/empty";
 import IconButton from "@/components/icon-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchButton from "@/components/search-button";
+import platform from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -32,7 +33,7 @@ const LocalMusicPage = () => {
   useEffect(() => {
     const init = async () => {
       if (localDirs?.length) {
-        const data = await window.electron.scanLocalMusic(localDirs);
+        const data = await platform.scanLocalMusic(localDirs);
         setList(data);
       } else {
         setList([]);
@@ -91,7 +92,7 @@ const LocalMusicPage = () => {
   };
 
   const addDirectory = async () => {
-    const dir = await window.electron.selectDirectory();
+    const dir = await platform.selectDirectory();
     if (!dir) return;
     const next = Array.from(new Set([...(localDirs || []), dir]));
     updateSettings({ localMusicDirs: next });
@@ -119,12 +120,12 @@ const LocalMusicPage = () => {
       setList([]);
       return;
     }
-    const data = await window.electron.scanLocalMusic(localDirs);
+    const data = await platform.scanLocalMusic(localDirs);
     setList(data);
   };
 
   const openFile = async (filePath: string) => {
-    await window.electron.showFileInFolder(filePath);
+    await platform.showFileInFolder(filePath);
   };
 
   const playFile = async (song: LocalMusicItem) => {
@@ -179,7 +180,7 @@ const LocalMusicPage = () => {
       title: "删除文件",
       description: "该操作会删除本地文件且不可恢复，请谨慎操作",
       onConfirm: async () => {
-        const ok = await window.electron.deleteLocalMusicFile(filePath);
+        const ok = await platform.deleteLocalMusicFile(filePath);
         if (ok) {
           setList(prev => prev.filter(i => i.path !== filePath));
           return true;

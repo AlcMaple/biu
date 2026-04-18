@@ -5,6 +5,7 @@ import { addToast, Spinner } from "@heroui/react";
 import { stripHtml } from "@/common/utils/str";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Empty from "@/components/empty";
+import platform from "@/platform";
 import { getWebInterfaceWbiSearchType, type SearchVideoItem } from "@/service/web-interface-search-type";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -142,7 +143,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
         });
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: stripHtml(item.title),
           cover: formatUrlProtocol(item.pic),
@@ -154,7 +155,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: stripHtml(item.title),
           cover: formatUrlProtocol(item.pic),
@@ -166,7 +167,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
         });
         break;
       case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+        platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
         break;
       default:
         break;

@@ -6,6 +6,7 @@ import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
 import { parseLrc } from "@/components/lyrics/parse-lrc";
+import platform from "@/platform";
 import { useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
@@ -55,7 +56,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
           ? `${playItem.bvid}-${playItem.cid}`
           : null;
     if (!cacheKey) return;
-    window.electron.getStore(StoreNameMap.LyricsCache).then(store => {
+    platform.getStore(StoreNameMap.LyricsCache).then(store => {
       if (canceled || !store || typeof store !== "object") return;
       const cached = store[cacheKey];
       if (cached && typeof cached.fontSize === "number") {
@@ -100,10 +101,10 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
                 ? `${playItem.bvid}-${playItem.cid}`
                 : null;
           if (!key) return;
-          const store = await window.electron.getStore(StoreNameMap.LyricsCache);
+          const store = await platform.getStore(StoreNameMap.LyricsCache);
           const prev = store?.[key] || {};
 
-          await window.electron.setStore(StoreNameMap.LyricsCache, {
+          await platform.setStore(StoreNameMap.LyricsCache, {
             ...(store || {}),
             [key]: {
               ...prev,

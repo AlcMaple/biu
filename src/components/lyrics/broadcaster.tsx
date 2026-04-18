@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
+import platform from "@/platform";
 import { useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
@@ -48,7 +49,7 @@ const LyricsBroadcaster = () => {
     const load = async () => {
       try {
         const cacheKey = isLocal ? `local-${playItem.id}` : `${playItem.bvid}-${playItem.cid}`;
-        const store = await window.electron.getStore(StoreNameMap.LyricsCache);
+        const store = await platform.getStore(StoreNameMap.LyricsCache);
         if (canceled) return;
         if (store && typeof store === "object") {
           const cached = store[cacheKey];

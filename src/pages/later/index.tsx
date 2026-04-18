@@ -4,6 +4,7 @@ import { addToast, Button, Spinner } from "@heroui/react";
 import { RiDeleteBinLine } from "@remixicon/react";
 
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import platform from "@/platform";
 import { postHistoryToViewDel } from "@/service/history-toview-del";
 import {
   getHistoryToViewList,
@@ -162,7 +163,7 @@ const Later = () => {
         ]);
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.pic,
@@ -175,7 +176,7 @@ const Later = () => {
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.pic,
@@ -188,7 +189,7 @@ const Later = () => {
         });
         break;
       case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+        platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
         break;
       default:
         break;

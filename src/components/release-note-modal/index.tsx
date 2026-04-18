@@ -5,6 +5,7 @@ import { RiInformationLine } from "@remixicon/react";
 import { filesize } from "filesize";
 import { useShallow } from "zustand/react/shallow";
 
+import platform from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useModalStore } from "@/store/modal";
 
@@ -26,7 +27,7 @@ const ReleaseNoteModal = () => {
   const startDownload = async () => {
     setStatus("downloading");
     try {
-      await window.electron.downloadAppUpdate();
+      await platform.downloadAppUpdate();
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
@@ -36,7 +37,7 @@ const ReleaseNoteModal = () => {
   const handleOpenInstaller = async () => {
     try {
       if (downloadInfo?.filePath) {
-        const ok = await window.electron.showFileInFolder(downloadInfo.filePath);
+        const ok = await platform.showFileInFolder(downloadInfo.filePath);
         if (!ok) {
           addToast({
             title: "无法打开安装包文件夹",
@@ -54,7 +55,7 @@ const ReleaseNoteModal = () => {
   };
 
   useEffect(() => {
-    const removeListener = window.electron.onDownloadAppProgress(info => {
+    const removeListener = platform.onDownloadAppProgress(info => {
       setStatus(info.status);
       switch (info.status) {
         case "downloading":
@@ -112,8 +113,8 @@ const ReleaseNoteModal = () => {
                   <RiInformationLine size={16} />
                   <span className="text-sm text-zinc-500 dark:text-zinc-400">安装包已下载完成</span>
                 </span>
-                {window.electron.isSupportAutoUpdate() ? (
-                  <Button color="primary" onPress={window.electron.quitAndInstall}>
+                {platform.isSupportAutoUpdate() ? (
+                  <Button color="primary" onPress={platform.quitAndInstall}>
                     退出并安装更新
                   </Button>
                 ) : (

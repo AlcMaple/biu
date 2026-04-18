@@ -1,5 +1,6 @@
 import { addToast } from "@heroui/react";
 
+import platform from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useModalStore } from "@/store/modal";
 
@@ -16,7 +17,7 @@ const UpdateCheckButton = () => {
       return;
     }
 
-    const res = await window.electron.checkAppUpdate();
+    const res = await platform.checkAppUpdate();
 
     if (res?.error) {
       addToast({

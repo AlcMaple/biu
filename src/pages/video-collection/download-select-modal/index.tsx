@@ -8,6 +8,7 @@ import { CollectionType } from "@/common/constants/collection";
 import { getAllFavMedia } from "@/common/utils/fav";
 import Image from "@/components/image";
 import ScrollContainer from "@/components/scroll-container";
+import platform from "@/platform";
 import { getUserVideoArchivesList } from "@/service/user-video-archives-list";
 
 interface DownloadSelectModalProps {
@@ -73,7 +74,7 @@ const DownloadSelectModal = ({ type, outputFileType, mediaCount, isOpen, onOpenC
 
   const handleDownload = async () => {
     if (selectedIds.length) {
-      await window.electron.addMediaDownloadTaskList(
+      await platform.addMediaDownloadTaskList(
         selectedIds.map(id => {
           const media = list.find(item => item.id === id);
           return {

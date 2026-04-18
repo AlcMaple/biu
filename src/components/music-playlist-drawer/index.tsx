@@ -7,6 +7,7 @@ import { uniqBy } from "es-toolkit/array";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
+import platform from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { isSame, usePlayList, type PlayData } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -51,7 +52,7 @@ const PlayListDrawer = () => {
         });
         break;
       case "download-audio":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "audio",
           title: item.title,
           cover: item.cover,
@@ -64,7 +65,7 @@ const PlayListDrawer = () => {
         });
         break;
       case "download-video":
-        await window.electron.addMediaDownloadTask({
+        await platform.addMediaDownloadTask({
           outputFileType: "video",
           title: item.title,
           cover: item.cover,

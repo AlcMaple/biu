@@ -5,6 +5,7 @@ import { RiComputerLine, RiExternalLinkLine, RiFingerprintLine, RiMicLine, RiMus
 import { motion } from "framer-motion";
 
 import IconButton from "@/components/icon-button";
+import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
 type RecordState = "idle" | "listening" | "success" | "error";
@@ -143,7 +144,7 @@ const ShazamModal = () => {
     const arrayBuffer = await blob.arrayBuffer();
 
     try {
-      const raw = await window.electron.recognizeSong(arrayBuffer);
+      const raw = await platform.recognizeSong(arrayBuffer);
 
       if (cancelledRef.current || recognizedRef.current) return;
       if (raw.error || !raw.track) return;
@@ -188,7 +189,7 @@ const ShazamModal = () => {
       let stream: MediaStream;
       try {
         if (source === "mic") {
-          await window.electron.requestMicPermission();
+          await platform.requestMicPermission();
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: false,
@@ -198,7 +199,7 @@ const ShazamModal = () => {
             video: false,
           });
         } else {
-          const sources = await window.electron.getDesktopSources();
+          const sources = await platform.getDesktopSources();
           if (!sources.length) throw new Error("无法获取系统音频源");
 
           const sourceId = sources[0].id;
@@ -385,7 +386,7 @@ const ShazamModal = () => {
                       size="sm"
                       color="primary"
                       endContent={<RiExternalLinkLine size={14} />}
-                      onPress={() => window.electron.openExternal(result.url!)}
+                      onPress={() => platform.openExternal(result.url!)}
                     >
                       查看详情
                     </Button>

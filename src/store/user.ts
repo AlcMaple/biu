@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import platform from "@/platform";
 import { getUserInfo, type UserInfo } from "@/service/user-info";
 import { StoreNameMap } from "@shared/store";
 
@@ -36,7 +37,7 @@ export const useUser = create<UserState & Action>()(
       partialize: state => state.user,
       storage: {
         getItem: async () => {
-          const store = await window.electron.getStore(StoreNameMap.UserLoginInfo);
+          const store = await platform.getStore(StoreNameMap.UserLoginInfo);
 
           return {
             state: store,
@@ -45,12 +46,12 @@ export const useUser = create<UserState & Action>()(
 
         setItem: async (_, value) => {
           if (value.state) {
-            await window.electron.setStore(StoreNameMap.UserLoginInfo, value.state);
+            await platform.setStore(StoreNameMap.UserLoginInfo, value.state);
           }
         },
 
         removeItem: async () => {
-          await window.electron.clearStore(StoreNameMap.UserLoginInfo);
+          await platform.clearStore(StoreNameMap.UserLoginInfo);
         },
       },
     },

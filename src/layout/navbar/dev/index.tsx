@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { RiCodeLine } from "@remixicon/react";
 
 import IconButton from "@/components/icon-button";
+import platform from "@/platform";
 
 const Dev = () => {
   const [isDev, setIsDev] = useState(false);
 
   useEffect(() => {
-    window.electron.isDev().then(setIsDev);
+    platform.isDev().then(setIsDev);
   }, []);
 
   if (!isDev) {
@@ -16,7 +17,7 @@ const Dev = () => {
   }
 
   return (
-    <IconButton onPress={window.electron.toggleDevTools}>
+    <IconButton onPress={platform.toggleDevTools}>
       <RiCodeLine size={18} />
     </IconButton>
   );

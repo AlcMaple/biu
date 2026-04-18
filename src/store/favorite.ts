@@ -1,11 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { StoreNameMap } from "@shared/store";
-
+import platform from "@/platform";
 import { getFavFolderCollectedList } from "@/service/fav-folder-collected-list";
 import { getFavFolderCreatedList } from "@/service/fav-folder-created-list";
 import { getSpaceNavnum } from "@/service/space-navnum";
+import { StoreNameMap } from "@shared/store";
 
 export interface FavoriteItem {
   id: number;
@@ -170,16 +170,16 @@ export const useFavoritesStore = create<State & Action>()(
       name: "favorites-order",
       storage: {
         getItem: async () => {
-          const store = await window.electron.getStore(StoreNameMap.LocalFavorites);
+          const store = await platform.getStore(StoreNameMap.LocalFavorites);
           return store ? { state: store } : null;
         },
         setItem: async (_, value) => {
           if (value.state) {
-            await window.electron.setStore(StoreNameMap.LocalFavorites, value.state);
+            await platform.setStore(StoreNameMap.LocalFavorites, value.state);
           }
         },
         removeItem: async () => {
-          await window.electron.clearStore(StoreNameMap.LocalFavorites);
+          await platform.clearStore(StoreNameMap.LocalFavorites);
         },
       },
       partialize: state => ({
