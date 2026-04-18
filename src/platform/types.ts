@@ -12,3 +12,15 @@ export interface Logger {
   info: (...args: unknown[]) => void;
   debug: (...args: unknown[]) => void;
 }
+
+export interface RequestConfig {
+  url: string;
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  params?: Record<string, string>;
+  data?: unknown;
+  headers?: Record<string, string>;
+}
+
+export interface PlatformHttp {
+  request: <T = unknown>(config: RequestConfig) => Promise<T>;
+}

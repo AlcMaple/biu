@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@capacitor/http':
+        specifier: ^0.0.2
+        version: 0.0.2
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -417,6 +420,13 @@ packages:
 
   '@cacheable/utils@2.3.2':
     resolution: {integrity: sha512-8kGE2P+HjfY8FglaOiW+y8qxcaQAfAhVML+i66XJR3YX5FtyDqn6Txctr3K2FrbxLKixRRYYBWMbuGciOhYNDg==}
+
+  '@capacitor/core@8.3.1':
+    resolution: {integrity: sha512-UF8ItlHguU1Z6GXfPTeT2gakf+ctNI8pAS1kwSBQlsJMlfD4OPoto/SmKnOxKCQvnF4WRcdWeg6C0zREUNaAQg==}
+
+  '@capacitor/http@0.0.2':
+    resolution: {integrity: sha512-3UPqYOmVkAQjCWWowSDGPnBkXY7znbPE7lNs8nhwTmE2E5fXTvjHM8PV15zOyn+nenY7zEu9Air49fGjrX+Tjg==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   '@commitlint/cli@20.1.0':
     resolution: {integrity: sha512-pW5ujjrOovhq5RcYv5xCpb4GkZxkO2+GtOdBW2/qrr0Ll9tl3PX0aBBobGQl3mdZUbOBgwAexEQLeH6uxL0VYg==}
@@ -6969,6 +6979,14 @@ snapshots:
     dependencies:
       hashery: 1.2.0
       keyv: 5.5.4
+
+  '@capacitor/core@8.3.1':
+    dependencies:
+      tslib: 2.8.1
+
+  '@capacitor/http@0.0.2':
+    dependencies:
+      '@capacitor/core': 8.3.1
 
   '@commitlint/cli@20.1.0(@types/node@24.10.6)(typescript@5.9.3)':
     dependencies:
