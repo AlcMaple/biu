@@ -9,7 +9,7 @@ export const pluginElectron = (): RsbuildPlugin => ({
   name: "plugin-electron",
   setup(api) {
     api.onAfterDevCompile(async ({ isFirstCompile }) => {
-      if (isFirstCompile) {
+      if (isFirstCompile && process.env.BIU_TARGET !== "android") {
         logger.info("[electron] Bundle the typescript configuration for electron...");
         await buildElectronConfig("development");
 

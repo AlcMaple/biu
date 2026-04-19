@@ -31,6 +31,7 @@
     "postinstall": "node node_modules/electron/install.js",
     "prepare": "husky install",
     "dev": "rsbuild dev",
+    "dev:android": "BIU_TARGET=android rsbuild dev",
     "build": "rsbuild build",
     "test": "vitest",
     "build:android": "rsbuild build && cap sync android",
