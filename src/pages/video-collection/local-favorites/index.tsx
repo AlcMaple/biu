@@ -38,7 +38,7 @@ import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
 import MusicListItem from "@/components/music-list-item";
-import MusicListHeader from "@/components/music-list-item/header";
+import MusicListHeader, { type MusicListSortKey } from "@/components/music-list-item/header";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
 import platform from "@/platform";
@@ -51,10 +51,13 @@ import { useTagStore } from "@/store/tags";
 
 import Header from "../header";
 
-const ORDER_OPTIONS = [
-  { key: "fav_time", label: "最近收藏" },
-  { key: "title", label: "按标题" },
-];
+const durationToSeconds = (d: number | string | undefined): number => {
+  if (d == null) return 0;
+  if (typeof d === "number") return d;
+  const parts = d.split(":").map(Number);
+  if (parts.some(Number.isNaN)) return 0;
+  return parts.reduce((acc, p) => acc * 60 + p, 0);
+};
 
 const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
@@ -74,7 +77,8 @@ const LocalFavorites = () => {
   const scrollRef = useRef<ScrollRefObject>(null);
 
   const [keyword, setKeyword] = useState("");
-  const [order, setOrder] = useState("fav_time");
+  const [sortKey, setSortKey] = useState<MusicListSortKey>("time");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<LocalFavItem | null>(null);
@@ -104,11 +108,38 @@ const LocalFavorites = () => {
         return activeTagIds.some(tid => tags.includes(tid));
       });
     }
-    if (order === "title") {
-      result = [...result].sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
-    }
-    return result;
-  }, [rawItems, keyword, order, activeTagIds, itemTags]);
+    const sign = sortDir === "asc" ? 1 : -1;
+    return [...result].sort((a, b) => {
+      let diff = 0;
+      switch (sortKey) {
+        case "title":
+          diff = a.title.localeCompare(b.title, "zh-CN");
+          break;
+        case "playCount":
+          diff = (a.playCount ?? 0) - (b.playCount ?? 0);
+          break;
+        case "duration":
+          diff = durationToSeconds(a.duration) - durationToSeconds(b.duration);
+          break;
+        case "time":
+        default:
+          diff = a.fav_time - b.fav_time;
+          break;
+      }
+      return sign * diff;
+    });
+  }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags]);
+
+  const handleSort = useCallback((key: MusicListSortKey) => {
+    setSortKey(prev => {
+      if (prev === key) {
+        setSortDir(dir => (dir === "asc" ? "desc" : "asc"));
+        return prev;
+      }
+      setSortDir("desc");
+      return key;
+    });
+  }, []);
 
   // 判断是否为本地歌曲（含兼容旧数据：source 字段存入前的本地歌曲）
   const isLocalItem = useCallback(
@@ -389,12 +420,7 @@ const LocalFavorites = () => {
             </DropdownMenu>
           </Dropdown>
         </div>
-        <SearchWithSort
-          onKeywordSearch={setKeyword}
-          orderOptions={ORDER_OPTIONS}
-          order={order}
-          onOrderChange={setOrder}
-        />
+        <SearchWithSort onKeywordSearch={setKeyword} />
       </div>
 
       {allTags.length > 0 && (
@@ -426,7 +452,14 @@ const LocalFavorites = () => {
       )}
 
       <div className="w-full">
-        <MusicListHeader hidePubTime={false} timeTitle="收藏时间" />
+        <MusicListHeader
+          hidePubTime={false}
+          timeTitle="收藏时间"
+          sortable={["title", "playCount", "time", "duration"]}
+          sortBy={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+        />
         {items.map((item, index) => (
           <MusicListItem
             key={String(item.rid)}
