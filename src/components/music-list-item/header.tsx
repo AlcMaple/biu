@@ -38,9 +38,8 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
         type="button"
         onClick={() => onSort?.(key)}
         className={clx(
-          "group flex w-full cursor-pointer items-center gap-0.5 transition-colors",
+          "group hover:text-default-700 flex w-full cursor-pointer items-center gap-0.5 transition-colors",
           align === "right" ? "justify-end" : "justify-start",
-          active ? "text-primary" : "hover:text-default-700",
         )}
       >
         <span>{label}</span>

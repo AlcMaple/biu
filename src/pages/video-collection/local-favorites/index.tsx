@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import {
@@ -129,6 +129,11 @@ const LocalFavorites = () => {
       return sign * diff;
     });
   }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags]);
+
+  useEffect(() => {
+    setSortKey("time");
+    setSortDir("desc");
+  }, [folderIdStr]);
 
   const handleSort = useCallback((key: MusicListSortKey) => {
     setSortKey(prev => {
