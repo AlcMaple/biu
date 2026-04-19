@@ -64,6 +64,24 @@ const reorderList = <T extends { id: number }>(list: T[], activeId: number, over
   return next;
 };
 
+/**
+ * 等待 persist 的 rehydrate 完成。
+ *
+ * Why: 若 rehydrate 未完成就 merge 远程数据，`createdFavorites` 内存态还是 [],
+ * `filter(isLocal)` 取到空数组，会把本地歌单元数据覆盖丢失（真实事故发生过一次）。
+ */
+const waitForHydration = () =>
+  new Promise<void>(resolve => {
+    if (useFavoritesStore.persist.hasHydrated()) {
+      resolve();
+      return;
+    }
+    const unsub = useFavoritesStore.persist.onFinishHydration(() => {
+      unsub();
+      resolve();
+    });
+  });
+
 export const useFavoritesStore = create<State & Action>()(
   persist(
     (set, get) => ({
@@ -72,10 +90,14 @@ export const useFavoritesStore = create<State & Action>()(
       createdOrder: [],
       collectedOrder: [],
       updateCreatedFavorites: async (userMid: number | string) => {
-        const favorites = await getAllCreatedFavorites(userMid);
-        // 保留本地创建的收藏夹
+        await waitForHydration();
+
+        const result = await getAllCreatedFavorites(userMid);
+        // 远程拉取失败时绝不覆写本地状态 —— 避免本地歌单被空数据冲掉
+        if (!result.ok) return;
+
         const localItems = get().createdFavorites.filter(item => item.isLocal);
-        const combined = [...localItems, ...favorites];
+        const combined = [...localItems, ...result.list];
         const ordered = applySavedOrder(combined, get().createdOrder);
 
         set(() => ({
@@ -126,8 +148,12 @@ export const useFavoritesStore = create<State & Action>()(
           };
         }),
       updateCollectedFavorites: async (userMid: number | string) => {
-        const favorites = await getAllCollectedFavorites(userMid);
-        const ordered = applySavedOrder(favorites, get().collectedOrder);
+        await waitForHydration();
+
+        const result = await getAllCollectedFavorites(userMid);
+        if (!result.ok) return;
+
+        const ordered = applySavedOrder(result.list, get().collectedOrder);
 
         set(() => ({
           collectedFavorites: ordered,
@@ -191,19 +217,25 @@ export const useFavoritesStore = create<State & Action>()(
   ),
 );
 
-async function getAllCreatedFavorites(userMid: number | string) {
-  const res = await getSpaceNavnum({
-    mid: userMid,
-  });
+/** 远程拉取结果 —— ok=false 代表请求链路失败，调用方必须拒绝覆写本地状态 */
+type FetchResult = { ok: true; list: FavoriteItem[] } | { ok: false };
+
+async function getAllCreatedFavorites(userMid: number | string): Promise<FetchResult> {
+  let res: Awaited<ReturnType<typeof getSpaceNavnum>>;
+  try {
+    res = await getSpaceNavnum({ mid: userMid });
+  } catch {
+    return { ok: false };
+  }
 
   if (res.code !== 0) {
-    return [];
+    return { ok: false };
   }
 
   const total = res.data?.favourite?.master ?? 0;
 
   if (!total) {
-    return [];
+    return { ok: true, list: [] };
   }
 
   const pageSize = 50;
@@ -217,20 +249,22 @@ async function getAllCreatedFavorites(userMid: number | string) {
     }),
   );
 
-  const favorites: FavoriteItem[] = [];
-
   const results = await Promise.allSettled(requests);
 
+  // 部分成功也视作失败 —— 半截数据合并回本地会丢失缺失页里的歌单
+  const anyFailed = results.some(r => r.status === "rejected" || r.value.code !== 0);
+  if (anyFailed) {
+    return { ok: false };
+  }
+
+  const favorites: FavoriteItem[] = [];
+
   results.forEach(result => {
-    if (result.status !== "fulfilled") {
-      return;
-    }
+    if (result.status !== "fulfilled") return;
 
     const response = result.value;
 
-    if (response.code !== 0 || !response.data?.list?.length) {
-      return;
-    }
+    if (!response.data?.list?.length) return;
 
     response.data.list.forEach(item => {
       if (item.state === 0) {
@@ -245,21 +279,26 @@ async function getAllCreatedFavorites(userMid: number | string) {
     });
   });
 
-  return favorites;
+  return { ok: true, list: favorites };
 }
 
-async function getAllCollectedFavorites(userMid: number | string) {
+async function getAllCollectedFavorites(userMid: number | string): Promise<FetchResult> {
   const pageSize = 50;
 
-  const firstRes = await getFavFolderCollectedList({
-    up_mid: userMid,
-    ps: pageSize,
-    pn: 1,
-    platform: "web",
-  });
+  let firstRes: Awaited<ReturnType<typeof getFavFolderCollectedList>>;
+  try {
+    firstRes = await getFavFolderCollectedList({
+      up_mid: userMid,
+      ps: pageSize,
+      pn: 1,
+      platform: "web",
+    });
+  } catch {
+    return { ok: false };
+  }
 
   if (firstRes.code !== 0 || !firstRes.data) {
-    return [];
+    return { ok: false };
   }
 
   const favorites: FavoriteItem[] = [];
@@ -282,7 +321,7 @@ async function getAllCollectedFavorites(userMid: number | string) {
   const totalPages = Math.ceil(total / pageSize);
 
   if (totalPages <= 1) {
-    return favorites;
+    return { ok: true, list: favorites };
   }
 
   const requests = Array.from({ length: totalPages - 1 }, (_, index) =>
@@ -296,16 +335,17 @@ async function getAllCollectedFavorites(userMid: number | string) {
 
   const results = await Promise.allSettled(requests);
 
+  const anyFailed = results.some(r => r.status === "rejected" || r.value.code !== 0);
+  if (anyFailed) {
+    return { ok: false };
+  }
+
   results.forEach(result => {
-    if (result.status !== "fulfilled") {
-      return;
-    }
+    if (result.status !== "fulfilled") return;
 
     const response = result.value;
 
-    if (response.code !== 0 || !response.data?.list?.length) {
-      return;
-    }
+    if (!response.data?.list?.length) return;
 
     response.data.list.forEach(item => {
       if (item.state === 0) {
@@ -320,5 +360,5 @@ async function getAllCollectedFavorites(userMid: number | string) {
     });
   });
 
-  return favorites;
+  return { ok: true, list: favorites };
 }
