@@ -340,6 +340,8 @@ const Favorites = () => {
               bvid: item.bvid,
               ownerName: item.upper?.name,
               ownerMid: item.upper?.mid,
+              duration: item.duration,
+              playCount: item.cnt_info?.play,
             },
             onSuccess: selectedIds => {
               if (isCreatedBySelf && !selectedIds.includes(Number(favFolderId))) {

@@ -155,6 +155,8 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
             bvid: item.bvid,
             ownerName: item.author,
             ownerMid: item.mid,
+            duration: item.length,
+            playCount: item.play,
           },
         });
         break;

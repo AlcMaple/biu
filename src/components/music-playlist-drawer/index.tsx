@@ -48,6 +48,7 @@ const PlayListDrawer = () => {
             bvid: item.bvid,
             ownerName: item.ownerName,
             ownerMid: item.ownerMid,
+            duration: item.duration,
           },
         });
         break;

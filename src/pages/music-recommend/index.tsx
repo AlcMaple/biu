@@ -204,6 +204,10 @@ const MusicRecommend = () => {
             title: item.title,
             cover: item.cover,
             bvid: item.bvid,
+            ownerName: item.author,
+            ownerMid: item.authorMid,
+            duration: item.duration,
+            playCount: item.playCount,
           },
         });
         break;
