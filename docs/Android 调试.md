@@ -1,107 +1,202 @@
 # Android 调试与发布
 
-主场是 Electron，Android 只是扩展。本文档的目标是让 Android 侧改 UI 不用每次重打 APK，同时完全不影响 Electron 的日常开发。
+## 调试（Live Reload）
 
-## TL;DR
-
-| 场景 | 命令 | 说明 |
-| --- | --- | --- |
-| 日常 Electron 开发 | `pnpm dev` | 行为与改造前一致，自动起 Electron |
-| Android 热更新调试 | `pnpm dev:android` + 手机连 Mac 的 dev server | 只跑 Rsbuild，不起 Electron |
-| Android 正式出包 | `pnpm build:android` + Gradle | 完全离线，不依赖任何 dev server |
-
-关键点：`pnpm dev:android` 是 **opt-in** 的 —— 不主动跑就完全不影响 Electron 流程。
-
-## Android 调试流程
-
-### 一次性准备
-
-查 Mac 在局域网里的 IP：
+### 1. 查 Mac 在局域网的 IP
 
 ```bash
 ipconfig getifaddr en0
 ```
 
-（若走的是 Wi-Fi 以外的接口，用 `ifconfig | grep "inet "` 自己挑一个非 `127.*` 的 IP。）
-
-### 首次安装 Live Reload 版 APK
-
-**每次换 IP 或者重装 APK 都要重跑这几步**（因为 `server.url` 是打进 APK 的 `capacitor.config.json` 里的）：
+### 2. 同步配置 + 装 debug APK（换 IP 需重跑）
 
 ```bash
-# 1. 同步配置到 android/ 工程（把 BIU_DEV_URL 注入进去）
-BIU_DEV_URL=http://192.168.x.x:5678 npx cap sync android
-
-# 2. 打一个 debug APK
+BIU_DEV_URL=http://<MAC_IP>:5678 npx cap sync android
 cd android
 ./gradlew assembleDebug
-
-# 3. 装到手机
-adb devices                 # 确认能看到设备序列号
+adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 cd ..
 ```
 
-### 日常调试循环
-
-一个终端跑 dev server：
+### 3. 启动 dev server
 
 ```bash
 pnpm dev:android
 ```
 
-手机上打开 Biu，就会加载 `http://192.168.x.x:5678`。之后每次改代码 **Rsbuild HMR 会直接推到手机**，不需要重打 APK。
+手机打开 Biu，改代码即热更新。调 Web 层在 Chrome 访问 `chrome://inspect`。
 
-调 Web 层（DOM/样式/JS）：Chrome 里访问 `chrome://inspect` → 找到设备和页面 → `inspect`。
+---
 
-### 调试时几个常见问题
+## 发布 Release APK
 
-- **手机打不开页面**：Mac 和手机必须在同一 Wi-Fi；Mac 的防火墙放行 5678。
-- **换了 Wi-Fi（IP 变了）**：重跑上面的"首次安装"三步。
-- **白屏/加载失败**：确认 `pnpm dev:android` 终端里显示了 `5678` 端口；用手机浏览器直接访问 `http://192.168.x.x:5678` 验证能打开。
-- **调用 Bilibili API 报 CORS/网络错**：Android 的网络层走的是 `@capacitor/http`（见 `75ce059`、`5a352a5`、`62a7990`），这一套在 Live Reload 模式下同样生效，无需额外配置。
+### 1. 生成 keystore（仅首次）
 
-## Android 正式发布流程
-
-发版前先检查环境是干净的：
+macOS / Linux：
 
 ```bash
-# 确保当前 shell 没有残留的调试环境变量
-unset BIU_DEV_URL
-unset BIU_TARGET
+mkdir -p ~/.biu
+keytool -genkey -v \
+  -keystore ~/.biu/biu-release.keystore \
+  -alias biu \
+  -keyalg RSA -keysize 2048 -validity 36500
 ```
 
-然后打离线包：
+Windows（PowerShell）：
+
+```powershell
+mkdir $HOME\.biu -Force
+keytool -genkey -v -keystore $HOME\.biu\biu-release.keystore -alias biu -keyalg RSA -keysize 2048 -validity 36500
+```
+
+敲下去会交互式问一串东西，按顺序处理：
+
+| 提示 | 怎么填 |
+| --- | --- |
+| `Enter keystore password:` | 自己设一个密码（至少 6 位），记住 |
+| `Re-enter new password:` | 再输一次同样的密码确认 |
+| `What is your first and last name?` | 随便填，回车也行 |
+| `What is the name of your organizational unit?` | 回车跳过 |
+| `What is the name of your organization?` | 回车跳过 |
+| `What is the name of your City or Locality?` | 回车跳过 |
+| `What is the name of your State or Province?` | 回车跳过 |
+| `What is the two-letter country code for this unit?` | 回车跳过 |
+| `Is CN=Unknown, OU=Unknown, ... correct?` | 输 `y` 回车 |
+| `Enter key password for <biu>` <br> `(RETURN if same as keystore password):` | **直接回车**，让 key 密码和 keystore 密码一致（最省事） |
+
+最后终端会提示 keystore 生成位置。**务必备份这个 `.keystore` 文件和密码**，丢了以后就没法给同一个应用发更新了。
+
+### 2. 配置签名
+
+> **机器维度和仓库维度的区分**
+>
+> - `keystore.properties` 和 `.keystore` 文件 **不提交**，每台机器各自一份（路径按本机填）。
+> - `build.gradle` 是 **提交** 到仓库的，但它只从 properties 里读路径，不写死，所以 macOS / Windows 共用同一份，首次改完之后两边都不用再动。
+>
+> 如果你在 Mac 和 Windows 上都要出包给同一个应用发布，**必须用同一个 `.keystore` 文件**（把它从一台机器拷到另一台机器），否则两边签出来的包算不同 App，用户无法覆盖升级。
+
+#### 2.1 新建 `android/keystore.properties`（每台机器各建一次）
+
+只在**当前这台机器**上建，路径写本机的实际路径。
+
+macOS / Linux：
+
+```properties
+storeFile=/Users/你的用户名/.biu/biu-release.keystore
+storePassword=你的密码
+keyAlias=biu
+keyPassword=你的密码
+```
+
+Windows（路径用正斜杠，或者用双反斜杠；**别用单反斜杠**，Gradle 会把它当转义符）：
+
+```properties
+storeFile=C:/Users/你的用户名/.biu/biu-release.keystore
+storePassword=你的密码
+keyAlias=biu
+keyPassword=你的密码
+```
+
+#### 2.2 加到 `.gitignore`（项目根目录，只需加一次，提交到仓库）
 
 ```bash
-# 1. 生产构建 + 同步到 android/ 工程（此时 server.url 不会写入）
-pnpm build:android
+echo "android/keystore.properties" >> .gitignore
+```
 
-# 2. 打 release APK（按实际签名配置调整）
+#### 2.3 改 `android/app/build.gradle`（提交到仓库，两个平台共用）
+
+当前文件开头是这样：
+
+```gradle
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "com.biu.app"
+    ...
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+```
+
+做两处改动：
+
+**① 在文件最顶部（`apply plugin` 之后）加载 properties 文件：**
+
+```gradle
+apply plugin: 'com.android.application'
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    ...
+```
+
+**② 在 `android { }` 里、`buildTypes` 之前加 `signingConfigs`；同时在已有的 `release { }` 里加一行 `signingConfig`：**
+
+```gradle
+android {
+    namespace = "com.biu.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        ...
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+```
+
+注意 **不要新建一个 `release { }` 块**，是往已经存在的那个里加 `signingConfig signingConfigs.release` 这一行。
+
+### 3. 打包
+
+macOS / Linux：
+
+```bash
+unset BIU_DEV_URL BIU_TARGET
+pnpm build:android
 cd android
 ./gradlew assembleRelease
-# 或者要 AAB 走 Google Play：
-# ./gradlew bundleRelease
 ```
 
-产物位置：
+Windows（PowerShell）：
 
-- APK：`android/app/build/outputs/apk/release/app-release.apk`
-- AAB：`android/app/build/outputs/bundle/release/app-release.aab`
+```powershell
+Remove-Item Env:BIU_DEV_URL -ErrorAction SilentlyContinue
+Remove-Item Env:BIU_TARGET  -ErrorAction SilentlyContinue
+pnpm build:android
+cd android
+.\gradlew.bat assembleRelease
+```
 
-### 出包前自检清单
+产物：`android/app/build/outputs/apk/release/app-release.apk`
 
-- [ ] `capacitor.config.ts` 里没有写死的 `server.url`（改造后已经走环境变量，正常情况下不用管）
-- [ ] 当前 shell 没有 `BIU_DEV_URL` / `BIU_TARGET`
-- [ ] 手机卸载掉之前装的 debug 版（签名不同会冲突）
-- [ ] 在飞行模式/断开 Mac 的情况下跑一遍 release APK，确认是真的离线包，不是还在偷偷连 dev server
+### 4. 安装验证
 
-### 首次发布需要的签名配置
-
-Android release 必须签名。项目目前没有把签名配置提交到仓库，第一次发版时需要：
-
-1. 用 `keytool` 生成一个 keystore 文件（保存到 `android/` 外面，不要提交）
-2. 在 `android/app/build.gradle` 里配置 `signingConfigs.release`
-3. keystore 口令建议走环境变量或 `~/.gradle/gradle.properties`
-
-这部分属于首次发版的一次性工作，之后直接 `./gradlew assembleRelease` 即可。
+```bash
+adb uninstall com.biu.app                  # 先卸载 debug 版（签名不同会冲突）
+adb install app/build/outputs/apk/release/app-release.apk
+```
