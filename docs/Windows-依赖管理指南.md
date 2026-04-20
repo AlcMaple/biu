@@ -16,7 +16,7 @@
 | 删除依赖 | `pnpm remove <包名>` | 同上 |
 | 升级某个依赖 | `pnpm update <包名>` | 按 package.json 的版本范围升级 |
 | **拉了新代码** | `pnpm install` | 根据 lockfile 同步队友的改动 |
-| **环境坏了想重装** | 跑 `dev_tools\setup-win.bat` | 脚本会删 node_modules 并保留 lockfile |
+| **环境坏了想重装** | 跑 `node dev_tools\setup-win.js` | 脚本会删 node_modules 并保留 lockfile |
 | 核弹级修复 | 删 lockfile + 跑脚本 | 仅在上一条仍失败时使用 |
 
 ---
@@ -70,7 +70,7 @@ pnpm build    :: 生产构建 + 打包 exe
 直接跑一键脚本：
 
 ```cmd
-dev_tools\setup-win.bat
+node dev_tools\setup-win.js
 ```
 
 脚本会自动：
@@ -91,14 +91,14 @@ dev_tools\setup-win.bat
 ```cmd
 rmdir /s /q node_modules
 del /f /q pnpm-lock.yaml
-dev_tools\setup-win.bat
+node dev_tools\setup-win.js
 ```
 
 跑完后记得把重新生成的 lockfile 检查一下（`git diff pnpm-lock.yaml`），确认变动合理再提交。
 
 ---
 
-## 四、什么时候必须跑 `setup-win.bat`
+## 四、什么时候必须跑 `setup-win.js`
 
 - 第一次 clone 项目到 Windows
 - 换了 Node 大版本（比如 20 → 22）
@@ -115,7 +115,7 @@ dev_tools\setup-win.bat
 
 上游依赖 `@electron/rebuild` / `app-builder-lib` 里有一个 `git+ssh://github.com/...` 形式的依赖。没配 SSH Key 的机器会卡住。
 
-**解决**：`setup-win.bat` 已经做了全局配置重写：
+**解决**：`setup-win.js` 已经做了全局配置重写：
 
 ```cmd
 git config --global url."https://github.com/".insteadOf "git@github.com:"
@@ -126,7 +126,7 @@ git config --global url."https://".insteadOf "git://"
 
 ### 5.2 `rsbuild 不是内部或外部命令`
 
-说明 `node_modules` 没装好。跑 `setup-win.bat` 重装即可。
+说明 `node_modules` 没装好。跑 `node dev_tools\setup-win.js` 重装即可。
 
 ### 5.3 `pnpm dev` 启动后白屏 / Electron 报错
 
@@ -171,7 +171,7 @@ engine-strict=true
 
 所以 `git clone` 之后任何人跑 `pnpm install` 都默认走国内镜像，不需要手动配置。
 
-`setup-win.bat` 里的 `pnpm config set registry ...` 是**全局**兜底（防止某些机器 `.npmrc` 没被识别）。两层保险。
+`setup-win.js` 里的 `pnpm config set registry ...` 是**全局**兜底（防止某些机器 `.npmrc` 没被识别）。两层保险。
 
 ---
 
@@ -179,5 +179,5 @@ engine-strict=true
 
 - **加依赖**：`pnpm add <名>`
 - **拉代码后**：`pnpm install`
-- **环境坏了**：`dev_tools\setup-win.bat`
+- **环境坏了**：`node dev_tools\setup-win.js`
 - **lockfile**：除非确认被污染，否则不要动它
