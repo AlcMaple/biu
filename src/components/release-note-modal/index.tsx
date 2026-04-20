@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
 
-import { addToast, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Progress } from "@heroui/react";
-import { RiInformationLine } from "@remixicon/react";
+import {
+  addToast,
+  Button,
+  Chip,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Progress,
+} from "@heroui/react";
+import { RiArrowRightSLine, RiInformationLine, RiSparkling2Fill } from "@remixicon/react";
 import { filesize } from "filesize";
 import { useShallow } from "zustand/react/shallow";
 
@@ -19,10 +29,16 @@ const ReleaseNoteModal = () => {
     })),
   );
   const releaseNotes = useAppUpdateStore(state => state.releaseNotes);
+  const latestVersion = useAppUpdateStore(state => state.latestVersion);
+  const [currentVersion, setCurrentVersion] = useState<string>("");
   const [status, setStatus] = useState<DownloadAppUpdateStatus>();
   const [downloadProgress, setDownloadProgress] = useState<DownloadAppProgressInfo>();
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo>();
   const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    platform.getAppVersion().then(setCurrentVersion);
+  }, []);
 
   const startDownload = async () => {
     setStatus("downloading");
@@ -89,8 +105,28 @@ const ReleaseNoteModal = () => {
         disableAnimation
       >
         <ModalContent>
-          <ModalHeader>✨ 有新版本更新</ModalHeader>
-          <ModalBody className="px-0">
+          <ModalHeader className="from-primary/15 via-secondary/10 border-divider flex flex-col gap-3 border-b bg-gradient-to-br to-transparent pb-4">
+            <div className="flex items-center gap-2">
+              <RiSparkling2Fill size={20} className="text-primary drop-shadow" />
+              <span className="from-primary to-secondary bg-gradient-to-r bg-clip-text text-base font-semibold text-transparent">
+                有新版本更新
+              </span>
+            </div>
+            <div className="text-default-600 flex items-center gap-2 text-xs">
+              {currentVersion && (
+                <Chip size="sm" variant="flat" color="default" radius="sm" className="font-mono">
+                  当前 v{currentVersion}
+                </Chip>
+              )}
+              {currentVersion && latestVersion && <RiArrowRightSLine size={16} className="text-default-400" />}
+              {latestVersion && (
+                <Chip size="sm" variant="shadow" color="success" radius="sm" className="font-mono shadow-green-500/30">
+                  最新 v{latestVersion}
+                </Chip>
+              )}
+            </div>
+          </ModalHeader>
+          <ModalBody className="px-0 pt-4">
             {releaseNotes?.trim() ? (
               <Typography content={releaseNotes} />
             ) : (
