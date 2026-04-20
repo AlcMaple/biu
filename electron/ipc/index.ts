@@ -1,5 +1,6 @@
 import type { IpcHandlerProps } from "./types";
 
+import { registerFancyPlayerThumbHandlers } from "./api/fancy-player-thumb";
 import { registerAppHandlers } from "./app";
 import { registerCookieIpcHandlers } from "./cookie";
 import { registerDialogHandlers } from "./dialog";
@@ -24,4 +25,5 @@ export function registerIpcHandlers(props: IpcHandlerProps) {
   registerLyricsHandlers();
   registerLocalMusicHandlers();
   registerShazamHandlers();
+  registerFancyPlayerThumbHandlers();
 }

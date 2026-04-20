@@ -25,6 +25,10 @@ const api: ElectronAPI = {
   setProxySettings: proxySettings => ipcRenderer.invoke(channel.app.setProxySettings, proxySettings),
   scanLocalMusic: dirs => ipcRenderer.invoke(channel.localMusic.scan, dirs),
   deleteLocalMusicFile: filePath => ipcRenderer.invoke(channel.localMusic.deleteFile, filePath),
+  peekFancyPlayerThumb: sourcePath => ipcRenderer.invoke(channel.fancyPlayer.peekThumb, sourcePath),
+  readFancyPlayerSourceFile: sourcePath => ipcRenderer.invoke(channel.fancyPlayer.readSourceFile, sourcePath),
+  saveFancyPlayerThumb: (sourcePath, data) => ipcRenderer.invoke(channel.fancyPlayer.saveThumb, sourcePath, data),
+  removeFancyPlayerThumb: sourcePath => ipcRenderer.invoke(channel.fancyPlayer.removeThumb, sourcePath),
   // 监听来自主进程的导航事件，并将路径回调给渲染端
   navigate: cb => {
     const navigateHandler = (_: Electron.IpcRendererEvent, path: string) => {
