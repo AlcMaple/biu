@@ -43,10 +43,7 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
         )}
       >
         <span>{label}</span>
-        <ArrowIcon
-          size={14}
-          className={clx("transition-opacity", active ? "opacity-100" : "opacity-0 group-hover:opacity-60")}
-        />
+        <ArrowIcon size={14} className="opacity-0 transition-opacity group-hover:opacity-60" />
       </button>
     );
   };
