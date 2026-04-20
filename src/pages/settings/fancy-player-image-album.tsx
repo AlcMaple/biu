@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@heroui/react";
 import { RiAddLine, RiCloseLine, RiImageLine } from "@remixicon/react";
@@ -17,10 +17,21 @@ const toImgSrc = (path: string) => {
 };
 
 const FancyPlayerImageAlbum = () => {
-  const { images, addImages, removeImage } = useFancyPlayerImages(
-    useShallow(s => ({ images: s.images, addImages: s.addImages, removeImage: s.removeImage })),
+  const { images, thumbs, addImages, removeImage, backfillThumbs } = useFancyPlayerImages(
+    useShallow(s => ({
+      images: s.images,
+      thumbs: s.thumbs,
+      addImages: s.addImages,
+      removeImage: s.removeImage,
+      backfillThumbs: s.backfillThumbs,
+    })),
   );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 兼容旧版本：对缺失缩略图的存量图片补齐（命中缓存则秒返回）
+  useEffect(() => {
+    backfillThumbs();
+  }, [backfillThumbs]);
 
   const handleSelectFiles = async () => {
     if (platform.selectImages) {
@@ -59,20 +70,20 @@ const FancyPlayerImageAlbum = () => {
               className="group relative h-20 w-20 flex-shrink-0"
               style={{ contentVisibility: "auto", containIntrinsicSize: "5rem 5rem" }}
             >
-              {/* 图片 */}
+              {/* 图片（优先使用缩略图；未生成前回退原图） */}
               <img
-                src={toImgSrc(img)}
+                src={toImgSrc(thumbs[img] ?? img)}
                 alt="背景图"
                 loading="lazy"
                 decoding="async"
                 width={80}
                 height={80}
-                className="h-full w-full rounded-xl object-cover shadow-sm transition-transform duration-200 group-hover:scale-[1.03]"
+                className="h-full w-full rounded-xl object-cover"
                 draggable={false}
               />
               {/* 删除按钮 —— 右上角圆形 badge，hover 时显示 */}
               <button
-                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 scale-75 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 shadow transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 hover:bg-red-500"
+                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-red-500"
                 onClick={() => removeImage(img)}
                 title="移除"
               >

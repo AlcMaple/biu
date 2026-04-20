@@ -130,6 +130,14 @@ declare global {
     scanLocalMusic: (dirs: string[]) => Promise<LocalMusicItem[]>;
     /** 删除本地音乐文件 */
     deleteLocalMusicFile: (filePath: string) => Promise<boolean>;
+    /** 查询精美播放器图片缩略图是否已缓存，命中则返回缩略图绝对路径，否则返回 null */
+    peekFancyPlayerThumb: (sourcePath: string) => Promise<string | null>;
+    /** 读取精美播放器源图片字节，供渲染端用 blob URL + canvas 解码缩放（支持 WebP/AVIF 等所有 Chromium 格式） */
+    readFancyPlayerSourceFile: (sourcePath: string) => Promise<Uint8Array | null>;
+    /** 保存渲染端生成好的 JPEG 缩略图字节，返回保存后的绝对路径 */
+    saveFancyPlayerThumb: (sourcePath: string, data: Uint8Array) => Promise<string | null>;
+    /** 删除精美播放器图片对应的缩略图缓存 */
+    removeFancyPlayerThumb: (sourcePath: string) => Promise<boolean>;
     /** 识别音频（传入 ArrayBuffer，返回 node-shazam 识别结果） */
     recognizeSong: (audioBuffer: ArrayBuffer) => Promise<Record<string, unknown>>;
     /** 获取桌面捕获源列表（用于系统音频采集） */

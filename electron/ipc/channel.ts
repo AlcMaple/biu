@@ -88,6 +88,12 @@ export const channel = {
     getDesktopSources: "shazam:get-desktop-sources",
     requestMicPermission: "shazam:request-mic-permission",
   },
+  fancyPlayer: {
+    peekThumb: "fancy-player:peek-thumb",
+    readSourceFile: "fancy-player:read-source-file",
+    saveThumb: "fancy-player:save-thumb",
+    removeThumb: "fancy-player:remove-thumb",
+  },
   window: {
     toggleMini: "window:toggle-mini",
     minimize: "window:minimize",
