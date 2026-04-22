@@ -8,6 +8,7 @@ import clx from "classnames";
 import { formatNumber } from "@/common/utils/number";
 import { formatDuration } from "@/common/utils/time";
 import Image from "@/components/image";
+import { isAndroid } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 
@@ -82,7 +83,8 @@ const MusicListItem = ({
         disableAnimation
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
-        onDoubleClick={onPress}
+        onDoubleClick={!isAndroid ? onPress : undefined}
+        onPress={isAndroid ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
           isCompact ? "h-9 min-h-9 min-w-0 px-0 text-sm" : "h-auto min-h-auto min-w-auto space-y-2 p-2",
@@ -139,7 +141,7 @@ const MusicListItem = ({
           )}
 
           {/* 3. UP名称 (Compact only) */}
-          {isCompact && (
+          {isCompact && !isAndroid && (
             <div className="min-w-0 truncate">
               <span
                 className={clx("text-foreground-500 w-fit truncate text-sm", {
@@ -157,19 +159,23 @@ const MusicListItem = ({
           )}
 
           {/* 4. 播放量 */}
-          <div className="text-foreground-500 flex justify-end text-xs">
-            {playCount !== undefined && playCount > 0 ? formatNumber(playCount) : "-"}
-          </div>
+          {!isAndroid && (
+            <div className="text-foreground-500 flex justify-end text-xs">
+              {playCount !== undefined && playCount > 0 ? formatNumber(playCount) : "-"}
+            </div>
+          )}
 
           {/* 5. 投稿时间 */}
-          {!hidePubTime && (
+          {!isAndroid && !hidePubTime && (
             <div className="text-foreground-500 flex justify-end text-xs">{pubTime && <span>{pubTime}</span>}</div>
           )}
 
           {/* 6. 时长 */}
-          <div className="text-foreground-500 flex justify-end text-xs tabular-nums">
-            {Boolean(duration) && <span>{typeof duration === "number" ? formatDuration(duration) : duration}</span>}
-          </div>
+          {!isAndroid && (
+            <div className="text-foreground-500 flex justify-end text-xs tabular-nums">
+              {Boolean(duration) && <span>{typeof duration === "number" ? formatDuration(duration) : duration}</span>}
+            </div>
+          )}
 
           {/* 7. 操作 */}
           <div className="flex h-full items-center justify-end">

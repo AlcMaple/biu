@@ -5,7 +5,7 @@ import { Tab, Tabs } from "@heroui/react";
 import { useShallow } from "zustand/react/shallow";
 
 import ScrollContainer from "@/components/scroll-container";
-import platform from "@/platform";
+import platform, { isAndroid } from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useSettings } from "@/store/settings";
 
@@ -119,19 +119,26 @@ const SettingsPage = () => {
 
   return (
     <ScrollContainer enableBackToTop className="h-full w-full">
-      <div className="m-auto mb-6 max-w-[900px] px-8 py-4">
+      <div className={isAndroid ? "m-auto mb-6 w-full max-w-[900px] px-4 py-4" : "m-auto mb-6 max-w-[900px] px-8 py-4"}>
         <div className="space-y-6">
-          <h1>设置</h1>
-          <Tabs aria-label="设置选项" classNames={{ panel: "px-1 py-0", cursor: "rounded-medium" }}>
+          {!isAndroid && <h1>设置</h1>}
+          <Tabs
+            aria-label="设置选项"
+            classNames={{ panel: "px-1 py-0", cursor: "rounded-medium", tabList: isAndroid ? "overflow-x-auto" : "" }}
+            fullWidth={isAndroid}
+            size={isAndroid ? "sm" : "md"}
+          >
             <Tab key="system" title="常规设置">
               <SystemSettingsTab {...system} />
             </Tab>
             <Tab key="menu" title="菜单设置">
               <MenuSettings control={system.control} />
             </Tab>
-            <Tab key="shortcut" title="快捷键设置">
-              <ShortcutSettingsPage />
-            </Tab>
+            {!isAndroid && (
+              <Tab key="shortcut" title="快捷键设置">
+                <ShortcutSettingsPage />
+              </Tab>
+            )}
             <Tab key="proxy" title="代理设置">
               <ProxySettings control={system.control} />
             </Tab>

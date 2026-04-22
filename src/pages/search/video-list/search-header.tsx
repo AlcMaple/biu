@@ -6,6 +6,7 @@ import { RiPlayFill } from "@remixicon/react";
 import type { WebSearchTypeVideoParams } from "@/service/web-interface-search-type";
 
 import AsyncButton from "@/components/async-button";
+import { isAndroid } from "@/platform";
 
 export type SortOrder = WebSearchTypeVideoParams["order"];
 
@@ -34,6 +35,44 @@ export default function SearchHeader({
   onPlayAll,
   playAllDisabled,
 }: SearchHeaderProps) {
+  if (isAndroid) {
+    return (
+      <div className="flex flex-col gap-2 px-4 pb-4">
+        <div className="-mx-4 overflow-x-auto px-4">
+          <Tabs
+            variant="light"
+            radius="md"
+            classNames={{
+              cursor: "rounded-medium",
+            }}
+            className="-ml-1"
+            selectedKey={order}
+            onSelectionChange={key => onOrderChange(key as SortOrder)}
+          >
+            {sortOptions.map(option => (
+              <Tab key={option.value} title={option.label} />
+            ))}
+          </Tabs>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <Switch isSelected={musicOnly} onValueChange={onMusicOnlyChange} size="sm">
+            仅音乐分区
+          </Switch>
+          <AsyncButton
+            color="primary"
+            size="sm"
+            startContent={<RiPlayFill size={18} />}
+            isDisabled={playAllDisabled}
+            onPress={onPlayAll}
+            className="dark:text-black"
+          >
+            全部播放
+          </AsyncButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-between px-4 pb-4">
       <Tabs

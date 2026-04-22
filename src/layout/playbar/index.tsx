@@ -2,8 +2,10 @@ import { useEffect } from "react";
 
 import { Card } from "@heroui/react";
 
+import { isAndroid } from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
+import AndroidPlayBar from "./android";
 import Center from "./center";
 import Left from "./left";
 import Right from "./right";
@@ -18,6 +20,10 @@ function PlayBar() {
   useEffect(() => {
     init();
   }, [init]);
+
+  if (isAndroid) {
+    return <AndroidPlayBar />;
+  }
 
   return (
     <Card

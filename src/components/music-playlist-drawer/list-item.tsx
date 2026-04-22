@@ -6,6 +6,7 @@ import { RiMoreFill, RiMusic2Line, RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
 import Image from "@/components/image";
+import { isAndroid } from "@/platform";
 import { type PlayData } from "@/store/play-list";
 
 import { getMenus } from "./menu";
@@ -80,7 +81,11 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
               isIconOnly
               variant="light"
               size="sm"
-              className={`flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`}
+              className={
+                isAndroid
+                  ? "flex-none"
+                  : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
+              }
             >
               <RiMoreFill size={16} />
             </Button>

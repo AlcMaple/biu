@@ -13,7 +13,7 @@ import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
-import platform from "@/platform";
+import platform, { isAndroid } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -26,6 +26,7 @@ import MusicPlayMode from "../music-play-mode";
 import MusicPlayProgress from "../music-play-progress";
 import OpenPlaylistDrawerButton from "../open-playlist-drawer-button";
 import WindowAction from "../window-action";
+import AndroidFullScreenPlayer from "./android";
 import { useGlassmorphism } from "./glassmorphism";
 import PageList from "./page-list";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
@@ -194,6 +195,8 @@ const FullScreenPlayer = () => {
   const appTheme = useMemo(() => resolveTheme(themeMode), [themeMode]);
 
   if (!playItem) return null;
+
+  if (isAndroid) return <AndroidFullScreenPlayer />;
 
   if (useFancyPlayer) return <FancyFullScreenPlayer />;
 

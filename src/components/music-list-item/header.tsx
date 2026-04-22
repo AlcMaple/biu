@@ -1,6 +1,7 @@
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
 import clx from "classnames";
 
+import { isAndroid } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import { getMusicListItemGrid } from "./styles";
@@ -47,6 +48,23 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
       </button>
     );
   };
+
+  if (isAndroid) {
+    return (
+      <div
+        className={clx(
+          "text-default-500 border-divider mb-2 grid w-full items-center gap-4 border-b text-sm",
+          isCompact ? "h-8" : "h-10 px-2",
+          gridCols,
+          className,
+        )}
+      >
+        <div className="min-w-8 text-center">#</div>
+        {renderCell("title", "标题", "left")}
+        <div className="w-8" />
+      </div>
+    );
+  }
 
   return (
     <div
