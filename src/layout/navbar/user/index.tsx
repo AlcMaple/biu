@@ -21,7 +21,7 @@ import {
 } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
-import platform from "@/platform";
+import platform, { isAndroid } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
@@ -176,7 +176,11 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
             size="sm"
             as="button"
             type="button"
-            className="mr-4 cursor-pointer transition-transform hover:scale-105"
+            className={
+              isAndroid
+                ? "cursor-pointer transition-transform hover:scale-105"
+                : "mr-4 cursor-pointer transition-transform hover:scale-105"
+            }
             src={user?.face}
           />
         </DropdownTrigger>

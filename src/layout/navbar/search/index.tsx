@@ -100,7 +100,8 @@ const SearchInput: React.FC<SearchInputProps> = ({ onFocusChange }) => {
       />
       <div
         className={classNames(
-          "bg-content2 rounded-medium absolute top-full left-0 z-100 mt-1 h-auto max-h-[80dvh] w-[360px] overflow-hidden shadow-2xl",
+          "bg-content2 rounded-medium absolute top-full left-0 z-100 mt-1 h-auto max-h-[80dvh] overflow-hidden shadow-2xl",
+          isAndroid ? "right-0 w-auto" : "w-[360px]",
           {
             hidden: !open,
             "flex flex-col": open,

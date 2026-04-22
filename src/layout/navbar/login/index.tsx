@@ -1,8 +1,9 @@
 import React, { useCallback } from "react";
 
-import { Divider, Modal, ModalBody, ModalContent, Tab, Tabs, addToast } from "@heroui/react";
+import { Divider, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 import moment from "moment";
 
+import { isAndroid } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useToken } from "@/store/token";
 import { useUser } from "@/store/user";
@@ -47,6 +48,39 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
     },
     [updateCollectedFavorites, updateCreatedFavorites, updateToken, updateUser],
   );
+
+  if (isAndroid) {
+    return (
+      <Modal
+        size="sm"
+        placement="center"
+        isOpen={isOpen}
+        isDismissable={false}
+        onOpenChange={onOpenChange}
+        classNames={{ base: "mx-4" }}
+      >
+        <ModalContent>
+          <ModalHeader className="justify-center pb-2 text-lg">登录</ModalHeader>
+          <ModalBody className="px-4 pt-0 pb-6">
+            <Tabs
+              aria-label="登录方式"
+              classNames={{ cursor: "rounded-medium", tabContent: "text-medium font-medium" }}
+              fullWidth
+              size="md"
+              variant="underlined"
+            >
+              <Tab key="code" title="短信登录">
+                <CodeLogin onClose={onClose} updateUserData={updateUserData} />
+              </Tab>
+              <Tab key="password" title="密码登录">
+                <PasswordLogin onClose={onClose} updateUserData={updateUserData} />
+              </Tab>
+            </Tabs>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    );
+  }
 
   return (
     <Modal size="2xl" radius="md" isOpen={isOpen} isDismissable={false} onOpenChange={onOpenChange}>

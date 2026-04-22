@@ -4,8 +4,11 @@ import { RiApps2AddFill, RiApps2AddLine } from "@remixicon/react";
 
 import { DefaultMenuList } from "@/common/constants/menus";
 import MenuGroup from "@/components/menu/menu-group";
+import { isAndroid } from "@/platform";
 import { useSettings } from "@/store/settings";
 import { useUser } from "@/store/user";
+
+const ANDROID_HIDDEN_HREFS = new Set(["/download-list"]);
 
 interface Props {
   isCollapsed?: boolean;
@@ -17,9 +20,9 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
   const hiddenMenuKeys = useSettings(state => state.hiddenMenuKeys);
 
   const items = useMemo(() => {
-    const filtered = DefaultMenuList.filter(item => (item.needLogin ? user?.isLogin : true)).filter(
-      item => item.href && !hiddenMenuKeys.includes(item.href),
-    );
+    const filtered = DefaultMenuList.filter(item => (item.needLogin ? user?.isLogin : true))
+      .filter(item => item.href && !hiddenMenuKeys.includes(item.href))
+      .filter(item => !(isAndroid && item.href && ANDROID_HIDDEN_HREFS.has(item.href)));
 
     if (isCollapsed) {
       return [
