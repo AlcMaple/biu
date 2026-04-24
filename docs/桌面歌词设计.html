@@ -3,76 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>完美版桌面歌词 - 顶部停靠与双轴缩放</title>
+    <title>桌面歌词 - 双行</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       .no-select {
         user-select: none;
         -webkit-user-select: none;
       }
-      .resize-handle {
+      .resize-handle { position: absolute; z-index: 50; }
+      .rh-n { top: 0; left: 8px; right: 8px; height: 8px; cursor: n-resize; }
+      .rh-s { bottom: 0; left: 8px; right: 8px; height: 8px; cursor: s-resize; }
+      .rh-e { right: 0; top: 8px; bottom: 8px; width: 8px; cursor: e-resize; }
+      .rh-w { left: 0; top: 8px; bottom: 8px; width: 8px; cursor: w-resize; }
+      .rh-nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nw-resize; }
+      .rh-ne { top: 0; right: 0; width: 12px; height: 12px; cursor: ne-resize; }
+      .rh-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
+      .rh-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; }
+
+      /* 列表整体上滚 */
+      #lyrics-list {
+        transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: transform;
+      }
+
+      /* 单行 */
+      .lyric-item {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        white-space: nowrap;
+        transition:
+          opacity 500ms ease,
+          transform 500ms ease;
+      }
+
+      /* 主歌词文字层（双层叠加做高亮扫词） */
+      .lyric-main {
+        position: relative;
+        font-weight: 800;
+        line-height: 1.25;
+        letter-spacing: 0.04em;
+      }
+      .lyric-main .base {
+        color: rgba(255, 255, 255, 0.85);
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      }
+      .lyric-main .progress {
         position: absolute;
-        z-index: 50;
-      }
-      .rh-n {
-        top: 0;
-        left: 8px;
-        right: 8px;
-        height: 8px;
-        cursor: n-resize;
-      }
-      .rh-s {
-        bottom: 0;
-        left: 8px;
-        right: 8px;
-        height: 8px;
-        cursor: s-resize;
-      }
-      .rh-e {
-        right: 0;
-        top: 8px;
-        bottom: 8px;
-        width: 8px;
-        cursor: e-resize;
-      }
-      .rh-w {
-        left: 0;
-        top: 8px;
-        bottom: 8px;
-        width: 8px;
-        cursor: w-resize;
-      }
-      .rh-nw {
         top: 0;
         left: 0;
-        width: 12px;
-        height: 12px;
-        cursor: nw-resize;
-      }
-      .rh-ne {
-        top: 0;
-        right: 0;
-        width: 12px;
-        height: 12px;
-        cursor: ne-resize;
-      }
-      .rh-sw {
-        bottom: 0;
-        left: 0;
-        width: 12px;
-        height: 12px;
-        cursor: sw-resize;
-      }
-      .rh-se {
-        bottom: 0;
-        right: 0;
-        width: 12px;
-        height: 12px;
-        cursor: se-resize;
+        height: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        width: 0%;
+        color: #a3e635;
+        text-shadow:
+          0 0 10px rgba(163, 230, 53, 0.55),
+          0 1px 4px rgba(0, 0, 0, 0.6);
       }
     </style>
   </head>
   <body class="no-select relative h-screen w-screen overflow-hidden bg-[#111827] font-sans">
+    <!-- 背景装饰（仅 demo） -->
     <div class="pointer-events-none absolute inset-0 z-0 flex flex-col justify-end">
       <div class="-mb-[10%] h-1/2 rounded-full bg-[#1d4ed8]/70 blur-[100px]"></div>
       <div class="h-2/3 rounded-full bg-[#3b82f6]/50 blur-[120px]"></div>
@@ -82,7 +75,7 @@
 
     <div
       id="lyric-window"
-      class="absolute z-10 h-[160px] w-[800px] overflow-hidden rounded-xl border border-transparent transition-colors duration-300"
+      class="absolute z-10 h-[170px] w-[800px] overflow-hidden rounded-xl border border-transparent transition-colors duration-300"
       style="left: calc(50% - 400px); top: 25%"
     >
       <div class="resize-handle rh-n" data-dir="n"></div>
@@ -94,16 +87,20 @@
       <div class="resize-handle rh-sw" data-dir="sw"></div>
       <div class="resize-handle rh-se" data-dir="se"></div>
 
+      <!-- 工具栏 -->
       <div
         id="normal-toolbar"
-        class="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[#a3e635]/30 bg-[#a3e635]/70 px-4 py-1.5 opacity-0 shadow-lg transition-opacity duration-300"
+        class="absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-4 py-1.5 opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-300"
       >
         <button class="text-white transition hover:text-blue-200">
           <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
         </button>
-        <button class="text-white transition hover:text-blue-200">
-          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+        <button id="btn-play-pause" class="text-white transition hover:text-blue-200">
+          <svg id="icon-pause" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+          </svg>
+          <svg id="icon-play" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
           </svg>
         </button>
         <button class="text-white transition hover:text-blue-200">
@@ -112,23 +109,14 @@
           </svg>
         </button>
         <div class="mx-0.5 h-3 w-px bg-white/30"></div>
-        <button id="btn-toggle-line" class="text-white transition hover:text-blue-200">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 5v14M18 5v14M6 9.5h7M11 14.5h7"></path>
+        <button id="btn-lock" class="text-white transition hover:text-blue-200" title="锁定">
+          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
           </svg>
         </button>
-        <button id="btn-lock" class="text-white transition hover:text-blue-200">
+        <button class="text-white transition hover:text-red-400" title="关闭">
           <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
-            />
-          </svg>
-        </button>
-        <button class="text-white transition hover:text-red-400">
-          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-            />
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
           </svg>
         </button>
       </div>
@@ -139,96 +127,219 @@
       >
         <button
           id="btn-unlock"
-          class="flex items-center gap-1.5 rounded-full bg-[#a3e635]/80 px-4 py-1.5 text-sm text-white shadow-lg backdrop-blur-md transition hover:bg-[#a3e635]"
+          class="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 px-4 py-1.5 text-sm text-white shadow-lg backdrop-blur-md transition hover:bg-black/70"
         >
           <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2-.9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"
-            /></svg
-          >解锁桌面歌词
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2-.9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+          </svg>
+          解锁桌面歌词
         </button>
       </div>
 
-      <div class="pointer-events-none absolute inset-0 flex justify-center px-6 pt-14 pb-4">
-        <div id="safe-area" class="flex h-full w-full flex-col items-center justify-start">
-          <div id="lyrics-container" class="flex origin-top flex-col items-center gap-4 will-change-transform">
-            <span
-              id="lyric-line-1"
-              class="text-4xl font-extrabold tracking-wider whitespace-nowrap text-[#a3e635] drop-shadow-md md:text-5xl"
-            >
-              お疲れさまとありがとうのキモチ
-            </span>
-            <span
-              id="lyric-line-2"
-              class="text-2xl font-bold tracking-wide whitespace-nowrap text-[#14b8a6] drop-shadow-md md:text-3xl"
-            >
-              如果将慰劳与感谢的感情，还有长长长长的测试文本
-            </span>
-          </div>
-        </div>
+      <!-- 歌词显示区 -->
+      <div id="lyrics-viewport" class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div id="lyrics-list" class="absolute left-0 right-0 flex flex-col items-center"></div>
       </div>
     </div>
 
     <script>
+      // ============ 元素引用 ============
       const windowEl = document.getElementById("lyric-window");
       const normalToolbar = document.getElementById("normal-toolbar");
       const lockedToolbar = document.getElementById("locked-toolbar");
       const btnLock = document.getElementById("btn-lock");
       const btnUnlock = document.getElementById("btn-unlock");
-      const btnToggleLine = document.getElementById("btn-toggle-line");
-
-      const safeArea = document.getElementById("safe-area");
-      const lyricsContainer = document.getElementById("lyrics-container");
-      const lyricLine2 = document.getElementById("lyric-line-2");
+      const btnPlayPause = document.getElementById("btn-play-pause");
+      const iconPlay = document.getElementById("icon-play");
+      const iconPause = document.getElementById("icon-pause");
+      const viewport = document.getElementById("lyrics-viewport");
+      const list = document.getElementById("lyrics-list");
       const handles = document.querySelectorAll(".resize-handle");
 
-      let isLocked = false;
+      // ============ 模拟歌词数据（去掉翻译） ============
+      const lyrics = [
+        { text: "お疲れさまとありがとうのキモチ", duration: 4200 },
+        { text: "伝えそびれて 今日も帰り道", duration: 4000 },
+        { text: "夕焼けに溶ける足音は二つ", duration: 4500 },
+        { text: "言葉はいらないと君が笑った", duration: 4300 },
+        { text: "ねぇ もう少しだけ このままで", duration: 3800 },
+        { text: "歩幅を合わせて歩いていこう", duration: 4500 },
+        { text: "明日もきっと同じ空の下", duration: 4200 },
+        { text: "君と笑っていたいだけなんだ", duration: 4400 },
+      ];
 
-      // 我们甚至可以把最小宽高放得更小，因为文字会自动缩放适应
-      const MIN_WIDTH = 300;
-      const MIN_HEIGHT = 120;
+      // ============ 状态 ============
+      let currentIndex = 0;
+      let isPlaying = true;
+      let lineStartTime = performance.now();
+      let pauseElapsed = 0;
+      let rafId = null;
 
-      // --- 核心：双轴动态感知缩放算法 ---
-      function fitLyrics() {
-        // 1. 获取扣除 padding 后的绝对可用空间 (宽度 & 高度)
-        const availableW = safeArea.clientWidth;
-        const availableH = safeArea.clientHeight;
-
-        // 2. 获取歌词块无视缩放的“最原始物理尺寸”
-        const contentW = lyricsContainer.offsetWidth;
-        const contentH = lyricsContainer.offsetHeight;
-
-        if (contentW === 0 || contentH === 0) return;
-
-        // 3. 分别计算宽度比例和高度比例
-        const scaleW = availableW / contentW;
-        const scaleH = availableH / contentH;
-
-        // 4. 取最小比例限制最大不放大(1)
-        let finalScale = Math.min(scaleW, scaleH, 1);
-
-        // 【关键新增】5. 给缩放加一个“兜底”，防止无限缩小！
-        // 比如 0.35 表示即使窗口再小，歌词最小也只缩放到原来的 35%
-        finalScale = Math.max(0.35, finalScale);
-
-        // 6. 应用缩放
-        lyricsContainer.style.transform = `scale(${finalScale})`;
+      // ============ 渲染整个歌词列表 ============
+      function renderList() {
+        list.innerHTML = "";
+        lyrics.forEach((line, i) => {
+          const item = document.createElement("div");
+          item.className = "lyric-item";
+          item.dataset.index = i;
+          item.innerHTML = `
+            <div class="lyric-main">
+              <span class="base">${line.text}</span>
+              <span class="progress">${line.text}</span>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+        requestAnimationFrame(() => {
+          updateAppearance();
+          scrollToCurrent(false);
+        });
       }
 
-      // 初始化适配
-      fitLyrics();
+      // ============ 双行可见外观 ============
+      // 桌面歌词只露两行：
+      //   offset 0  = 当前唱的行（高亮、稍大）
+      //   offset 1  = 下一句预备行（暗色、稍小，提示"接下来"）
+      //   其他      = 完全隐藏（opacity 0），让出空间
+      function updateAppearance() {
+        const items = list.querySelectorAll(".lyric-item");
+        items.forEach((item, i) => {
+          const offset = i - currentIndex;
+          let opacity, scale, mainSize;
 
-      // 悬浮状态
+          if (offset === 0) {
+            opacity = 1;
+            scale = 1;
+            mainSize = "2.4rem";
+          } else if (offset === 1) {
+            opacity = 0.45;
+            scale = 0.85;
+            mainSize = "1.7rem";
+          } else {
+            opacity = 0;
+            scale = 0.8;
+            mainSize = "1.7rem";
+          }
+
+          item.style.opacity = opacity;
+          item.style.transform = `scale(${scale})`;
+
+          const main = item.querySelector(".lyric-main");
+          if (main) main.style.fontSize = mainSize;
+
+          // 当前行的 progress 由 startCurrentLineProgress 单独控制
+          const progress = item.querySelector(".progress");
+          if (progress && i !== currentIndex) {
+            progress.style.transition = "none";
+            progress.style.width = "0%";
+          }
+        });
+      }
+
+      // ============ 当前行扫词高亮 ============
+      function startCurrentLineProgress(fromRatio = 0) {
+        const item = list.querySelector(`.lyric-item[data-index="${currentIndex}"]`);
+        if (!item) return;
+        const progress = item.querySelector(".progress");
+        const remaining = lyrics[currentIndex].duration * (1 - fromRatio);
+
+        progress.style.transition = "none";
+        progress.style.width = `${fromRatio * 100}%`;
+        void progress.offsetWidth;
+        progress.style.transition = `width ${remaining}ms linear`;
+        progress.style.width = "100%";
+      }
+
+      // ============ 定位当前行 ============
+      // 把"当前行"放在视口 45% 高度处：
+      //   - 比正中间(50%)略偏上，给下方预备行留出空间
+      //   - 但又不能太偏上(35%)，否则会被顶部工具栏遮挡
+      function scrollToCurrent(animated = true) {
+        const item = list.querySelector(`.lyric-item[data-index="${currentIndex}"]`);
+        if (!item) return;
+        const viewportH = viewport.clientHeight;
+        const targetY = viewportH * 0.45 - (item.offsetTop + item.offsetHeight / 2);
+        list.style.transition = animated
+          ? "transform 600ms cubic-bezier(0.22, 1, 0.36, 1)"
+          : "none";
+        list.style.transform = `translateY(${targetY}px)`;
+      }
+
+      // ============ 推进 ============
+      function nextLine() {
+        currentIndex = (currentIndex + 1) % lyrics.length;
+        if (currentIndex === 0) {
+          list.querySelectorAll(".progress").forEach(p => {
+            p.style.transition = "none";
+            p.style.width = "0%";
+          });
+        }
+        updateAppearance();
+        scrollToCurrent(true);
+        startCurrentLineProgress(0);
+        lineStartTime = performance.now();
+        pauseElapsed = 0;
+      }
+
+      // ============ 主循环 ============
+      function tick(now) {
+        if (!isPlaying) return;
+        const elapsed = now - lineStartTime;
+        if (elapsed >= lyrics[currentIndex].duration) {
+          nextLine();
+        }
+        rafId = requestAnimationFrame(tick);
+      }
+
+      // ============ 启动 ============
+      renderList();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          startCurrentLineProgress(0);
+          lineStartTime = performance.now();
+          rafId = requestAnimationFrame(tick);
+        });
+      });
+
+      // ============ 播放/暂停 ============
+      btnPlayPause.addEventListener("click", () => {
+        const item = list.querySelector(`.lyric-item[data-index="${currentIndex}"]`);
+        const progress = item?.querySelector(".progress");
+
+        if (isPlaying) {
+          isPlaying = false;
+          pauseElapsed = performance.now() - lineStartTime;
+          if (progress) {
+            const currentW = window.getComputedStyle(progress).width;
+            const baseW = item.querySelector(".lyric-main").offsetWidth;
+            progress.style.transition = "none";
+            progress.style.width = `${(parseFloat(currentW) / baseW) * 100}%`;
+          }
+          if (rafId) cancelAnimationFrame(rafId);
+          iconPause.classList.add("hidden");
+          iconPlay.classList.remove("hidden");
+        } else {
+          isPlaying = true;
+          const ratio = pauseElapsed / lyrics[currentIndex].duration;
+          startCurrentLineProgress(ratio);
+          lineStartTime = performance.now() - pauseElapsed;
+          rafId = requestAnimationFrame(tick);
+          iconPlay.classList.add("hidden");
+          iconPause.classList.remove("hidden");
+        }
+      });
+
+      // ============ 悬浮高亮 ============
+      let isLocked = false;
+
       function setHoverState(isHovering) {
         if (isLocked) return;
         if (isHovering) {
-          // 移除了 'border'，因为 HTML 里已经有了
-          windowEl.classList.add("bg-[#a3e635]/10", "backdrop-blur-sm", "border-[#a3e635]/20");
+          windowEl.classList.add("bg-white/5", "backdrop-blur-sm", "border-white/20");
           windowEl.classList.remove("border-transparent");
           normalToolbar.classList.replace("opacity-0", "opacity-100");
         } else {
-          // 移除了 'border'
-          windowEl.classList.remove("bg-[#a3e635]/10", "backdrop-blur-sm", "border-[#a3e635]/20");
+          windowEl.classList.remove("bg-white/5", "backdrop-blur-sm", "border-white/20");
           windowEl.classList.add("border-transparent");
           normalToolbar.classList.replace("opacity-100", "opacity-0");
         }
@@ -237,17 +348,11 @@
       windowEl.addEventListener("mouseenter", () => setHoverState(true));
       windowEl.addEventListener("mouseleave", () => setHoverState(false));
 
-      // 单双行切换：现在切换后直接调用自适应，再也不会出现撑破或者裁切的情况
-      btnToggleLine.addEventListener("click", () => {
-        lyricLine2.classList.toggle("hidden");
-        // 稍微延迟确保 DOM 高度更新后重新计算比例
-        setTimeout(fitLyrics, 0);
-      });
+      // ============ 拖拽与缩放 ============
+      const MIN_WIDTH = 320;
+      const MIN_HEIGHT = 130;
 
-      // --- 拖拽与缩放逻辑 ---
-      let isDragging = false,
-        isResizing = false,
-        currentHandle = null;
+      let isDragging = false, isResizing = false, currentHandle = null;
       let startX, startY, startW, startH, startLeft, startTop;
 
       handles.forEach(handle => {
@@ -255,13 +360,10 @@
           if (isLocked) return;
           isResizing = true;
           currentHandle = handle.getAttribute("data-dir");
-          startX = e.clientX;
-          startY = e.clientY;
+          startX = e.clientX; startY = e.clientY;
           const rect = windowEl.getBoundingClientRect();
-          startW = rect.width;
-          startH = rect.height;
-          startLeft = rect.left;
-          startTop = rect.top;
+          startW = rect.width; startH = rect.height;
+          startLeft = rect.left; startTop = rect.top;
           e.preventDefault();
           e.stopPropagation();
         });
@@ -270,10 +372,8 @@
       windowEl.addEventListener("mousedown", e => {
         if (isLocked || e.target.closest("button") || e.target.classList.contains("resize-handle")) return;
         isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        startLeft = windowEl.offsetLeft;
-        startTop = windowEl.offsetTop;
+        startX = e.clientX; startY = e.clientY;
+        startLeft = windowEl.offsetLeft; startTop = windowEl.offsetTop;
         document.body.style.cursor = "move";
       });
 
@@ -287,31 +387,17 @@
           }
           return;
         }
-
         if (isDragging) {
           windowEl.style.left = `${startLeft + (e.clientX - startX)}px`;
           windowEl.style.top = `${startTop + (e.clientY - startY)}px`;
         }
-
         if (isResizing && currentHandle) {
-          const dx = e.clientX - startX,
-            dy = e.clientY - startY;
-          let newW = startW,
-            newH = startH,
-            newL = startLeft,
-            newT = startTop;
-
+          const dx = e.clientX - startX, dy = e.clientY - startY;
+          let newW = startW, newH = startH, newL = startLeft, newT = startTop;
           if (currentHandle.includes("e")) newW = startW + dx;
-          if (currentHandle.includes("w")) {
-            newW = startW - dx;
-            newL = startLeft + dx;
-          }
+          if (currentHandle.includes("w")) { newW = startW - dx; newL = startLeft + dx; }
           if (currentHandle.includes("s")) newH = startH + dy;
-          if (currentHandle.includes("n")) {
-            newH = startH - dy;
-            newT = startTop + dy;
-          }
-
+          if (currentHandle.includes("n")) { newH = startH - dy; newT = startTop + dy; }
           if (newW >= MIN_WIDTH) {
             windowEl.style.width = `${newW}px`;
             if (currentHandle.includes("w")) windowEl.style.left = `${newL}px`;
@@ -320,35 +406,23 @@
             windowEl.style.height = `${newH}px`;
             if (currentHandle.includes("n")) windowEl.style.top = `${newT}px`;
           }
-
-          // 窗口改变时，实时触发计算！
-          fitLyrics();
+          scrollToCurrent(false);
         }
       });
 
       window.addEventListener("mouseup", () => {
-        isDragging = false;
-        isResizing = false;
-        currentHandle = null;
+        isDragging = false; isResizing = false; currentHandle = null;
         document.body.style.cursor = "";
       });
 
+      // ============ 锁定 / 解锁 ============
       btnLock.addEventListener("click", () => {
-        // 1. 清除悬浮状态（背景变透明）
         setHoverState(false);
-
-        // 2. 状态上锁，禁用容器内部元素的指针事件
         isLocked = true;
         windowEl.classList.add("pointer-events-none");
-
-        // 3. 隐藏常规工具栏
         normalToolbar.classList.add("hidden");
-
-        // 4. 显示锁定工具栏，并【直接设为不透明】（因为此时鼠标肯定在上面）
         lockedToolbar.classList.remove("hidden");
         lockedToolbar.classList.replace("opacity-0", "opacity-100");
-
-        // 5. 隐藏所有缩放手柄
         handles.forEach(h => (h.style.display = "none"));
       });
 
