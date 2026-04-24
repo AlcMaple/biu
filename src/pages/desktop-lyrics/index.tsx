@@ -136,6 +136,9 @@ const DesktopLyrics = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  // Whether the cursor is currently inside the window while locked.
+  // Drives visibility of the unlock button so it only appears on hover.
+  const [cursorInsideLocked, setCursorInsideLocked] = useState(false);
 
   const bcRef = useRef<BroadcastChannel | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -204,7 +207,9 @@ const DesktopLyrics = () => {
       const item = list.querySelector<HTMLElement>(`[data-lyric-index="${activeIndex}"]`);
       if (!item) return;
       const viewportH = viewport.clientHeight;
-      const targetY = viewportH * 0.45 - (item.offsetTop + item.offsetHeight / 2);
+      // Anchor the active line a bit past the vertical center so it clears
+      // the toolbar at top and still leaves room for the next line below.
+      const targetY = viewportH * 0.55 - (item.offsetTop + item.offsetHeight / 2);
       list.style.transition = animated ? "transform 600ms cubic-bezier(0.22, 1, 0.36, 1)" : "none";
       list.style.transform = `translateY(${targetY}px)`;
     },
@@ -267,67 +272,133 @@ const DesktopLyrics = () => {
     // background can get stuck because isLocked guard blocks the state clear.
     setIsHovered(false);
     setIsLocked(true);
+    setCursorInsideLocked(false);
     applyIgnoreMouse(true);
-    // Cursor is still inside the window at the moment of clicking lock,
-    // so show the unlock button immediately without waiting for mousemove.
-    if (unlockBtnRef.current) unlockBtnRef.current.style.opacity = "1";
   }, [applyIgnoreMouse]);
 
   const handleUnlock = useCallback(() => {
     setIsLocked(false);
+    setCursorInsideLocked(false);
     setIsHovered(true); // cursor is still inside after clicking unlock
     applyIgnoreMouse(false);
   }, [applyIgnoreMouse]);
 
   // Locked state: virtual hover detection.
   // CSS :hover is dead when setIgnoreMouseEvents is active, so we use mousemove
-  // (forwarded by Electron via { forward: true }) + getBoundingClientRect to
-  // decide whether to show the unlock button and pass clicks through.
+  // (forwarded by Electron via { forward: true }) to track cursor position.
+  //
+  // Forwarded mousemove only fires while the cursor is over the window area.
+  // When the cursor leaves, events stop — we debounce a hide so the button
+  // fades out shortly after the cursor has actually gone elsewhere.
   useEffect(() => {
     if (!isLocked) return;
+    let hideTimer: number | null = null;
+    const HIDE_DELAY = 400;
+    const clearHide = () => {
+      if (hideTimer !== null) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+    };
     const onMouseMove = (e: MouseEvent) => {
+      const inWindow =
+        e.clientX >= 0 && e.clientY >= 0 && e.clientX <= window.innerWidth && e.clientY <= window.innerHeight;
+      if (inWindow) {
+        setCursorInsideLocked(true);
+        clearHide();
+        hideTimer = window.setTimeout(() => setCursorInsideLocked(false), HIDE_DELAY);
+      } else {
+        clearHide();
+        setCursorInsideLocked(false);
+      }
       const btn = unlockBtnRef.current;
       if (!btn) {
         applyIgnoreMouse(true);
         return;
       }
-      btn.style.opacity = "1";
       const r = btn.getBoundingClientRect();
-      const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const over =
+        inWindow && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
       applyIgnoreMouse(!over);
     };
     window.addEventListener("mousemove", onMouseMove);
-    return () => window.removeEventListener("mousemove", onMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      clearHide();
+    };
   }, [isLocked, applyIgnoreMouse]);
 
   // ── Resize ────────────────────────────────────────────────────────────────
-  const handleResizeDragStart = useCallback(async (dir: ResizeDir, startX: number, startY: number) => {
-    const bounds = await platform.getDesktopLyricsBounds();
-    if (!bounds) return;
-    const init = { ...bounds };
-    const onMove = (e: MouseEvent) => {
-      const dx = e.screenX - startX,
-        dy = e.screenY - startY;
-      const next = { ...init };
-      if (dir.includes("e")) next.width = init.width + dx;
-      if (dir.includes("s")) next.height = init.height + dy;
-      if (dir.includes("w")) {
-        next.x = init.x + dx;
-        next.width = init.width - dx;
-      }
-      if (dir.includes("n")) {
-        next.y = init.y + dy;
-        next.height = init.height - dy;
-      }
-      void platform.setDesktopLyricsBounds(next);
-    };
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, []);
+  const handleResizeDragStart = useCallback(
+    async (dir: ResizeDir, startX: number, startY: number) => {
+      // Defensive: the handles aren't rendered when locked, but catch any
+      // late-fired mousedown (e.g., lock-click race) before mutating bounds.
+      if (isLocked) return;
+      const bounds = await platform.getDesktopLyricsBounds();
+      if (!bounds) return;
+      const init = { ...bounds };
+      const onMove = (e: MouseEvent) => {
+        const dx = e.screenX - startX,
+          dy = e.screenY - startY;
+        const next = { ...init };
+        if (dir.includes("e")) next.width = init.width + dx;
+        if (dir.includes("s")) next.height = init.height + dy;
+        if (dir.includes("w")) {
+          next.x = init.x + dx;
+          next.width = init.width - dx;
+        }
+        if (dir.includes("n")) {
+          next.y = init.y + dy;
+          next.height = init.height - dy;
+        }
+        void platform.setDesktopLyricsBounds(next);
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [isLocked],
+  );
+
+  // ── Window drag ───────────────────────────────────────────────────────────
+  // We intentionally don't use `-webkit-app-region: drag` on the container:
+  // drag regions swallow mousemove events at the OS level, so hover detection
+  // only worked over the buttons and resize handles (the only `no-drag` zones).
+  // Instead we implement dragging manually via IPC-driven setBounds — the
+  // whole window now receives mousemove, which is what the hover-glass effect
+  // relies on.
+  const handleWindowDragStart = useCallback(
+    async (e: React.MouseEvent<HTMLDivElement>) => {
+      if (isLocked) return;
+      const target = e.target as HTMLElement;
+      // Don't start a drag when the user is clicking a button. Resize handles
+      // already call stopPropagation, so their events never reach us.
+      if (target.closest("button")) return;
+      const bounds = await platform.getDesktopLyricsBounds();
+      if (!bounds) return;
+      const init = { ...bounds };
+      const startX = e.screenX;
+      const startY = e.screenY;
+      const onMove = (ev: MouseEvent) => {
+        void platform.setDesktopLyricsBounds({
+          x: init.x + (ev.screenX - startX),
+          y: init.y + (ev.screenY - startY),
+          width: init.width,
+          height: init.height,
+        });
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [isLocked],
+  );
 
   const handleClose = () => platform.toggleDesktopLyrics();
 
@@ -377,23 +448,26 @@ const DesktopLyrics = () => {
 
       {/*
         Outer container fills the Electron window (h-screen w-screen).
-        window-drag enables Electron frameless window dragging.
+        Dragging is wired through onMouseDown → IPC setBounds (see
+        handleWindowDragStart) instead of `-webkit-app-region: drag`, which
+        swallows mouse events and breaks full-area hover detection.
       */}
       <div
-        className="window-drag relative h-screen w-screen overflow-hidden rounded-xl border transition-colors duration-300 select-none"
+        className="relative h-screen w-screen overflow-hidden rounded-xl border transition-colors duration-300 select-none"
         style={{
           borderColor: isHovered && !isLocked ? "rgba(255,255,255,0.2)" : "transparent",
           background: isHovered && !isLocked ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.01)",
           backdropFilter: isHovered && !isLocked ? "blur(6px)" : "none",
           WebkitBackdropFilter: isHovered && !isLocked ? "blur(6px)" : "none",
         }}
+        onMouseDown={handleWindowDragStart}
       >
         {/* Resize handles */}
         {!isLocked && RESIZE_DIRS.map(dir => <ResizeHandle key={dir} dir={dir} onDragStart={handleResizeDragStart} />)}
 
         {/* Normal toolbar */}
         <div
-          className="window-no-drag absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-1.5 shadow-lg transition-opacity duration-300"
+          className="absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-1.5 shadow-lg transition-opacity duration-300"
           style={{
             opacity: isHovered && !isLocked ? 1 : 0,
             pointerEvents: isHovered && !isLocked ? "auto" : "none",
@@ -418,17 +492,17 @@ const DesktopLyrics = () => {
           <ToolBtn onClick={handleLock} title="锁定">
             <RiLockLine size={16} />
           </ToolBtn>
-          <ToolBtn onClick={handleClose} title="关闭" danger>
+          <ToolBtn onClick={handleClose} title="关闭">
             <RiCloseLine size={16} />
           </ToolBtn>
         </div>
 
-        {/* Locked toolbar */}
+        {/* Locked toolbar — only visible when the cursor is inside the window */}
         <div
-          className="absolute top-3 left-1/2 z-50 -translate-x-1/2 transition-opacity duration-300"
+          className="absolute top-3 left-1/2 z-50 -translate-x-1/2 transition-opacity duration-200"
           style={{
-            opacity: isLocked ? 1 : 0,
-            pointerEvents: isLocked ? "auto" : "none",
+            opacity: isLocked && cursorInsideLocked ? 1 : 0,
+            pointerEvents: isLocked && cursorInsideLocked ? "auto" : "none",
           }}
         >
           <button
@@ -436,7 +510,7 @@ const DesktopLyrics = () => {
             type="button"
             onClick={handleUnlock}
             title="解锁桌面歌词"
-            className="window-no-drag flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm text-white shadow-lg transition-colors duration-150"
+            className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm text-white shadow-lg transition-colors duration-150"
             style={{
               background: "rgba(0,0,0,0.55)",
               border: "1px solid rgba(255,255,255,0.15)",
