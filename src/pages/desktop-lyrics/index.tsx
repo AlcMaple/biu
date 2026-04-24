@@ -8,8 +8,9 @@ import {
   RiPlayLine,
   RiSkipBackLine,
   RiSkipForwardLine,
-  RiText,
 } from "@remixicon/react";
+
+import type { LyricLine } from "@/store/lyrics-state";
 
 import platform from "@/platform";
 
@@ -17,8 +18,13 @@ export const DESKTOP_LYRICS_CHANNEL = "biu-desktop-lyrics";
 
 export interface DesktopLyricsMessage {
   type?: "update" | "request" | "cmd";
-  line?: string;
-  nextLine?: string;
+  lines?: LyricLine[];
+  activeIndex?: number;
+  // Duration of the current line in ms (next line's time - current line's time).
+  lineDurationMs?: number;
+  // How far we are into the current line at the moment this message was sent.
+  // The window animates from this ratio using its own clock.
+  lineElapsedMs?: number;
   isPlaying?: boolean;
   cmd?: "prev" | "next" | "toggle";
 }
@@ -123,16 +129,17 @@ const ToolBtn = ({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const DesktopLyrics = () => {
-  const [line, setLine] = useState("");
-  const [nextLine, setNextLine] = useState("");
+  const [lines, setLines] = useState<LyricLine[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [lineDurationMs, setLineDurationMs] = useState(0);
+  const [lineElapsedMs, setLineElapsedMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [dualLine, setDualLine] = useState(true);
 
   const bcRef = useRef<BroadcastChannel | null>(null);
-  const safeAreaRef = useRef<HTMLDivElement>(null);
-  const lyricsInnerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const unlockBtnRef = useRef<HTMLButtonElement>(null);
 
   // ── BroadcastChannel ──────────────────────────────────────────────────────
@@ -140,10 +147,13 @@ const DesktopLyrics = () => {
     const bc = new BroadcastChannel(DESKTOP_LYRICS_CHANNEL);
     bcRef.current = bc;
     bc.onmessage = (ev: MessageEvent<DesktopLyricsMessage>) => {
-      if (ev.data.type === "request" || ev.data.type === "cmd") return;
-      setLine(ev.data.line ?? "");
-      setNextLine(ev.data.nextLine ?? "");
-      setIsPlaying(ev.data.isPlaying ?? false);
+      const data = ev.data;
+      if (data.type === "request" || data.type === "cmd") return;
+      if (Array.isArray(data.lines)) setLines(data.lines);
+      if (typeof data.activeIndex === "number") setActiveIndex(data.activeIndex);
+      if (typeof data.lineDurationMs === "number") setLineDurationMs(data.lineDurationMs);
+      if (typeof data.lineElapsedMs === "number") setLineElapsedMs(data.lineElapsedMs);
+      if (typeof data.isPlaying === "boolean") setIsPlaying(data.isPlaying);
     };
     bc.postMessage({ type: "request" });
     return () => {
@@ -155,6 +165,9 @@ const DesktopLyrics = () => {
   const sendCmd = useCallback((cmd: "prev" | "next" | "toggle") => {
     bcRef.current?.postMessage({ type: "cmd", cmd });
   }, []);
+
+  const currentText = activeIndex >= 0 ? (lines[activeIndex]?.text ?? "") : "";
+  const hasLyrics = currentText.length > 0;
 
   // ── Hover detection ───────────────────────────────────────────────────────
   //
@@ -179,37 +192,70 @@ const DesktopLyrics = () => {
     };
   }, [isLocked]);
 
-  // ── GPU-accelerated scale (transform: scale, NOT font-size) ──────────────
-  //
-  // offsetWidth/offsetHeight report the element's LAYOUT size — unaffected
-  // by CSS transforms — so we can always measure the "natural" dimensions.
-  const fitLyrics = useCallback(() => {
-    const safe = safeAreaRef.current;
-    const inner = lyricsInnerRef.current;
-    if (!safe || !inner) return;
-    const availW = safe.clientWidth;
-    const availH = safe.clientHeight;
-    const natW = inner.offsetWidth;
-    const natH = inner.offsetHeight;
-    if (!natW || !natH) return;
-    // Dual-axis fit: min of width-ratio and height-ratio, capped at 1 (no upscale)
-    // Floor at 0.35 so lyrics are always at least partially visible
-    const s = Math.max(0.35, Math.min(availW / natW, availH / natH, 1));
-    inner.style.transform = `scale(${s})`;
-  }, []);
+  // ── List-scroll: keep the current line pinned at ~45% of the viewport ────
+  // The entire list translates up when activeIndex advances. CSS transition
+  // on `transform` makes the scroll smooth. Recomputed on window resize too
+  // so the anchor point stays correct while the user is resizing.
+  const scrollToCurrent = useCallback(
+    (animated = true) => {
+      const viewport = viewportRef.current;
+      const list = listRef.current;
+      if (!viewport || !list) return;
+      const item = list.querySelector<HTMLElement>(`[data-lyric-index="${activeIndex}"]`);
+      if (!item) return;
+      const viewportH = viewport.clientHeight;
+      const targetY = viewportH * 0.45 - (item.offsetTop + item.offsetHeight / 2);
+      list.style.transition = animated ? "transform 600ms cubic-bezier(0.22, 1, 0.36, 1)" : "none";
+      list.style.transform = `translateY(${targetY}px)`;
+    },
+    [activeIndex],
+  );
 
-  // Re-fit when Electron resizes the native window (triggers DOM resize event)
   useEffect(() => {
-    fitLyrics();
-    window.addEventListener("resize", fitLyrics);
-    return () => window.removeEventListener("resize", fitLyrics);
-  }, [fitLyrics]);
+    scrollToCurrent(true);
+  }, [scrollToCurrent]);
 
-  // Re-fit after content / dual-line changes (defer one tick for DOM update)
   useEffect(() => {
-    const t = setTimeout(fitLyrics, 0);
-    return () => clearTimeout(t);
-  }, [line, nextLine, dualLine, fitLyrics]);
+    const onResize = () => scrollToCurrent(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [scrollToCurrent]);
+
+  // ── Karaoke progress driver ──────────────────────────────────────────────
+  // The progress overlay fills left-to-right by animating CSS width with a
+  // linear transition. Whenever the line (or play state) changes, we restart
+  // the transition based on `lineElapsedMs / lineDurationMs`:
+  //   • playing: snap to the elapsed ratio, then transition to 100% over the
+  //     remaining duration
+  //   • paused: snap to the elapsed ratio with no transition (progress halts)
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const active = list.querySelector<HTMLElement>(`[data-lyric-index="${activeIndex}"] .progress`);
+    if (!active) return;
+
+    const duration = Math.max(0, lineDurationMs);
+    const elapsed = Math.max(0, Math.min(lineElapsedMs, duration));
+    const ratio = duration > 0 ? elapsed / duration : 0;
+
+    active.style.transition = "none";
+    active.style.width = `${ratio * 100}%`;
+    // Force a reflow so the next transition starts from the snapped width.
+    void active.offsetWidth;
+
+    if (isPlaying && duration > 0) {
+      const remaining = duration - elapsed;
+      active.style.transition = `width ${remaining}ms linear`;
+      active.style.width = "100%";
+    }
+
+    // Reset non-current progress bars so revisiting an earlier line starts clean.
+    list.querySelectorAll<HTMLElement>(".progress").forEach(el => {
+      if (el === active) return;
+      el.style.transition = "none";
+      el.style.width = "0%";
+    });
+  }, [activeIndex, lineDurationMs, lineElapsedMs, isPlaying, lines]);
 
   // ── Lock / unlock ─────────────────────────────────────────────────────────
   const applyIgnoreMouse = useCallback((ignore: boolean) => {
@@ -291,97 +337,95 @@ const DesktopLyrics = () => {
         /* Override HeroUI theme's body background so Electron transparent window works */
         html, body, #root { background: transparent !important; }
 
-        @keyframes lyric-in {
-          from { opacity: 0; transform: translateY(5px); }
-          to   { opacity: 1; transform: translateY(0); }
+        #biu-lyrics-list {
+          will-change: transform;
         }
-        .lyric-in { animation: lyric-in 0.22s ease both; }
+
+        .lyric-item {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          white-space: nowrap;
+          transition: opacity 500ms ease, transform 500ms ease;
+        }
+
+        .lyric-main {
+          position: relative;
+          font-weight: 800;
+          line-height: 1.25;
+          letter-spacing: 0.04em;
+        }
+        .lyric-main .base {
+          color: rgba(255, 255, 255, 0.85);
+          text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+        }
+        .lyric-main .progress {
+          position: absolute;
+          top: 0;
+          left: 0;
+          height: 100%;
+          overflow: hidden;
+          white-space: nowrap;
+          width: 0%;
+          color: #a3e635;
+          text-shadow:
+            0 0 10px rgba(163, 230, 53, 0.55),
+            0 1px 4px rgba(0, 0, 0, 0.6);
+        }
       `}</style>
 
       {/*
         Outer container fills the Electron window (h-screen w-screen).
         window-drag enables Electron frameless window dragging.
-        Pre-loaded transparent border prevents 1px layout jitter on hover.
       */}
       <div
-        className="window-drag relative h-screen w-screen overflow-hidden rounded-xl border transition-all duration-300 select-none"
+        className="window-drag relative h-screen w-screen overflow-hidden rounded-xl border transition-colors duration-300 select-none"
         style={{
-          borderColor: isHovered && !isLocked ? "rgba(30,215,96,0.2)" : "transparent",
-          // rgba(0,0,0,0.01): nearly invisible but non-zero alpha tells macOS to
-          // deliver mouse events to this area even when the window is transparent.
-          // Without this, transparent pixels are hit-test-ignored by the OS and
-          // window.mousemove never fires outside the visible lyrics text.
-          background: isHovered && !isLocked ? "rgba(30,215,96,0.08)" : "rgba(0,0,0,0.01)",
-          backdropFilter: isHovered && !isLocked ? "blur(4px)" : "none",
-          WebkitBackdropFilter: isHovered && !isLocked ? "blur(4px)" : "none",
-          boxShadow: "none",
+          borderColor: isHovered && !isLocked ? "rgba(255,255,255,0.2)" : "transparent",
+          background: isHovered && !isLocked ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.01)",
+          backdropFilter: isHovered && !isLocked ? "blur(6px)" : "none",
+          WebkitBackdropFilter: isHovered && !isLocked ? "blur(6px)" : "none",
         }}
       >
         {/* Resize handles */}
         {!isLocked && RESIZE_DIRS.map(dir => <ResizeHandle key={dir} dir={dir} onDragStart={handleResizeDragStart} />)}
 
-        {/*
-          Normal toolbar — always mounted, visibility controlled by opacity so
-          CSS transition works. pointerEvents:none when hidden so mouse passes
-          through to the drag region underneath.
-          window-no-drag overrides the parent drag region for button clicks.
-        */}
+        {/* Normal toolbar */}
         <div
-          className="window-no-drag absolute top-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full px-2 py-1 transition-all duration-300"
+          className="window-no-drag absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-1.5 shadow-lg transition-opacity duration-300"
           style={{
             opacity: isHovered && !isLocked ? 1 : 0,
             pointerEvents: isHovered && !isLocked ? "auto" : "none",
-            background: "rgba(10, 18, 12, 0.85)",
-            border: "1px solid rgba(30,215,96,0.28)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(30,215,96,0.1)",
+            background: "rgba(0,0,0,0.45)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
           }}
         >
           <ToolBtn onClick={() => sendCmd("prev")} title="上一曲">
-            <RiSkipBackLine size={14} />
+            <RiSkipBackLine size={16} />
           </ToolBtn>
           <ToolBtn onClick={() => sendCmd("toggle")} title={isPlaying ? "暂停" : "播放"}>
-            {isPlaying ? <RiPauseLine size={15} /> : <RiPlayLine size={15} />}
+            {isPlaying ? <RiPauseLine size={18} /> : <RiPlayLine size={18} />}
           </ToolBtn>
           <ToolBtn onClick={() => sendCmd("next")} title="下一曲">
-            <RiSkipForwardLine size={14} />
+            <RiSkipForwardLine size={16} />
           </ToolBtn>
 
-          <div
-            style={{
-              width: 1,
-              height: 11,
-              margin: "0 3px",
-              flexShrink: 0,
-              background: "rgba(255,255,255,0.12)",
-            }}
-          />
+          <div style={{ width: 1, height: 12, margin: "0 2px", background: "rgba(255,255,255,0.3)" }} />
 
-          <ToolBtn
-            onClick={() => {
-              setDualLine(v => !v);
-              setTimeout(fitLyrics, 0);
-            }}
-            title={dualLine ? "关闭双行" : "开启双行"}
-            active={dualLine}
-          >
-            <RiText size={14} />
-          </ToolBtn>
           <ToolBtn onClick={handleLock} title="锁定">
-            <RiLockLine size={14} />
+            <RiLockLine size={16} />
           </ToolBtn>
           <ToolBtn onClick={handleClose} title="关闭" danger>
-            <RiCloseLine size={14} />
+            <RiCloseLine size={16} />
           </ToolBtn>
         </div>
 
-        {/*
-          Locked toolbar — same position as normal toolbar, always mounted.
-          Contains only the unlock button.
-        */}
+        {/* Locked toolbar */}
         <div
-          className="absolute top-2.5 left-1/2 z-50 -translate-x-1/2 transition-opacity duration-300"
+          className="absolute top-3 left-1/2 z-50 -translate-x-1/2 transition-opacity duration-300"
           style={{
             opacity: isLocked ? 1 : 0,
             pointerEvents: isLocked ? "auto" : "none",
@@ -392,87 +436,73 @@ const DesktopLyrics = () => {
             type="button"
             onClick={handleUnlock}
             title="解锁桌面歌词"
-            className="window-no-drag flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-lg transition-colors duration-150"
+            className="window-no-drag flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm text-white shadow-lg transition-colors duration-150"
             style={{
-              background: "rgba(30,215,96,0.82)",
-              color: "#fff",
-              border: "1px solid rgba(30,215,96,0.55)",
+              background: "rgba(0,0,0,0.55)",
+              border: "1px solid rgba(255,255,255,0.15)",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
-              pointerEvents: "auto",
-              boxShadow: "0 2px 14px rgba(30,215,96,0.35)",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = "rgba(30,215,96,0.95)";
+              e.currentTarget.style.background = "rgba(0,0,0,0.7)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "rgba(30,215,96,0.82)";
+              e.currentTarget.style.background = "rgba(0,0,0,0.55)";
             }}
           >
-            <RiLockUnlockLine size={12} />
+            <RiLockUnlockLine size={14} />
             解锁桌面歌词
           </button>
         </div>
 
         {/*
-          Safe area — pointer-events-none so lyrics never block window dragging.
-          paddingTop reserves space for the toolbar.
-          The lyrics container uses transform-origin: top center so when the
-          window grows vertically, lyrics stay anchored under the toolbar
-          instead of drifting to the vertical center.
+          Lyrics viewport — the scrolling list lives inside. pointer-events:none
+          so text never blocks the window drag region underneath.
+          The list is absolutely positioned so translateY can move it freely
+          without affecting layout of surrounding elements.
         */}
-        <div
-          ref={safeAreaRef}
-          className="pointer-events-none absolute inset-0 flex justify-center"
-          style={{ paddingTop: 52, paddingBottom: 10, paddingLeft: 20, paddingRight: 20 }}
-        >
-          <div className="flex h-full w-full flex-col items-center justify-start">
-            <div
-              ref={lyricsInnerRef}
-              className="flex flex-col items-center"
-              style={{ gap: 10, transformOrigin: "top center", willChange: "transform" }}
-            >
-              {line ? (
-                <>
-                  <p
-                    key={line}
-                    className="lyric-in font-extrabold tracking-wide whitespace-nowrap"
-                    style={{
-                      fontSize: 36,
-                      lineHeight: 1.2,
-                      background: "linear-gradient(90deg, #fff 10%, #9dffca 55%, #1ed760 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                      filter: "drop-shadow(0 2px 10px rgba(30,215,96,0.5))",
-                    }}
+        <div ref={viewportRef} className="pointer-events-none absolute inset-0 overflow-hidden">
+          {hasLyrics ? (
+            <div ref={listRef} id="biu-lyrics-list" className="absolute right-0 left-0 flex flex-col items-center">
+              {lines.map((lineObj, i) => {
+                const offset = i - activeIndex;
+                let opacity = 0;
+                let scale = 0.8;
+                let fontSize = "1.7rem";
+                if (offset === 0) {
+                  opacity = 1;
+                  scale = 1;
+                  fontSize = "2.4rem";
+                } else if (offset === 1) {
+                  opacity = 0.45;
+                  scale = 0.85;
+                  fontSize = "1.7rem";
+                }
+                return (
+                  <div
+                    key={i}
+                    data-lyric-index={i}
+                    className="lyric-item"
+                    style={{ opacity, transform: `scale(${scale})` }}
                   >
-                    {line}
-                  </p>
-                  {dualLine && nextLine && (
-                    <p
-                      key={nextLine}
-                      className="lyric-in font-bold tracking-wide whitespace-nowrap"
-                      style={{
-                        fontSize: 22,
-                        lineHeight: 1.2,
-                        color: "rgba(30,215,96,0.52)",
-                      }}
-                    >
-                      {nextLine}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p
-                  className="font-bold whitespace-nowrap"
-                  style={{ fontSize: 24, lineHeight: 1.2, color: "rgba(255,255,255,0.18)" }}
-                >
-                  暂无歌词
-                </p>
-              )}
+                    <div className="lyric-main" style={{ fontSize }}>
+                      <span className="base">{lineObj.text}</span>
+                      <span className="progress">{lineObj.text}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p
+                className="font-bold whitespace-nowrap"
+                style={{ fontSize: 24, lineHeight: 1.2, color: "rgba(255,255,255,0.2)" }}
+              >
+                暂无歌词
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </>

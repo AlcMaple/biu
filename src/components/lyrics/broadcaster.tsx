@@ -8,6 +8,10 @@ import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 import { StoreNameMap } from "@shared/store";
 
+// Fallback duration used for the last lyric line (or any line missing a
+// successor) so the karaoke progress has something finite to animate over.
+const TAIL_LINE_DURATION_MS = 5000;
+
 const DEFAULT_OFFSET = 0;
 
 /**
@@ -86,21 +90,52 @@ const LyricsBroadcaster = () => {
     return 0;
   })();
 
-  const line = activeIndex >= 0 ? (lyrics[activeIndex]?.text ?? "") : "";
-  const nextLine = activeIndex >= 0 ? (lyrics[activeIndex + 1]?.text ?? "") : "";
+  // Duration of the active lyric line — gap to the next line, or a tail
+  // fallback for the last line. Used by the desktop window to drive its
+  // karaoke progress animation.
+  const lineDurationMs = (() => {
+    if (activeIndex < 0 || activeIndex >= lyrics.length) return 0;
+    const nextLyric = lyrics[activeIndex + 1];
+    if (nextLyric) return Math.max(0, nextLyric.time - lyrics[activeIndex].time);
+    return TAIL_LINE_DURATION_MS;
+  })();
+  const lineElapsedMs = activeIndex >= 0 && lyrics[activeIndex] ? Math.max(0, currentMs - lyrics[activeIndex].time) : 0;
 
-  // Broadcast current state whenever it changes
+  // Broadcast whenever the active line, play state, or loaded lyrics change.
+  // lineElapsedMs piggybacks on each broadcast (it's accurate at broadcast
+  // time; between broadcasts the window extrapolates via CSS transitions).
   useEffect(() => {
-    bc.postMessage({ type: "update", line, nextLine, isPlaying });
-  }, [bc, line, nextLine, isPlaying]);
+    bc.postMessage({
+      type: "update",
+      lines: lyrics,
+      activeIndex,
+      lineDurationMs,
+      lineElapsedMs,
+      isPlaying,
+    });
+    // lineElapsedMs intentionally omitted: updating it every progress tick
+    // would flood the channel. Captured at the moment the line/isPlaying
+    // changes, which is when the window needs a fresh snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bc, lyrics, activeIndex, lineDurationMs, isPlaying]);
 
   // Handle messages from desktop lyrics window
   useEffect(() => {
     const handleMessage = (ev: MessageEvent<{ type?: string; cmd?: string }>) => {
       const { type, cmd } = ev.data ?? {};
-      // Respond to handshake requests
+      // Respond to handshake requests with the full current snapshot,
+      // including the fresh elapsed ms (re-read to avoid stale closure value).
       if (type === "request") {
-        bc.postMessage({ type: "update", line, nextLine, isPlaying });
+        const freshElapsed =
+          activeIndex >= 0 && lyrics[activeIndex] ? Math.max(0, currentMs - lyrics[activeIndex].time) : 0;
+        bc.postMessage({
+          type: "update",
+          lines: lyrics,
+          activeIndex,
+          lineDurationMs,
+          lineElapsedMs: freshElapsed,
+          isPlaying,
+        });
         return;
       }
       // Handle player control commands from the desktop lyrics toolbar
@@ -113,7 +148,7 @@ const LyricsBroadcaster = () => {
     };
     bc.addEventListener("message", handleMessage);
     return () => bc.removeEventListener("message", handleMessage);
-  }, [bc, line, nextLine, isPlaying]);
+  }, [bc, lyrics, activeIndex, lineDurationMs, currentMs, isPlaying]);
 
   return null;
 };
