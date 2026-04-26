@@ -270,6 +270,7 @@ const DesktopLyrics = () => {
   const handleLock = useCallback(() => {
     // IMPORTANT: clear hover BEFORE setting locked — if reversed, the glass
     // background can get stuck because isLocked guard blocks the state clear.
+    // 锁定只控制鼠标穿透，与置顶状态无关 —— 桌面歌词始终置顶（主进程 keep-alive 维护）。
     setIsHovered(false);
     setIsLocked(true);
     setCursorInsideLocked(false);
@@ -283,48 +284,52 @@ const DesktopLyrics = () => {
     applyIgnoreMouse(false);
   }, [applyIgnoreMouse]);
 
-  // Locked state: virtual hover detection.
-  // CSS :hover is dead when setIgnoreMouseEvents is active, so we use mousemove
-  // (forwarded by Electron via { forward: true }) to track cursor position.
+  // Locked state: poll cursor position via OS-level GetCursorPos through main IPC.
   //
-  // Forwarded mousemove only fires while the cursor is over the window area.
-  // When the cursor leaves, events stop — we debounce a hide so the button
-  // fades out shortly after the cursor has actually gone elsewhere.
+  // Why polling instead of the forwarded `mousemove` event:
+  // setIgnoreMouseEvents(true, { forward: true }) on Windows is unreliable when
+  // the window also has WS_EX_NOACTIVATE (focusable: false) + WS_EX_TRANSPARENT —
+  // mousemove events frequently get dropped, so the unlock button never appears.
+  // OS-level GetCursorPos always works regardless of any window flags.
+  //
+  // 80ms polling is imperceptible to the user (12.5 fps for hover state is fine)
+  // and the IPC overhead is negligible.
   useEffect(() => {
     if (!isLocked) return;
-    let hideTimer: number | null = null;
-    const HIDE_DELAY = 400;
-    const clearHide = () => {
-      if (hideTimer !== null) {
-        window.clearTimeout(hideTimer);
-        hideTimer = null;
-      }
-    };
-    const onMouseMove = (e: MouseEvent) => {
-      const inWindow =
-        e.clientX >= 0 && e.clientY >= 0 && e.clientX <= window.innerWidth && e.clientY <= window.innerHeight;
-      if (inWindow) {
-        setCursorInsideLocked(true);
-        clearHide();
-        hideTimer = window.setTimeout(() => setCursorInsideLocked(false), HIDE_DELAY);
-      } else {
-        clearHide();
+    let cancelled = false;
+    const POLL_MS = 80;
+
+    const tick = async () => {
+      if (cancelled) return;
+      const cursor = await platform.getDesktopLyricsCursorRelative();
+      if (cancelled) return;
+
+      if (!cursor) {
+        // Cursor outside window → hide button, ensure click-through is on
         setCursorInsideLocked(false);
+        applyIgnoreMouse(true);
+        return;
       }
+
+      setCursorInsideLocked(true);
+      // If cursor is over the unlock button, temporarily disable click-through
+      // so the button can receive the click. Otherwise keep events passing
+      // through to apps below (LOL, WeGame, etc).
       const btn = unlockBtnRef.current;
       if (!btn) {
         applyIgnoreMouse(true);
         return;
       }
       const r = btn.getBoundingClientRect();
-      const over =
-        inWindow && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const over = cursor.x >= r.left && cursor.x <= r.right && cursor.y >= r.top && cursor.y <= r.bottom;
       applyIgnoreMouse(!over);
     };
-    window.addEventListener("mousemove", onMouseMove);
+
+    const id = window.setInterval(tick, POLL_MS);
+    void tick(); // run once immediately so the button responds without waiting a tick
     return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      clearHide();
+      cancelled = true;
+      window.clearInterval(id);
     };
   }, [isLocked, applyIgnoreMouse]);
 
@@ -406,7 +411,17 @@ const DesktopLyrics = () => {
     <>
       <style>{`
         /* Override HeroUI theme's body background so Electron transparent window works */
-        html, body, #root { background: transparent !important; }
+        html, body, #root {
+          background: transparent !important;
+          /* Second layer of safety: even if setIgnoreMouseEvents has a timing
+             hiccup, the bare html/body don't capture clicks. Only the lyrics
+             container (which sets pointer-events: auto via .biu-hit-area) does. */
+          pointer-events: none;
+        }
+
+        /* The actual hittable surface — must explicitly opt-in to pointer events
+           because the html/body chain above is none. */
+        .biu-hit-area { pointer-events: auto; }
 
         #biu-lyrics-list {
           will-change: transform;
@@ -453,7 +468,7 @@ const DesktopLyrics = () => {
         swallows mouse events and breaks full-area hover detection.
       */}
       <div
-        className="relative h-screen w-screen overflow-hidden rounded-xl border transition-colors duration-300 select-none"
+        className="biu-hit-area relative h-screen w-screen overflow-hidden rounded-xl border transition-colors duration-300 select-none"
         style={{
           borderColor: isHovered && !isLocked ? "rgba(255,255,255,0.2)" : "transparent",
           background: isHovered && !isLocked ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.01)",

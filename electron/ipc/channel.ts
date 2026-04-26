@@ -111,5 +111,6 @@ export const channel = {
     desktopLyricsSetIgnoreMouseEvents: "window:desktop-lyrics-set-ignore-mouse-events",
     desktopLyricsGetBounds: "window:desktop-lyrics-get-bounds",
     desktopLyricsSetBounds: "window:desktop-lyrics-set-bounds",
+    desktopLyricsGetCursorRelative: "window:desktop-lyrics-get-cursor-relative",
   },
 };

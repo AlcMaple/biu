@@ -192,6 +192,9 @@ const api: ElectronAPI = {
   getDesktopLyricsBounds: () => ipcRenderer.invoke(channel.window.desktopLyricsGetBounds),
   // 设置桌面歌词窗口位置和大小
   setDesktopLyricsBounds: bounds => ipcRenderer.invoke(channel.window.desktopLyricsSetBounds, bounds),
+  // 获取光标相对桌面歌词窗口左上角的坐标（光标在窗口外返回 null）
+  // 用于锁定模式下兜底轮询，避免 setIgnoreMouseEvents forward 在 Windows 丢事件
+  getDesktopLyricsCursorRelative: () => ipcRenderer.invoke(channel.window.desktopLyricsGetCursorRelative),
   // 订阅桌面歌词窗口可见性变化（窗口被内部关闭时通知）
   onDesktopLyricsVisibilityChange: cb => {
     const handler = (_: Electron.IpcRendererEvent, visible: boolean) => cb(visible);

@@ -15,7 +15,9 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
 
   desktopLyricsWindow = new BrowserWindow({
     title: "Biu Desktop Lyrics",
-    show: true,
+    // ★ show: false + 后面用 showInactive() 显示，避免初次显示时抢焦点。
+    // show: true 会在创建时触发激活，可能在 LOL 启动瞬间打断它的全屏独占。
+    show: false,
     width: winWidth,
     height: 160,
     x: Math.round((width - winWidth) / 2),
@@ -24,6 +26,11 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
     transparent: true,
     resizable: true,
     alwaysOnTop: true,
+    // ★ 关键：构造时直接设 focusable: false（对应 Win32 WS_EX_NOACTIVATE）。
+    // 必须在构造里设，setFocusable(false) 在窗口创建后调用有时机问题。
+    // 窗口永远不可激活 → 不抢焦点 → 不触发前台切换 → 全屏游戏不被最小化。
+    // 鼠标点击仍可工作，只是不能获得键盘焦点（桌面歌词本来就不需要）。
+    focusable: false,
     skipTaskbar: true,
     hasShadow: false,
     webPreferences: {
@@ -35,9 +42,14 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
     },
   });
 
-  // 提升到 screen-saver 层级，确保压过其他应用的 topmost 窗口（视频播放器、系统弹窗等）
-  desktopLyricsWindow.setAlwaysOnTop(true, "screen-saver");
-  // 在所有工作区和全屏模式下可见
+  // 仅 macOS 上一次性升级到 screen-saver 层级（Windows 所有非 normal 层级都
+  // 映射到 HWND_TOPMOST，重复调用反而可能通知 DWM 干扰全屏游戏，所以 Windows
+  // 不调，依赖构造里的 alwaysOnTop: true 即可）。
+  if (process.platform === "darwin") {
+    desktopLyricsWindow.setAlwaysOnTop(true, "screen-saver");
+  }
+
+  // 在所有工作区和全屏模式下可见（macOS only，Windows 上无副作用）
   desktopLyricsWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   onClosedCallback = onClosed ?? null;
@@ -63,6 +75,10 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
 
   const indexPath = path.resolve(__dirname, "../dist/web/index.html");
   desktopLyricsWindow.loadFile(indexPath, { hash: "desktop-lyrics" });
+
+  // ★ 用 showInactive() 显示，不抢焦点。配合 focusable: false，桌面歌词从生命周期
+  // 第一帧起就不会触发任何前台/激活变化，DirectX 全屏独占游戏不会被打断。
+  desktopLyricsWindow.showInactive();
 
   return desktopLyricsWindow;
 }

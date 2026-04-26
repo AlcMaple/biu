@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, screen } from "electron";
 
 import { createDesktopLyricsWindow, destroyDesktopLyricsWindow, isDesktopLyricsVisible } from "../desktop-lyrics";
 import { createMiniPlayer, destroyMiniPlayer, miniPlayer } from "../mini-player";
@@ -69,6 +69,21 @@ export function registerWindowHandlers({ getMainWindow }) {
     next.width = Math.max(next.width, 300);
     next.height = Math.max(next.height, 80);
     win.setBounds(next);
+  });
+
+  // 锁定模式下，setIgnoreMouseEvents(true, { forward: true }) 在 Windows 上
+  // 配合 focusable: false + WS_EX_TRANSPARENT 经常丢 mousemove 事件，
+  // 导致渲染端无法检测鼠标悬停。这里走 OS 级 GetCursorPos 兜底，渲染端轮询调用。
+  // 返回光标相对窗口左上角的坐标；光标不在窗口内返回 null。
+  ipcMain.handle(channel.window.desktopLyricsGetCursorRelative, event => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return null;
+    const cursor = screen.getCursorScreenPoint();
+    const bounds = win.getBounds();
+    const x = cursor.x - bounds.x;
+    const y = cursor.y - bounds.y;
+    if (x < 0 || y < 0 || x > bounds.width || y > bounds.height) return null;
+    return { x, y };
   });
 
   ipcMain.handle(channel.window.toggleDesktopLyrics, () => {
