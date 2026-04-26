@@ -51,6 +51,7 @@ const platform: Platform = {
   setDesktopLyricsIgnoreMouseEvents: noop,
   getDesktopLyricsBounds: async () => null,
   setDesktopLyricsBounds: asyncNoop,
+  getDesktopLyricsCursorRelative: async () => null,
   minimizeWindow: noop,
   toggleMaximizeWindow: noop,
   closeWindow: noop,

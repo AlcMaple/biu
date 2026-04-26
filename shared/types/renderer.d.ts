@@ -92,6 +92,8 @@ declare global {
     getDesktopLyricsBounds: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
     /** 设置桌面歌词窗口位置和大小 */
     setDesktopLyricsBounds: (bounds: Partial<{ x: number; y: number; width: number; height: number }>) => Promise<void>;
+    /** 获取光标相对桌面歌词窗口左上角的坐标（光标在窗口外返回 null）；锁定模式 hover 检测兜底 */
+    getDesktopLyricsCursorRelative: () => Promise<{ x: number; y: number } | null>;
     /** 最小化窗口 */
     minimizeWindow: () => void;
     /** 最大化/还原窗口 */
