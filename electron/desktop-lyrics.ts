@@ -35,6 +35,8 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
     },
   });
 
+  // 提升到 screen-saver 层级，确保压过其他应用的 topmost 窗口（视频播放器、系统弹窗等）
+  desktopLyricsWindow.setAlwaysOnTop(true, "screen-saver");
   // 在所有工作区和全屏模式下可见
   desktopLyricsWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
