@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Drawer, DrawerBody, DrawerContent, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
-import { RiArrowDownSLine, RiSettings3Line } from "@remixicon/react";
+import { RiArrowDownSLine, RiPencilLine, RiSettings3Line } from "@remixicon/react";
 import clsx from "classnames";
 import { useShallow } from "zustand/shallow";
 
@@ -15,6 +15,7 @@ import WindowAction from "@/components/window-action";
 import platform from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 
@@ -61,9 +62,14 @@ const FancyFullScreenPlayer = () => {
 
   const [isUiVisible, setIsUiVisible] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isArtistEditOpen, setIsArtistEditOpen] = useState(false);
+  const [artistInput, setArtistInput] = useState("");
   const hideUiTimeoutRef = useRef<number | null>(null);
   const prevPlayIdRef = useRef<string | null>(null);
   const preloaderRef = useRef<HTMLImageElement | null>(null);
+  const artistInputRef = useRef<HTMLInputElement | null>(null);
+  // Enter/Esc 改 isArtistEditOpen 时，紧随其后的 blur 不应再触发保存/重复保存
+  const skipBlurSaveRef = useRef(false);
 
   /** 预加载图片，加载完成后再执行回调，避免切换时出现空白或屏闪 */
   const preloadThenSwitch = useCallback((nextPath: string, onReady: () => void) => {
@@ -137,10 +143,22 @@ const FancyFullScreenPlayer = () => {
 
   useEffect(() => {
     if (!isUiVisible && isSettingsOpen) setIsSettingsOpen(false);
-  }, [isUiVisible, isSettingsOpen]);
+    if (!isUiVisible && isArtistEditOpen) setIsArtistEditOpen(false);
+  }, [isUiVisible, isSettingsOpen, isArtistEditOpen]);
+
+  useEffect(() => {
+    if (isArtistEditOpen) {
+      // 进入编辑下一帧聚焦并全选，方便直接覆盖输入
+      const t = window.setTimeout(() => {
+        artistInputRef.current?.focus();
+        artistInputRef.current?.select();
+      }, 0);
+      return () => window.clearTimeout(t);
+    }
+  }, [isArtistEditOpen]);
 
   const scheduleHideUi = (delay: number) => {
-    if (isSettingsOpen) return;
+    if (isSettingsOpen || isArtistEditOpen) return;
     if (hideUiTimeoutRef.current) window.clearTimeout(hideUiTimeoutRef.current);
     hideUiTimeoutRef.current = window.setTimeout(() => setIsUiVisible(false), delay);
   };
@@ -151,6 +169,49 @@ const FancyFullScreenPlayer = () => {
       hideUiTimeoutRef.current = null;
     }
     if (!isUiVisible) setIsUiVisible(true);
+  };
+
+  const displayArtist = playItem?.customArtist || playItem?.ownerName;
+
+  const openArtistEditor = () => {
+    if (!playItem) return;
+    setArtistInput(playItem.customArtist ?? playItem.ownerName ?? "");
+    setIsArtistEditOpen(true);
+    if (hideUiTimeoutRef.current) {
+      window.clearTimeout(hideUiTimeoutRef.current);
+      hideUiTimeoutRef.current = null;
+    }
+    setIsUiVisible(true);
+  };
+
+  const commitArtist = () => {
+    if (!playItem) return;
+    const trimmed = artistInput.trim();
+    const next = trimmed || undefined;
+    usePlayList.getState().setCustomArtist(playItem.id, next);
+    if (playItem.source === "local") {
+      useLocalFavItemsStore.getState().setCustomArtistByRid(playItem.id, next);
+    }
+  };
+
+  const handleSaveArtist = () => {
+    skipBlurSaveRef.current = true;
+    commitArtist();
+    setIsArtistEditOpen(false);
+  };
+
+  const handleCancelArtistEdit = () => {
+    skipBlurSaveRef.current = true;
+    setIsArtistEditOpen(false);
+  };
+
+  const handleArtistInputBlur = () => {
+    if (skipBlurSaveRef.current) {
+      skipBlurSaveRef.current = false;
+      return;
+    }
+    commitArtist();
+    setIsArtistEditOpen(false);
   };
 
   if (!playItem) return null;
@@ -344,7 +405,7 @@ const FancyFullScreenPlayer = () => {
                           className="text-xl text-white/80 italic xl:text-2xl"
                           style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
                         >
-                          {playItem.ownerName || "—"}
+                          {displayArtist || "—"}
                         </span>
                       </div>
                     </div>
@@ -365,12 +426,46 @@ const FancyFullScreenPlayer = () => {
                       </h1>
                       <div className="flex items-center gap-4">
                         <div className="h-px w-8 bg-white/40" />
-                        <p
-                          className="text-lg text-white/90 xl:text-xl"
-                          style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
-                        >
-                          {playItem.ownerName}
-                        </p>
+                        {isArtistEditOpen ? (
+                          <input
+                            ref={artistInputRef}
+                            type="text"
+                            value={artistInput}
+                            onChange={e => setArtistInput(e.target.value)}
+                            onBlur={handleArtistInputBlur}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleSaveArtist();
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                handleCancelArtistEdit();
+                              }
+                            }}
+                            placeholder="输入歌手名"
+                            spellCheck={false}
+                            className="min-w-[12rem] border-b border-white/50 bg-transparent pb-1 text-lg text-white/90 caret-white outline-none placeholder:text-white/30 xl:text-xl"
+                            style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={openArtistEditor}
+                            className="group/artist flex items-center gap-2 border-b border-transparent pb-1 transition-colors hover:border-white/30"
+                            title={displayArtist ? "编辑歌手" : "添加歌手"}
+                          >
+                            <span
+                              className={clsx("text-lg xl:text-xl", displayArtist ? "text-white/90" : "text-white/40")}
+                              style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
+                            >
+                              {displayArtist || "添加歌手"}
+                            </span>
+                            <RiPencilLine
+                              size={13}
+                              className="text-white/50 opacity-0 transition-opacity group-hover/artist:opacity-100"
+                            />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -423,7 +518,7 @@ const FancyFullScreenPlayer = () => {
                     fontFamily: "Georgia, 'Noto Serif', serif",
                   }}
                 >
-                  {playItem.title?.slice(0, 4) || "♪"}
+                  {displayArtist?.slice(0, 8) || playItem.title?.slice(0, 4) || "♪"}
                 </div>
                 <div className="mt-4 h-[80px] w-px bg-white xl:h-[100px]" />
               </div>

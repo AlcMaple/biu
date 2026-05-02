@@ -31,6 +31,8 @@ export interface LocalFavItem {
   page?: number;
   /** 分集标题 */
   partTitle?: string;
+  /** 用户自定义歌手（覆盖 ownerName 显示，目前仅作用于精美播放器） */
+  customArtist?: string;
 }
 
 interface State {
@@ -46,6 +48,8 @@ interface Action {
   getItems: (folderId: number) => LocalFavItem[];
   getItemCount: (folderId: number) => number;
   clearFolder: (folderId: number) => void;
+  /** 跨所有收藏夹按 rid 设置自定义歌手 */
+  setCustomArtistByRid: (rid: string | number, artist: string | undefined) => void;
 }
 
 export const useLocalFavItemsStore = create<State & Action>()(
@@ -96,6 +100,21 @@ export const useLocalFavItemsStore = create<State & Action>()(
           const next = { ...state.folderItems };
           delete next[folderId];
           return { folderItems: next };
+        }),
+      setCustomArtistByRid: (rid, artist) =>
+        set(state => {
+          let changed = false;
+          const next: Record<number, LocalFavItem[]> = {};
+          for (const [folderIdStr, items] of Object.entries(state.folderItems)) {
+            next[Number(folderIdStr)] = items.map(i => {
+              if (String(i.rid) === String(rid)) {
+                changed = true;
+                return { ...i, customArtist: artist };
+              }
+              return i;
+            });
+          }
+          return changed ? { folderItems: next } : {};
         }),
     }),
     {
