@@ -61,6 +61,8 @@ export interface PlayData {
   isDolby?: boolean;
   /** 来源 */
   source?: "local" | "online";
+  /** 用户自定义歌手（覆盖 ownerName 显示，目前仅作用于精美播放器） */
+  customArtist?: string;
 }
 
 interface State {
@@ -128,6 +130,7 @@ interface Action {
 
   getAudio: () => HTMLAudioElement;
   getPlayItem: () => PlayData | undefined;
+  setCustomArtist: (id: string, artist: string | undefined) => void;
 }
 
 const idGenerator = () => `${Date.now()}${uniqueId()}`;
@@ -1127,6 +1130,14 @@ export const usePlayList = create<State & Action>()(
           return playItem;
         },
         getAudio: () => audio,
+        setCustomArtist: (id, artist) => {
+          set(state => {
+            const item = state.list.find(i => i.id === id);
+            if (item) {
+              item.customArtist = artist;
+            }
+          });
+        },
       };
     }),
     {
