@@ -111,3 +111,6 @@ api.example.json
 .github/instructions
 .gitnexus
 .claude
+
+# pack.mjs 输出
+biu-*.zip
