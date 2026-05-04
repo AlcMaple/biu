@@ -5,6 +5,7 @@ import { RiArrowDownSLine, RiPencilLine, RiSettings3Line } from "@remixicon/reac
 import clsx from "classnames";
 import { useShallow } from "zustand/shallow";
 
+import { formatDuration } from "@/common/utils/time";
 import Empty from "@/components/empty";
 import FullScreenPlayerSettingsPanel from "@/components/full-screen-player/settings-panel";
 import IconButton from "@/components/icon-button";
@@ -172,6 +173,13 @@ const FancyFullScreenPlayer = () => {
   };
 
   const displayArtist = playItem?.customArtist || playItem?.ownerName;
+
+  /**
+   * 左侧封面竖排副标：与 "Now Playing" 配对的小字。
+   * 用时长（"04:35"）替代之前的歌手 —— 歌手已经在中间权威位置完整显示+可编辑，
+   * 这里再显示就是冗余；时长是非重复信息，竖排数字也契合古典唱片封套美学。
+   */
+  const verticalDuration = playItem?.duration ? formatDuration(playItem.duration) : "";
 
   const openArtistEditor = () => {
     if (!playItem) return;
@@ -405,7 +413,7 @@ const FancyFullScreenPlayer = () => {
                           className="text-xl text-white/80 italic xl:text-2xl"
                           style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
                         >
-                          {displayArtist || "—"}
+                          {verticalDuration || "—"}
                         </span>
                       </div>
                     </div>
@@ -506,21 +514,12 @@ const FancyFullScreenPlayer = () => {
                 </footer>
               </div>
 
-              {/* ══ 右下角装饰文字（fixed，与 HTML bottom-20 一致）══ */}
+              {/* ══ 右下角装饰细线（取消大字以避免与中间标题/歌手信息重复）══ */}
               <div
                 aria-hidden
-                className="pointer-events-none fixed right-12 bottom-20 z-0 flex flex-col items-end opacity-80 xl:bottom-24"
+                className="pointer-events-none fixed right-12 bottom-20 z-0 flex flex-col items-end opacity-60 xl:bottom-24"
               >
-                <div
-                  className="text-5xl leading-none text-white xl:text-6xl"
-                  style={{
-                    writingMode: "vertical-rl",
-                    fontFamily: "Georgia, 'Noto Serif', serif",
-                  }}
-                >
-                  {displayArtist?.slice(0, 8) || playItem.title?.slice(0, 4) || "♪"}
-                </div>
-                <div className="mt-4 h-[80px] w-px bg-white xl:h-[100px]" />
+                <div className="h-[80px] w-px bg-white xl:h-[100px]" />
               </div>
             </DrawerBody>
           )
