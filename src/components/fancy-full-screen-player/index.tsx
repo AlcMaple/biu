@@ -39,7 +39,9 @@ const toBgUrl = (path: string) => {
 const FancyFullScreenPlayer = () => {
   const isOpen = useModalStore(s => s.isFullScreenPlayerOpen);
   const close = useModalStore(s => s.closeFullScreenPlayer);
-  const { playId, list } = usePlayList(useShallow(s => ({ playId: s.playId, list: s.list })));
+  const { playId, list, duration } = usePlayList(
+    useShallow(s => ({ playId: s.playId, list: s.list, duration: s.duration })),
+  );
   const playItem = list.find(item => item.id === playId);
   const { showLyrics } = useFullScreenPlayerSettings(useShallow(s => ({ showLyrics: s.showLyrics })));
   const { getRandomImage } = useFancyPlayerImages(useShallow(s => ({ getRandomImage: s.getRandomImage })));
@@ -178,8 +180,12 @@ const FancyFullScreenPlayer = () => {
    * 左侧封面竖排副标：与 "Now Playing" 配对的小字。
    * 用时长（"04:35"）替代之前的歌手 —— 歌手已经在中间权威位置完整显示+可编辑，
    * 这里再显示就是冗余；时长是非重复信息，竖排数字也契合古典唱片封套美学。
+   *
+   * 优先用 store 里的 duration（audio 元素 loadedmetadata 后写入，本地/在线都有），
+   * 退到 playItem.duration（B 站接口返回的静态元数据；本地歌曲此字段为空）。
    */
-  const verticalDuration = playItem?.duration ? formatDuration(playItem.duration) : "";
+  const durationSeconds = duration ?? playItem?.duration;
+  const verticalDuration = durationSeconds ? formatDuration(durationSeconds) : "";
 
   const openArtistEditor = () => {
     if (!playItem) return;
