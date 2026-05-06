@@ -390,6 +390,9 @@ export const usePlayList = create<State & Action>()(
             audio.playbackRate = get().rate;
             audio.loop = get().playMode === PlayMode.Single;
 
+            // 连续播放失败计数：自动跳过坏曲时，避免整个列表都失效时无限循环 next()
+            let consecutiveErrorCount = 0;
+
             audio.ondurationchange = () => {
               const dur = audio.duration;
               if (!Number.isNaN(dur) && dur !== Infinity) {
@@ -416,6 +419,7 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onplay = () => {
+              consecutiveErrorCount = 0; // 成功开始播放，重置失败计数
               set({ isPlaying: true });
               updatePlaybackState();
               updatePositionState();
@@ -454,6 +458,40 @@ export const usePlayList = create<State & Action>()(
               }
 
               get().next();
+            };
+
+            // 加载/解码失败时自动跳到下一首。
+            //
+            // 触发场景：UP 主下架视频、签名 URL 过期（长时间暂停后）、网络中断、
+            // 视频被替换 cid。原本只有 `audio.onended` 会调 next()，加载阶段就失败
+            // 时不会触发 ended，导致 UI 卡住不动；这里补齐失败路径。
+            audio.onerror = () => {
+              // src 被清空（clear() 会触发）/ 已无当前播放项：忽略
+              if (!audio.getAttribute("src")) return;
+              const playId = get().playId;
+              if (!playId) return;
+              const err = audio.error;
+              // ABORTED(1) 是用户主动中止（切歌时旧请求被打断），不算播放失败
+              if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
+
+              consecutiveErrorCount += 1;
+              const listLength = get().list.length;
+              // 防 runaway：整个列表都跳过一遍仍失败时停止，避免无限循环
+              if (listLength === 0 || consecutiveErrorCount >= listLength) {
+                consecutiveErrorCount = 0;
+                if (!audio.paused) audio.pause();
+                toastError("当前列表中没有可播放的歌曲");
+                return;
+              }
+
+              log.error("音频播放失败，自动跳到下一首", {
+                playId,
+                src: audio.src,
+                code: err.code,
+                message: err.message,
+              });
+              toastError("当前歌曲无法播放，已自动跳过");
+              void get().next();
             };
 
             if ("mediaSession" in navigator) {
