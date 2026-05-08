@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Biu · Android Mocks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0a; color: #fafafa;
+      font-family: "PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(1.6); opacity: 0; } }
+    @keyframes eq { 0%, 100% { height: 12px; } 50% { height: 4px; } }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <template id="__bundler_thumbnail">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect width="100" height="100" fill="#0a0a0a"/>
+      <rect x="30" y="22" width="40" height="56" rx="8" fill="none" stroke="#1ed760" stroke-width="3"/>
+      <polygon points="44,40 44,60 60,50" fill="#1ed760"/>
+    </svg>
+  </template>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="biu-shared.jsx"></script>
+  <script type="text/babel" src="biu-base.jsx"></script>
+  <script type="text/babel" src="biu-login.jsx"></script>
+  <script type="text/babel" src="biu-playlist.jsx"></script>
+  <script type="text/babel" src="biu-player.jsx"></script>
+  <script type="text/babel" src="biu-shazam.jsx"></script>
+  <script type="text/babel" src="biu-search.jsx"></script>
+
+  <script type="text/babel" data-presets="react">
+    // Phone artboards: 412 + 14 (border) ≈ 426w, 892 + 14 ≈ 906h
+    const W = 426, H = 906;
+
+    function Mocks() {
+      return (
+        <DesignCanvas
+          title="Biu · Android"
+          subtitle="移动端探索 · 基于现有 Electron 端视觉语言（深色 + #1ed760 主色 + B 站收藏夹模型）"
+        >
+          <DCSection id="onboarding" title="启动 · 登录" subtitle="Splash + 两种登录方式">
+            <DCArtboard id="splash" label="启动页" width={W} height={H}>
+              <ScreenSplash/>
+            </DCArtboard>
+            <DCArtboard id="login-pwd" label="账号密码" width={W} height={H}>
+              <ScreenLoginPwd/>
+            </DCArtboard>
+            <DCArtboard id="login-sms" label="短信登录" width={W} height={H}>
+              <ScreenLoginSms/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="home" title="首页 · 状态" subtitle="主入口与几种异常状态">
+            <DCArtboard id="home" label="首页" width={W} height={H}>
+              <ScreenHome/>
+            </DCArtboard>
+            <DCArtboard id="empty-loading" label="加载中" width={W} height={H}>
+              <ScreenEmpty kind="loading"/>
+            </DCArtboard>
+            <DCArtboard id="empty-network" label="网络异常" width={W} height={H}>
+              <ScreenEmpty kind="network"/>
+            </DCArtboard>
+            <DCArtboard id="empty-empty" label="空状态" width={W} height={H}>
+              <ScreenEmpty kind="empty"/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="playlist" title="歌单" subtitle="列表 / 详情 / 操作菜单 / 新建">
+            <DCArtboard id="playlist-list" label="我的歌单" width={W} height={H}>
+              <ScreenPlaylistList/>
+            </DCArtboard>
+            <DCArtboard id="playlist-detail" label="歌单详情" width={W} height={H}>
+              <ScreenPlaylistDetail/>
+            </DCArtboard>
+            <DCArtboard id="song-menu" label="歌曲菜单" width={W} height={H}>
+              <ScreenSongMenu/>
+            </DCArtboard>
+            <DCArtboard id="create-playlist" label="新建歌单" width={W} height={H}>
+              <ScreenCreatePlaylist/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="player" title="播放器" subtitle="全屏 / 队列抽屉 / 锁屏通知">
+            <DCArtboard id="full-player" label="全屏播放器" width={W} height={H}>
+              <ScreenFullPlayer/>
+            </DCArtboard>
+            <DCArtboard id="queue" label="播放队列" width={W} height={H}>
+              <ScreenQueueDrawer/>
+            </DCArtboard>
+            <DCArtboard id="lock-notif" label="锁屏通知" width={W} height={H}>
+              <ScreenLockNotif/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="shazam" title="听歌识曲" subtitle="录音 / 命中">
+            <DCArtboard id="shazam-listen" label="正在聆听" width={W} height={H}>
+              <ScreenShazamListen/>
+            </DCArtboard>
+            <DCArtboard id="shazam-found" label="已识别" width={W} height={H}>
+              <ScreenShazamFound/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="search" title="搜索" subtitle="入口 / 联想 / 结果">
+            <DCArtboard id="search-empty" label="搜索入口" width={W} height={H}>
+              <ScreenSearchEmpty/>
+            </DCArtboard>
+            <DCArtboard id="search-typing" label="联想中" width={W} height={H}>
+              <ScreenSearchTyping/>
+            </DCArtboard>
+            <DCArtboard id="search-results" label="结果页" width={W} height={H}>
+              <ScreenSearchResults/>
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Mocks/>);
+  </script>
+</body>
+</html>
