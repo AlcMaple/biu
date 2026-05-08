@@ -2,7 +2,32 @@
 
 > Android 端定位：**保留基础必要功能，不追 Electron 广度**。整体参考网易云音乐做基础体验，但**只兜 Electron 应用已有的能力**——Electron 不存在的功能不在 Android 落地。
 >
-> **本轮 UI 全部重新设计**：HTML 设计稿后续放入仓库作为参考；Electron 端已有的实现（store / service / IPC / 平台抽象 / 业务逻辑）可以**当作功能参考**直接复用，但 UI 层（页面、组件、样式、交互）**从零搭**，不复用现有 React 组件。
+> **本轮 UI 全部重新设计**：HTML 设计稿已就位（见下"UI 参考"），Electron 端已有的实现（store / service / IPC / 平台抽象 / 业务逻辑）可以**当作功能参考**直接复用，但 UI 层（页面、组件、样式、交互）**从零搭**，不复用现有 React 组件。
+
+## UI 参考
+
+本轮 Android UI 严格按下面的设计稿实现：
+
+| 文件 | 用途 |
+|---|---|
+| `docs/Biu_Android__.html` | 单文件 HTML 预览（内嵌 TSX，浏览器打开即可看所有屏幕） |
+| `docs/android-design/*.jsx` | 设计稿源代码，每屏幕一个 `Screen*` 函数；细节按这里来 |
+| `docs/android-design/biu-shared.jsx` | 设计 token（`T`）、图标（`I`）、容器（`Phone`/`TopBar`/`MiniPlaybar`/`TabBar` 等）、`Cover`/`HiResBadge`/`SourceTag` 等基础组件 |
+
+### 视觉系统速查（来自 `biu-shared.jsx` 的 `T`）
+
+- 主色 `#1ed760`（Spotify 绿）/ 主色文字 `#000`
+- 背景 `#0a0a0a` / 表面 `#18181b` / 表面提升 `#232328`
+- 文字 `#fafafa` / 次级 `#a1a1aa` / 微弱 `#71717a`
+- 圆角 `rSm 8` / `rMd 12` / `rLg 16`
+- 字体栈：PingFang SC → Hiragino Sans GB → Microsoft YaHei → 系统
+
+### 全局结构
+
+- 底部 4 Tab：**首页 / 歌单 / 搜索 / 我的**（`TabBar`）
+- 多数页面底部停驻 `MiniPlaybar`（封面 + 标题 + 播放/下一首/队列 + 进度细线）
+- 顶部统一 `TopBar`（`left` + `title/sub` + `right`）
+- 每屏幕外层用 `Phone`（含 `StatusBar` + `NavBar`）
 
 ## 不做清单（明确省略）
 
@@ -28,9 +53,32 @@
 
 ---
 
+## 零、启动流程
+
+> 用户打开 App 第一眼看到的画面，逻辑上先于所有其他模块。
+>
+> **UI 参考**：`biu-base.jsx` 的 `ScreenSplash`
+
+启动包含两层：**原生层闪屏**（WebView 还没起来时由 OS 显示静态帧，避免白屏）+ **应用层闪屏**（WebView 起来后由 React 渲染的 Biu 品牌帧，期间做 token 检查与 store hydration，再决定跳哪个屏）。
+
+- [ ] 原生层冷启动闪屏 — `@capacitor/splash-screen`，配 Biu 品牌静态帧
+- [ ] 应用层 Splash 屏（React）— 严格按 `ScreenSplash` 实现：
+  - [ ] Biu Logo（绿色渐变方块 + TV+播放键 SVG）
+  - [ ] 主标 "Biu"
+  - [ ] 副标 "基于 Bilibili 的音乐播放器"
+  - [ ] 底部版本号 + "非官方 · 仅供学习研究"（版本号从 `package.json` 注入）
+- [ ] 启动路由：splash 期间检查 token 与 cookie 状态
+  - [ ] 有效 token → 进首页（`ScreenHome`）
+  - [ ] 无 token / token 失效 → 进登录页（`ScreenLoginPwd`）
+- [ ] Splash 显示时长：等待 store hydration（Preferences 读完）+ 最短显示时间（避免一闪而过显得突兀）
+
+---
+
 ## 一、登录与账号
 
 > Electron 端有扫码 / 账号密码 / 短信三种登录；移动端**省略扫码**（手机扫电脑屏才合理，反过来不实用）。
+>
+> **UI 参考**：`biu-login.jsx` 的 `ScreenLoginPwd`（账号密码） / `ScreenLoginSms`（短信验证码）
 
 - [ ] 登录页 UI（账号密码 + 短信验证码）  
   逻辑参考：`src/layout/navbar/login/password-login.tsx`、`code-login.tsx`、`src/store/user.ts`、`src/store/token.ts`
@@ -41,6 +89,8 @@
 - [ ] 退出登录 + cookie 清理（清干净 `.bilibili.com` 域 + Preferences token）
 
 ## 二、歌单模块
+
+> **UI 参考**：`biu-playlist.jsx` 的 `ScreenPlaylistList`（列表）/ `ScreenPlaylistDetail`（详情）/ `ScreenSongMenu`（三点菜单）/ `ScreenCreatePlaylist`（新建）
 
 ### 歌单列表页
 
@@ -72,6 +122,8 @@
 
 ## 三、播放器模块
 
+> **UI 参考**：`biu-player.jsx` 的 `ScreenFullPlayer`（全屏播放）/ `ScreenQueueDrawer`（播放队列）/ `ScreenLockNotif`（锁屏 + 通知栏样式预览）；迷你播放栏见 `biu-shared.jsx` 的 `MiniPlaybar`
+
 ### 渲染层（UI 重新设计）
 
 - [ ] 迷你播放栏（底部常驻：当前歌曲 + 播放/暂停 + 下一首）  
@@ -99,6 +151,8 @@
 ## 四、听歌识曲模块
 
 > Electron 端用 Node 包 `node-shazam`（内部 `shazamio-core` WASM + ffmpeg WebM→WAV）；Android 需移植到 WebView 纯前端方案。
+>
+> **UI 参考**：`biu-shazam.jsx` 的 `ScreenShazamListen`（录音中）/ `ScreenShazamFound`（识别结果）/ `ScreenShazamHistory`（历史记录）
 
 - [ ] 识曲入口 UI（首页快捷按钮 / 麦克风图标）  
   逻辑参考：`src/components/shazam-modal/`
@@ -112,6 +166,8 @@
 
 ## 五、搜索模块
 
+> **UI 参考**：`biu-search.jsx` 的 `ScreenSearchEmpty`（搜索历史 + 热门）/ `ScreenSearchTyping`（输入联想）/ `ScreenSearchResults`（结果列表）
+
 - [ ] 搜索入口 / 输入框 UI  
   逻辑参考：`src/pages/search/`、`src/components/search-button/`
 - [ ] 搜索建议 / 联想  
@@ -124,13 +180,14 @@
 
 ## 六、基础体验
 
+> **UI 参考**：`biu-base.jsx` 的 `ScreenHome`（首页）/ `ScreenEmpty`（空状态：`network` / `loading` / `empty` 三种 kind）。启动闪屏 `ScreenSplash` 见**零、启动流程**。
+
 - [ ] 首页布局（Android 首页：搜索栏 + 歌单入口 + 识曲入口；推荐 / 排行省略）
 - [ ] 网络异常 / 空状态 / 加载中占位 UI  
   逻辑参考：`src/components/empty/`
 - [ ] 深色模式（系统主题感知 + Tailwind dark 类切换）  
   逻辑参考：`src/store/settings.ts` 的 `themeMode`
 - [ ] 竖屏完整布局
-- [ ] 启动闪屏（Splash）— `@capacitor/splash-screen`，配冷启动品牌帧避免白屏
 - [ ] HTTP 跨域（B 站 API 在 WebView 里 CORS 受限）
   - [ ] CapacitorHttp 启用 + 渲染端 axios 适配  
     逻辑参考：`src/service/request/android-adapter.ts`、`src/platform/http-android.ts`
