@@ -62,11 +62,11 @@
 启动包含两层：**原生层闪屏**（WebView 还没起来时由 OS 显示静态帧，避免白屏）+ **应用层闪屏**（WebView 起来后由 React 渲染的 Biu 品牌帧，期间做 token 检查与 store hydration，再决定跳哪个屏）。
 
 - [ ] 原生层冷启动闪屏 — `@capacitor/splash-screen`，配 Biu 品牌静态帧
-- [ ] 应用层 Splash 屏（React）— 严格按 `ScreenSplash` 实现：
-  - [ ] Biu Logo（绿色渐变方块 + TV+播放键 SVG）
-  - [ ] 主标 "Biu"
-  - [ ] 副标 "基于 Bilibili 的音乐播放器"
-  - [ ] 底部版本号 + "非官方 · 仅供学习研究"（版本号从 `package.json` 注入）
+- [~] 应用层 Splash 屏（React）— 严格按 `ScreenSplash` 实现：（代码已落，**待视觉验证**）
+  - [~] Biu Logo（绿色渐变方块 + TV+播放键 SVG）
+  - [~] 主标 "Biu"
+  - [~] 副标 "基于 Bilibili 的音乐播放器"
+  - [~] 底部版本号 + "非官方 · 仅供学习研究"（版本号从 `package.json` 注入）
 - [ ] 启动路由：splash 期间检查 token 与 cookie 状态
   - [ ] 有效 token → 进首页（`ScreenHome`）
   - [ ] 无 token / token 失效 → 进登录页（`ScreenLoginPwd`）
