@@ -133,12 +133,16 @@ export function createDesktopLyricsWindow(onClosed?: () => void): BrowserWindow 
     });
   }
 
-  const indexPath = path.resolve(__dirname, "../dist/web/index.html");
-  desktopLyricsWindow.loadFile(indexPath, { hash: "desktop-lyrics" });
-
   // ★ 用 showInactive() 显示，不抢焦点。配合 focusable: false，桌面歌词从生命周期
   // 第一帧起就不会触发任何前台/激活变化，DirectX 全屏独占游戏不会被打断。
-  desktopLyricsWindow.showInactive();
+  // 必须等 ready-to-show（首帧已渲染）再 show，否则会先看到 HTML body 默认底色
+  // 闪一下白块。show: false → showInactive() 的组合本身不抢焦点，仍然安全。
+  desktopLyricsWindow.once("ready-to-show", () => {
+    desktopLyricsWindow?.showInactive();
+  });
+
+  const indexPath = path.resolve(__dirname, "../dist/web/index.html");
+  desktopLyricsWindow.loadFile(indexPath, { hash: "desktop-lyrics" });
 
   return desktopLyricsWindow;
 }
