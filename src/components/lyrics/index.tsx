@@ -31,6 +31,11 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
   const playId = usePlayList(s => s.playId);
   const [fontSize, setFontSize] = useState<number>(DEFAULT_FONT_SIZE);
 
+  // 拖拽校准：按住任意一行向上/下拖动，让该行对齐到屏幕中央（当前演唱锚点），
+  // 松手时将整条歌词时间轴按 `offset = line.time - currentTime*1000` 平移。
+  // `index === null` 表示未进入拖拽态（仅按下未越过 5px 阈值时同样为 null）。
+  const [calibration, setCalibration] = useState<{ index: number; dy: number } | null>(null);
+
   // Read lyrics state from shared store (owned by LyricsBroadcaster)
   const lyrics = useLyricsState(s => s.lyrics);
   const translatedLyrics = useLyricsState(s => s.translatedLyrics);
@@ -175,6 +180,66 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
     }
   }, [activeIndex]);
 
+  const handleCalibrationPointerDown = useCallback(
+    (lineIndex: number) => (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!showControls) return;
+      if (e.button !== 0) return; // 仅响应主键（左键 / 主触点）
+      const startY = e.clientY;
+      let started = false;
+      const pointerId = e.pointerId;
+
+      const onMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        const dy = ev.clientY - startY;
+        if (!started) {
+          if (Math.abs(dy) < 5) return;
+          started = true;
+          document.body.style.userSelect = "none";
+        }
+        setCalibration({ index: lineIndex, dy });
+      };
+
+      const finish = (commit: boolean) => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+        document.body.style.userSelect = "";
+        if (!started) {
+          setCalibration(null);
+          return;
+        }
+        if (commit) {
+          const line = useLyricsState.getState().lyrics[lineIndex];
+          if (line) {
+            const now = usePlayProgress.getState().currentTime * 1000;
+            const nextOffset = Math.round(line.time - now);
+            handleOffsetChange(nextOffset);
+            addToast({
+              color: "success",
+              title: `歌词已校准 (${nextOffset >= 0 ? "+" : ""}${nextOffset} ms)`,
+            });
+          }
+        }
+        setCalibration(null);
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        finish(true);
+      };
+      // 浏览器/系统层级抢走 pointer（右键、alt-tab 等）时回滚，不提交校准
+      const onCancel = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        finish(false);
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+    },
+    [showControls, handleOffsetChange],
+  );
+
   const handleLyricsAdopted = useCallback(
     (nextLyrics?: string, nextTLyrics?: string) => {
       onCloseSearch();
@@ -212,6 +277,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
   }, [updateCenterPadding]);
 
   useEffect(() => {
+    if (calibration) return; // 拖拽校准期间冻结自动滚动，避免行位置跳变干扰对齐
     const wrapper = containerRef.current;
     if (activeIndex < 0) return;
     const el = lineRefs.current[activeIndex];
@@ -219,13 +285,15 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
       const top = el.offsetTop - wrapper.clientHeight / 2 + el.clientHeight / 2;
       wrapper.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
     }
-  }, [activeIndex, centerPadding]);
+  }, [activeIndex, centerPadding, calibration]);
 
   const renderLine = (line: { time: number; text: string }, index: number) => {
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
     const activeWeight = isActive ? "font-extrabold" : "font-normal";
     const activeShadow = isActive ? activeTextBase : "";
+    const isDragging = calibration?.index === index;
+    const dragDy = isDragging ? calibration!.dy : 0;
 
     return (
       <div
@@ -233,12 +301,22 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
         ref={node => {
           lineRefs.current[index] = node;
         }}
+        onPointerDown={showControls ? handleCalibrationPointerDown(index) : undefined}
         className={clsx(
-          "w-full transform-none py-2 transition-all duration-300 ease-out",
+          "w-full py-2 transition-all duration-300 ease-out",
           centered ? "text-center" : "text-left",
           isActive ? "opacity-100" : "opacity-60",
+          showControls && !calibration && "cursor-grab",
+          isDragging && "cursor-grabbing",
         )}
-        style={{ fontSize: isActive ? fontSize * 1.5 : fontSize, transform: "none" }}
+        style={{
+          fontSize: isActive ? fontSize * 1.5 : fontSize,
+          transform: isDragging ? `translateY(${dragDy}px)` : "none",
+          transition: isDragging ? "none" : undefined,
+          position: isDragging ? "relative" : undefined,
+          zIndex: isDragging ? 20 : undefined,
+          touchAction: showControls ? "none" : undefined,
+        }}
       >
         <div
           className={clsx("leading-snug break-words whitespace-pre-wrap", activeWeight, activeShadow)}
@@ -282,6 +360,47 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
             </div>
           )}
         </div>
+
+        {/*
+          校准参考线 + 顶部提示横幅。背景在 fancy-player 等场景里是用户随机的图片
+          （亮/暗、纯/杂都可能），所以参考线必须自带高对比度的边缘，标签必须有
+          独立的对比层。
+          - 参考线：白色渐变 + 双向阴影（外发光黑色 + 微弱白色光晕），亮底/暗底都看得清。
+          - 顶部横幅：黑底白字 + 半透明白描边 + 文字阴影 + backdrop-blur，与歌词文本
+            和右下角控件完全错开。
+        */}
+        {calibration ? (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute right-0 left-0 z-10"
+              style={{ top: "50%", transform: "translateY(-50%)" }}
+            >
+              <div
+                className="h-px w-full"
+                style={{
+                  background:
+                    "linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 18%, rgba(255,255,255,0.95) 82%, rgba(255,255,255,0) 100%)",
+                  boxShadow: "0 0 6px rgba(0,0,0,0.6), 0 0 14px rgba(255,255,255,0.4)",
+                }}
+              />
+            </div>
+            <div aria-hidden className="pointer-events-none absolute top-4 left-1/2 z-20 -translate-x-1/2">
+              <span
+                className="rounded-full px-3 py-1 text-[11px] font-semibold whitespace-nowrap text-white"
+                style={{
+                  background: "rgba(0,0,0,0.78)",
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.55)",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.9)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                }}
+              >
+                拖动到中央基准线 · 松开校准
+              </span>
+            </div>
+          </>
+        ) : null}
 
         {showControls && (
           <div className="text-foreground/80 pointer-events-none absolute right-6 bottom-6 flex flex-col items-center space-y-3 text-sm transition-opacity duration-200">
