@@ -46,6 +46,14 @@ export const lyricsCacheStore = new Store<Record<string, MusicLyrics>>({
   defaults: {},
 });
 
+export const windowStateStore = new Store<{
+  desktopLyrics?: Electron.Rectangle;
+}>({
+  name: StoreNameMap.WindowState,
+  cwd: getUserDataPath(),
+  defaults: {},
+});
+
 const localDataPath = path.join(app.getPath("documents"), "Biu");
 
 export const localFavoritesStore = new Store<Record<string, any>>({

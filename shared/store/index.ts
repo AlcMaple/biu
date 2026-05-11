@@ -7,4 +7,5 @@ export enum StoreNameMap {
   LocalFavorites = "local-favorites",
   LocalFavItems = "local-fav-items",
   Tags = "tags",
+  WindowState = "window-state",
 }
