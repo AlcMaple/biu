@@ -114,3 +114,8 @@ api.example.json
 
 # pack.mjs 输出
 biu-*.zip
+
+# 歌词时间轴对齐服务端代理（部署到外部 VPS 运行，不进 Electron 安装包，不进 git）
+# electron-builder files 字段是白名单（${ELECTRON_OUT_DIRNAME}/** + dist/web/**），
+# 天然不会把 biu-lyrics-server/ 打进 exe/dmg；这里再屏蔽进 git。
+biu-lyrics-server/
