@@ -42,8 +42,12 @@ const EXCLUDE_DIRS = [
   "android", // Capacitor Android 工程，Windows 仅运行 Electron
 ];
 
+// ★ 用 */${p}/* 而非 ${PROJECT}/${p}/* —— zip 的 glob 里 `*` 会跨 `/`，
+// 一条 pattern 覆盖任意深度。否则像 biu-lyrics-server/node_modules、
+// biu-windows-test/node_modules 这种嵌套子项目里的依赖会漏出来，
+// 单 pnpm 的 .pnpm/ 嵌套 store 就能让 zip 膨胀 10x+。
 const EXCLUDES = [
-  ...EXCLUDE_DIRS.map(p => `--exclude="${PROJECT}/${p}/*"`),
+  ...EXCLUDE_DIRS.map(p => `--exclude="*/${p}/*"`),
   `--exclude="*.DS_Store"`, // macOS 元数据
 ];
 

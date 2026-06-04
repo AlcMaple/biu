@@ -46,7 +46,7 @@ Same plugin, different hooks: `onBeforeBuild` compiles the main/preload bundles,
 At runtime, `src/platform/detect.ts` decides `isElectron = navigator.userAgent.includes("Electron")`; everything else in the platform layer flows from this:
 - `src/platform/index.ts` exports a single `platform` object that lazily picks `electron.ts` or `android.ts` (the Android branch dynamically imports `http-android` so Electron builds don't pull in `@capacitor/core`).
 - `src/platform/electron.ts` is a thin pass-through to `window.electron` (the preload bridge).
-- `src/platform/android.ts` is currently **mostly noops** (`getStore/setStore/getCookie/setCookie/recognizeSong` etc.) — see Gotchas below.
+- `src/platform/android.ts` now has **real implementations for storage and cookies** (`getStore/setStore/clearStore` via `@capacitor/preferences`, `getCookie/setCookie` via `CapacitorCookies`); most other methods (`recognizeSong`, MediaSession, fonts, window controls, downloads, etc.) are still noops — see Gotchas below.
 - `BIU_TARGET=android` is **only a build-time env var** for the Rsbuild plugin (skips main-process compile). Runtime dispatch is purely UA-based.
 
 ### The IPC contract — 5 places to touch when adding a channel
@@ -67,7 +67,7 @@ The three Electron windows share renderer state via Zustand stores. Cross-window
 - Bilibili API signing (WBI) lives in `electron/network/`.
 
 ### Zustand stores
-Top-level stores in `src/store/` cover playback (`play-list`, `play-progress`, `lyrics-state`), session (`token`, `user`), persisted user data (`local-fav-items`, `settings`, `search-history`), and shortcuts. **Persistence on Electron** goes through `platform.getStore/setStore` → IPC → `electron-store`. Modal-only stores live under `src/store/modal/`.
+Top-level stores in `src/store/` cover playback (`play-list`, `play-progress`, `lyrics-state`), session (`token`, `user`), persisted user data (`local-fav-items`, `settings`, `search-history`), and shortcuts. **Persistence on Electron** goes through `platform.getStore/setStore` → IPC → `electron-store`; **on Android** the same calls hit `@capacitor/preferences`. Modal-only stores live under `src/store/modal/`.
 
 ### Routing
 React Router 7 in hash mode. `src/routes.tsx` declares the main app routes plus the two special standalone-window routes (`/mini-player`, `/desktop-lyrics`) that the corresponding Electron windows load by hash.
@@ -108,10 +108,13 @@ Vitest + jsdom + globals enabled. `tests/setup.ts` mocks `MediaSession` and audi
 ### Dead code
 `knip.json` whitelists entries: `src/index.tsx`, `electron/main.ts`, `electron/preload.ts`, plus the build plugins.
 
+### Project ideas log
+Phased development notes live in `docs/ideas/` (numbered `NNN-<topic>.md`). The highest-numbered file is the in-progress phase (currently `002-歌词时间轴对齐.md`).
+
 ## Gotchas
 
-### Android platform layer is mostly stubbed
-Most methods in `src/platform/android.ts` are noops — particularly the storage layer (`getStore/setStore/clearStore`), cookie handling, and Shazam. Android-specific UI lives in `src/layout/playbar/android.tsx` and `src/components/full-screen-player/android.tsx`. Treat any Android feature work as a port — assume nothing native works until verified.
+### Android platform layer is partially wired
+**Storage and cookies now work** on Android (`getStore/setStore/clearStore` → `@capacitor/preferences` with a `biu:` key prefix; `getCookie/setCookie` → `CapacitorCookies` against the `.bilibili.com` domain, mirroring `electron/ipc/cookie.ts`). This unblocks token / local-fav / settings / lyrics-cache persistence. **Still noops**: Shazam (`recognizeSong`), MediaSession (no background play / notification / lock-screen / headset / AudioFocus), fonts, window controls, downloads, and the WhisperX/desktop-lyrics methods. Android-specific UI lives in `src/layout/playbar/android.tsx` and `src/components/full-screen-player/android.tsx`. Treat any *other* Android feature as a port — assume nothing native works until verified.
 
 ### Shazam (听歌识曲)
 - `electron/ipc/shazam.ts` uses **`node-shazam`** (pure TS + WASM via `shazamio-core`). **No Python.** Older Python pipeline is gone.
