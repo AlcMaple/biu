@@ -119,3 +119,6 @@ biu-*.zip
 # electron-builder files 字段是白名单（${ELECTRON_OUT_DIRNAME}/** + dist/web/**），
 # 天然不会把 biu-lyrics-server/ 打进 exe/dmg；这里再屏蔽进 git。
 biu-lyrics-server/
+
+# 含已过期 OSS 预签名 URL（OSSAccessKeyId/Signature），不进 git 历史
+biu-windows-test/wei-yi-asr-result.json
