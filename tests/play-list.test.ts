@@ -159,6 +159,85 @@ describe("play-list store", () => {
     expect(usePlayList.getState().playId).toBe("2-id");
   });
 
+  test("random mode plays every song before repeating", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    // 先切到随机模式，再灌入队列，让 playList 初始化本轮已播集合
+    usePlayList.setState({ playMode: PlayMode.Random });
+    await s.playList([
+      { type: "audio", sid: 1, title: "a1" },
+      { type: "audio", sid: 2, title: "a2" },
+      { type: "audio", sid: 3, title: "a3" },
+      { type: "audio", sid: 4, title: "a4" },
+      { type: "audio", sid: 5, title: "a5" },
+      { type: "audio", sid: 6, title: "a6" },
+    ]);
+    const total = usePlayList.getState().list.length;
+    const allIds = new Set(usePlayList.getState().list.map(i => i.id));
+
+    // 一整轮：起始歌 + (total-1) 次 next，应恰好覆盖全部歌曲且无重复
+    const firstCycle = [usePlayList.getState().playId as string];
+    for (let i = 0; i < total - 1; i++) {
+      await s.next();
+      firstCycle.push(usePlayList.getState().playId as string);
+    }
+    expect(new Set(firstCycle).size).toBe(total);
+    expect(new Set(firstCycle)).toEqual(allIds);
+
+    // 跨轮边界：新一轮第一首不能与上一轮最后一首相同（避免紧挨重复）
+    const lastOfFirst = firstCycle[firstCycle.length - 1];
+    await s.next();
+    expect(usePlayList.getState().playId).not.toBe(lastOfFirst);
+
+    // 新一轮同样不重复地覆盖全部歌曲
+    const secondCycle = [usePlayList.getState().playId as string];
+    for (let i = 0; i < total - 1; i++) {
+      await s.next();
+      secondCycle.push(usePlayList.getState().playId as string);
+    }
+    expect(new Set(secondCycle).size).toBe(total);
+  });
+
+  test("再次播放全部会重置随机轮次，之前听过的歌可再次播放", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    usePlayList.setState({ playMode: PlayMode.Random });
+
+    const songs = [
+      { type: "audio" as const, sid: 1, title: "a1" },
+      { type: "audio" as const, sid: 2, title: "a2" },
+      { type: "audio" as const, sid: 3, title: "a3" },
+      { type: "audio" as const, sid: 4, title: "a4" },
+    ];
+    const sidOf = (id?: string) => usePlayList.getState().list.find(i => i.id === id)?.sid;
+
+    // 第一次「播放全部」，听掉 3 首（模拟 a、b、c）
+    await s.playList(songs);
+    const playedSids = new Set([sidOf(usePlayList.getState().playId)]);
+    for (let i = 0; i < 2; i++) {
+      await s.next();
+      playedSids.add(sidOf(usePlayList.getState().playId));
+    }
+    expect(playedSids.size).toBe(3);
+
+    // 再次「播放全部」：已播集合应重置为只含起始歌
+    await s.playList(songs);
+    expect(usePlayList.getState().randomPlayedIds.length).toBe(1);
+
+    // 新一轮完整跑一遍，应覆盖全部 4 首
+    const total = usePlayList.getState().list.length;
+    const newSids = new Set([sidOf(usePlayList.getState().playId)]);
+    for (let i = 0; i < total - 1; i++) {
+      await s.next();
+      newSids.add(sidOf(usePlayList.getState().playId));
+    }
+    expect(newSids).toEqual(new Set([1, 2, 3, 4]));
+    // 上一轮听过的歌，在新一轮里都能再被播到
+    for (const sid of playedSids) {
+      expect(newSids.has(sid)).toBe(true);
+    }
+  });
+
   test("addToNext inserts after current", async () => {
     const s = usePlayList.getState();
     await s.init();
