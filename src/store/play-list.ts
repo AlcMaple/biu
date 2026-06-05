@@ -90,6 +90,8 @@ interface State {
   randomHistory: string[];
   /** 随机播放前向队列：游标右侧已探索过（回退后可再前进）的歌曲 id 序列 */
   randomFuture: string[];
+  /** 本轮随机已播歌曲 id 集合：用于「播完全部歌曲前不重复」，全部播完后清空开启新一轮 */
+  randomPlayedIds: string[];
 }
 
 export interface PlayItem {
@@ -134,6 +136,13 @@ interface Action {
 }
 
 const idGenerator = () => `${Date.now()}${uniqueId()}`;
+
+/** 去重压入：仅当 id 不在数组中时追加（用于维护本轮随机已播集合） */
+const pushUnique = (arr: string[], id: string) => {
+  if (!arr.includes(id)) {
+    arr.push(id);
+  }
+};
 
 const getMVData = async (bvid: string) => {
   const res = await getWebInterfaceView({ bvid });
@@ -382,6 +391,7 @@ export const usePlayList = create<State & Action>()(
         shouldKeepPagesOrderInRandomPlayMode: true,
         randomHistory: [],
         randomFuture: [],
+        randomPlayedIds: [],
         list: [],
         init: async () => {
           if (audio) {
@@ -561,6 +571,10 @@ export const usePlayList = create<State & Action>()(
           }
           set(state => {
             state.playMode = nextPlayMode;
+            // 切入随机模式：开启新一轮，把当前歌标记为已播，避免紧挨重复
+            if (nextPlayMode === PlayMode.Random) {
+              state.randomPlayedIds = state.playId ? [state.playId] : [];
+            }
           });
         },
         setRate: rate => {
@@ -727,9 +741,14 @@ export const usePlayList = create<State & Action>()(
           const { playMode, playId } = get();
           set(state => {
             // 随机模式下直接点歌视为主动导航：当前歌压入历史，清空前向队列
-            if (playMode === PlayMode.Random && playId) {
-              state.randomHistory.push(playId);
+            if (playMode === PlayMode.Random) {
+              if (playId) {
+                state.randomHistory.push(playId);
+                pushUnique(state.randomPlayedIds, playId);
+              }
               state.randomFuture = [];
+              // 点选的歌计入本轮已播，避免随机时再次抽到
+              pushUnique(state.randomPlayedIds, id);
             }
             state.playId = id;
             if (state.nextId === id) {
@@ -790,6 +809,8 @@ export const usePlayList = create<State & Action>()(
           set(state => {
             state.randomHistory = newHistory;
             state.randomFuture = [];
+            // 新队列开启新一轮随机：当前歌标记为已播
+            state.randomPlayedIds = playMode === PlayMode.Random ? [initialId] : [];
             state.list = newList;
             state.playId = initialId;
           });
@@ -811,6 +832,8 @@ export const usePlayList = create<State & Action>()(
               if (playMode === PlayMode.Random) {
                 state.randomHistory.push(playId);
                 state.randomFuture = [];
+                pushUnique(state.randomPlayedIds, playId);
+                pushUnique(state.randomPlayedIds, nextId);
               }
               state.playId = nextId;
               state.nextId = undefined;
@@ -856,6 +879,8 @@ export const usePlayList = create<State & Action>()(
                 if (nextPage) {
                   set(state => {
                     state.randomHistory.push(playId);
+                    pushUnique(state.randomPlayedIds, playId);
+                    pushUnique(state.randomPlayedIds, nextPage.id);
                     state.playId = nextPage.id;
                   });
                   break;
@@ -877,6 +902,8 @@ export const usePlayList = create<State & Action>()(
                   }
                   if (futureId) {
                     state.randomHistory.push(playId);
+                    pushUnique(state.randomPlayedIds, playId);
+                    pushUnique(state.randomPlayedIds, futureId);
                     state.playId = futureId;
                   }
                 });
@@ -884,12 +911,29 @@ export const usePlayList = create<State & Action>()(
                 // 队列全部失效，跌落到随机生成
               }
 
-              // 懒惰生成新随机歌：从非当前曲目中随机选取
-              const candidates = list.filter(item => item.id !== playId);
+              // 懒惰生成新随机歌：本轮已播过的（randomPlayedIds）不再抽取，
+              // 直到全部歌曲都播过一遍才清空开启新一轮，实现「播完全部前不重复」。
+              const playedThisCycle = new Set(get().randomPlayedIds);
+              playedThisCycle.add(playId); // 当前歌算作已播
+              let candidates = list.filter(item => !playedThisCycle.has(item.id));
+              const startNewCycle = candidates.length === 0;
+              if (startNewCycle) {
+                // 本轮已播完所有歌：开启新一轮，仅排除当前歌避免紧挨重复
+                candidates = list.filter(item => item.id !== playId);
+              }
               const randomIndex = Math.floor(Math.random() * candidates.length);
+              const nextRandomId = candidates[randomIndex].id;
               set(state => {
                 state.randomHistory.push(playId);
-                state.playId = candidates[randomIndex].id;
+                if (startNewCycle) {
+                  // 新一轮是「全部歌曲」的又一次完整覆盖：仅以新选中歌为起点
+                  // （上一首已从候选里排除，保证不紧挨重复），上一首仍会在本轮内被播到。
+                  state.randomPlayedIds = [nextRandomId];
+                } else {
+                  pushUnique(state.randomPlayedIds, playId);
+                  pushUnique(state.randomPlayedIds, nextRandomId);
+                }
+                state.playId = nextRandomId;
               });
               break;
             }
@@ -1097,6 +1141,7 @@ export const usePlayList = create<State & Action>()(
             }
             state.randomHistory = state.randomHistory.filter(hId => hId !== id);
             state.randomFuture = state.randomFuture.filter(fId => fId !== id);
+            state.randomPlayedIds = state.randomPlayedIds.filter(pId => pId !== id);
           });
         },
         del: async id => {
@@ -1138,6 +1183,7 @@ export const usePlayList = create<State & Action>()(
             remove(state.list, item => isSame(item, removedItem));
             state.randomHistory = state.randomHistory.filter(hId => !removedIds.has(hId));
             state.randomFuture = state.randomFuture.filter(fId => !removedIds.has(fId));
+            state.randomPlayedIds = state.randomPlayedIds.filter(pId => !removedIds.has(pId));
           });
         },
         clear: () => {
@@ -1159,6 +1205,7 @@ export const usePlayList = create<State & Action>()(
             state.nextId = undefined;
             state.randomHistory = [];
             state.randomFuture = [];
+            state.randomPlayedIds = [];
           });
           usePlayProgress.getState().setCurrentTime(0);
         },
