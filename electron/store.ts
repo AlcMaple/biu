@@ -54,7 +54,8 @@ export const windowStateStore = new Store<{
   defaults: {},
 });
 
-const localDataPath = path.join(app.getPath("documents"), "Biu");
+/** 本地收藏夹/歌曲/标签数据目录（用户可将其放进网盘同步目录实现跨端同步） */
+export const localDataPath = path.join(app.getPath("documents"), "Biu");
 
 export const localFavoritesStore = new Store<Record<string, any>>({
   name: StoreNameMap.LocalFavorites,

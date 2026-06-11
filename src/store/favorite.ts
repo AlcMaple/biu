@@ -7,6 +7,8 @@ import { getFavFolderCreatedList } from "@/service/fav-folder-created-list";
 import { getSpaceNavnum } from "@/service/space-navnum";
 import { StoreNameMap } from "@shared/store";
 
+import { useLocalFavItemsStore } from "./local-fav-items";
+
 export interface FavoriteItem {
   id: number;
   title: string;
@@ -200,9 +202,29 @@ export const useFavoritesStore = create<State & Action>()(
           return store ? { state: store } : null;
         },
         setItem: async (_, value) => {
-          if (value.state) {
-            await platform.setStore(StoreNameMap.LocalFavorites, value.state);
+          if (!value.state) return;
+          const next = value.state as { createdFavorites?: FavoriteItem[]; [key: string]: unknown };
+
+          // 防覆盖保险：当要写入的本地收藏夹为空、但磁盘上原本非空、且歌曲数据(folderItems)
+          // 仍存在时，几乎必然是「重新登录把内存里的本地收藏夹合并成空后立刻写盘」这类事故
+          // （正常删收藏夹会先 clearFolder 清掉对应 folderItems）。此时保留磁盘上的本地夹元
+          // 数据，只更新其余字段，避免本地收藏夹凭空消失（真实事故发生过）。
+          const nextLocal = (next.createdFavorites ?? []).filter(item => item.isLocal);
+          if (nextLocal.length === 0) {
+            const hasFolderItems = Object.keys(useLocalFavItemsStore.getState().folderItems ?? {}).length > 0;
+            if (hasFolderItems) {
+              const prev = (await platform.getStore(StoreNameMap.LocalFavorites)) as
+                | { createdFavorites?: FavoriteItem[] }
+                | undefined;
+              const prevLocal = (prev?.createdFavorites ?? []).filter(item => item.isLocal);
+              if (prevLocal.length > 0) {
+                await platform.setStore(StoreNameMap.LocalFavorites, { ...next, createdFavorites: prevLocal });
+                return;
+              }
+            }
           }
+
+          await platform.setStore(StoreNameMap.LocalFavorites, next);
         },
         removeItem: async () => {
           await platform.clearStore(StoreNameMap.LocalFavorites);
