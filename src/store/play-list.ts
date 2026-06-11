@@ -632,6 +632,19 @@ export const usePlayList = create<State & Action>()(
 
           // 当前正在播放，如果暂停了则播放（指定了分集时校验 cid）
           if (isSame(currentItem, candidate) && (!targetCid || currentItem?.cid === targetCid)) {
+            // 分集显示标题/封面跟随调用方传入的值（如收藏夹里重命名后再次点击）
+            if (targetCid && currentItem) {
+              set(state => {
+                const target = state.list.find(item => item.id === currentItem.id);
+                if (!target) return;
+                if (sanitizedTitle) {
+                  target.pageTitle = sanitizedTitle;
+                }
+                if (cover) {
+                  target.pageCover = formatUrlProtocol(cover);
+                }
+              });
+            }
             if (audio.paused) {
               await ensureAudioSrcValid();
               await playAudioSafely();
@@ -648,6 +661,16 @@ export const usePlayList = create<State & Action>()(
               // 指定分集时，清除同视频其他分集，避免播完后续播不属于本次收藏的集数
               set(state => {
                 state.list = state.list.filter(item => !(item.bvid === bvid && item.cid !== targetCid));
+                // 显示标题/封面同步为调用方传入的值（收藏时调整的名字与收藏夹封面）
+                const target = state.list.find(item => item.id === existItem.id);
+                if (target) {
+                  if (sanitizedTitle) {
+                    target.pageTitle = sanitizedTitle;
+                  }
+                  if (cover) {
+                    target.pageCover = formatUrlProtocol(cover);
+                  }
+                }
                 state.playId = existItem.id;
               });
               try {
@@ -716,6 +739,18 @@ export const usePlayList = create<State & Action>()(
           if (!nextPlayItem) {
             toastError("播放失败：无法获取播放信息");
             return;
+          }
+
+          // 指定分集播放（来自本地收藏夹）时，调用方传入的标题（收藏时调整的
+          // 「原歌名-P1」或重命名后的名字）与封面优先于 B 站分 P 名/首帧截图，
+          // 保证播放栏与收藏夹列表显示一致
+          if (targetCid) {
+            if (sanitizedTitle) {
+              nextPlayItem.pageTitle = sanitizedTitle;
+            }
+            if (cover) {
+              nextPlayItem.pageCover = formatUrlProtocol(cover);
+            }
           }
 
           set(state => {
