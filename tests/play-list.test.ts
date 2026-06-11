@@ -262,6 +262,35 @@ describe("play-list store", () => {
     expect(usePlayList.getState().playId).toBe(list[0].id);
   });
 
+  test("点歌插入到当前歌曲的下一位并切过去播放，而不是追加到队尾", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    usePlayList.setState({ playMode: PlayMode.Loop });
+    await s.playList([
+      { type: "audio" as const, sid: 1, title: "a1" },
+      { type: "audio" as const, sid: 2, title: "a2" },
+      { type: "audio" as const, sid: 3, title: "a3" },
+    ]);
+    // 当前在第一首，模拟全网搜索点歌
+    await s.play({
+      type: "audio",
+      sid: 99,
+      title: "搜索歌",
+      cover: "https://c.test/1.png",
+      ownerName: "up",
+      ownerMid: 9,
+    });
+
+    const { list, playId } = usePlayList.getState();
+    expect(list.map(i => i.sid)).toEqual([1, 99, 2, 3]);
+    expect(playId).toBe(list[1].id);
+
+    // 插入的歌播完后顺着原歌单继续，而不是绕回歌单开头
+    await s.next();
+    const after = usePlayList.getState();
+    expect(after.list.find(i => i.id === after.playId)?.sid).toBe(2);
+  });
+
   test("addToNext inserts after current", async () => {
     const s = usePlayList.getState();
     await s.init();
