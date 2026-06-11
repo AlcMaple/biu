@@ -725,7 +725,11 @@ export const usePlayList = create<State & Action>()(
             if (!targetCid && bvid) {
               state.list = state.list.filter(item => item.bvid !== bvid);
             }
-            state.list = [...state.list, ...itemsToAdd];
+            // 插到当前播放歌曲的下一位而不是队尾：插入的歌播完后顺着原歌单继续，
+            // 列表循环时不会每次点歌后都从歌单头重播；无当前歌时退化为追加到队尾
+            const currentIndex = state.list.findIndex(item => item.id === state.playId);
+            const insertAt = currentIndex === -1 ? state.list.length : currentIndex + 1;
+            state.list.splice(insertAt, 0, ...itemsToAdd);
             state.playId = nextPlayItem.id;
           });
         },
