@@ -1,4 +1,4 @@
-import { RiOrderPlayLine, RiRepeat2Line, RiRepeatOneLine, RiShuffleLine } from "@remixicon/react";
+import { RiRepeat2Line, RiRepeatOneLine, RiShuffleLine } from "@remixicon/react";
 
 export const PlayRate = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -6,10 +6,7 @@ export const PlayRate = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
  * 播放模式
  */
 export enum PlayMode {
-  /**
-   * 顺序播放
-   */
-  Sequence = 1,
+  // 1 = 顺序播放（已移除）。数值保留为空位，旧持久化值由 play-list store 的 migrate 回落到 Loop。
   /**
    * 循环播放
    */
@@ -25,11 +22,6 @@ export enum PlayMode {
 }
 
 export const getPlayModeList = (iconSize?: number) => [
-  {
-    value: PlayMode.Sequence,
-    desc: "顺序播放",
-    icon: <RiOrderPlayLine size={iconSize} />,
-  },
   {
     value: PlayMode.Loop,
     desc: "循环播放",

@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from "vitest";
 
-import { PlayMode } from "@/common/constants/audio";
+import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { usePlayList } from "@/store/play-list";
 
 vi.mock("@/common/utils/audio", () => ({
@@ -236,6 +236,30 @@ describe("play-list store", () => {
     for (const sid of playedSids) {
       expect(newSids.has(sid)).toBe(true);
     }
+  });
+
+  test("已移除顺序播放，播放模式只剩循环/随机/单曲", () => {
+    const modes = getPlayModeList();
+    expect(modes).toHaveLength(3);
+    expect(modes.map(m => m.desc)).toEqual(["循环播放", "随机播放", "单曲播放"]);
+    expect(modes.some(m => m.desc === "顺序播放")).toBe(false);
+  });
+
+  test("播到队尾不再停止：循环模式下从最后一首会回绕到第一首", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    usePlayList.setState({ playMode: PlayMode.Loop });
+    await s.playList([
+      { type: "audio" as const, sid: 1, title: "a1" },
+      { type: "audio" as const, sid: 2, title: "a2" },
+      { type: "audio" as const, sid: 3, title: "a3" },
+    ]);
+    // 模拟「搜索播放一首歌追加到队尾」：跳到最后一首
+    const list = usePlayList.getState().list;
+    usePlayList.setState({ playId: list[list.length - 1].id });
+    await s.next();
+    // 旧 bug：顺序模式到队尾会停止；现在循环模式应回绕到第一首继续播
+    expect(usePlayList.getState().playId).toBe(list[0].id);
   });
 
   test("addToNext inserts after current", async () => {
