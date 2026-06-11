@@ -13,7 +13,8 @@ import { destroyMiniPlayer } from "./mini-player";
 import { injectAuthCookie } from "./network/cookie";
 import { installWebRequestInterceptors } from "./network/interceptor";
 import { registerAllShortcuts, unregisterAllShortcuts } from "./shortcut";
-import { appSettingsStore } from "./store";
+import { appSettingsStore, localDataPath } from "./store";
+import { backupLocalData } from "./store-backup";
 import { autoUpdater, setupAutoUpdater, stopCheckForUpdates } from "./updater";
 import { getWindowIcon } from "./utils";
 import { setupWindowsThumbar } from "./windows/thumbar";
@@ -149,6 +150,9 @@ if (!gotTheLock) {
     } catch (error) {
       log.error("[main] Failed to read proxy settings from store:", error);
     }
+
+    // 启动即快照本地数据，独立于网盘同步兜底（防双向同步把收藏夹冲掉无法找回）
+    backupLocalData(localDataPath);
 
     createWindow();
     injectAuthCookie();
