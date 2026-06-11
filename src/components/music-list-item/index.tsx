@@ -39,6 +39,8 @@ interface Props {
   menus: ContextMenuItem[];
   onMenuAction?: (key: string) => void;
   hidePubTime?: boolean;
+  /** 资源已失效：灰显并展示「失效」角标 */
+  invalid?: boolean;
 }
 
 const MusicListItem = ({
@@ -60,6 +62,7 @@ const MusicListItem = ({
   index,
   pubTime,
   hidePubTime,
+  invalid,
 }: Props) => {
   const navigate = useNavigate();
   const playId = usePlayList(state => state.playId);
@@ -73,6 +76,10 @@ const MusicListItem = ({
   const isCompact = displayMode === "compact";
 
   const gridCols = getMusicListItemGrid(isCompact, hidePubTime);
+
+  const invalidBadge = invalid && (
+    <span className="border-danger/40 text-danger flex-none rounded-sm border px-1 text-[10px] leading-4">失效</span>
+  );
 
   return (
     <ContextMenu items={menus} onAction={onMenuAction}>
@@ -96,8 +103,11 @@ const MusicListItem = ({
 
           {/* 2. 音乐信息 */}
           {isCompact ? (
-            <div className="min-w-0 truncate text-left">
-              <span className={clx("truncate", { "text-primary": isPlay })}>{title}</span>
+            <div className="flex min-w-0 items-center gap-1.5 text-left">
+              {invalidBadge}
+              <span className={clx("truncate", { "text-primary": isPlay, "text-foreground-400": invalid })}>
+                {title}
+              </span>
             </div>
           ) : (
             <div className="flex min-w-0 items-center overflow-hidden">
@@ -108,7 +118,7 @@ const MusicListItem = ({
                   src={cover}
                   width="100%"
                   height="100%"
-                  className="m-0"
+                  className={clx("m-0", { "opacity-50": invalid })}
                   params="672w_378h_1c.avif"
                 />
                 {!isPlay && typeof onPress === "function" && (
@@ -121,7 +131,17 @@ const MusicListItem = ({
                 )}
               </div>
               <div className="ml-2 flex min-w-0 flex-col items-start justify-center space-y-1">
-                <span className={clx("w-full truncate text-left text-base", { "text-primary": isPlay })}>{title}</span>
+                <div className="flex w-full min-w-0 items-center gap-1.5">
+                  {invalidBadge}
+                  <span
+                    className={clx("truncate text-left text-base", {
+                      "text-primary": isPlay,
+                      "text-foreground-400": invalid,
+                    })}
+                  >
+                    {title}
+                  </span>
+                </div>
                 {Boolean(upName) && (
                   <span
                     className={clx("text-foreground-500 w-fit truncate text-sm", {

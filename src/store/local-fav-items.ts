@@ -33,6 +33,11 @@ export interface LocalFavItem {
   partTitle?: string;
   /** 用户自定义歌手（覆盖 ownerName 显示，目前仅作用于精美播放器） */
   customArtist?: string;
+  /**
+   * 资源已失效（B站侧被删除/下架）。检测时机为打开收藏夹时后台批量查询。
+   * 失效项保留在收藏夹中供用户辨认，但会被各播放入口跳过，避免播放卡住。
+   */
+  invalid?: boolean;
 }
 
 interface State {
@@ -50,6 +55,11 @@ interface Action {
   clearFolder: (folderId: number) => void;
   /** 跨所有收藏夹按 rid 设置自定义歌手 */
   setCustomArtistByRid: (rid: string | number, artist: string | undefined) => void;
+  /**
+   * 按检测结果刷新失效标记：checkedRids 中的项，命中 invalidRids 则标记失效，
+   * 否则清除标记（资源恢复有效时摘掉旧标记）；未检测到的项保持原状。
+   */
+  updateInvalidFlags: (folderId: number, invalidRids: Set<string>, checkedRids: Set<string>) => void;
 }
 
 export const useLocalFavItemsStore = create<State & Action>()(
@@ -100,6 +110,22 @@ export const useLocalFavItemsStore = create<State & Action>()(
           const next = { ...state.folderItems };
           delete next[folderId];
           return { folderItems: next };
+        }),
+      updateInvalidFlags: (folderId, invalidRids, checkedRids) =>
+        set(state => {
+          const current = state.folderItems[folderId];
+          if (!current?.length) return {};
+          let changed = false;
+          const updated = current.map(item => {
+            const rid = String(item.rid);
+            if (!checkedRids.has(rid)) return item;
+            const invalid = invalidRids.has(rid) ? true : undefined;
+            if (item.invalid === invalid) return item;
+            changed = true;
+            return { ...item, invalid };
+          });
+          if (!changed) return {};
+          return { folderItems: { ...state.folderItems, [folderId]: updated } };
         }),
       setCustomArtistByRid: (rid, artist) =>
         set(state => {

@@ -30,9 +30,9 @@ import {
   RiStarLine,
   RiStarOffLine,
 } from "@remixicon/react";
-import { chunk } from "es-toolkit/array";
 
 import { CollectionType } from "@/common/constants/collection";
+import { detectInvalidLocalFavItems, isLocalSourceItem } from "@/common/utils/fav";
 import { formatMillisecond } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -42,7 +42,6 @@ import MusicListHeader, { type MusicListSortKey } from "@/components/music-list-
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
 import platform from "@/platform";
-import { getFavResourceInfos } from "@/service/fav-resource-infos";
 import { useFavoritesStore } from "@/store/favorite";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
@@ -58,6 +57,9 @@ const durationToSeconds = (d: number | string | undefined): number => {
   if (parts.some(Number.isNaN)) return 0;
   return parts.reduce((acc, p) => acc * 60 + p, 0);
 };
+
+// 本次启动内已后台检测过失效状态的收藏夹，避免来回切换页面时反复请求
+const invalidCheckedFolders = new Set<number>();
 
 const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
@@ -91,6 +93,7 @@ const LocalFavorites = () => {
   const rawItems = useLocalFavItemsStore(s => s.folderItems[folderId]) ?? [];
   const removeItem = useLocalFavItemsStore(s => s.removeItem);
   const renameItem = useLocalFavItemsStore(s => s.renameItem);
+  const updateInvalidFlags = useLocalFavItemsStore(s => s.updateInvalidFlags);
   const clearFolder = useLocalFavItemsStore(s => s.clearFolder);
   const rmCreatedFavorite = useFavoritesStore(s => s.rmCreatedFavorite);
 
@@ -135,6 +138,24 @@ const LocalFavorites = () => {
     setSortDir("desc");
   }, [folderIdStr]);
 
+  // 打开收藏夹时后台检测 B 站资源失效状态并打标记（每次启动每个收藏夹只检测一次）
+  useEffect(() => {
+    if (!folderId || invalidCheckedFolders.has(folderId)) return;
+    const allItems = useLocalFavItemsStore.getState().folderItems[folderId];
+    if (!allItems?.length) return;
+    invalidCheckedFolders.add(folderId);
+    detectInvalidLocalFavItems(allItems)
+      .then(({ checked, invalid }) => {
+        // 一个都没检测成功（如断网）时允许下次进入重试
+        if (!checked.size) {
+          invalidCheckedFolders.delete(folderId);
+          return;
+        }
+        updateInvalidFlags(folderId, invalid, checked);
+      })
+      .catch(() => invalidCheckedFolders.delete(folderId));
+  }, [folderId, updateInvalidFlags]);
+
   const handleSort = useCallback((key: MusicListSortKey) => {
     setSortKey(prev => {
       if (prev === key) {
@@ -145,12 +166,6 @@ const LocalFavorites = () => {
       return key;
     });
   }, []);
-
-  // 判断是否为本地歌曲（含兼容旧数据：source 字段存入前的本地歌曲）
-  const isLocalItem = useCallback(
-    (item: LocalFavItem) => item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName),
-    [],
-  );
 
   const itemToPlayItem = useCallback((item: LocalFavItem) => {
     if (item.source === "local") {
@@ -197,6 +212,10 @@ const LocalFavorites = () => {
 
   const handleItemPress = useCallback(
     (item: LocalFavItem) => {
+      if (item.invalid) {
+        addToast({ title: "该内容已失效，无法播放", color: "warning" });
+        return;
+      }
       const playItem = itemToPlayItem(item);
       if (playItem.source === "local" && !playItem.audioUrl) {
         addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
@@ -208,7 +227,10 @@ const LocalFavorites = () => {
   );
 
   const handlePlayAll = useCallback(async () => {
-    const medias = items.map(itemToPlayItem).filter(m => !(m.source === "local" && !m.audioUrl));
+    const medias = items
+      .filter(i => !i.invalid)
+      .map(itemToPlayItem)
+      .filter(m => !(m.source === "local" && !m.audioUrl));
     if (!medias.length) {
       addToast({ title: "暂无可播放内容", color: "warning" });
       return;
@@ -217,7 +239,10 @@ const LocalFavorites = () => {
   }, [items, itemToPlayItem]);
 
   const handleAddToPlayList = useCallback(() => {
-    const medias = items.map(itemToPlayItem).filter(m => !(m.source === "local" && !m.audioUrl));
+    const medias = items
+      .filter(i => !i.invalid)
+      .map(itemToPlayItem)
+      .filter(m => !(m.source === "local" && !m.audioUrl));
     if (!medias.length) {
       addToast({ title: "暂无可播放内容", color: "warning" });
       return;
@@ -228,27 +253,14 @@ const LocalFavorites = () => {
 
   const handleClearInvalid = useCallback(async () => {
     const allItems = useLocalFavItemsStore.getState().folderItems[folderId] ?? [];
-    const checkable = allItems.filter(i => i.type === 2 || i.type === 12);
-    if (!checkable.length) {
+    if (!allItems.some(i => !isLocalSourceItem(i))) {
       addToast({ title: "暂无可检测内容", color: "warning" });
       return;
     }
 
-    const chunks = chunk(checkable, 50);
-    const invalidRids: (string | number)[] = [];
-
-    for (const chunkItems of chunks) {
-      const resources = chunkItems.map(i => `${i.rid}:${i.type}`).join(",");
-      const res = await getFavResourceInfos({ resources, platform: "web" });
-      if (res.code === 0 && res.data) {
-        const validIds = new Set(res.data.filter(i => i.attr === 0).map(i => String(i.id)));
-        chunkItems.forEach(item => {
-          if (!validIds.has(String(item.rid))) {
-            invalidRids.push(item.rid);
-          }
-        });
-      }
-    }
+    const { invalid } = await detectInvalidLocalFavItems(allItems);
+    // 本次检测到的失效项 + 之前后台检测已打标的失效项
+    const invalidRids = allItems.filter(i => invalid.has(String(i.rid)) || i.invalid).map(i => i.rid);
 
     if (!invalidRids.length) {
       addToast({ title: "没有失效内容", color: "success" });
@@ -294,14 +306,18 @@ const LocalFavorites = () => {
           });
           break;
         case "play-next":
-          if (isUnplayableLocal) {
+          if (item.invalid) {
+            addToast({ title: "该内容已失效，无法播放", color: "warning" });
+          } else if (isUnplayableLocal) {
             addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
           } else {
             usePlayList.getState().addToNext(playItem);
           }
           break;
         case "add-to-playlist":
-          if (isUnplayableLocal) {
+          if (item.invalid) {
+            addToast({ title: "该内容已失效，无法播放", color: "warning" });
+          } else if (isUnplayableLocal) {
             addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
           } else {
             usePlayList.getState().addList([playItem]);
@@ -473,16 +489,17 @@ const LocalFavorites = () => {
             type={item.type === 2 ? "mv" : "audio"}
             bvid={item.type === 2 ? item.bvid : undefined}
             cid={item.type === 2 ? item.cid : undefined}
-            sid={isLocalItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
-            itemId={isLocalItem(item) ? String(item.rid) : undefined}
-            source={isLocalItem(item) ? "local" : item.source}
+            sid={isLocalSourceItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
+            itemId={isLocalSourceItem(item) ? String(item.rid) : undefined}
+            source={isLocalSourceItem(item) ? "local" : item.source}
             cover={item.cover}
-            upName={isLocalItem(item) ? undefined : item.ownerName}
-            upMid={isLocalItem(item) ? undefined : item.ownerMid}
+            upName={isLocalSourceItem(item) ? undefined : item.ownerName}
+            upMid={isLocalSourceItem(item) ? undefined : item.ownerMid}
             playCount={item.playCount}
             duration={item.duration}
             pubTime={formatMillisecond(item.fav_time)}
-            menus={getLocalItemMenus(!isLocalItem(item))}
+            invalid={item.invalid}
+            menus={getLocalItemMenus(!isLocalSourceItem(item))}
             onMenuAction={key => handleMenuAction(key, item)}
             onPress={() => handleItemPress(item)}
           />
