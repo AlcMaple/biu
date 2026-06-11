@@ -40,15 +40,23 @@ async function injectBiliTicketCookie() {
 }
 
 /**
- * buvid4: 过期时间：30天
+ * buvid3/buvid4: 过期时间：30天
+ * 两个都注入与官方网页保持一致——扫码登录确认环节会关联设备指纹，缺失时手机端可能报「API校验失败」
  */
 async function injectBuvidCookie() {
   const buvid = await getWebBuvid();
+  const expirationDate = Math.floor(Date.now() / 1000 + 30 * 24 * 3600);
+
+  await setCookie({
+    name: "buvid3",
+    value: buvid.b_3,
+    expirationDate,
+  });
 
   await setCookie({
     name: "buvid4",
     value: buvid.b_4,
-    expirationDate: Math.floor(Date.now() / 1000 + 30 * 24 * 3600),
+    expirationDate,
   });
 }
 
@@ -58,11 +66,11 @@ function setupCookieAutoRefresh() {
     const name = cookie.name;
     const expired = cause === "expired" || cause === "expired-overwrite";
     if (!expired) return;
-    if (name === "buvid4") {
+    if (name === "buvid3" || name === "buvid4") {
       try {
         await injectBuvidCookie();
       } catch (err) {
-        log.warn("[cookies] auto refresh buvid4 failed", err);
+        log.warn(`[cookies] auto refresh ${name} failed`, err);
       }
       return;
     }
