@@ -194,7 +194,9 @@ const LocalFavorites = () => {
         type: "mv" as const,
         bvid: item.bvid!,
         cid: item.cid,
-        title: item.partTitle || item.title,
+        // 收藏夹里显示的名字（收藏时调整的「原歌名-P1」或重命名后的名字），
+        // 播放时作为显示标题，保证播放栏与列表一致
+        title: item.title,
         cover: item.cover,
         ownerMid: item.ownerMid,
         ownerName: item.ownerName,

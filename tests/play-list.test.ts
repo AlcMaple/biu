@@ -291,6 +291,28 @@ describe("play-list store", () => {
     expect(after.list.find(i => i.id === after.playId)?.sid).toBe(2);
   });
 
+  test("分集从收藏夹播放时，显示标题用收藏夹里的名字而不是 B 站分 P 名", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    // 收藏的是 BVx 的 P1（cid=11，分 P 名为 "p1"），收藏夹里名字被调整为「原歌名-P1」
+    await s.play({ type: "mv", bvid: "BVx", cid: "11", title: "原歌名-P1", cover: "https://fav.test/cover.png" });
+
+    let state = usePlayList.getState();
+    expect(state.list).toHaveLength(1);
+    expect(state.list[0].cid).toBe("11");
+    // 播放栏显示 pageTitle || title / pageCover || cover，应与收藏夹列表一致，
+    // 而不是分 P 名 "p1" 和分 P 首帧截图
+    expect(state.list[0].pageTitle).toBe("原歌名-P1");
+    expect(state.list[0].pageCover).toBe("https://fav.test/cover.png");
+    expect(state.playId).toBe(state.list[0].id);
+
+    // 收藏夹里重命名后再次点击同一首，显示标题/封面同步更新
+    await s.play({ type: "mv", bvid: "BVx", cid: "11", title: "重命名后", cover: "https://fav.test/cover2.png" });
+    state = usePlayList.getState();
+    expect(state.list[0].pageTitle).toBe("重命名后");
+    expect(state.list[0].pageCover).toBe("https://fav.test/cover2.png");
+  });
+
   test("addToNext inserts after current", async () => {
     const s = usePlayList.getState();
     await s.init();
