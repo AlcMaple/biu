@@ -463,13 +463,6 @@ export const usePlayList = create<State & Action>()(
                 endPlayReport();
               }
 
-              const currentIndex = get().list.findIndex(item => item.id === get().playId);
-              if (get().playMode === PlayMode.Sequence && currentIndex === get().list.length - 1) {
-                audio.currentTime = 0;
-                audio.pause();
-                return;
-              }
-
               get().next();
             };
 
@@ -847,7 +840,6 @@ export const usePlayList = create<State & Action>()(
           const currentIndex = list.findIndex(item => item.id === playId);
           const nextIndex = (currentIndex + 1) % list.length;
           switch (playMode) {
-            case PlayMode.Sequence:
             case PlayMode.Single:
             case PlayMode.Loop: {
               if (list.length === 1) {
@@ -1230,6 +1222,16 @@ export const usePlayList = create<State & Action>()(
     }),
     {
       name: "play-list-store",
+      // v1：移除「顺序播放」（旧枚举值 1）。已持久化为顺序播放的机器回落到循环播放，
+      // 否则 playMode=1 不再匹配任何分支，播完当前歌将无法自动续播。
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as { playMode?: number } | undefined;
+        if (state && version < 1 && state.playMode === 1) {
+          state.playMode = PlayMode.Loop;
+        }
+        return state as never;
+      },
       partialize: state => ({
         isMuted: state.isMuted,
         volume: state.volume,
