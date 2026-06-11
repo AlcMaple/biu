@@ -33,6 +33,7 @@ const useSystemSettingsForm = () => {
     showSearchHistory,
     proxySettings,
     reportPlayHistory,
+    volumeBoost,
   } = useSettings(
     useShallow(s => ({
       fontFamily: s.fontFamily,
@@ -51,6 +52,7 @@ const useSystemSettingsForm = () => {
       showSearchHistory: s.showSearchHistory,
       proxySettings: s.proxySettings,
       reportPlayHistory: s.reportPlayHistory,
+      volumeBoost: s.volumeBoost,
     })),
   );
   const updateSettings = useSettings(s => s.update);
@@ -85,6 +87,7 @@ const useSystemSettingsForm = () => {
         password: "",
       },
       reportPlayHistory,
+      volumeBoost,
     },
   });
 

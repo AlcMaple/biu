@@ -276,6 +276,37 @@ export const SystemSettingsTab = ({
           />
         </div>
       </div>
+      {/* 音量增强 */}
+      <div className={rowCls}>
+        <div className={labelCls}>
+          <div className="text-medium font-medium">音量增强</div>
+          <div className="text-sm text-zinc-500">
+            在系统音量之外额外放大音频，适合声音很小的歌曲；100% 为不增强，过高可能破音
+          </div>
+        </div>
+        <div className={isAndroid ? "w-full" : "w-[360px]"}>
+          <Controller
+            control={control}
+            name="volumeBoost"
+            render={({ field }) => (
+              <Slider
+                showTooltip={false}
+                size="sm"
+                endContent={<span className="w-12 text-right tabular-nums">{field.value ?? 100}%</span>}
+                aria-label="音量增强"
+                value={field.value ?? 100}
+                onChange={v => field.onChange(Number(v))}
+                minValue={100}
+                maxValue={300}
+                step={10}
+                classNames={{
+                  thumb: "after:hidden",
+                }}
+              />
+            )}
+          />
+        </div>
+      </div>
       {/* 播放记录上报 */}
       <div className={rowCls}>
         <div className={labelCls}>
