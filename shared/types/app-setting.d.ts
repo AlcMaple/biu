@@ -38,4 +38,10 @@ interface AppSettings {
   reportPlayHistory: boolean;
   /** 本地音乐目录列表 */
   localMusicDirs: string[];
+  /**
+   * 音量增强百分比。100 = 不增强，最高 300。
+   * 在系统音量与播放器音量之外，对解码后的音频信号做软件放大，
+   * 因此能让「系统音量已拉满但仍很小声」的歌曲变响。
+   */
+  volumeBoost: number;
 }

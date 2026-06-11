@@ -7,6 +7,7 @@ import { immer } from "zustand/middleware/immer";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { getAudioUrl, getDashUrl, isUrlValid } from "@/common/utils/audio";
+import { resumeAudioGraph } from "@/common/utils/audio-graph";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
 import { stripHtml } from "@/common/utils/str";
 import { formatUrlProtocol } from "@/common/utils/url";
@@ -429,6 +430,8 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onplay = () => {
+              // 播放是用户手势：借机恢复可能被浏览器自动挂起的音频图，确保音量增强生效
+              resumeAudioGraph();
               consecutiveErrorCount = 0; // 成功开始播放，重置失败计数
               set({ isPlaying: true });
               updatePlaybackState();
