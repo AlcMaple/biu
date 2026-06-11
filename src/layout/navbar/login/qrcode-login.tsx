@@ -4,8 +4,8 @@ import { useRequest } from "ahooks";
 import clx from "classnames";
 import { QRCodeCanvas } from "qrcode.react";
 
-import { getPassportLoginWebQrcodeGenerate } from "@/service/passport-login-web-qrcode-generate";
-import { getPassportLoginWebQrcodePoll } from "@/service/passport-login-web-qrcode-poll";
+import platform from "@/platform";
+import { postTvQrcodeAuthCode, postTvQrcodePoll } from "@/service/passport-tv-login-qrcode";
 
 type QrcodeLoginProps = {
   onClose: () => void;
@@ -18,30 +18,31 @@ const QrcodeLogin = ({ onClose, updateUserData }: QrcodeLoginProps) => {
     data: qrcodeData,
     refreshAsync: refreshCode,
   } = useRequest(async () => {
-    const data = await getPassportLoginWebQrcodeGenerate();
+    const data = await postTvQrcodeAuthCode();
     return data?.data;
   });
 
   const { data: pollData, cancel: cancelPoll } = useRequest(
     async () => {
-      const res = await getPassportLoginWebQrcodePoll({ qrcode_key: qrcodeData?.qrcode_key as string });
-
-      return res?.data;
+      return await postTvQrcodePoll(qrcodeData?.auth_code as string);
     },
     {
-      ready: Boolean(qrcodeData?.qrcode_key),
-      refreshDeps: [qrcodeData?.qrcode_key],
+      ready: Boolean(qrcodeData?.auth_code),
+      refreshDeps: [qrcodeData?.auth_code],
       pollingInterval: 2000,
       pollingWhenHidden: false,
       onSuccess: async pollData => {
-        if (pollData?.code === 0) {
-          const { refresh_token } = pollData;
+        if (pollData?.code === 0 && pollData.data) {
+          cancelPoll();
+          // TV 端登录不走 set-cookie，Cookie 在响应体里返回，逐个写入会话
+          for (const cookie of pollData.data.cookie_info?.cookies ?? []) {
+            await platform.setCookie(cookie.name, cookie.value, cookie.expires);
+          }
 
-          await updateUserData(refresh_token);
+          await updateUserData(pollData.data.refresh_token);
 
           addToast({ title: "登录成功", color: "success" });
           onClose();
-          cancelPoll();
         }
 
         if (pollData?.code === 86038) {
