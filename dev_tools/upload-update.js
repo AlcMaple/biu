@@ -16,6 +16,7 @@
  */
 
 import fs from "fs";
+import os from "os";
 import path from "path";
 import readline from "readline";
 import { Client } from "ssh2";
@@ -34,6 +35,10 @@ const REMOTE_DIR = "/var/www/html/biu/updates/";
 const ROOT_DIR = path.join(__dirname, "..");
 const ARTIFACTS_DIR = path.join(ROOT_DIR, "dist", "artifacts");
 
+// 部署 SSH 私钥路径：默认 ~/.ssh/biu_deploy，可用环境变量 BIU_DEPLOY_KEY 覆盖。
+// 存在则免密登录；首次用 `node dev_tools/upload-update.js --install-key` 把公钥写到服务器。
+const KEY_PATH = process.env.BIU_DEPLOY_KEY || path.join(os.homedir(), ".ssh", "biu_deploy");
+
 // ─── 读取版本号 ───────────────────────────────────────────────────────────────
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, "package.json"), "utf8"));
@@ -42,9 +47,12 @@ const version = pkg.version;
 // ─── 解析参数，决定上传哪些平台 ──────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const uploadWin = args.length === 0 || args.includes("--win");
-const uploadMac = args.length === 0 || args.includes("--mac");
-const uploadLinux = args.length === 0 || args.includes("--linux");
+const installKey = args.includes("--install-key");
+const platformArgs = args.filter(a => a !== "--install-key");
+const noPlatformArg = platformArgs.length === 0;
+const uploadWin = noPlatformArg || platformArgs.includes("--win");
+const uploadMac = noPlatformArg || platformArgs.includes("--mac");
+const uploadLinux = noPlatformArg || platformArgs.includes("--linux");
 
 // ─── 待上传文件列表（按平台分组）─────────────────────────────────────────────
 
@@ -95,15 +103,27 @@ function askPassword() {
   });
 }
 
-/** 建立 SSH 连接 */
-function connect(password) {
+/** 建立 SSH 连接。auth 为 { privateKey } 或 { password } */
+function connect(auth) {
   return new Promise((resolve, reject) => {
     const client = new Client();
     client
       .on("ready", () => resolve(client))
       .on("error", reject)
-      .connect({ host: HOST, port: 22, username: USER, password, readyTimeout: 10000 });
+      .connect({ host: HOST, port: 22, username: USER, readyTimeout: 10000, ...auth });
   });
+}
+
+/** 解析认证方式：优先 SSH 私钥（免密），找不到再回退到交互输入密码 */
+async function resolveAuth() {
+  if (fs.existsSync(KEY_PATH)) {
+    log(`使用 SSH 私钥认证：${KEY_PATH}`);
+    return { privateKey: fs.readFileSync(KEY_PATH) };
+  }
+  log(`未找到部署私钥（${KEY_PATH}），回退到密码认证。`);
+  log("提示：运行 `node dev_tools/upload-update.js --install-key` 可配置一次性免密登录。");
+  const password = await askPassword();
+  return { password };
 }
 
 /** 在远端执行命令，输出打印到终端 */
@@ -174,6 +194,45 @@ log("╔════════════════════════
 log(`║       Biu v${version} 上传更新文件           ║`);
 log("╚══════════════════════════════════════════╝");
 
+// ─── 免密配置：把本机公钥写入服务器 authorized_keys（一次性，需输入一次密码）───
+if (installKey) {
+  const pubPath = KEY_PATH + ".pub";
+  if (!fs.existsSync(pubPath)) {
+    log(`\n❌ 未找到公钥 ${pubPath}`);
+    log(`   请先生成密钥：ssh-keygen -t ed25519 -f "${KEY_PATH}" -N ""`);
+    process.exit(1);
+  }
+  const pubKey = fs.readFileSync(pubPath, "utf8").trim();
+  log(`\n将把以下公钥写入 ${USER}@${HOST} 的 authorized_keys（需输入一次服务器密码）：`);
+  log(`  ${pubKey}`);
+  const password = await askPassword();
+  log("");
+
+  let keyClient;
+  try {
+    process.stdout.write("连接服务器...");
+    keyClient = await connect({ password });
+    log(" ✅");
+  } catch (e) {
+    log("\n❌ 连接失败：" + e.message);
+    process.exit(1);
+  }
+  try {
+    const safe = pubKey.replace(/'/g, "'\\''");
+    await exec(
+      keyClient,
+      `mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && { grep -qF '${safe}' ~/.ssh/authorized_keys || echo '${safe}' >> ~/.ssh/authorized_keys; }`,
+    );
+    log("✅ 公钥已写入，后续运行将自动免密登录。");
+  } catch (e) {
+    log("\n❌ 写入失败：" + e.message);
+    process.exit(1);
+  } finally {
+    keyClient.end();
+  }
+  process.exit(0);
+}
+
 // 检查 dist/artifacts/ 目录是否存在
 if (!fs.existsSync(ARTIFACTS_DIR)) {
   log("\n❌ 未找到 dist/artifacts/ 目录，请先运行 pnpm build 完成打包。");
@@ -210,14 +269,14 @@ for (const { platform, filename } of filesToUpload) {
 }
 log("");
 
-// 提示输入密码（一次性，后续所有操作复用同一连接）
-const password = await askPassword();
+// 解析认证（优先私钥免密，否则提示输入密码），后续所有操作复用同一连接
+const auth = await resolveAuth();
 log("");
 
 let client;
 try {
   process.stdout.write("连接服务器...");
-  client = await connect(password);
+  client = await connect(auth);
   log(" ✅");
 } catch (e) {
   log("\n❌ 连接失败：" + e.message);
