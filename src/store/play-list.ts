@@ -54,6 +54,8 @@ export interface PlayData {
   duration?: number;
   /** 视频音频url */
   audioUrl?: string;
+  /** 候选音频地址（正规源优先、PCDN 兜底），播放失败时自动换源重试 */
+  audioUrlCandidates?: string[];
   /** 视频url */
   videoUrl?: string;
   /** 是否为无损音频 */
@@ -197,6 +199,14 @@ const toastError = (title: string) => {
   });
 };
 
+/** 换源等过程性提示：短暂自动消失，不打断使用 */
+const toastInfo = (title: string) => {
+  addToast({
+    title,
+    color: "warning",
+  });
+};
+
 const sanitizeTitle = (title: string) => stripHtml(title);
 
 const handlePlayError = (error: any) => {
@@ -336,6 +346,7 @@ export const usePlayList = create<State & Action>()(
               const listItem = state.list.find(item => item.id === state.playId);
               if (listItem) {
                 listItem.audioUrl = mvPlayData.audioUrl;
+                listItem.audioUrlCandidates = mvPlayData.audioUrlCandidates;
                 listItem.videoUrl = mvPlayData.videoUrl;
                 listItem.isLossless = mvPlayData.isLossless;
                 listItem.isDolby = mvPlayData.isDolby;
@@ -367,6 +378,7 @@ export const usePlayList = create<State & Action>()(
               const listItem = state.list.find(item => item.id === state.playId);
               if (listItem) {
                 listItem.audioUrl = musicPlayData.audioUrl;
+                listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
                 listItem.isLossless = musicPlayData.isLossless;
               }
             });
@@ -404,6 +416,60 @@ export const usePlayList = create<State & Action>()(
             // 连续播放失败计数：自动跳过坏曲时，避免整个列表都失效时无限循环 next()
             let consecutiveErrorCount = 0;
 
+            // 卡死看门狗：进入缓冲后超时仍无任何进度（坏源常见表现是不报错只挂起），
+            // 视为播放失败触发换源自救；期间有进度推进则视为网络慢，重新计时观察
+            const STALL_TIMEOUT_MS = 8000;
+            let stallWatchdog: ReturnType<typeof setTimeout> | undefined;
+            const clearStallWatchdog = () => {
+              if (stallWatchdog) {
+                clearTimeout(stallWatchdog);
+                stallWatchdog = undefined;
+              }
+            };
+            const armStallWatchdog = () => {
+              if (stallWatchdog) return;
+              const playId = get().playId;
+              if (!playId) return;
+              const positionAtArm = audio.currentTime;
+              stallWatchdog = setTimeout(() => {
+                stallWatchdog = undefined;
+                if (get().playId !== playId || audio.paused) return;
+                if (audio.currentTime !== positionAtArm) {
+                  armStallWatchdog();
+                  return;
+                }
+                log.warn("播放长时间无进度，触发换源自救", { playId, src: audio.src, position: positionAtArm });
+                void handlePlaybackFailure(playId, audio.src, { message: "stall watchdog timeout" });
+              }, STALL_TIMEOUT_MS);
+            };
+
+            // 播放失败统一处理（onerror 与卡死看门狗共用）：先换源自救，救不回来才跳下一首
+            const handlePlaybackFailure = async (
+              playId: string,
+              failedSrc: string,
+              errInfo: { code?: number; message?: string },
+            ) => {
+              clearStallWatchdog();
+              // 对齐官方播放器的容错：先换备用地址/重新取地址自救
+              if (await tryFailoverAudioSource(playId, failedSrc)) return;
+              // 自救期间用户已切歌：不再处理
+              if (get().playId !== playId) return;
+
+              consecutiveErrorCount += 1;
+              const listLength = get().list.length;
+              // 防 runaway：整个列表都跳过一遍仍失败时停止，避免无限循环
+              if (listLength === 0 || consecutiveErrorCount >= listLength) {
+                consecutiveErrorCount = 0;
+                if (!audio.paused) audio.pause();
+                toastError("当前列表中没有可播放的歌曲");
+                return;
+              }
+
+              log.error("音频播放失败，自动跳到下一首", { playId, src: failedSrc, ...errInfo });
+              toastError("当前歌曲无法播放，已自动跳过");
+              void get().next();
+            };
+
             audio.ondurationchange = () => {
               const dur = audio.duration;
               if (!Number.isNaN(dur) && dur !== Infinity) {
@@ -425,6 +491,11 @@ export const usePlayList = create<State & Action>()(
               updatePositionState();
             };
 
+            // 缓冲事件驱动卡死看门狗：长时间无进度时换源自救
+            audio.onwaiting = armStallWatchdog;
+            audio.onstalled = armStallWatchdog;
+            audio.onplaying = () => clearStallWatchdog();
+
             audio.onratechange = () => {
               updatePositionState();
             };
@@ -443,6 +514,7 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onpause = () => {
+              clearStallWatchdog();
               set({ isPlaying: false });
               updatePlaybackState();
               updatePositionState();
@@ -480,24 +552,7 @@ export const usePlayList = create<State & Action>()(
               // ABORTED(1) 是用户主动中止（切歌时旧请求被打断），不算播放失败
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
-              consecutiveErrorCount += 1;
-              const listLength = get().list.length;
-              // 防 runaway：整个列表都跳过一遍仍失败时停止，避免无限循环
-              if (listLength === 0 || consecutiveErrorCount >= listLength) {
-                consecutiveErrorCount = 0;
-                if (!audio.paused) audio.pause();
-                toastError("当前列表中没有可播放的歌曲");
-                return;
-              }
-
-              log.error("音频播放失败，自动跳到下一首", {
-                playId,
-                src: audio.src,
-                code: err.code,
-                message: err.message,
-              });
-              toastError("当前歌曲无法播放，已自动跳过");
-              void get().next();
+              void handlePlaybackFailure(playId, audio.src, { code: err.code, message: err.message });
             };
 
             if ("mediaSession" in navigator) {
@@ -1286,6 +1341,69 @@ export const usePlayList = create<State & Action>()(
   ),
 );
 
+/** 换源自救状态：当前歌曲已试过的音频地址，切歌后自动重置 */
+let failoverPlayId: string | undefined;
+let failoverTriedUrls = new Set<string>();
+let failoverRefreshed = false;
+
+/**
+ * 播放出错时的换源自救（对齐官方播放器行为）：先逐个换没试过的候选地址，
+ * 候选用尽后再重新向 B 站取一次新地址；都失败才返回 false，由调用方跳下一首兜底。
+ * 只在真实播放失败时触发，每个地址最多试一次、新地址最多重取一次，不会产生轮询压力。
+ */
+async function tryFailoverAudioSource(playId: string, failedSrc: string): Promise<boolean> {
+  if (failoverPlayId !== playId) {
+    failoverPlayId = playId;
+    failoverTriedUrls = new Set();
+    failoverRefreshed = false;
+  }
+  if (failedSrc) {
+    failoverTriedUrls.add(failedSrc);
+  }
+
+  const state = usePlayList.getState();
+  // 出错后用户已切歌：按已处理返回，避免误跳下一首
+  if (state.playId !== playId) return true;
+  const playItem = state.getPlayItem?.();
+  // 本地文件没有备用源可换
+  if (!playItem || playItem.source === "local") return false;
+
+  const resumeTime = usePlayProgress.getState().currentTime || 0;
+
+  const nextUrl = playItem.audioUrlCandidates?.find(url => !failoverTriedUrls.has(url));
+  if (nextUrl) {
+    log.warn("音频播放失败，自动切换备用地址重试", { playId, failedSrc, nextUrl });
+    failoverTriedUrls.add(nextUrl);
+    toastInfo("播放卡顿，正在切换播放源…");
+    resumeAudioFrom(nextUrl, resumeTime);
+    return true;
+  }
+
+  if (!failoverRefreshed) {
+    failoverRefreshed = true;
+    log.warn("音频播放失败，候选地址已用尽，重新获取播放地址重试", { playId, failedSrc });
+    const refreshed = await refreshCurrentAudioSource();
+    if (refreshed && !failoverTriedUrls.has(audio.src)) {
+      failoverTriedUrls.add(audio.src);
+      toastInfo("播放卡顿，正在重新获取播放源…");
+      resumeAudioFrom(audio.src, resumeTime);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** 从指定地址续播：保留中断前的播放进度，换源重试时不从头播 */
+function resumeAudioFrom(url: string, resumeTime: number) {
+  audio.src = url;
+  audio.load();
+  if (resumeTime > 0) {
+    audio.currentTime = resumeTime;
+  }
+  void playAudioSafely();
+}
+
 async function refreshCurrentAudioSource(): Promise<boolean> {
   const { getPlayItem } = usePlayList.getState?.() ?? {};
   const playItem = getPlayItem?.();
@@ -1303,6 +1421,7 @@ async function refreshCurrentAudioSource(): Promise<boolean> {
           const listItem = state.list.find(item => item.id === state.playId);
           if (listItem) {
             listItem.audioUrl = mvPlayData.audioUrl;
+            listItem.audioUrlCandidates = mvPlayData.audioUrlCandidates;
             listItem.videoUrl = mvPlayData.videoUrl;
             listItem.isLossless = mvPlayData.isLossless;
             listItem.isDolby = mvPlayData.isDolby;
@@ -1320,6 +1439,7 @@ async function refreshCurrentAudioSource(): Promise<boolean> {
           const listItem = state.list.find(item => item.id === state.playId);
           if (listItem) {
             listItem.audioUrl = musicPlayData.audioUrl;
+            listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
             listItem.isLossless = musicPlayData.isLossless;
           }
         });
@@ -1394,6 +1514,7 @@ usePlayList.subscribe(async (state, prevState) => {
               const listItem = state.list.find(item => item.id === state.playId);
               if (listItem) {
                 listItem.audioUrl = mvPlayData?.audioUrl;
+                listItem.audioUrlCandidates = mvPlayData?.audioUrlCandidates;
                 listItem.videoUrl = mvPlayData?.videoUrl;
                 listItem.isLossless = mvPlayData?.isLossless;
                 listItem.isDolby = mvPlayData?.isDolby;
@@ -1432,6 +1553,7 @@ usePlayList.subscribe(async (state, prevState) => {
                     ...firstMV,
                     ...{
                       audioUrl: mvPlayData?.audioUrl,
+                      audioUrlCandidates: mvPlayData?.audioUrlCandidates,
                       videoUrl: mvPlayData?.videoUrl,
                       isLossless: mvPlayData?.isLossless,
                       isDolby: mvPlayData?.isDolby,
@@ -1478,6 +1600,7 @@ usePlayList.subscribe(async (state, prevState) => {
             const listItem = state.list.find(item => item.id === state.playId);
             if (listItem) {
               listItem.audioUrl = musicPlayData?.audioUrl;
+              listItem.audioUrlCandidates = musicPlayData?.audioUrlCandidates;
             }
           });
         } else {

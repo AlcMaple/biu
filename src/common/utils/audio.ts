@@ -23,6 +23,26 @@ function sortAudio(audio: DashAudio[]) {
   });
 }
 
+/**
+ * PCDN/MCDN 节点（如 xy…xy.mcdn.bilivideo.cn、*.szbdyd.com）对第三方播放器限速严重，
+ * 常出现播放几秒后卡死或直接返回坏数据（MediaError code 4 Format error）。
+ * B 站经常把这类节点放在 baseUrl，稳定的 upos 源在 backupUrl 里。
+ */
+const isPcdnUrl = (url: string) => {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.endsWith(".mcdn.bilivideo.cn") || hostname.endsWith(".szbdyd.com");
+  } catch {
+    return false;
+  }
+};
+
+/** 从 baseUrl/backupUrl 收集去重后的候选地址，按“正规源优先、PCDN 兜底”排序 */
+const collectStreamUrls = (baseUrl?: string, backupUrl?: string[]) => {
+  const candidates = [...new Set([baseUrl, ...(backupUrl || [])].filter((url): url is string => Boolean(url)))];
+  return [...candidates.filter(url => !isPcdnUrl(url)), ...candidates.filter(url => isPcdnUrl(url))];
+};
+
 function selectAudioByQuality(audioList: DashAudio[], quality: AudioQuality): DashAudio | undefined {
   if (!audioList.length) return undefined;
 
@@ -52,29 +72,33 @@ export async function getDashUrl(bvid: string, cid: string | number, audioQualit
 
     const bestVideoInfo = getUrlInfoRes?.data?.dash?.video?.[0];
     const videoResolution = `${bestVideoInfo?.width}x${bestVideoInfo?.height}`;
-    const videoUrl = bestVideoInfo?.baseUrl || bestVideoInfo?.backupUrl?.[0];
+    const videoUrl = collectStreamUrls(bestVideoInfo?.baseUrl, bestVideoInfo?.backupUrl)[0];
     const flacAudio = getUrlInfoRes?.data?.dash?.flac?.audio;
     const dolbyAudio = getUrlInfoRes?.data?.dash?.dolby?.audio?.[0];
 
     if (audioQuality === "auto" || audioQuality === "lossless") {
       if (flacAudio) {
+        const audioUrlCandidates = collectStreamUrls(flacAudio.baseUrl, flacAudio.backupUrl);
         return {
           isLossless: true,
           audioCodecs: flacAudio.codecs.toLowerCase(),
           audioBandwidth: flacAudio.bandwidth,
-          audioUrl: flacAudio.baseUrl || flacAudio.backupUrl[0],
+          audioUrl: audioUrlCandidates[0] || "",
+          audioUrlCandidates,
           videoUrl,
           videoResolution,
         };
       }
 
       if (dolbyAudio) {
+        const audioUrlCandidates = collectStreamUrls(dolbyAudio.baseUrl, dolbyAudio.backupUrl);
         return {
           isLossless: false,
           isDolby: true,
           audioCodecs: dolbyAudio.codecs.toLowerCase(),
           audioBandwidth: dolbyAudio.bandwidth,
-          audioUrl: dolbyAudio.baseUrl || dolbyAudio.backupUrl?.[0] || "",
+          audioUrl: audioUrlCandidates[0] || "",
+          audioUrlCandidates,
           videoUrl,
           videoResolution: `${bestVideoInfo?.width}x${bestVideoInfo?.height}`,
         };
@@ -83,11 +107,13 @@ export async function getDashUrl(bvid: string, cid: string | number, audioQualit
 
     const audioList = getUrlInfoRes?.data?.dash?.audio || [];
     const selectedAudio = selectAudioByQuality(audioList, audioQuality);
+    const audioUrlCandidates = collectStreamUrls(selectedAudio?.baseUrl, selectedAudio?.backupUrl);
     return {
       isLossless: false,
       audioCodecs: selectedAudio?.codecs?.toLowerCase() || "",
       audioBandwidth: selectedAudio?.bandwidth,
-      audioUrl: selectedAudio?.baseUrl || selectedAudio?.backupUrl?.[0] || "",
+      audioUrl: audioUrlCandidates[0] || "",
+      audioUrlCandidates,
       videoUrl,
       videoResolution,
     };
@@ -115,6 +141,7 @@ export const getAudioUrl = async (sid: number | string) => {
 
   return {
     audioUrl: res?.data?.cdns?.[0],
+    audioUrlCandidates: res?.data?.cdns || [],
     audioCodecs: isFlac ? "flac" : "",
     isLossless: isFlac,
   };
