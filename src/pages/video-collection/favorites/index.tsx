@@ -6,6 +6,7 @@ import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
 import { getAllFavMedia } from "@/common/utils/fav";
+import { resolvePlayCount } from "@/common/utils/number";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
@@ -341,7 +342,7 @@ const Favorites = () => {
               ownerName: item.upper?.name,
               ownerMid: item.upper?.mid,
               duration: item.duration,
-              playCount: item.cnt_info?.play,
+              playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
             },
             onSuccess: selectedIds => {
               if (isCreatedBySelf && !selectedIds.includes(Number(favFolderId))) {

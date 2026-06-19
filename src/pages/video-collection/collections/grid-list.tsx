@@ -4,6 +4,7 @@ import { Spinner } from "@heroui/react";
 
 import type { Media } from "@/service/user-video-archives-list";
 
+import { resolvePlayCount } from "@/common/utils/number";
 import Empty from "@/components/empty";
 import MusicCard from "@/components/music-card";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
@@ -27,7 +28,7 @@ const SeriesGridList = ({ data, loading, className, getScrollElement, onMenuActi
           key={item.bvid}
           title={item.title}
           cover={item.cover}
-          playCount={item.cnt_info?.play}
+          playCount={resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt)}
           duration={item.duration}
           ownerName={item.upper?.name}
           ownerMid={item.upper?.mid}

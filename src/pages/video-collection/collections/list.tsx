@@ -4,6 +4,7 @@ import { Spinner } from "@heroui/react";
 
 import type { Media } from "@/service/user-video-archives-list";
 
+import { resolvePlayCount } from "@/common/utils/number";
 import { formatSecondsToDate } from "@/common/utils/time";
 import Empty from "@/components/empty";
 import MusicListItem from "@/components/music-list-item";
@@ -70,7 +71,7 @@ const SeriesList = ({ data, loading, className, getScrollElement, onMenuAction }
               cover={item.cover}
               upName={item.upper?.name}
               upMid={item.upper?.mid}
-              playCount={item.cnt_info?.play}
+              playCount={resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt)}
               duration={item.duration}
               pubTime={formatSecondsToDate(item.pubtime)}
               onPress={() => handlePress(item)}

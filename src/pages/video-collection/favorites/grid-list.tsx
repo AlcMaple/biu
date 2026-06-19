@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 
 import type { FavMedia } from "@/service/fav-resource";
 
+import { resolvePlayCount } from "@/common/utils/number";
 import MusicCard from "@/components/music-card";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
 
@@ -37,7 +38,7 @@ const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
           key={item.id}
           title={item.title}
           cover={item.cover}
-          playCount={item.cnt_info.play}
+          playCount={resolvePlayCount(item.cnt_info.play, item.cnt_info.vt)}
           duration={item.duration}
           ownerName={item.upper?.name}
           ownerMid={item.upper?.mid}

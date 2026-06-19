@@ -118,8 +118,9 @@ export interface FavMediaUpper {
  */
 export interface FavMediaCntInfo {
   collect: number; // 收藏数
-  play: number; // 播放数
+  play: number; // 播放数（旧统计；新版 vt 数据下这里可能为 0）
   danmaku: number; // 弹幕数
+  vt?: number; // 新版播放量（play 为 0 时取此值）
 }
 
 /**
