@@ -7,6 +7,7 @@ import { useRequest } from "ahooks";
 import type { Media } from "@/service/user-video-archives-list";
 
 import { CollectionType } from "@/common/constants/collection";
+import { resolvePlayCount } from "@/common/utils/number";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
 import { getSeriesArchives } from "@/service/series-archives";
@@ -108,7 +109,10 @@ const Series = () => {
     }
     switch (order) {
       case "play":
-        result = [...result].sort((a, b) => (b.cnt_info?.play || 0) - (a.cnt_info?.play || 0));
+        result = [...result].sort(
+          (a, b) =>
+            resolvePlayCount(b.cnt_info?.play, b.cnt_info?.vt) - resolvePlayCount(a.cnt_info?.play, a.cnt_info?.vt),
+        );
         break;
       case "pubtime":
         result = [...result].sort((a, b) => (b.pubtime || 0) - (a.pubtime || 0));
@@ -187,7 +191,7 @@ const Series = () => {
             ownerName: item.upper?.name,
             ownerMid: item.upper?.mid,
             duration: item.duration,
-            playCount: item.cnt_info?.play,
+            playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
           },
         });
         break;

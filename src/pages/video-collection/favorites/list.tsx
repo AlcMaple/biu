@@ -2,6 +2,7 @@ import React from "react";
 
 import type { FavMedia } from "@/service/fav-resource";
 
+import { resolvePlayCount } from "@/common/utils/number";
 import { formatSecondsToDate } from "@/common/utils/time";
 import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
@@ -58,7 +59,7 @@ const FavoriteList: React.FC<FavoriteListProps> = ({
               cover={item.cover}
               upName={item.upper?.name}
               upMid={item.upper?.mid}
-              playCount={item.cnt_info.play}
+              playCount={resolvePlayCount(item.cnt_info.play, item.cnt_info.vt)}
               duration={item.duration}
               pubTime={formatSecondsToDate(item.fav_time)}
               onPress={canPlay ? () => onItemPress(item) : undefined}
