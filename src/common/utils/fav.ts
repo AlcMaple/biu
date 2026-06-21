@@ -1,7 +1,7 @@
 import { chunk } from "es-toolkit/array";
 
 import { bv2av } from "@/common/utils/bv";
-import { getFavResourceIds } from "@/service/fav-resource";
+import { getFavResourceIds, type FavMedia } from "@/service/fav-resource";
 import { getFavResourceInfos, type FavResourceInfo } from "@/service/fav-resource-infos";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 
@@ -67,6 +67,40 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
   });
 
   return { checked, invalid };
+};
+
+/**
+ * 补全收藏夹列表的播放量。
+ *
+ * B 站列表接口 `/x/v3/fav/resource/list` 对部分视频返回 `cnt_info.play=0`（接口反规范化数据缺失，
+ * 并非真实 0 播放，实测同一视频 `/x/v3/fav/resource/infos` 与稿件 stat 都能拿到正确播放量），
+ * 导致这些视频在列表里播放量显示为「-」。这里仅对 play / vt 都为 0 的项批量回查 infos 接口补全：
+ * - 正常列表：零额外请求；
+ * - 存在异常项的页：每页最多触发一次 infos（≤50 个一批），与「打开收藏夹批量查失效」同等量级，不会放大风控。
+ */
+export const fillFavMediaPlayCount = async (medias: FavMedia[]): Promise<FavMedia[]> => {
+  const missing = medias.filter(m => [2, 12].includes(m.type) && !m.cnt_info?.play && !m.cnt_info?.vt);
+  if (missing.length === 0) return medias;
+
+  const playMap = new Map<string, number>();
+  const chunks = chunk(missing, 50);
+  const results = await Promise.allSettled(
+    chunks.map(items =>
+      getFavResourceInfos({ resources: items.map(m => `${m.id}:${m.type}`).join(","), platform: "web" }),
+    ),
+  );
+  for (const result of results) {
+    if (result.status !== "fulfilled" || result.value.code !== 0 || !result.value.data) continue;
+    for (const info of result.value.data) {
+      if (info.cnt_info?.play) playMap.set(`${info.id}:${info.type}`, info.cnt_info.play);
+    }
+  }
+  if (playMap.size === 0) return medias;
+
+  return medias.map(m => {
+    const play = playMap.get(`${m.id}:${m.type}`);
+    return play ? { ...m, cnt_info: { ...m.cnt_info, play } } : m;
+  });
 };
 
 /** 获取本地收藏夹的所有媒体（转为 PlayItem 格式） */
