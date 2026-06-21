@@ -5,7 +5,7 @@ import { addToast, useDisclosure } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
-import { getAllFavMedia } from "@/common/utils/fav";
+import { fillFavMediaPlayCount, getAllFavMedia } from "@/common/utils/fav";
 import { resolvePlayCount } from "@/common/utils/number";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
@@ -143,11 +143,14 @@ const Favorites = () => {
           return;
         }
 
+        // 列表接口对部分视频返回 play=0，回查 infos 补全播放量，避免显示为「-」
+        const medias = await fillFavMediaPlayCount(pageData.medias);
+
         setHasMore(pageData.hasMore);
         if (targetPage === 1) {
-          setItems(pageData.medias);
+          setItems(medias);
         } else {
-          appendItems(pageData.medias);
+          appendItems(medias);
         }
       } catch (error) {
         addToast({
