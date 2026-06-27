@@ -9,6 +9,18 @@ import { audioQualitySort } from "../constants/audio";
 import { VideoFnval } from "../constants/video";
 import { getUrlParams } from "./url";
 
+/**
+ * B 站「资源已永久失效」错误码：稿件被删除 / 设为不可见 / 仅 UP 主可见、音频被下架等。
+ * 命中这些码即可安全地从播放列表剔除该歌曲；网络超时、参数错误等临时或非删除类故障
+ * **不在此列**，避免把临时问题误判成失效而删掉用户的歌。
+ * - 视频：-404 无视频、62002 稿件不可见、62012 仅 UP 主可见（见 player-playurl / web-interface-view）。
+ * - 音频：7201006 音频不存在或已下架（见 audio-song-info / audio-web-url）。
+ */
+const RESOURCE_GONE_CODES = new Set([-404, 62002, 62012, 7201006]);
+
+/** 判断 B 站接口返回码是否表示资源已永久失效（被删除 / 下架 / 不可见）。 */
+export const isResourceGoneCode = (code?: number): boolean => typeof code === "number" && RESOURCE_GONE_CODES.has(code);
+
 function sortAudio(audio: DashAudio[]) {
   return audio.toSorted((a, b) => {
     if (a.bandwidth !== b.bandwidth) {

@@ -6,7 +6,7 @@ import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
-import { getAudioUrl, getDashUrl, isUrlValid } from "@/common/utils/audio";
+import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/common/utils/audio";
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
 import { stripHtml } from "@/common/utils/str";
@@ -360,7 +360,9 @@ export const usePlayList = create<State & Action>()(
               title: currentPlayItem.title,
               mvPlayData,
             });
-            toastError("无法获取音频播放链接");
+            if (!(await dropCurrentIfInvalid(currentPlayItem.id, currentPlayItem))) {
+              toastError("无法获取音频播放链接");
+            }
           }
         }
 
@@ -389,7 +391,9 @@ export const usePlayList = create<State & Action>()(
               title: currentPlayItem.title,
               musicPlayData,
             });
-            toastError("无法获取音频播放链接");
+            if (!(await dropCurrentIfInvalid(currentPlayItem.id, currentPlayItem))) {
+              toastError("无法获取音频播放链接");
+            }
           }
         }
       };
@@ -454,6 +458,13 @@ export const usePlayList = create<State & Action>()(
               if (await tryFailoverAudioSource(playId, failedSrc)) return;
               // 自救期间用户已切歌：不再处理
               if (get().playId !== playId) return;
+
+              // 换源都救不回来：若确认稿件已被删除/下架，直接从列表移除并续播（自然跳过失效歌曲）
+              const failedItem = get().list.find(item => item.id === playId);
+              if (failedItem && (await dropCurrentIfInvalid(playId, failedItem))) {
+                consecutiveErrorCount = 0;
+                return;
+              }
 
               consecutiveErrorCount += 1;
               const listLength = get().list.length;
@@ -1464,6 +1475,49 @@ function resetAudioAndPlay(url: string) {
   void playAudioSafely();
 }
 
+/**
+ * 拿不到播放地址时，确认当前歌曲是否已被 B 站删除 / 下架（永久失效），
+ * 若确认失效则提示用户、把它从播放列表移除并自动跳到下一首；
+ * 无法确认（网络故障等临时问题）则保守地不处理，沿用原有报错提示。
+ *
+ * 解决的问题：长期不变更的播放列表里，部分视频被 UP 主或 B 站删除后，
+ * 播到那首歌会因为取不到播放地址而卡死。这里用接口明确的「失效码」判定
+ * （区别于网络超时等临时故障，避免误删），命中后复用 del() 的「删当前歌→自动续播」逻辑。
+ * 若紧接着的下一首同样失效，会在它成为当前歌时再次触发，从而连续跳过多首失效歌曲。
+ *
+ * @returns 是否已作为失效处理（true 时调用方无需再提示 / 重试）
+ */
+async function dropCurrentIfInvalid(playId: string, playItem: PlayData): Promise<boolean> {
+  let gone = false;
+  try {
+    if (playItem.type === "mv" && playItem.bvid) {
+      const res = await getWebInterfaceView({ bvid: playItem.bvid });
+      gone = isResourceGoneCode(res?.code);
+    } else if (playItem.type === "audio" && playItem.sid) {
+      const res = await getAudioSongInfo({ sid: playItem.sid });
+      gone = isResourceGoneCode(res?.code);
+    }
+  } catch {
+    return false; // 无法确认是否失效：保守处理，不删
+  }
+
+  if (!gone) return false;
+
+  const state = usePlayList.getState();
+  // 确认期间用户已切歌：不再处理，避免误删用户正在听的歌
+  if (state.playId !== playId) return true;
+
+  log.warn("歌曲已失效，自动从播放列表移除并跳过", {
+    playId,
+    bvid: playItem.bvid,
+    sid: playItem.sid,
+    title: playItem.title,
+  });
+  toastInfo(`「${playItem.title || "该歌曲"}」已失效，已自动移除`);
+  await state.del(playId);
+  return true;
+}
+
 // 切换歌曲时，更新当前播放的歌曲信息
 usePlayList.subscribe(async (state, prevState) => {
   if (state.playId !== prevState.playId) {
@@ -1528,7 +1582,9 @@ usePlayList.subscribe(async (state, prevState) => {
               title: playItem.title,
               mvPlayData,
             });
-            toastError("无法获取音频播放链接");
+            if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+              toastError("无法获取音频播放链接");
+            }
           }
         } else if (playItem?.bvid) {
           const mvData = await getMVData(playItem.bvid);
@@ -1571,7 +1627,9 @@ usePlayList.subscribe(async (state, prevState) => {
                 title: firstMV.title,
                 mvPlayData,
               });
-              toastError("无法获取音频播放链接");
+              if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+                toastError("无法获取音频播放链接");
+              }
             }
           } else {
             log.error("无法获取音频播放链接", {
@@ -1580,7 +1638,9 @@ usePlayList.subscribe(async (state, prevState) => {
               title: playItem.title,
               mvData,
             });
-            toastError("无法获取音频播放链接");
+            if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+              toastError("无法获取音频播放链接");
+            }
           }
         }
       }
@@ -1610,7 +1670,9 @@ usePlayList.subscribe(async (state, prevState) => {
             title: playItem.title,
             musicPlayData,
           });
-          toastError("无法获取音频播放链接");
+          if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+            toastError("无法获取音频播放链接");
+          }
         }
       }
     }
