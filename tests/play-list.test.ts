@@ -16,6 +16,7 @@ vi.mock("@/common/utils/audio", () => ({
     isLossless: false,
   })),
   isUrlValid: vi.fn(url => typeof url === "string" && url.length > 0),
+  isResourceGoneCode: (code?: number) => typeof code === "number" && [-404, 62002, 62012, 7201006].includes(code),
 }));
 
 vi.mock("@/service/audio-song-info", () => ({
@@ -377,5 +378,57 @@ describe("play-list store", () => {
 
     await s.addToNext({ type: "mv", bvid: "BV_fail", title: "fail" });
     expect(usePlayList.getState().list.length).toBe(1);
+  });
+
+  test("播到已被删除的歌曲时自动跳过并从播放列表移除", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+
+    const { getDashUrl } = await import("@/common/utils/audio");
+    const { getWebInterfaceView } = await import("@/service/web-interface-view");
+    // 当前歌（已被删除）：取不到播放地址，且稿件接口返回 -404（已失效）；后续 alive 走默认 mock（可播放）
+    vi.mocked(getDashUrl).mockImplementationOnce(async () => ({ isLossless: false }) as any);
+    vi.mocked(getWebInterfaceView).mockImplementationOnce(async () => ({ code: -404 }) as any);
+
+    usePlayList.setState({
+      list: [
+        { id: "dead", type: "mv", bvid: "BV_dead", cid: "1", title: "已删除" },
+        { id: "alive", type: "mv", bvid: "BV_alive", cid: "2", title: "正常" },
+      ],
+      playId: "dead",
+    });
+
+    // 订阅副作用是异步的：等待「失效检测 → 移除 → 自动续播」完成
+    await vi.waitFor(() => {
+      const st = usePlayList.getState();
+      expect(st.list.some(i => i.id === "dead")).toBe(false);
+      expect(st.list.length).toBe(1);
+      expect(st.playId).toBe("alive");
+    });
+  });
+
+  test("取不到播放地址但稿件未失效（如临时网络故障）时不会误删", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+
+    const { getDashUrl } = await import("@/common/utils/audio");
+    const { getWebInterfaceView } = await import("@/service/web-interface-view");
+    // 取不到地址，但稿件接口未返回失效码（默认 mock 无 code）→ 应保守保留，不删
+    vi.mocked(getDashUrl).mockImplementationOnce(async () => ({ isLossless: false }) as any);
+
+    usePlayList.setState({
+      list: [
+        { id: "a", type: "mv", bvid: "BV_a", cid: "1", title: "a" },
+        { id: "b", type: "mv", bvid: "BV_b", cid: "2", title: "b" },
+      ],
+      playId: "a",
+    });
+
+    // 给副作用足够的时间执行，确认不会移除 a
+    await vi.waitFor(() => {
+      expect(vi.mocked(getWebInterfaceView)).toHaveBeenCalled();
+    });
+    expect(usePlayList.getState().list.some(i => i.id === "a")).toBe(true);
+    expect(usePlayList.getState().list.length).toBe(2);
   });
 });
