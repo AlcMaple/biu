@@ -281,7 +281,7 @@ export const SystemSettingsTab = ({
         <div className={labelCls}>
           <div className="text-medium font-medium">音量增强</div>
           <div className="text-sm text-zinc-500">
-            在系统音量之外额外放大音频，适合声音很小的歌曲；100% 为不增强，过高可能破音
+            在系统音量之外额外放大音频，适合声音很小的歌曲；100% 为不增强，内置限幅保护，拉高也不会破音
           </div>
         </div>
         <div className={isAndroid ? "w-full" : "w-[360px]"}>
