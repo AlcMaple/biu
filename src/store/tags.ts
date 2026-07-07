@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { randomTagColor } from "@/common/constants/tag-colors";
 import platform from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
@@ -17,7 +18,8 @@ interface State {
 }
 
 interface Action {
-  addTag: (name: string, color: string) => void;
+  /** 创建标签，不传 color 时从色池随机分配，返回新建的标签 */
+  addTag: (name: string, color?: string) => Tag;
   removeTag: (id: number) => void;
   getItemTagIds: (rid: string | number) => number[];
   setItemTags: (rid: string | number, tagIds: number[]) => void;
@@ -28,10 +30,11 @@ export const useTagStore = create<State & Action>()(
     (set, get) => ({
       tags: [],
       itemTags: {},
-      addTag: (name, color) =>
-        set(state => ({
-          tags: [...state.tags, { id: Date.now(), name, color }],
-        })),
+      addTag: (name, color) => {
+        const tag: Tag = { id: Date.now(), name, color: color ?? randomTagColor() };
+        set(state => ({ tags: [...state.tags, tag] }));
+        return tag;
+      },
       removeTag: id =>
         set(state => {
           const itemTags: Record<string, number[]> = {};

@@ -17,7 +17,6 @@ import {
   useDisclosure,
 } from "@heroui/react";
 import {
-  RiCheckLine,
   RiDeleteBinLine,
   RiEraserLine,
   RiExternalLinkLine,
@@ -41,6 +40,7 @@ import MusicListItem from "@/components/music-list-item";
 import MusicListHeader, { type MusicListSortKey } from "@/components/music-list-item/header";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
+import { TagFilterPopover } from "@/components/tag-popover";
 import platform from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -86,7 +86,6 @@ const LocalFavorites = () => {
   const [renameTarget, setRenameTarget] = useState<LocalFavItem | null>(null);
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
 
-  const allTags = useTagStore(s => s.tags);
   const itemTags = useTagStore(s => s.itemTags);
 
   const folder = useFavoritesStore(s => s.createdFavorites.find(f => f.id === folderId));
@@ -443,36 +442,11 @@ const LocalFavorites = () => {
             </DropdownMenu>
           </Dropdown>
         </div>
-        <SearchWithSort onKeywordSearch={setKeyword} />
-      </div>
-
-      {allTags.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {allTags.map(tag => {
-            const active = activeTagIds.includes(tag.id);
-            return (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() =>
-                  setActiveTagIds(prev =>
-                    prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
-                  )
-                }
-                className="flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-                style={
-                  active
-                    ? { backgroundColor: tag.color + "22", color: tag.color, borderColor: tag.color + "88" }
-                    : { color: tag.color, borderColor: tag.color + "44" }
-                }
-              >
-                {active && <RiCheckLine size={10} />}
-                {tag.name}
-              </button>
-            );
-          })}
+        <div className="flex items-center space-x-2">
+          <TagFilterPopover activeTagIds={activeTagIds} onChange={setActiveTagIds} />
+          <SearchWithSort onKeywordSearch={setKeyword} />
         </div>
-      )}
+      </div>
 
       <div className="w-full">
         <MusicListHeader

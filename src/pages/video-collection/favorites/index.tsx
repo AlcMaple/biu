@@ -10,6 +10,7 @@ import { resolvePlayCount } from "@/common/utils/number";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
+import { TagFilterPopover } from "@/components/tag-popover";
 import platform from "@/platform";
 import { postFavFolderFav } from "@/service/fav-folder-fav";
 import { getFavFolderInfo } from "@/service/fav-folder-info";
@@ -54,7 +55,6 @@ const Favorites = () => {
   const [listLoading, setListLoading] = useState(false);
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
 
-  const allTags = useTagStore(s => s.tags);
   const itemTags = useTagStore(s => s.itemTags);
 
   const filteredItems = useMemo(() => {
@@ -491,34 +491,8 @@ const Favorites = () => {
         onPlayAll={onPlayAll}
         onAddToPlayList={addAllMedia}
         onClearInvalid={clearInvalid}
+        tagFilter={<TagFilterPopover activeTagIds={activeTagIds} onChange={setActiveTagIds} />}
       />
-
-      {allTags.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {allTags.map(tag => {
-            const active = activeTagIds.includes(tag.id);
-            return (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() =>
-                  setActiveTagIds(prev =>
-                    prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
-                  )
-                }
-                className="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-                style={
-                  active
-                    ? { backgroundColor: tag.color + "22", color: tag.color, borderColor: tag.color + "88" }
-                    : { color: tag.color, borderColor: tag.color + "44" }
-                }
-              >
-                {tag.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {displayMode === "card" ? (
         <FavoriteGridList
