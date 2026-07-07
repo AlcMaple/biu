@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { RiPlayFill, RiPlayListAddLine } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
@@ -12,6 +14,8 @@ interface Props extends FavToggleProps, SearchProps, MenuProps {
   loading?: boolean;
   onPlayAll: () => void;
   onAddToPlayList: () => void;
+  /** 右侧搜索/排序前的附加控件（如标签筛选入口） */
+  tagFilter?: ReactNode;
 }
 
 const Operations = ({
@@ -29,6 +33,7 @@ const Operations = ({
   onPlayAll,
   onAddToPlayList,
   onClearInvalid,
+  tagFilter,
 }: Props) => {
   return (
     <div className="mb-4 flex items-center justify-between">
@@ -55,12 +60,15 @@ const Operations = ({
           onClearInvalid={onClearInvalid}
         />
       </div>
-      <SearchWithSort
-        onKeywordSearch={onKeywordSearch}
-        orderOptions={orderOptions}
-        order={order}
-        onOrderChange={onOrderChange}
-      />
+      <div className="flex items-center space-x-2">
+        {tagFilter}
+        <SearchWithSort
+          onKeywordSearch={onKeywordSearch}
+          orderOptions={orderOptions}
+          order={order}
+          onOrderChange={onOrderChange}
+        />
+      </div>
     </div>
   );
 };

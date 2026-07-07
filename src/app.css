@@ -60,3 +60,9 @@ html, body, #root {
 
   padding: 0;
 }
+
+/* 细版滚动条：用于弹窗、浮层等小型滚动区 */
+.os-thin .os-scrollbar {
+  --os-size: 6px;
+  --os-handle-border-radius: 3px;
+}

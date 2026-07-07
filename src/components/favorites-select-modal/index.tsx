@@ -4,8 +4,6 @@ import {
   addToast,
   Button,
   Checkbox,
-  Chip,
-  Divider,
   Modal,
   ModalBody,
   ModalContent,
@@ -14,12 +12,13 @@ import {
   Radio,
   RadioGroup,
 } from "@heroui/react";
-import { RiCheckLine, RiTimeLine } from "@remixicon/react";
+import { RiTimeLine } from "@remixicon/react";
 import { useRequest } from "ahooks";
 
 import type { Page } from "@/service/web-interface-view";
 
 import { formatDuration } from "@/common/utils/time";
+import { TagPanel } from "@/components/tag-popover";
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
@@ -94,15 +93,19 @@ const FavoritesSelectModal = () => {
       setIsPagesLoading(false);
       prevSelectedRef.current = [];
     } else {
-      if (rid) {
-        setSelectedTagIds(getItemTagIds(rid));
-      }
       // 对多P视频提前进入加载态，防止收藏夹列表闪现
       if (needsFetchPages) {
         setIsPagesLoading(true);
       }
     }
-  }, [isFavSelectModalOpen, rid, getItemTagIds, needsFetchPages]);
+  }, [isFavSelectModalOpen, rid, needsFetchPages]);
+
+  // 标签初始状态：分集收藏时标签挂在分集 cid 上，整个视频挂在 rid 上
+  useEffect(() => {
+    if (!isFavSelectModalOpen || !rid || showPagePicker) return;
+    const tagRid = pickedCid !== "whole" ? pickedCid : rid;
+    setSelectedTagIds(getItemTagIds(tagRid));
+  }, [isFavSelectModalOpen, rid, showPagePicker, pickedCid, getItemTagIds]);
 
   // 获取多P视频分集列表，决定是否显示选集步骤
   useRequest(
@@ -282,9 +285,9 @@ const FavoritesSelectModal = () => {
         removeLocalItem(folderId, localRid);
       }
 
-      // 保存标签
+      // 保存标签：分集收藏挂在 cid 上，整个视频挂在 rid 上（与本地条目的 rid 一致）
       if (rid) {
-        setItemTagsInStore(rid, selectedTagIds);
+        setItemTagsInStore(localRid, selectedTagIds);
       }
 
       onFavSelectModalOpenChange(false);
@@ -315,6 +318,9 @@ const FavoritesSelectModal = () => {
     }
   };
 
+  // 标签的归属对象：分集收藏时是分集（cid），整个视频时是视频本身（rid）
+  const tagRid = pickedCid !== "whole" ? pickedCid : rid;
+
   const allItems = [
     // 收藏具体分集时不显示 B站收藏夹（分集仅允许存入本地收藏夹）
     ...(pickedCid === "whole"
@@ -340,7 +346,7 @@ const FavoritesSelectModal = () => {
       isOpen={isFavSelectModalOpen}
       onOpenChange={onFavSelectModalOpenChange}
       isDismissable={false}
-      size="md"
+      size={allTags.length > 0 ? "xl" : "md"}
       radius="md"
       classNames={{
         backdrop: "z-200",
@@ -355,7 +361,7 @@ const FavoritesSelectModal = () => {
             <div className="flex items-center justify-center py-10 text-sm text-zinc-400">加载中…</div>
           ) : showPagePicker ? (
             /* 选集步骤 */
-            <ScrollContainer style={{ height: "100%" }}>
+            <ScrollContainer style={{ height: "100%" }} className="os-thin">
               <div className="flex flex-col gap-1 px-4">
                 <RadioGroup value={pickedCid} onValueChange={setPickedCid}>
                   <Radio value="whole">
@@ -389,77 +395,63 @@ const FavoritesSelectModal = () => {
               </div>
             </ScrollContainer>
           ) : (
-            /* 选收藏夹步骤 */
-            <ScrollContainer style={{ height: "100%" }}>
-              <div className="flex flex-col gap-1 overflow-auto px-4">
-                {allItems.map(item => {
-                  const checked = selectedIds.includes(item.id);
-                  return (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      key={item.id}
-                      onClick={() => toggle(item.id)}
-                      onKeyDown={() => toggle(item.id)}
-                      className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    >
-                      <Checkbox
-                        color="primary"
-                        isSelected={checked}
-                        onChange={() => toggle(item.id)}
-                        onClick={e => e.stopPropagation()}
-                        aria-label={item.title}
-                        isDisabled={item.isLocal && !itemInfo}
-                      />
-                      <div className="flex min-w-0 flex-1 items-center justify-between">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{item.title}</div>
-                          <div className="mt-0.5 text-xs text-zinc-500">
-                            {item.media_count ?? 0} 个内容
-                            {item.isLocal && (
-                              <span className="ml-1 rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-700">
-                                本地
-                              </span>
-                            )}
+            /* 选收藏夹步骤：有标签时右侧多一栏标签面板（左右独立滚动），无标签时保持单栏 */
+            <div className={allTags.length > 0 ? "flex h-[340px]" : "h-full"}>
+              <ScrollContainer
+                style={{ height: "100%" }}
+                options={{ scrollbars: { visibility: "hidden" } }}
+                className="min-w-0 flex-1"
+              >
+                <div className="flex flex-col gap-1 overflow-auto px-4">
+                  {allItems.map(item => {
+                    const checked = selectedIds.includes(item.id);
+                    return (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        key={item.id}
+                        onClick={() => toggle(item.id)}
+                        onKeyDown={() => toggle(item.id)}
+                        className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      >
+                        <Checkbox
+                          color="primary"
+                          isSelected={checked}
+                          onChange={() => toggle(item.id)}
+                          onClick={e => e.stopPropagation()}
+                          aria-label={item.title}
+                          isDisabled={item.isLocal && !itemInfo}
+                        />
+                        <div className="flex min-w-0 flex-1 items-center justify-between">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">{item.title}</div>
+                            <div className="mt-0.5 text-xs text-zinc-500">
+                              {item.media_count ?? 0} 个内容
+                              {item.isLocal && (
+                                <span className="ml-1 rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-700">
+                                  本地
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              </ScrollContainer>
               {allTags.length > 0 && (
-                <div className="px-4 pt-3">
-                  <Divider className="mb-3" />
-                  <div className="mb-2 text-sm font-medium text-zinc-500">标签</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allTags.map(tag => {
-                      const selected = selectedTagIds.includes(tag.id);
-                      return (
-                        <Chip
-                          key={tag.id}
-                          variant={selected ? "flat" : "bordered"}
-                          style={
-                            selected
-                              ? { backgroundColor: tag.color + "22", color: tag.color }
-                              : { borderColor: tag.color + "66", color: tag.color }
-                          }
-                          className="cursor-pointer"
-                          startContent={selected ? <RiCheckLine size={12} /> : undefined}
-                          onClick={() =>
-                            setSelectedTagIds(prev =>
-                              prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id],
-                            )
-                          }
-                        >
-                          {tag.name}
-                        </Chip>
-                      );
-                    })}
-                  </div>
+                <div className="border-divider flex w-60 flex-none flex-col border-l pt-2">
+                  <div className="text-foreground-500 px-4 pb-1.5 text-sm font-medium">标签</div>
+                  <TagPanel
+                    selectedIds={selectedTagIds}
+                    onChange={setSelectedTagIds}
+                    className="min-h-0 flex-1"
+                    listClassName="min-h-0 flex-1"
+                  />
                 </div>
               )}
-            </ScrollContainer>
+            </div>
           )}
         </ModalBody>
         <ModalFooter>
@@ -480,7 +472,7 @@ const FavoritesSelectModal = () => {
               onPress={handleConfirm}
               isDisabled={
                 hasSameIds(selectedIds, prevSelectedRef.current) &&
-                hasSameIds(selectedTagIds, rid ? getItemTagIds(rid) : [])
+                hasSameIds(selectedTagIds, tagRid ? getItemTagIds(tagRid) : [])
               }
             >
               确认
