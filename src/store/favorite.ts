@@ -243,29 +243,77 @@ export const useFavoritesStore = create<State & Action>()(
 );
 
 /**
- * 确保默认红心歌单「我喜欢的音乐」存在。作为私人FM/心动模式的数据源，且不可删除。
- * 必须在 rehydrate 完成后调用，否则会被随后加载的持久化数据覆盖。
+ * 确保恰好存在一个默认红心歌单「我喜欢的音乐」（保留 id LIKED_FOLDER_ID = -1）。
+ * 作为私人FM/心动模式的数据源，不可删除。
+ *
+ * 采用（adopt）策略：历史上用户可能手动建过同名本地歌单（普通负数 id -Date.now()）。
+ * 早期版本的本函数只按 id === -1 判断存在与否，因而不认识这类同名旧歌单，会额外再建一个
+ * 空的 -1，导致侧栏出现两个「我喜欢的音乐」（真实反馈过一次）。现改为：发现同名本地旧歌单时，
+ * 把它的歌曲并入 -1 后删除旧歌单，保证同名歌单唯一、且默认歌单里就是用户实际收藏的歌
+ * （私人FM 只读 -1，见 store/heartbeat.ts）。
+ *
+ * ⚠️ 必须在 favorites 与 local-fav-items 两个持久化 store 都 rehydrate 完成后调用：
+ * 迁移歌曲依赖 folderItems 已加载，否则会把旧同名歌单里的歌丢掉。
  */
 export function ensureLikedFolder() {
-  const state = useFavoritesStore.getState();
-  if (state.createdFavorites.some(f => f.id === LIKED_FOLDER_ID)) return;
-  state.addCreatedFavorite({
-    id: LIKED_FOLDER_ID,
-    title: LIKED_FOLDER_TITLE,
-    type: 11,
-    isLocal: true,
-    isDefault: true,
+  const favStore = useFavoritesStore.getState();
+
+  // 需并入的历史同名本地歌单（排除保留 id -1 自身）
+  const dupes = favStore.createdFavorites.filter(
+    f => f.isLocal && f.id !== LIKED_FOLDER_ID && f.title === LIKED_FOLDER_TITLE,
+  );
+  const dupeCover = dupes.find(d => d.cover)?.cover;
+
+  // 1. 确保默认歌单存在，并补齐 isDefault / 封面
+  const existing = favStore.createdFavorites.find(f => f.id === LIKED_FOLDER_ID);
+  if (!existing) {
+    favStore.addCreatedFavorite({
+      id: LIKED_FOLDER_ID,
+      title: LIKED_FOLDER_TITLE,
+      cover: dupeCover, // 复用同名旧歌单封面，减少视觉突变
+      type: 11,
+      isLocal: true,
+      isDefault: true,
+    });
+  } else if (!existing.isDefault || (!existing.cover && dupeCover)) {
+    favStore.modifyCreatedFavorite({
+      ...existing,
+      isDefault: true,
+      cover: existing.cover ?? dupeCover,
+    });
+  }
+
+  if (!dupes.length) return;
+
+  // 2. 把同名旧歌单的歌曲并入默认歌单，再删除旧歌单
+  const { mergeFolder } = useLocalFavItemsStore.getState();
+  dupes.forEach(d => {
+    mergeFolder(Number(d.id), LIKED_FOLDER_ID);
+    useFavoritesStore.getState().rmCreatedFavorite(Number(d.id));
   });
 }
 
-if (useFavoritesStore.persist.hasHydrated()) {
-  ensureLikedFolder();
-} else {
-  const unsub = useFavoritesStore.persist.onFinishHydration(() => {
-    unsub();
-    ensureLikedFolder();
+/** 等待多个持久化 store 全部 rehydrate 后执行一次回调 */
+function whenAllHydrated(
+  stores: { persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void } }[],
+  cb: () => void,
+) {
+  const pending = new Set(stores.filter(s => !s.persist.hasHydrated()));
+  if (pending.size === 0) {
+    cb();
+    return;
+  }
+  pending.forEach(store => {
+    const unsub = store.persist.onFinishHydration(() => {
+      unsub();
+      pending.delete(store);
+      if (pending.size === 0) cb();
+    });
   });
 }
+
+// 依赖 folderItems，故须等 favorites 与 local-fav-items 两个 store 都 hydrate 完成
+whenAllHydrated([useFavoritesStore, useLocalFavItemsStore], ensureLikedFolder);
 
 /** 远程拉取结果 —— ok=false 代表请求链路失败，调用方必须拒绝覆写本地状态 */
 type FetchResult = { ok: true; list: FavoriteItem[] } | { ok: false };

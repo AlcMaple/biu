@@ -53,6 +53,8 @@ interface Action {
   getItems: (folderId: number) => LocalFavItem[];
   getItemCount: (folderId: number) => number;
   clearFolder: (folderId: number) => void;
+  /** 将 fromId 收藏夹的条目并入 toId（按 rid 去重、保留各自原 fav_time），并移除 fromId */
+  mergeFolder: (fromId: number, toId: number) => void;
   /** 跨所有收藏夹按 rid 设置自定义歌手 */
   setCustomArtistByRid: (rid: string | number, artist: string | undefined) => void;
   /**
@@ -109,6 +111,18 @@ export const useLocalFavItemsStore = create<State & Action>()(
         set(state => {
           const next = { ...state.folderItems };
           delete next[folderId];
+          return { folderItems: next };
+        }),
+      mergeFolder: (fromId, toId) =>
+        set(state => {
+          if (fromId === toId) return {};
+          const from = state.folderItems[fromId];
+          if (!from) return {};
+          const to = state.folderItems[toId] ?? [];
+          const seen = new Set(to.map(i => String(i.rid)));
+          const merged = [...to, ...from.filter(i => !seen.has(String(i.rid)))];
+          const next = { ...state.folderItems, [toId]: merged };
+          delete next[fromId];
           return { folderItems: next };
         }),
       updateInvalidFlags: (folderId, invalidRids, checkedRids) =>

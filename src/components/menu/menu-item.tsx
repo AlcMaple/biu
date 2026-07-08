@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import clx from "classnames";
@@ -38,7 +38,6 @@ const MenuItem: React.FC<MenuItemProps> = ({
   dndProps,
 }) => {
   const location = useLocation();
-  const { id } = useParams();
   const navigate = useNavigate();
 
   const handlePress = () => {
@@ -46,9 +45,12 @@ const MenuItem: React.FC<MenuItemProps> = ({
     onPress?.();
   };
 
+  // 精确匹配路径段：早期用 href.includes(routeId) 做子串匹配，当选中歌单 id 为短前缀
+  // （如默认红心歌单 -1）时会命中所有以其为前缀的本地歌单 id（-1772…），导致全部误高亮。
   const isActive = useMemo(() => {
-    return location.pathname === href || (id && href?.split("?")[0].includes(id));
-  }, [location.pathname, href, id]);
+    if (!href) return false;
+    return location.pathname === href.split("?")[0];
+  }, [location.pathname, href]);
 
   const iconContent = useMemo(() => {
     const icon =
