@@ -6,6 +6,7 @@ import DownloadList from "./pages/download-list";
 import DynamicFeed from "./pages/dynamic-feed";
 import EmptyPage from "./pages/empty";
 import FollowList from "./pages/follow-list";
+import Heartbeat from "./pages/heartbeat";
 import History from "./pages/history";
 import Later from "./pages/later";
 import LocalMusicPage from "./pages/local-music";
@@ -26,6 +27,10 @@ const routes: RouteObject[] = [
       {
         index: true,
         element: <MusicRecommend />,
+      },
+      {
+        path: "heartbeat",
+        element: <Heartbeat />,
       },
       {
         path: "later",

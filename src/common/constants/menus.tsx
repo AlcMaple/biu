@@ -1,6 +1,8 @@
 import {
   RiDiscLine,
   RiDiscFill,
+  RiHeartPulseLine,
+  RiHeartPulseFill,
   RiUserFollowLine,
   RiUserFollowFill,
   RiFileDownloadLine,
@@ -21,6 +23,12 @@ export const DefaultMenuList: (MenuItemProps & { needLogin?: boolean })[] = [
     href: "/",
     icon: RiDiscLine,
     activeIcon: RiDiscFill,
+  },
+  {
+    title: "私人FM",
+    href: "/heartbeat",
+    icon: RiHeartPulseLine,
+    activeIcon: RiHeartPulseFill,
   },
   {
     title: "我的关注",

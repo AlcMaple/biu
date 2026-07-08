@@ -273,6 +273,10 @@ const LocalFavorites = () => {
   }, [folderId, removeItem]);
 
   const handleDeleteFolder = useCallback(() => {
+    if (folder?.isDefault) {
+      addToast({ title: "默认歌单不可删除", color: "warning" });
+      return;
+    }
     onOpenConfirmModal({
       title: folder?.title ? `确认删除「${folder.title}」吗？` : "确认删除该收藏夹吗？",
       type: "danger",
@@ -283,7 +287,7 @@ const LocalFavorites = () => {
         return true;
       },
     });
-  }, [clearFolder, folder?.title, folderId, navigate, onOpenConfirmModal, rmCreatedFavorite]);
+  }, [clearFolder, folder?.isDefault, folder?.title, folderId, navigate, onOpenConfirmModal, rmCreatedFavorite]);
 
   const handleMenuAction = useCallback(
     async (key: string, item: LocalFavItem) => {
@@ -390,7 +394,7 @@ const LocalFavorites = () => {
       color: "danger" as const,
       onPress: handleDeleteFolder,
     },
-  ];
+  ].filter(m => !(m.key === "delete" && folder?.isDefault));
 
   return (
     <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={folderIdStr} className="h-full w-full px-4 pb-6">

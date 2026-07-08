@@ -52,6 +52,7 @@ interface CollectionMenuItem {
   type?: number;
   mid?: number;
   isLocal?: boolean;
+  isDefault?: boolean;
 }
 
 const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Props) => {
@@ -247,6 +248,10 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
 
   const handleDeleteFavorite = useCallback(
     (favorite: FavoriteItem) => {
+      if (favorite.isDefault) {
+        addToast({ title: "默认歌单不可删除", color: "warning" });
+        return;
+      }
       onOpenConfirmModal({
         title: favorite.title ? `确认删除「${favorite.title}」吗？` : "确认删除该收藏夹吗？",
         type: "danger",
@@ -455,7 +460,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
               id={item.id}
               collapsed={isCollapsed}
               disabled={!isGroupDragEnabled}
-              contextMenuItems={contextMenuItems}
+              contextMenuItems={item.isDefault ? contextMenuItems.filter(m => m.key !== "delete") : contextMenuItems}
               onContextMenuAction={action => onContextMenuAction(action, item)}
               {...item}
             />
@@ -491,6 +496,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
       type: item.type,
       mid: item.mid,
       isLocal: item.isLocal,
+      isDefault: item.isDefault,
     }));
 
     const titleExtra = onOpenAddFavorite ? (
@@ -522,6 +528,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
           id: item.id,
           title: item.title,
           isLocal: item.isLocal,
+          isDefault: item.isDefault,
         }),
     });
   };

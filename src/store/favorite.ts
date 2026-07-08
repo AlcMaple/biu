@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import platform from "@/platform";
 import { getFavFolderCollectedList } from "@/service/fav-folder-collected-list";
 import { getFavFolderCreatedList } from "@/service/fav-folder-created-list";
@@ -17,6 +18,8 @@ export interface FavoriteItem {
   mid?: number;
   /** 本地创建 */
   isLocal?: boolean;
+  /** 默认歌单（如「我喜欢的音乐」），不可删除 */
+  isDefault?: boolean;
   intro?: string;
 }
 
@@ -238,6 +241,31 @@ export const useFavoritesStore = create<State & Action>()(
     },
   ),
 );
+
+/**
+ * 确保默认红心歌单「我喜欢的音乐」存在。作为私人FM/心动模式的数据源，且不可删除。
+ * 必须在 rehydrate 完成后调用，否则会被随后加载的持久化数据覆盖。
+ */
+export function ensureLikedFolder() {
+  const state = useFavoritesStore.getState();
+  if (state.createdFavorites.some(f => f.id === LIKED_FOLDER_ID)) return;
+  state.addCreatedFavorite({
+    id: LIKED_FOLDER_ID,
+    title: LIKED_FOLDER_TITLE,
+    type: 11,
+    isLocal: true,
+    isDefault: true,
+  });
+}
+
+if (useFavoritesStore.persist.hasHydrated()) {
+  ensureLikedFolder();
+} else {
+  const unsub = useFavoritesStore.persist.onFinishHydration(() => {
+    unsub();
+    ensureLikedFolder();
+  });
+}
 
 /** 远程拉取结果 —— ok=false 代表请求链路失败，调用方必须拒绝覆写本地状态 */
 type FetchResult = { ok: true; list: FavoriteItem[] } | { ok: false };
