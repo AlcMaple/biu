@@ -20,9 +20,10 @@ import { postFavResourceBatchDel } from "@/service/fav-resource-batch-del";
 import { postFavResourceClean } from "@/service/fav-resource-clean";
 import { useFavFolderItemsStore } from "@/store/fav-folder-items";
 import { useFavoritesStore } from "@/store/favorite";
+import { useHeartbeat } from "@/store/heartbeat";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
-import { isSame, usePlayList } from "@/store/play-list";
+import { isSame, usePlayList, type PlayItem } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
@@ -210,17 +211,33 @@ const Favorites = () => {
     [loadPage, order],
   );
 
-  const handleItemPress = useCallback((item: FavMedia) => {
-    usePlayList.getState().play({
-      type: item.type === 2 ? "mv" : "audio",
-      bvid: item.type === 2 ? item.bvid : undefined,
-      sid: item.type === 12 ? item.id : undefined,
-      title: item.title,
-      cover: item.cover,
-      ownerName: item.upper?.name,
-      ownerMid: item.upper?.mid,
-    });
-  }, []);
+  const handleItemPress = useCallback(
+    async (item: FavMedia) => {
+      const clicked: PlayItem = {
+        type: item.type === 2 ? "mv" : "audio",
+        bvid: item.type === 2 ? item.bvid : undefined,
+        sid: item.type === 12 ? item.id : undefined,
+        title: item.title,
+        cover: item.cover,
+        ownerName: item.upper?.name,
+        ownerMid: item.upper?.mid,
+      };
+      // 心动模式进行中：从收藏夹点歌视为「转去播放这个收藏夹」——结束私人FM，整队替换成整个收藏夹
+      if (useHeartbeat.getState().active && favFolderId) {
+        try {
+          const all = await getAllFavMedia({ id: favFolderId });
+          if (all.length) {
+            useHeartbeat.getState().stopAndReplace(all, clicked);
+            return;
+          }
+        } catch {
+          // 拉取全量失败则退化为普通插播
+        }
+      }
+      usePlayList.getState().play(clicked);
+    },
+    [favFolderId],
+  );
 
   const onPlayAll = async () => {
     if (!favFolderId) {

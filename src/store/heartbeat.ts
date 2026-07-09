@@ -5,15 +5,19 @@ import {
   INITIAL_QUEUE_TARGET,
   LIKED_FOLDER_ID,
   MAX_SEEDS,
+  MAX_SERVED_HISTORY,
+  SECOND_DEGREE_SEEDS,
   SIMILAR_PER_LIKED,
   TOPUP_BATCH,
   TOPUP_THRESHOLD,
 } from "@/common/constants/heartbeat";
 import { getLocalFavMedia } from "@/common/utils/fav";
-import { type SongCandidate } from "@/common/utils/pure-song";
-import { buildCandidatePool, type Seed } from "@/service/heartbeat/candidate-engine";
+import { songKey, type SongCandidate } from "@/common/utils/pure-song";
+import platform from "@/platform";
+import { buildCandidatePool, clearHeartbeatCache, type Seed } from "@/service/heartbeat/candidate-engine";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList, type PlayItem } from "@/store/play-list";
+import { StoreNameMap } from "@shared/store";
 
 /** start() 的结果，交给页面决定提示文案 */
 export type StartResult = "ok" | "likes-only" | "empty" | "error";
@@ -23,14 +27,22 @@ interface HeartbeatState {
   active: boolean;
   /** 是否正在构建队列 */
   loading: boolean;
-  /** 已服务过的候选 bvid（避免重复推荐） */
+  /** 已服务过的候选 bvid（避免重复推荐，含持久化的跨会话历史） */
   servedBvids: Set<string>;
-  /** 本会话红心种子的 bvid（用于判断当前队列是否仍是本会话） */
-  sessionBvids: Set<string>;
-  /** UP 反馈分：种子里出现越多分越高，续供时优先推这些 UP 的歌 */
+  /** 已服务过的歌曲指纹（同名去重） */
+  servedKeys: Set<string>;
+  /** 本会话在播放队列里的 PlayData id 集合（判断当前队列是否仍属于本次心动会话） */
+  sessionIds: Set<string>;
+  /** UP 反馈分：越高续供越优先；被「不喜欢」的 UP 会被压低 */
   ownerScore: Record<number, number>;
+  /** 开始一次心动会话（每次进入都会重开，打断当前播放） */
   start: () => Promise<StartResult>;
+  /** 结束心动会话 */
   stop: () => void;
+  /** 结束心动会话并把播放队列整体替换成给定歌单（用于「转去播放某个歌单」） */
+  stopAndReplace: (medias: PlayItem[], startFrom?: PlayItem) => void;
+  /** 把当前播放的歌加入/移出「我喜欢的音乐」 */
+  toggleLikeCurrent: () => "added" | "removed" | null;
 }
 
 /** 随机打乱（Fisher-Yates） */
@@ -54,10 +66,19 @@ function candToPlayItem(c: SongCandidate): PlayItem {
   };
 }
 
+/** 两个播放项是否同一首（用于把歌单旋转到点击的那首起播） */
+function sameItem(a: PlayItem, b: PlayItem): boolean {
+  if (a.type !== b.type) return false;
+  if (a.type === "mv") return Boolean(a.bvid) && a.bvid === b.bvid;
+  if (a.type === "audio") {
+    return (a.sid !== undefined && a.sid === b.sid) || (a.source === "local" && Boolean(a.id) && a.id === b.id);
+  }
+  return false;
+}
+
 /**
  * 交织：以相似歌起手（尽量少插红心），每 SIMILAR_PER_LIKED 首相似歌后穿插 1 首红心歌。
- * 每首红心歌至多出现一次。若相似歌太少、整段一次都没插到红心，则在开头附近补 1 首，
- * 保证「红心尽量少但不能没有」。
+ * 每首红心歌至多出现一次；整段一次都没插到时在开头附近补 1 首，保证「红心尽量少但不能没有」。
  */
 function interleave(likes: PlayItem[], sims: PlayItem[]): PlayItem[] {
   if (!sims.length) return likes;
@@ -96,33 +117,77 @@ function debugDumpQueue(pool: SongCandidate[], queue: PlayItem[], simBvids: Set<
   console.groupEnd();
 }
 
-/** 从红心歌单取种子（采样、需带 bvid 或 ownerMid） */
-function collectSeeds(): { seeds: Seed[]; likedBvids: Set<string>; ownerScore: Record<number, number> } {
-  const items = useLocalFavItemsStore
+// —— 红心种子上下文 ——
+
+function likedItems() {
+  return useLocalFavItemsStore
     .getState()
     .getItems(LIKED_FOLDER_ID)
     .filter(i => !i.invalid);
+}
 
+function likedContext() {
+  const items = likedItems();
   const likedBvids = new Set<string>(items.map(i => i.bvid).filter((b): b is string => Boolean(b)));
-
   const ownerScore: Record<number, number> = {};
   items.forEach(i => {
     if (i.ownerMid) ownerScore[i.ownerMid] = (ownerScore[i.ownerMid] ?? 0) + 1;
   });
+  return { items, likedBvids, ownerScore };
+}
 
-  const seeds: Seed[] = shuffle(items)
-    .filter(i => i.bvid || i.ownerMid)
-    .slice(0, MAX_SEEDS)
-    .map(i => ({ bvid: i.bvid, ownerMid: i.ownerMid }));
+// —— 种子轮转：一次会话把红心歌单里所有能当种子的歌分批轮着用，保证不漏任何一首 ——
 
-  return { seeds, likedBvids, ownerScore };
+let seedOrder: Seed[] = [];
+let seedCursor = 0;
+
+function resetSeedRotation() {
+  seedOrder = shuffle(likedItems().filter(i => i.bvid || i.ownerMid)).map(i => ({
+    bvid: i.bvid,
+    ownerMid: i.ownerMid,
+  }));
+  seedCursor = 0;
+}
+
+/** 取下一批种子（轮转，用完一轮从头继续，覆盖全部红心） */
+function nextSeeds(count: number): Seed[] {
+  if (!seedOrder.length) resetSeedRotation();
+  if (!seedOrder.length) return [];
+  const n = Math.min(count, seedOrder.length);
+  const out: Seed[] = [];
+  for (let k = 0; k < n; k++) {
+    out.push(seedOrder[(seedCursor + k) % seedOrder.length]);
+  }
+  seedCursor = (seedCursor + n) % seedOrder.length;
+  return out;
+}
+
+// —— 已推历史持久化（跨会话/跨天不重复推荐） ——
+
+async function loadServed(): Promise<{ bvids: string[]; keys: string[] }> {
+  try {
+    const s = (await platform.getStore(StoreNameMap.HeartbeatServed)) as
+      | { bvids?: string[]; keys?: string[] }
+      | undefined;
+    return { bvids: s?.bvids ?? [], keys: s?.keys ?? [] };
+  } catch {
+    return { bvids: [], keys: [] };
+  }
+}
+
+function persistServed(bvids: Set<string>, keys: Set<string>) {
+  void platform.setStore(StoreNameMap.HeartbeatServed, {
+    bvids: [...bvids].slice(-MAX_SERVED_HISTORY),
+    keys: [...keys].slice(-MAX_SERVED_HISTORY),
+  });
 }
 
 export const useHeartbeat = create<HeartbeatState>((set, get) => ({
   active: false,
   loading: false,
   servedBvids: new Set(),
-  sessionBvids: new Set(),
+  servedKeys: new Set(),
+  sessionIds: new Set(),
   ownerScore: {},
 
   start: async () => {
@@ -136,11 +201,23 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
         return "empty";
       }
 
-      const { seeds, likedBvids, ownerScore } = collectSeeds();
-      const pool = await buildCandidatePool(seeds, { exclude: likedBvids, doVerify: true });
+      clearHeartbeatCache(); // 新会话：清掉上一会话的同 UP/看了又看缓存
+      resetSeedRotation();
+
+      const hist = await loadServed(); // 跨会话已推历史
+      const served = new Set<string>(hist.bvids);
+      const servedKeys = new Set<string>(hist.keys);
+
+      const { likedBvids, ownerScore } = likedContext();
+      const seeds = nextSeeds(MAX_SEEDS);
+      const exclude = new Set<string>([...likedBvids, ...served]); // 排除红心 + 历史已推
+      const pool = await buildCandidatePool(seeds, { exclude, excludeKeys: servedKeys, doVerify: true });
 
       const sims = shuffle(pool).map(candToPlayItem);
-      const served = new Set<string>(pool.map(c => c.bvid));
+      pool.forEach(c => {
+        served.add(c.bvid);
+        servedKeys.add(songKey(c.title));
+      });
 
       // 循环模式播放，保住交织顺序（随机模式会打乱穿插比例）
       const audio = usePlayList.getState().getAudio();
@@ -148,18 +225,13 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       usePlayList.setState({ playMode: PlayMode.Loop });
 
       const queue = sims.length ? interleave(shuffle(likes), sims).slice(0, INITIAL_QUEUE_TARGET) : shuffle(likes);
-
-      debugDumpQueue(pool, queue, served);
+      debugDumpQueue(pool, queue, new Set(pool.map(c => c.bvid)));
 
       await usePlayList.getState().playList(queue);
+      const sessionIds = new Set(usePlayList.getState().list.map(it => it.id));
 
-      set({
-        active: true,
-        loading: false,
-        servedBvids: served,
-        sessionBvids: likedBvids,
-        ownerScore,
-      });
+      set({ active: true, loading: false, servedBvids: served, servedKeys, sessionIds, ownerScore });
+      persistServed(served, servedKeys);
       attachTopup();
 
       return sims.length ? "ok" : "likes-only";
@@ -173,6 +245,40 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
   stop: () => {
     detachTopup();
     set({ active: false });
+  },
+
+  stopAndReplace: (medias, startFrom) => {
+    get().stop();
+    let ordered = medias;
+    if (startFrom) {
+      const idx = medias.findIndex(m => sameItem(m, startFrom));
+      if (idx > 0) ordered = [...medias.slice(idx), ...medias.slice(0, idx)];
+    }
+    void usePlayList.getState().playList(ordered);
+  },
+
+  toggleLikeCurrent: () => {
+    const cur = usePlayList.getState().getPlayItem();
+    if (!cur || cur.type !== "mv" || !cur.bvid) return null;
+
+    const store = useLocalFavItemsStore.getState();
+    const rid = cur.aid ? Number(cur.aid) : cur.bvid;
+    if (store.hasItem(LIKED_FOLDER_ID, rid)) {
+      store.removeItem(LIKED_FOLDER_ID, rid);
+      return "removed";
+    }
+    store.addItem(LIKED_FOLDER_ID, {
+      rid,
+      type: 2,
+      source: "online",
+      title: cur.title,
+      cover: cur.cover,
+      bvid: cur.bvid,
+      ownerName: cur.ownerName,
+      ownerMid: cur.ownerMid,
+      duration: cur.duration,
+    });
+    return "added";
   },
 }));
 
@@ -206,8 +312,9 @@ async function maybeTopup() {
 
   const { list, playId } = usePlayList.getState();
 
-  // 队列是否仍是本会话：还含有服务过的/红心的曲目。若用户改播了别的东西，自动结束心动会话。
-  const inSession = list.some(it => it.bvid && (hb.servedBvids.has(it.bvid) || hb.sessionBvids.has(it.bvid)));
+  // 队列是否仍属于本会话：按 play-list 内部 id 判断（不看 bvid）。
+  // 搜索/全网插播时会话原有 id 仍在 → 继续；点歌单（播放全部或点单曲）整队替换 → id 全变 → 自动结束心动会话。
+  const inSession = list.some(it => hb.sessionIds.has(it.id));
   if (!inSession) {
     useHeartbeat.getState().stop();
     return;
@@ -219,23 +326,44 @@ async function maybeTopup() {
 
   toppingUp = true;
   try {
-    const { seeds } = collectSeeds();
-    const exclude = new Set<string>([...hb.sessionBvids, ...hb.servedBvids]);
-    const pool = await buildCandidatePool(seeds, { exclude, doVerify: true });
+    const { likedBvids } = likedContext();
+    // 二度扩展：拿几首已服务过的候选当新的「看了又看」种子，持续引入新 UP，避免只在红心的同 UP 里打转
+    const secondDegree: Seed[] = [...hb.servedBvids]
+      .slice(-40)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, SECOND_DEGREE_SEEDS)
+      .map(bvid => ({ bvid }));
+
+    const allSeeds = [...nextSeeds(MAX_SEEDS), ...secondDegree];
+    const exclude = new Set<string>([...likedBvids, ...hb.servedBvids]);
+    const pool = await buildCandidatePool(allSeeds, {
+      exclude,
+      excludeKeys: hb.servedKeys,
+      maxSeeds: allSeeds.length,
+      doVerify: true,
+    });
     if (!pool.length) return;
 
-    // 反馈重排：偏好红心里出现更多的 UP
+    // 反馈重排：偏好红心里出现更多的 UP（被「不喜欢」的 UP 会被压低）
     const ranked = [...pool].sort(
       (a, b) => (hb.ownerScore[b.ownerMid ?? -1] ?? 0) - (hb.ownerScore[a.ownerMid ?? -1] ?? 0),
     );
 
-    const batch = ranked.slice(0, TOPUP_BATCH).map(candToPlayItem);
-    debugDumpQueue(ranked.slice(0, TOPUP_BATCH), batch, new Set(ranked.map(c => c.bvid)));
+    const picked = ranked.slice(0, TOPUP_BATCH);
+    const batch = picked.map(candToPlayItem);
+    debugDumpQueue(picked, batch, new Set(picked.map(c => c.bvid)));
     usePlayList.getState().addList(batch);
 
-    const served = new Set(useHeartbeat.getState().servedBvids);
-    ranked.forEach(c => served.add(c.bvid));
-    useHeartbeat.setState({ servedBvids: served });
+    const cur = useHeartbeat.getState();
+    const served = new Set(cur.servedBvids);
+    const servedKeys = new Set(cur.servedKeys);
+    picked.forEach(c => {
+      served.add(c.bvid);
+      servedKeys.add(songKey(c.title));
+    });
+    const sessionIds = new Set([...cur.sessionIds, ...usePlayList.getState().list.map(it => it.id)]);
+    useHeartbeat.setState({ servedBvids: served, servedKeys, sessionIds });
+    persistServed(served, servedKeys);
   } catch (e) {
     console.error("[heartbeat] top-up failed", e);
   } finally {

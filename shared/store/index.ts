@@ -8,4 +8,5 @@ export enum StoreNameMap {
   LocalFavItems = "local-fav-items",
   Tags = "tags",
   WindowState = "window-state",
+  HeartbeatServed = "heartbeat-served",
 }

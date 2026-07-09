@@ -35,4 +35,13 @@ export const TOPUP_THRESHOLD = 8;
 export const TOPUP_BATCH = 20;
 
 /** Stage 2（view 核验）单批最多核验多少个候选，控制请求量 */
-export const VERIFY_LIMIT = 24;
+export const VERIFY_LIMIT = 18;
+
+/** 单个 UP 在一次构建里最多贡献几首（防同一系列/同曲风刷屏，逼出多样性） */
+export const PER_UP_CAP = 2;
+
+/** 续供时额外拿几首「已服务过的候选」当新的看了又看种子（二度扩展，引入新 UP） */
+export const SECOND_DEGREE_SEEDS = 3;
+
+/** 已推荐历史的持久化上限（滚动保留最近这么多首，跨会话/跨天不重复；到顶后最老的滚出、可再出现） */
+export const MAX_SERVED_HISTORY = 800;
