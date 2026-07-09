@@ -31,7 +31,7 @@ export const toSeconds = (d: number | string | undefined | null): number => {
  * 这是过滤噪声的主力（B 站音乐区搜索里大量 40 分钟循环歌单、reaction、直拍、测评）。
  */
 const TITLE_BLOCK =
-  /(合集|歌单|串烧|联唱|medley|mashup|混剪|直拍|翻跳|对比|测评|评测|开箱|拆箱|vlog|盘点|排行|top\s*\d|一小时|1\s*小时|半小时|\d{2,}\s*首|循环\s*歌|\bloop\b|repeat|教学|教程|扒谱|reaction|react\b|解说|讲解|直播|录播|回放|全专|专辑|电台|采访|剪辑)/i;
+  /(合集|歌单|串烧|联唱|medley|mashup|混剪|直拍|翻跳|对比|测评|评测|开箱|拆箱|vlog|盘点|排行|top\s*\d|一小时|1\s*小时|半小时|\d{2,}\s*首|循环\s*歌|\bloop\b|repeat|教学|教程|扒谱|reaction|react\b|解说|讲解|直播|录播|回放|全专|专辑|电台|采访|剪辑|同台|演唱会|演唱會|the\s*first\s*take|ファースト・?テイク)/i;
 
 /** 子分区名命中即排除：现场有大量前后摇/报幕/掌声，电台/教学为口播。 */
 const TNAME_BLOCK = /(现场|电台|教学|乐评|资讯|访谈)/;
@@ -46,4 +46,30 @@ export function isPureSongCandidate(c: SongCandidate): boolean {
   if (TITLE_BLOCK.test(c.title)) return false;
   if (c.tname && TNAME_BLOCK.test(c.tname)) return false;
   return true;
+}
+
+/**
+ * 从标题提取「歌曲指纹」用于同名去重：不同 UP 传的同一首歌（bvid 不同、标题略有差异）折叠成同一 key。
+ * 去掉括号内容 + 常见修饰词 + 非字母数字，剩核心歌名。启发式，宁可偶尔错并（精度优先）。
+ */
+export function songKey(title: string): string {
+  let t = (title ?? "").toLowerCase();
+  t = t.replace(/[【[（(「『《<].*?[】\]）)」』>》]/g, " ");
+  t = t.replace(
+    /中日|中文|双语|字幕|中字|歌词|完整版|full|官方|官方版|\bmv\b|4k|8k|hd|1080p|无损|hi-?res|高音质|cover|翻唱|feat\.?|ft\.?|live|超清|谐音|纯音乐|伴奏|remix|重制|搬运|首发/gi,
+    " ",
+  );
+  t = t.replace(/[^\p{L}\p{N}]/gu, "");
+  return t || title.trim().toLowerCase();
+}
+
+/**
+ * 同名判定：两个歌曲指纹相等，或较短者（≥4 字，避免超短名误并）是较长者的子串，即视为同一首歌。
+ * 用子串包含而非精确相等，是为了吃下「裸歌名」vs「歌名+歌手名+歌词分配」这类同一首歌的不同投稿。
+ */
+export function isSameSong(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.length >= 4 && long.includes(short);
 }

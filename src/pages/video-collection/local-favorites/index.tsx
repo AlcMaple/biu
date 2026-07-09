@@ -43,6 +43,7 @@ import SearchWithSort from "@/components/search-with-sort";
 import { TagFilterPopover } from "@/components/tag-popover";
 import platform from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
+import { useHeartbeat } from "@/store/heartbeat";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -222,9 +223,18 @@ const LocalFavorites = () => {
         addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
         return;
       }
+      // 心动模式进行中：从歌单点歌视为「转去播放这个歌单」——结束私人FM，整队替换成本歌单
+      if (useHeartbeat.getState().active) {
+        const medias = items
+          .filter(i => !i.invalid)
+          .map(itemToPlayItem)
+          .filter(m => !(m.source === "local" && !m.audioUrl));
+        useHeartbeat.getState().stopAndReplace(medias, playItem);
+        return;
+      }
       usePlayList.getState().play(playItem);
     },
-    [itemToPlayItem],
+    [itemToPlayItem, items],
   );
 
   const handlePlayAll = useCallback(async () => {

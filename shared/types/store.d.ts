@@ -11,6 +11,7 @@ declare global {
     [StoreNameMap.LocalFavorites]: Record<string, any>;
     [StoreNameMap.LocalFavItems]: Record<string, any>;
     [StoreNameMap.Tags]: Record<string, any>;
+    [StoreNameMap.HeartbeatServed]: { bvids: string[]; keys: string[] };
   };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPureSongCandidate, toSeconds, type SongCandidate } from "@/common/utils/pure-song";
+import { isPureSongCandidate, isSameSong, songKey, toSeconds, type SongCandidate } from "@/common/utils/pure-song";
 
 const base: SongCandidate = {
   bvid: "BV1xx",
@@ -35,6 +35,8 @@ describe("isPureSongCandidate", () => {
       "【路人re】苏新皓朱志鑫同舞台直拍对比",
       "reaction 第一次听",
       "电吉他改装爱好者必看！拾音器测评",
+      "【偶像活动】星宫莓 雾矢葵 初同台 アイドル活動！",
+      "THE FIRST TAKE / 优里 - 大提灯",
     ]) {
       expect(isPureSongCandidate({ ...base, title, durationSec: 210 })).toBe(false);
     }
@@ -52,5 +54,23 @@ describe("isPureSongCandidate", () => {
 
   it("rejects when bvid is missing", () => {
     expect(isPureSongCandidate({ ...base, bvid: "" })).toBe(false);
+  });
+});
+
+describe("同名去重 songKey / isSameSong", () => {
+  it("folds the same song uploaded with different decorated titles (图1 case)", () => {
+    const a = songKey("カレンダーガール (Calendar Girl) — 星宮莓 x 霧矢葵 | 歌词分配 | 中字");
+    const b = songKey("[中字] カレンダーガール");
+    expect(isSameSong(a, b)).toBe(true);
+  });
+
+  it("folds live/cover variants of one song", () => {
+    expect(isSameSong(songKey("晴天"), songKey("晴天 (Live)"))).toBe(true);
+    expect(isSameSong(songKey("カレンダーガール"), songKey("【中字】カレンダーガール 完整版"))).toBe(true);
+  });
+
+  it("keeps different songs distinct", () => {
+    expect(isSameSong(songKey("晴天"), songKey("稻香"))).toBe(false);
+    expect(isSameSong(songKey("カレンダーガール"), songKey("エメラルドの魔法"))).toBe(false);
   });
 });
