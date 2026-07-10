@@ -133,9 +133,19 @@ const LocalFavorites = () => {
     });
   }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags]);
 
+  // 当前歌单内实际用到的标签（标签筛选只针对歌单内部）
+  const availableTagIds = useMemo(() => {
+    const set = new Set<number>();
+    for (const item of rawItems) {
+      for (const tid of itemTags[String(item.rid)] ?? []) set.add(tid);
+    }
+    return [...set];
+  }, [rawItems, itemTags]);
+
   useEffect(() => {
     setSortKey("time");
     setSortDir("desc");
+    setActiveTagIds([]);
   }, [folderIdStr]);
 
   // 打开收藏夹时后台检测 B 站资源失效状态并打标记（每次启动每个收藏夹只检测一次）
@@ -457,7 +467,7 @@ const LocalFavorites = () => {
           </Dropdown>
         </div>
         <div className="flex items-center space-x-2">
-          <TagFilterPopover activeTagIds={activeTagIds} onChange={setActiveTagIds} />
+          <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
           <SearchWithSort onKeywordSearch={setKeyword} />
         </div>
       </div>

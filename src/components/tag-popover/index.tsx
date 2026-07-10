@@ -1,19 +1,19 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { RiArrowDownSLine, RiPriceTag3Line } from "@remixicon/react";
 import clx from "classnames";
 
 import ScrollContainer from "@/components/scroll-container";
-import { useTagStore } from "@/store/tags";
+import { type Tag, useTagStore } from "@/store/tags";
 
 interface TagPanelProps {
   /** 已选标签 id */
   selectedIds: number[];
   onChange: (ids: number[]) => void;
-  /** 行尾显示每个标签已打标的内容数 */
-  showCounts?: boolean;
-  /** 传入则显示底部「清除筛选」footer（筛选场景） */
+  /** 覆盖展示的标签列表（默认取全局标签）；筛选场景传入「当前歌单内出现过的标签」 */
+  tags?: Tag[];
+  /** 传入则显示底部 footer（筛选场景：未选时提示可多选，已选时给「清除筛选」） */
   onClear?: () => void;
   className?: string;
   /** 控制列表区高度（默认 max-h-56） */
@@ -24,20 +24,16 @@ interface TagPanelProps {
  * 标签面板：圆环↔色点多选列表（标签的创建/删除在设置页完成）。
  * 既可内嵌使用（收藏弹窗右栏），也可包在 Popover 里作为筛选浮层。
  */
-export const TagPanel = ({ selectedIds, onChange, showCounts, onClear, className, listClassName }: TagPanelProps) => {
-  const tags = useTagStore(s => s.tags);
-  const itemTags = useTagStore(s => s.itemTags);
-
-  const counts = useMemo(() => {
-    if (!showCounts) return {} as Record<number, number>;
-    const result: Record<number, number> = {};
-    for (const ids of Object.values(itemTags)) {
-      for (const id of ids) {
-        result[id] = (result[id] ?? 0) + 1;
-      }
-    }
-    return result;
-  }, [showCounts, itemTags]);
+export const TagPanel = ({
+  selectedIds,
+  onChange,
+  tags: tagsProp,
+  onClear,
+  className,
+  listClassName,
+}: TagPanelProps) => {
+  const storeTags = useTagStore(s => s.tags);
+  const tags = tagsProp ?? storeTags;
 
   const toggle = (id: number) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
@@ -66,9 +62,6 @@ export const TagPanel = ({ selectedIds, onChange, showCounts, onClear, className
                   style={selected ? { backgroundColor: tag.color, borderColor: tag.color } : undefined}
                 />
                 <span className="min-w-0 truncate">{tag.name}</span>
-                {showCounts && (
-                  <span className="text-foreground-400 ml-auto text-[10px] tabular-nums">{counts[tag.id] ?? 0}</span>
-                )}
               </div>
             );
           })}
@@ -76,18 +69,18 @@ export const TagPanel = ({ selectedIds, onChange, showCounts, onClear, className
       </ScrollContainer>
 
       {Boolean(onClear) && (
-        <div className="border-divider text-foreground-400 flex items-center justify-between border-t px-3 py-2 text-[11px]">
-          <span>可多选 · 任一命中</span>
-          <button
-            type="button"
-            onClick={onClear}
-            className={clx(
-              "text-foreground-500 hover:text-foreground text-xs",
-              selectedIds.length ? "visible" : "invisible",
-            )}
-          >
-            清除筛选
-          </button>
+        <div className="border-divider border-t p-1.5">
+          {selectedIds.length > 0 ? (
+            <button
+              type="button"
+              onClick={onClear}
+              className="hover:bg-default-100 text-foreground-500 hover:text-foreground w-full rounded-lg px-2 py-1.5 text-center text-[13px] transition-colors"
+            >
+              清除筛选
+            </button>
+          ) : (
+            <div className="text-foreground-400 py-1 text-center text-[11px]">可多选 · 任一命中</div>
+          )}
         </div>
       )}
     </div>
@@ -96,15 +89,34 @@ export const TagPanel = ({ selectedIds, onChange, showCounts, onClear, className
 
 interface TagFilterPopoverProps {
   activeTagIds: number[];
+  /** 当前歌单内实际出现过的标签 id —— 筛选只针对歌单内部，不展示全局无关标签 */
+  availableTagIds: number[];
   onChange: (ids: number[]) => void;
 }
 
-/** 工具栏「标签」筛选入口：无标签时整体隐藏，有筛选生效时按钮角上亮主色圆点 */
-export const TagFilterPopover = ({ activeTagIds, onChange }: TagFilterPopoverProps) => {
+/**
+ * 工具栏「标签」筛选入口：只展示当前歌单里用到的标签，浮层宽度对齐按钮本身。
+ * 歌单内无任何标签时整体隐藏，有筛选生效时按钮角上亮主色圆点。
+ */
+export const TagFilterPopover = ({ activeTagIds, availableTagIds, onChange }: TagFilterPopoverProps) => {
   const tags = useTagStore(s => s.tags);
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [triggerWidth, setTriggerWidth] = useState<number>();
 
-  if (!tags.length) return null;
+  // 展示的标签 = 歌单内出现过的 ∪ 当前已选（已选的即便被移出歌单也要能取消，避免筛完清不掉）
+  const visibleTags = useMemo(() => {
+    const allowed = new Set([...availableTagIds, ...activeTagIds]);
+    return tags.filter(t => allowed.has(t.id));
+  }, [tags, availableTagIds, activeTagIds]);
+
+  if (!visibleTags.length) return null;
+
+  const handleOpenChange = (open: boolean) => {
+    // 展开前量一次触发按钮宽度，让浮层与按钮同宽
+    if (open && triggerRef.current) setTriggerWidth(triggerRef.current.offsetWidth);
+    setIsOpen(open);
+  };
 
   return (
     <Popover
@@ -113,10 +125,11 @@ export const TagFilterPopover = ({ activeTagIds, onChange }: TagFilterPopoverPro
       offset={8}
       shouldBlockScroll={false}
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={handleOpenChange}
     >
       <PopoverTrigger>
         <Button
+          ref={triggerRef}
           variant="flat"
           radius="md"
           startContent={<RiPriceTag3Line size={16} />}
@@ -129,8 +142,8 @@ export const TagFilterPopover = ({ activeTagIds, onChange }: TagFilterPopoverPro
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[252px] p-0">
-        <TagPanel selectedIds={activeTagIds} onChange={onChange} showCounts onClear={() => onChange([])} />
+      <PopoverContent className="p-0" style={triggerWidth ? { width: triggerWidth } : undefined}>
+        <TagPanel selectedIds={activeTagIds} onChange={onChange} tags={visibleTags} onClear={() => onChange([])} />
       </PopoverContent>
     </Popover>
   );

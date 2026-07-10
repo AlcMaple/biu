@@ -66,6 +66,15 @@ const Favorites = () => {
     });
   }, [items, activeTagIds, itemTags]);
 
+  // 当前收藏夹（已加载部分）内实际用到的标签（标签筛选只针对歌单内部）
+  const availableTagIds = useMemo(() => {
+    const set = new Set<number>();
+    for (const item of items) {
+      for (const tid of itemTags[String(item.id)] ?? []) set.add(tid);
+    }
+    return [...set];
+  }, [items, itemTags]);
+
   const pageRef = useRef(1);
   const scrollRef = useRef<ScrollRefObject>(null);
 
@@ -173,6 +182,7 @@ const Favorites = () => {
     pageRef.current = 1;
     setKeyword(defaultKeyword);
     setOrder(defaultOrder);
+    setActiveTagIds([]);
     clearItems();
     void loadPage(1, defaultKeyword, defaultOrder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -508,7 +518,9 @@ const Favorites = () => {
         onPlayAll={onPlayAll}
         onAddToPlayList={addAllMedia}
         onClearInvalid={clearInvalid}
-        tagFilter={<TagFilterPopover activeTagIds={activeTagIds} onChange={setActiveTagIds} />}
+        tagFilter={
+          <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
+        }
       />
 
       {displayMode === "card" ? (
