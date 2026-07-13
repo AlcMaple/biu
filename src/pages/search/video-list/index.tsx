@@ -96,6 +96,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
+      playCount: item.play,
     }));
 
     usePlayList.getState().addList(items);
@@ -110,6 +111,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
+      playCount: item.play,
     };
 
     switch (key) {

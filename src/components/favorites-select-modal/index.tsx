@@ -17,6 +17,7 @@ import { useRequest } from "ahooks";
 
 import type { Page } from "@/service/web-interface-view";
 
+import { addOnlineItemToLocalFav } from "@/common/utils/fav";
 import { formatDuration } from "@/common/utils/time";
 import { TagPanel } from "@/components/tag-popover";
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
@@ -59,7 +60,6 @@ const FavoritesSelectModal = () => {
 
   // 用具体 selector 避免订阅整个 store 导致不必要的重渲染
   const folderItems = useLocalFavItemsStore(s => s.folderItems);
-  const addLocalItem = useLocalFavItemsStore(s => s.addItem);
   const removeLocalItem = useLocalFavItemsStore(s => s.removeItem);
 
   const allTags = useTagStore(s => s.tags);
@@ -255,7 +255,7 @@ const FavoritesSelectModal = () => {
       // 处理本地收藏夹
       for (const folderId of localToAdd) {
         if (itemInfo) {
-          addLocalItem(folderId, {
+          addOnlineItemToLocalFav(folderId, {
             rid: localRid,
             type,
             source: itemInfo.source,

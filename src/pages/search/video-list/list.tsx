@@ -33,6 +33,7 @@ const List: React.FC<ListProps> = ({ items, getScrollElement, onMenuAction, load
       cover: formatUrlProtocol(item.pic),
       ownerName: item.author,
       ownerMid: item.mid,
+      playCount: item.play,
     });
   }, []);
 

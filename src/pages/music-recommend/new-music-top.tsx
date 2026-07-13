@@ -44,6 +44,7 @@ const NewMusicTop = ({ onLayoutChange }: NewMusicTopProps) => {
         title: item.title,
         cover: item.cover,
         ownerName: item.author,
+        playCount: item.total_vv,
       })
       .catch(error => {
         log.error("[new-music-top] play error", error);

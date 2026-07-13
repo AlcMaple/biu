@@ -64,6 +64,8 @@ export interface PlayData {
   isDolby?: boolean;
   /** 来源 */
   source?: "local" | "online";
+  /** 播放量快照（收藏进本地歌单时直接沿用，省去回查 infos） */
+  playCount?: number;
   /** 用户自定义歌手（覆盖 ownerName 显示，目前仅作用于精美播放器） */
   customArtist?: string;
 }
@@ -110,6 +112,8 @@ export interface PlayItem {
   ownerMid?: number;
   /** 目标分集 cid（多P视频时用于直接播放指定分集） */
   cid?: string;
+  /** 播放量快照（随歌曲一路带下来，收藏时直接沿用，无需回查 infos） */
+  playCount?: number;
 }
 
 interface Action {
@@ -163,6 +167,8 @@ const getMVData = async (bvid: string) => {
       ownerName: res?.data?.owner?.name,
       ownerMid: res?.data?.owner?.mid,
       hasMultiPart,
+      // 元数据回查本就拉了 stat，顺手带上播放量，收藏时无需再查 infos
+      playCount: res?.data?.stat?.view,
 
       pageIndex: item.page,
       pageTitle: hasMultiPart ? item.part : res?.data?.title,
@@ -689,6 +695,7 @@ export const usePlayList = create<State & Action>()(
           id,
           source,
           audioUrl,
+          playCount,
           cid: targetCid,
         }: PlayItem) => {
           const { list, playId } = get();
@@ -787,6 +794,7 @@ export const usePlayList = create<State & Action>()(
                     cover: cover ? formatUrlProtocol(cover) : undefined,
                     ownerName,
                     ownerMid,
+                    playCount,
                   },
                 ];
           // 补充缺失信息（有 targetCid 时也需要获取完整分集列表）
@@ -1084,7 +1092,7 @@ export const usePlayList = create<State & Action>()(
             });
           }
         },
-        addToNext: async ({ type, title, bvid, sid, cover, ownerName, ownerMid, id, source, audioUrl }) => {
+        addToNext: async ({ type, title, bvid, sid, cover, ownerName, ownerMid, id, source, audioUrl, playCount }) => {
           const { playId, nextId: currentNextId, list } = get();
           const currentItem = list.find(item => item.id === playId);
           const sanitizedTitle = sanitizeTitle(title);
@@ -1143,6 +1151,7 @@ export const usePlayList = create<State & Action>()(
                     cover: cover ? formatUrlProtocol(cover) : undefined,
                     ownerName,
                     ownerMid,
+                    playCount,
                   },
                 ];
           if (source !== "local" && (!cover || !ownerName || !ownerMid)) {

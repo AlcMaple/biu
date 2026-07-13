@@ -41,6 +41,7 @@ const MusicRecommendList: React.FC<MusicRecommendListProps> = ({
       cover: item.cover,
       ownerName: item.author,
       ownerMid: item.authorMid,
+      playCount: item.playCount,
     });
   }, []);
 

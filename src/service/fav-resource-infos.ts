@@ -85,10 +85,12 @@ export interface FavResourceInfoUpper {
 export interface FavResourceInfoCntInfo {
   /** 收藏数 */
   collect: number;
-  /** 播放数 */
+  /** 播放数（旧统计；新版 vt 数据下这里可能为 0） */
   play: number;
   /** 弹幕数 */
   danmaku: number;
+  /** 新版播放量（play 为 0 时取此值） */
+  vt?: number;
 }
 
 /**

@@ -42,6 +42,7 @@ const MusicFavButton = () => {
         ownerMid: playItem.ownerMid,
         cid: playItem.cid,
         duration: playItem.duration,
+        playCount: playItem.playCount,
       },
       onSuccess: selectedIds => {
         setIsFav(Boolean(selectedIds?.length));

@@ -45,6 +45,7 @@ vi.mock("@/service/web-interface-view", () => ({
       title: "mv-title",
       pic: "https://cover.test/m.png",
       owner: { name: "owner", mid: 1 },
+      stat: { view: 888 },
       pages: [
         { cid: 11, page: 1, part: "p1", duration: 60, first_frame: "https://ff.test/1.png" },
         { cid: 12, page: 2, part: "p2", duration: 60, first_frame: "https://ff.test/2.png" },
@@ -430,5 +431,31 @@ describe("play-list store", () => {
     });
     expect(usePlayList.getState().list.some(i => i.id === "a")).toBe(true);
     expect(usePlayList.getState().list.length).toBe(2);
+  });
+
+  // —— 播放量 carry-through：播放时把播放量带进队列，收藏时直接沿用、无需回查 infos ——
+
+  test("play() 把 playCount 带进当前播放项（元数据齐全时零回查）", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    // cover/owner 齐全 → 跳过 getMVData/getAudioData，直接用传入的 playCount
+    await s.play({ type: "audio", sid: 202, title: "a", cover: "c", ownerName: "o", ownerMid: 1, playCount: 12345 });
+    expect(usePlayList.getState().getPlayItem()?.playCount).toBe(12345);
+  });
+
+  test("play() 需回查元数据时，从 getMVData 的 stat.view 顺带取播放量", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    // 缺 cover → 触发 getMVData，播放量取自 stat.view（mock = 888）
+    await s.play({ type: "mv", bvid: "BVstat", title: "m" });
+    expect(usePlayList.getState().getPlayItem()?.playCount).toBe(888);
+  });
+
+  test("addList() 透传 playCount 到队列项", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    await s.play({ type: "audio", sid: 300, title: "seed", cover: "c", ownerName: "o", ownerMid: 1 });
+    await s.addList([{ type: "audio", sid: 303, title: "x", cover: "c", ownerName: "o", ownerMid: 1, playCount: 777 }]);
+    expect(usePlayList.getState().list.some(i => i.playCount === 777)).toBe(true);
   });
 });

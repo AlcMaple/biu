@@ -62,6 +62,11 @@ interface Action {
    * 否则清除标记（资源恢复有效时摘掉旧标记）；未检测到的项保持原状。
    */
   updateInvalidFlags: (folderId: number, invalidRids: Set<string>, checkedRids: Set<string>) => void;
+  /**
+   * 补全缺失的播放量：仅对当前 playCount 为空/0 的项写入 playByRid 中的值，
+   * 不覆盖已有快照。用于「点心动/播放栏收藏」入口存入时未带播放量的历史数据。
+   */
+  updatePlayCounts: (folderId: number, playByRid: Map<string, number>) => void;
 }
 
 export const useLocalFavItemsStore = create<State & Action>()(
@@ -137,6 +142,21 @@ export const useLocalFavItemsStore = create<State & Action>()(
             if (item.invalid === invalid) return item;
             changed = true;
             return { ...item, invalid };
+          });
+          if (!changed) return {};
+          return { folderItems: { ...state.folderItems, [folderId]: updated } };
+        }),
+      updatePlayCounts: (folderId, playByRid) =>
+        set(state => {
+          const current = state.folderItems[folderId];
+          if (!current?.length || !playByRid.size) return {};
+          let changed = false;
+          const updated = current.map(item => {
+            if (item.playCount) return item; // 已有播放量则保留原快照，不覆盖
+            const play = playByRid.get(String(item.rid));
+            if (!play) return item;
+            changed = true;
+            return { ...item, playCount: play };
           });
           if (!changed) return {};
           return { folderItems: { ...state.folderItems, [folderId]: updated } };
