@@ -11,7 +11,7 @@ import {
   TOPUP_BATCH,
   TOPUP_THRESHOLD,
 } from "@/common/constants/heartbeat";
-import { getLocalFavMedia } from "@/common/utils/fav";
+import { addOnlineItemToLocalFav, getLocalFavMedia } from "@/common/utils/fav";
 import { songKey, type SongCandidate } from "@/common/utils/pure-song";
 import platform from "@/platform";
 import { buildCandidatePool, clearHeartbeatCache, type Seed } from "@/service/heartbeat/candidate-engine";
@@ -63,6 +63,7 @@ function candToPlayItem(c: SongCandidate): PlayItem {
     cover: c.cover,
     ownerMid: c.ownerMid,
     ownerName: c.ownerName,
+    playCount: c.play,
   };
 }
 
@@ -267,7 +268,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       store.removeItem(LIKED_FOLDER_ID, rid);
       return "removed";
     }
-    store.addItem(LIKED_FOLDER_ID, {
+    addOnlineItemToLocalFav(LIKED_FOLDER_ID, {
       rid,
       type: 2,
       source: "online",
@@ -277,6 +278,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       ownerName: cur.ownerName,
       ownerMid: cur.ownerMid,
       duration: cur.duration,
+      playCount: cur.playCount,
     });
     return "added";
   },

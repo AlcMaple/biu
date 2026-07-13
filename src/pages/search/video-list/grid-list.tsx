@@ -42,6 +42,7 @@ const GridList: React.FC<GridListProps> = ({ items, getScrollElement, onMenuActi
               cover: item.pic,
               ownerName: item.author,
               ownerMid: item.mid,
+              playCount: item.play,
             });
           }}
         />

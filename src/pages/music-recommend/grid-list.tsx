@@ -54,6 +54,7 @@ const MusicRecommendGridList: React.FC<MusicRecommendGridListProps> = ({
               cover: item.cover,
               ownerName: item.author,
               ownerMid: item.authorMid,
+              playCount: item.playCount,
             });
           }}
         />

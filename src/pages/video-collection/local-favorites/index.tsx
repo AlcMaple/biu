@@ -94,6 +94,7 @@ const LocalFavorites = () => {
   const removeItem = useLocalFavItemsStore(s => s.removeItem);
   const renameItem = useLocalFavItemsStore(s => s.renameItem);
   const updateInvalidFlags = useLocalFavItemsStore(s => s.updateInvalidFlags);
+  const updatePlayCounts = useLocalFavItemsStore(s => s.updatePlayCounts);
   const clearFolder = useLocalFavItemsStore(s => s.clearFolder);
   const rmCreatedFavorite = useFavoritesStore(s => s.rmCreatedFavorite);
 
@@ -148,23 +149,26 @@ const LocalFavorites = () => {
     setActiveTagIds([]);
   }, [folderIdStr]);
 
-  // 打开收藏夹时后台检测 B 站资源失效状态并打标记（每次启动每个收藏夹只检测一次）
+  // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量
+  // （二者共用同一批 infos 请求；每次启动每个收藏夹只检测一次）
   useEffect(() => {
     if (!folderId || invalidCheckedFolders.has(folderId)) return;
     const allItems = useLocalFavItemsStore.getState().folderItems[folderId];
     if (!allItems?.length) return;
     invalidCheckedFolders.add(folderId);
     detectInvalidLocalFavItems(allItems)
-      .then(({ checked, invalid }) => {
+      .then(({ checked, invalid, playByRid }) => {
         // 一个都没检测成功（如断网）时允许下次进入重试
         if (!checked.size) {
           invalidCheckedFolders.delete(folderId);
           return;
         }
         updateInvalidFlags(folderId, invalid, checked);
+        // 「点播放栏收藏」入口存入时没有播放量，这里用 infos 的真实播放量补全「-」
+        updatePlayCounts(folderId, playByRid);
       })
       .catch(() => invalidCheckedFolders.delete(folderId));
-  }, [folderId, updateInvalidFlags]);
+  }, [folderId, updateInvalidFlags, updatePlayCounts]);
 
   const handleSort = useCallback((key: MusicListSortKey) => {
     setSortKey(prev => {
@@ -210,6 +214,7 @@ const LocalFavorites = () => {
         cover: item.cover,
         ownerMid: item.ownerMid,
         ownerName: item.ownerName,
+        playCount: item.playCount,
       };
     }
     return {
@@ -219,6 +224,7 @@ const LocalFavorites = () => {
       cover: item.cover,
       ownerMid: item.ownerMid,
       ownerName: item.ownerName,
+      playCount: item.playCount,
     };
   }, []);
 

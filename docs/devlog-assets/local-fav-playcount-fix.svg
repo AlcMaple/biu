@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 414" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" role="img">
+  <title>本地歌单播放量：播放时带上，收藏零请求</title>
+  <desc>播放量随歌曲带进播放队列 PlayData.playCount，收藏时（播放栏星标/心动）直接沿用、零请求；另有收藏当场回查与打开歌单两层兜底。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="879" height="413" rx="12" fill="#f6f8fa" stroke="#d0d7de"/>
+
+  <text x="40" y="34" font-size="18" font-weight="700" fill="#1f2328">本地歌单播放量：播放时带上，收藏零请求</text>
+
+  <text x="42" y="60" font-size="13" font-weight="600" fill="#57606a">① 播放那一刻 —— 各来源本就带着播放量，写进播放队列</text>
+
+  <!-- 来源行 -->
+  <g font-size="10.5" fill="#1f2328" text-anchor="middle">
+    <rect x="42" y="72" width="150" height="54" rx="8" fill="#e6f4ea" stroke="#2da44e"/>
+    <text x="117" y="96">搜索<tspan x="117" dy="16" font-size="10" fill="#3a6b47">item.play</tspan></text>
+    <rect x="204" y="72" width="150" height="54" rx="8" fill="#e6f4ea" stroke="#2da44e"/>
+    <text x="279" y="96">私人FM<tspan x="279" dy="16" font-size="10" fill="#3a6b47">candidate.play</tspan></text>
+    <rect x="366" y="72" width="150" height="54" rx="8" fill="#e6f4ea" stroke="#2da44e"/>
+    <text x="441" y="96">自己歌单<tspan x="441" dy="16" font-size="10" fill="#3a6b47">item.playCount</tspan></text>
+    <rect x="528" y="72" width="150" height="54" rx="8" fill="#e6f4ea" stroke="#2da44e"/>
+    <text x="603" y="96">推荐 / 收藏夹<tspan x="603" dy="16" font-size="10" fill="#3a6b47">cnt_info · view</tspan></text>
+    <rect x="690" y="72" width="150" height="54" rx="8" fill="#e6f4ea" stroke="#2da44e"/>
+    <text x="765" y="96">元数据回查<tspan x="765" dy="16" font-size="10" fill="#3a6b47">stat.view</tspan></text>
+  </g>
+
+  <line x1="440" y1="130" x2="440" y2="150" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="42" y="152" width="796" height="42" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+  <text x="440" y="178" font-size="13" fill="#1f2328" text-anchor="middle" font-weight="600">播放队列 PlayData / PlayItem —— <tspan font-family="monospace">playCount</tspan> 一路带着，不再丢</text>
+
+  <text x="42" y="228" font-size="13" font-weight="600" fill="#57606a">② 收藏那一刻 —— 播放栏 ★ / 心动 ❤ 直接沿用，零请求</text>
+
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="42" y="242" width="380" height="50" rx="8" fill="#eaeef2" stroke="#57606a"/>
+    <text x="232" y="272" fill="#1f2328">读 playItem.playCount → 存入本地歌单</text>
+    <rect x="458" y="242" width="380" height="50" rx="8" fill="#caf0d6" stroke="#1a7f37"/>
+    <text x="648" y="272" fill="#0f5026" font-weight="600">✓ 零请求 · 即时显示真实播放量</text>
+  </g>
+  <line x1="424" y1="267" x2="456" y2="267" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="42" y="312" width="796" height="84" rx="8" fill="#dafbe1" stroke="#1a7f37"/>
+  <text x="58" y="336" font-size="12" fill="#0f5026" font-weight="600">两个兜底（都不放大请求量）</text>
+  <text x="58" y="357" font-size="12" fill="#0f5026">① 未接 carry-through 的入口（历史 / 稍后再看 / 动态等）或源字段为 0 → 收藏时回查 infos 一次（另一条接口）；</text>
+  <text x="58" y="377" font-size="12" fill="#0f5026">② 打开歌单 → updatePlayCounts 补历史遗留数据 + ① 回查失败的重试（搭失效检测顺风车，零额外请求）。</text>
+</svg>
