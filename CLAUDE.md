@@ -109,7 +109,7 @@ Vitest + jsdom + globals enabled. `tests/setup.ts` mocks `MediaSession` and audi
 `knip.json` whitelists entries: `src/index.tsx`, `electron/main.ts`, `electron/preload.ts`, plus the build plugins.
 
 ### Project ideas log
-Phased development notes live in `docs/ideas/` (numbered `NNN-<topic>.md`). The highest-numbered file is the in-progress phase (currently `002-歌词时间轴对齐.md`).
+Phased development notes live in `docs/ideas/` (numbered `NNN-<topic>.md`). The highest-numbered file is the in-progress phase (currently `003-私人FM.md`).
 
 ## Gotchas
 

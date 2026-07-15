@@ -20,6 +20,7 @@ const api: ElectronAPI = {
   getCookie: key => ipcRenderer.invoke(channel.cookie.get, key),
   setCookie: (name, value, expirationDate) => ipcRenderer.invoke(channel.cookie.set, { name, value, expirationDate }),
   searchNeteaseSongs: params => ipcRenderer.invoke(channel.lyrics.searchNeteaseSongs, params),
+  getNeteaseSimilarSongs: params => ipcRenderer.invoke(channel.lyrics.getNeteaseSimilarSongs, params),
   getNeteaseLyrics: params => ipcRenderer.invoke(channel.lyrics.getNeteaseLyrics, params),
   searchLrclibLyrics: params => ipcRenderer.invoke(channel.lyrics.searchLrclib, params),
   setProxySettings: proxySettings => ipcRenderer.invoke(channel.app.setProxySettings, proxySettings),

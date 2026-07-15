@@ -7,6 +7,7 @@ import {
   type GetLyricsByNeteaseParams,
   type SearchSongByNeteaseParams,
 } from "./api/netease-lyric";
+import { getSimiSongByNetease } from "./api/netease-simi";
 import {
   checkWhisperXDeps,
   installWhisperXDeps,
@@ -19,6 +20,10 @@ import { channel } from "./channel";
 export function registerLyricsHandlers() {
   ipcMain.handle(channel.lyrics.searchNeteaseSongs, async (_, params: SearchSongByNeteaseParams) => {
     return getSongByNetease(params);
+  });
+
+  ipcMain.handle(channel.lyrics.getNeteaseSimilarSongs, async (_, params: GetSimiSongByNeteaseParams) => {
+    return getSimiSongByNetease(params);
   });
 
   ipcMain.handle(channel.lyrics.getNeteaseLyrics, async (_, params: GetLyricsByNeteaseParams) => {

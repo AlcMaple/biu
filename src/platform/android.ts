@@ -101,6 +101,7 @@ const platform: Platform = {
     }
   },
   searchNeteaseSongs: async () => ({}),
+  getNeteaseSimilarSongs: async () => ({}),
   getNeteaseLyrics: async () => ({}),
   searchLrclibLyrics: async () => [],
   getPlatform: () => "linux" as AppPlatForm,

@@ -93,6 +93,16 @@ interface NeteaseUser {
   uptime?: number;
 }
 
+interface GetSimiSongByNeteaseParams {
+  songid: number;
+  limit?: number;
+}
+
+interface GetSimiSongByNeteaseResponse {
+  code?: number;
+  songs?: NeteaseSong[];
+}
+
 interface SearchSongByLrclibParams {
   q: string;
   track_name?: string;

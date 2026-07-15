@@ -42,6 +42,8 @@ declare global {
     setCookie: (name: string, value: string, expirationDate?: number) => Promise<void>;
     /** 搜索网易云歌曲 */
     searchNeteaseSongs: (params: SearchSongByNeteaseParams) => Promise<SearchSongByNeteaseResponse>;
+    /** 获取网易云相似歌曲（同曲风异歌手，用于私人FM 跨界推荐） */
+    getNeteaseSimilarSongs: (params: GetSimiSongByNeteaseParams) => Promise<GetSimiSongByNeteaseResponse>;
     /** 获取网易云歌词 */
     getNeteaseLyrics: (params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>;
     /** 在 LrcLib 搜索歌曲/歌词 */

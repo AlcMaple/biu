@@ -26,6 +26,7 @@ import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
 import { getWebInterfaceView } from "@/service/web-interface-view";
 import { useFavoritesStore } from "@/store/favorite";
+import { useHeartbeat } from "@/store/heartbeat";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
@@ -283,6 +284,15 @@ const FavoritesSelectModal = () => {
       }
       for (const folderId of localToDel) {
         removeLocalItem(folderId, localRid);
+      }
+
+      // 收藏动作 → 私人FM 二度扩展种子：仅当「FM 播放中 + 收藏的是 FM 推荐过的歌」才记（门槛在 store 里判）
+      if ((biliAddIds || localToAdd.length) && itemInfo?.bvid) {
+        useHeartbeat.getState().noteFavoriteFromFm({
+          bvid: itemInfo.bvid,
+          title: itemInfo.title,
+          ownerMid: itemInfo.ownerMid,
+        });
       }
 
       // 保存标签：分集收藏挂在 cid 上，整个视频挂在 rid 上（与本地条目的 rid 一致）

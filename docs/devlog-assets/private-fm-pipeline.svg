@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#5b6470"/>
+    </marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#c98a2b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="958" height="658" rx="12" fill="#fbfbfa" stroke="#e4e4e2"/>
+  <text x="24" y="32" font-size="16" font-weight="700" fill="#1a1a1a">私人FM 数据流 · Phase 1 主管线</text>
+
+  <!-- 红心歌单 -->
+  <rect x="100" y="50" width="380" height="44" rx="8" fill="#eef3fb" stroke="#b9ccec"/>
+  <text x="290" y="78" font-size="13" fill="#1a2b45" text-anchor="middle" font-weight="600">「我喜欢的音乐」红心歌单（种子池）</text>
+  <line x1="290" y1="94" x2="290" y2="120" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+  <text x="300" y="112" font-size="11" fill="#5b6470">nextSeeds 轮转 · 覆盖全部红心（非只取前 6）</text>
+
+  <!-- 种子 -->
+  <rect x="155" y="122" width="270" height="42" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="290" y="148" font-size="12.5" fill="#1a1a1a" text-anchor="middle">种子：bvid / ownerMid / title</text>
+  <line x1="290" y1="164" x2="290" y2="198" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+  <text x="300" y="186" font-size="11" fill="#5b6470">三腿并发取候选</text>
+
+  <!-- 三条腿 -->
+  <rect x="15" y="200" width="175" height="64" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="102" y="226" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">看了又看</text>
+  <text x="102" y="245" font-size="10.5" fill="#6b6b66" text-anchor="middle">archive/related · 跨UP</text>
+
+  <rect x="203" y="200" width="175" height="64" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="290" y="226" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">同UP投稿</text>
+  <text x="290" y="245" font-size="10.5" fill="#6b6b66" text-anchor="middle">space/arc/search</text>
+
+  <rect x="391" y="200" width="175" height="64" rx="8" fill="#f3eefb" stroke="#cbb9ec"/>
+  <text x="478" y="226" font-size="12" fill="#2c1a45" text-anchor="middle" font-weight="600">网易相似表 [P2]</text>
+  <text x="478" y="245" font-size="10.5" fill="#5b4b7a" text-anchor="middle">两道模糊匹配（见上图）</text>
+
+  <!-- 汇聚 -->
+  <line x1="102" y1="264" x2="288" y2="290" stroke="#5b6470" stroke-width="1.2"/>
+  <line x1="290" y1="264" x2="290" y2="290" stroke="#5b6470" stroke-width="1.2"/>
+  <line x1="478" y1="264" x2="292" y2="290" stroke="#5b6470" stroke-width="1.2"/>
+  <text x="290" y="286" font-size="11" fill="#5b6470" text-anchor="middle">合并（网易腿最前 · 真口味优先）</text>
+  <line x1="290" y1="292" x2="290" y2="304" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- Stage 1 -->
+  <rect x="90" y="304" width="400" height="42" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="290" y="330" font-size="12" fill="#1a1a1a" text-anchor="middle">Stage 1 净化：时长 75~420s + 标题/子分区黑名单</text>
+  <line x1="290" y1="346" x2="290" y2="360" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- Stage 2 -->
+  <rect x="90" y="362" width="400" height="42" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="290" y="388" font-size="12" fill="#1a1a1a" text-anchor="middle">Stage 2 view 核验：videos===1 剔多P / 合集</text>
+  <line x1="290" y1="404" x2="290" y2="418" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- 去重 -->
+  <rect x="90" y="420" width="400" height="42" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="290" y="446" font-size="12" fill="#1a1a1a" text-anchor="middle">去重：bvid + 同名(isSameSong) + 单UP ≤ 2</text>
+  <line x1="290" y1="462" x2="290" y2="476" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- 交织 -->
+  <rect x="90" y="478" width="400" height="42" rx="8" fill="#eef7f0" stroke="#b9dcc4"/>
+  <text x="290" y="504" font-size="12" fill="#153524" text-anchor="middle" font-weight="600">交织：相似打底 · 每 8 首插 1 红心（Loop 保序）</text>
+  <line x1="290" y1="520" x2="290" y2="534" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- 队列 -->
+  <rect x="180" y="536" width="220" height="44" rx="8" fill="#eef3fb" stroke="#b9ccec"/>
+  <text x="290" y="563" font-size="13" fill="#1a2b45" text-anchor="middle" font-weight="600">播放队列</text>
+
+  <!-- 续供触发（队列 → 面板） -->
+  <path d="M400 558 H585 V200 H616" fill="none" stroke="#c98a2b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ao)"/>
+  <text transform="rotate(-90 575 380)" x="575" y="380" font-size="11" fill="#b5791f" text-anchor="middle">队列剩余 &lt; 8 触发续供</text>
+
+  <!-- 续供面板 -->
+  <rect x="620" y="150" width="320" height="290" rx="10" fill="#fffaf0" stroke="#e2c78f" stroke-dasharray="4 3"/>
+  <text x="780" y="177" font-size="13.5" fill="#8a5a12" text-anchor="middle" font-weight="700">续供 topup</text>
+
+  <!-- 续供种子（3 名额，优先收藏、不够补齐） -->
+  <rect x="642" y="192" width="276" height="118" rx="7" fill="#fff" stroke="#e0cba0"/>
+  <text x="654" y="212" font-size="11.5" fill="#7a5410" font-weight="600">续供种子（喂回候选引擎）</text>
+  <text x="660" y="232" font-size="11" fill="#3a3a36">· 红心种子轮转（nextSeeds）</text>
+  <text x="660" y="251" font-size="11" fill="#3a3a36">· 二度种子：FM 里被你收藏的推荐歌（喂三腿）</text>
+  <text x="672" y="267" font-size="10.5" fill="#8a6a2a">FM 推了你还收藏＝强正反馈</text>
+  <text x="660" y="287" font-size="11" fill="#3a3a36">· 兜底补齐：二度不够 3 个时，最近 40 已推随机抽</text>
+  <text x="672" y="303" font-size="10.5" fill="#8a6a2a">补足名额（仅 bvid → 只喂看了又看，弱路径）</text>
+  <line x1="780" y1="310" x2="780" y2="326" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- 再跑管线 -->
+  <rect x="642" y="328" width="276" height="50" rx="7" fill="#fff" stroke="#e0cba0"/>
+  <text x="780" y="348" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">再跑候选管线</text>
+  <text x="780" y="366" font-size="10.5" fill="#6b6b66" text-anchor="middle">净化 · 去重 · 按红心 UP 频次重排</text>
+  <line x1="780" y1="378" x2="780" y2="394" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- addList -->
+  <rect x="642" y="394" width="276" height="38" rx="7" fill="#eef7f0" stroke="#b9dcc4"/>
+  <text x="780" y="418" font-size="12" fill="#153524" text-anchor="middle" font-weight="600">addList 追加到队列</text>
+
+  <!-- 回填（面板 → 队列） -->
+  <path d="M780 432 V620 H290 V582" fill="none" stroke="#c98a2b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ao)"/>
+  <text x="535" y="613" font-size="11" fill="#b5791f" text-anchor="middle">addList 回填播放队列 · 无限续供</text>
+</svg>

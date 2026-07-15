@@ -8,7 +8,7 @@ import { resolvePlayCount } from "@/common/utils/number";
 import Empty from "@/components/empty";
 import MusicCard from "@/components/music-card";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
-import { usePlayList } from "@/store/play-list";
+import { mediaToPlayItem, playFromFolder } from "@/service/heartbeat/play-from-folder";
 
 import { getContextMenus } from "./menu";
 
@@ -38,19 +38,13 @@ const SeriesGridList = ({ data, loading, className, getScrollElement, onMenuActi
             onMenuAction(key, item);
           }}
           onPress={() => {
-            usePlayList.getState().play({
-              type: "mv",
-              bvid: item.bvid,
-              title: item.title,
-              cover: item.cover,
-              ownerName: item.upper?.name,
-              ownerMid: item.upper?.mid,
-            });
+            // 从歌单点歌：心动模式进行中则切走 FM、整队替换成本合集；否则常规插播
+            playFromFolder(mediaToPlayItem(item), data.map(mediaToPlayItem));
           }}
         />
       );
     },
-    [onMenuAction],
+    [data, onMenuAction],
   );
 
   if (loading && data.length === 0) {

@@ -1,7 +1,16 @@
 import { chunk } from "es-toolkit/array";
 
-import { MAX_SEEDS, PER_SEED_RELATED, PER_SEED_SPACE, PER_UP_CAP, VERIFY_LIMIT } from "@/common/constants/heartbeat";
+import {
+  MAX_SEEDS,
+  NETEASE_SEEDS_PER_BUILD,
+  NETEASE_TIMEOUT_MS,
+  PER_SEED_RELATED,
+  PER_SEED_SPACE,
+  PER_UP_CAP,
+  VERIFY_LIMIT,
+} from "@/common/constants/heartbeat";
 import { isPureSongCandidate, isSameSong, songKey, toSeconds, type SongCandidate } from "@/common/utils/pure-song";
+import { fromNeteaseSimilar } from "@/service/heartbeat/netease-similar";
 import { getSpaceWbiArcSearch } from "@/service/space-wbi-arc-search";
 import { getWebInterfaceArchiveRelated } from "@/service/web-interface-archive-related";
 import { getWebInterfaceView } from "@/service/web-interface-view";
@@ -10,6 +19,13 @@ import { getWebInterfaceView } from "@/service/web-interface-view";
 export interface Seed {
   bvid?: string;
   ownerMid?: number;
+  /** 歌曲标题（网易腿用来去程搜索） */
+  title?: string;
+}
+
+/** 软超时：ms 内没完成就返回 fallback（防止慢腿拖慢队列构建） */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))]);
 }
 
 export interface BuildOptions {
@@ -124,7 +140,14 @@ async function verify(cands: SongCandidate[], limit: number): Promise<SongCandid
 export async function buildCandidatePool(seeds: Seed[], opts: BuildOptions): Promise<SongCandidate[]> {
   const picked = seeds.slice(0, opts.maxSeeds ?? MAX_SEEDS);
 
-  // 看了又看优先（跨 UP、多样性高），同 UP 垫后（稳定但同系列高度重合）
+  // 网易相似（真口味，跨歌手，优先）：少数种子走此腿，软超时防拖慢；失败即静默返回空
+  const neteaseGroups = await Promise.all(
+    picked
+      .filter(s => s.title)
+      .slice(0, NETEASE_SEEDS_PER_BUILD)
+      .map(s => withTimeout(fromNeteaseSimilar(s.title), NETEASE_TIMEOUT_MS, [] as SongCandidate[])),
+  );
+  // 看了又看（跨 UP、多样性高），同 UP 垫后（稳定但同系列高度重合）
   const relatedGroups = await Promise.all(picked.filter(s => s.bvid).map(s => fromRelated(s.bvid!)));
   const spaceGroups = await Promise.all(picked.filter(s => s.ownerMid).map(s => fromSameUp(s.ownerMid!)));
 
@@ -133,7 +156,7 @@ export async function buildCandidatePool(seeds: Seed[], opts: BuildOptions): Pro
   const perUp = new Map<number, number>();
   const pool: SongCandidate[] = [];
 
-  for (const g of [...relatedGroups, ...spaceGroups]) {
+  for (const g of [...neteaseGroups, ...relatedGroups, ...spaceGroups]) {
     for (const c of g) {
       if (!c.bvid || seenBvid.has(c.bvid)) continue;
       if (!isPureSongCandidate(c)) continue;

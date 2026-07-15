@@ -9,4 +9,5 @@ export enum StoreNameMap {
   Tags = "tags",
   WindowState = "window-state",
   HeartbeatServed = "heartbeat-served",
+  HeartbeatFavSeeds = "heartbeat-fav-seeds",
 }
