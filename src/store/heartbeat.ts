@@ -15,6 +15,7 @@ import { addOnlineItemToLocalFav, getLocalFavMedia } from "@/common/utils/fav";
 import { songKey, type SongCandidate } from "@/common/utils/pure-song";
 import platform from "@/platform";
 import { buildCandidatePool, clearHeartbeatCache, type Seed } from "@/service/heartbeat/candidate-engine";
+import { getFavSeeds, recordFavoritedSong, type FavSeed } from "@/service/heartbeat/fav-seeds";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList, type PlayItem } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
@@ -43,6 +44,8 @@ interface HeartbeatState {
   stopAndReplace: (medias: PlayItem[], startFrom?: PlayItem) => void;
   /** 把当前播放的歌加入/移出「我喜欢的音乐」 */
   toggleLikeCurrent: () => "added" | "removed" | null;
+  /** 在 FM 播放时收藏了一首 FM 推荐过的歌 → 记为二度扩展种子（强正反馈，非 FM 推荐/非 FM 时不记） */
+  noteFavoriteFromFm: (seed: FavSeed) => void;
 }
 
 /** 随机打乱（Fisher-Yates） */
@@ -146,6 +149,7 @@ function resetSeedRotation() {
   seedOrder = shuffle(likedItems().filter(i => i.bvid || i.ownerMid)).map(i => ({
     bvid: i.bvid,
     ownerMid: i.ownerMid,
+    title: i.title,
   }));
   seedCursor = 0;
 }
@@ -282,6 +286,14 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
     });
     return "added";
   },
+
+  noteFavoriteFromFm: seed => {
+    const st = get();
+    // 双门槛：① FM 正在播放；② 收藏的是 FM 推荐过的歌（在 servedBvids 里 —— 红心种子被排除在候选外，
+    // 不会进 servedBvids，所以这里天然只认「FM 推的、非红心的」歌）。二者皆满足才记为二度扩展种子。
+    if (!st.active || !seed.bvid || !st.servedBvids.has(seed.bvid)) return;
+    void recordFavoritedSong(seed);
+  },
 }));
 
 // —— 续供：订阅播放队列，接近播完时追加更多相似歌 ——
@@ -307,6 +319,18 @@ function attachTopup() {
   });
 }
 
+/**
+ * 二度扩展种子 = 用户「在 FM 里收藏的 FM 推荐歌」（强正反馈：FM 推了、你还收藏了 → 顺着它找更多同类）。
+ * 来自 `noteFavoriteFromFm` 记的收藏动作缓冲（带 bvid/ownerMid/title → 喂全部三腿），跨会话持久。
+ * 顺着用户明确认可的推荐扩展，不像「拿 FM 自产候选」那样漂。
+ */
+async function favoriteSeeds(limit: number): Promise<Seed[]> {
+  const buffered = await getFavSeeds();
+  return shuffle(buffered)
+    .slice(0, limit)
+    .map(s => ({ bvid: s.bvid, ownerMid: s.ownerMid, title: s.title }));
+}
+
 async function maybeTopup() {
   if (toppingUp) return;
   const hb = useHeartbeat.getState();
@@ -329,12 +353,21 @@ async function maybeTopup() {
   toppingUp = true;
   try {
     const { likedBvids } = likedContext();
-    // 二度扩展：拿几首已服务过的候选当新的「看了又看」种子，持续引入新 UP，避免只在红心的同 UP 里打转
-    const secondDegree: Seed[] = [...hb.servedBvids]
-      .slice(-40)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, SECOND_DEGREE_SEEDS)
-      .map(bvid => ({ bvid }));
+    // 二度扩展：先用「FM 里被收藏的推荐歌」（强正反馈，全元数据 → 喂三腿）；不够 SECOND_DEGREE_SEEDS 个时，
+    // 用弱路径「最近已推候选随机抽」补齐剩余名额（仅带 bvid → 只喂看了又看；种子是 FM 自产、可能漂）。
+    const favSeeds = await favoriteSeeds(SECOND_DEGREE_SEEDS);
+    const need = SECOND_DEGREE_SEEDS - favSeeds.length;
+    const favBvids = new Set(favSeeds.map(s => s.bvid));
+    const servedFill: Seed[] =
+      need > 0
+        ? [...hb.servedBvids]
+            .filter(b => !favBvids.has(b))
+            .slice(-40)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, need)
+            .map(bvid => ({ bvid }))
+        : [];
+    const secondDegree: Seed[] = [...favSeeds, ...servedFill];
 
     const allSeeds = [...nextSeeds(MAX_SEEDS), ...secondDegree];
     const exclude = new Set<string>([...likedBvids, ...hb.servedBvids]);

@@ -10,7 +10,7 @@ import Empty from "@/components/empty";
 import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
 import VirtualPageList from "@/components/virtual-page-list";
-import { usePlayList } from "@/store/play-list";
+import { mediaToPlayItem, playFromFolder } from "@/service/heartbeat/play-from-folder";
 import { useSettings } from "@/store/settings";
 
 import { getContextMenus } from "../collections/menu";
@@ -37,16 +37,13 @@ const SeriesList = ({
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
-  const handlePress = useCallback((item: Media) => {
-    usePlayList.getState().play({
-      type: "mv",
-      bvid: item.bvid,
-      title: item.title,
-      cover: item.cover,
-      ownerName: item.upper?.name,
-      ownerMid: item.upper?.mid,
-    });
-  }, []);
+  const handlePress = useCallback(
+    (item: Media) => {
+      // 从歌单点歌：心动模式进行中则切走 FM、整队替换成本系列；否则常规插播
+      playFromFolder(mediaToPlayItem(item), data.map(mediaToPlayItem));
+    },
+    [data],
+  );
 
   if (loading && data.length === 0) {
     return (

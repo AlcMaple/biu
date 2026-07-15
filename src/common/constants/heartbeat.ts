@@ -40,8 +40,22 @@ export const VERIFY_LIMIT = 18;
 /** 单个 UP 在一次构建里最多贡献几首（防同一系列/同曲风刷屏，逼出多样性） */
 export const PER_UP_CAP = 2;
 
-/** 续供时额外拿几首「已服务过的候选」当新的看了又看种子（二度扩展，引入新 UP） */
+/** 续供时二度扩展的种子数（优先取用户主动收藏的歌，无则退回已服务候选抽样） */
 export const SECOND_DEGREE_SEEDS = 3;
+
+/** 收藏动作种子缓冲上限：滚动记录用户最近收藏的歌（含收进 B站在线收藏夹的），作二度扩展种子 */
+export const MAX_FAV_SEEDS = 60;
 
 /** 已推荐历史的持久化上限（滚动保留最近这么多首，跨会话/跨天不重复；到顶后最老的滚出、可再出现） */
 export const MAX_SERVED_HISTORY = 800;
+
+// —— Phase 2：网易相似表（第三条腿，默认开、失败即静默） ——
+
+/** 每次构建让多少个种子走网易腿（控制回程 B站搜索量） */
+export const NETEASE_SEEDS_PER_BUILD = 3;
+
+/** 每个种子取网易相似歌的前 K 首回搜 B站 */
+export const NETEASE_TOP_K = 3;
+
+/** 网易腿单个种子的软超时（毫秒）：超时即返回空，不拖慢队列构建 */
+export const NETEASE_TIMEOUT_MS = 5000;

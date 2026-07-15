@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 288" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="af" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#5b6470"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="898" height="286" rx="12" fill="#fbfbfa" stroke="#e4e4e2"/>
+  <text x="22" y="30" font-size="15" font-weight="700" fill="#1a1a1a">点歌来源 → 私人FM 处理（切走 / 保留）</text>
+
+  <!-- 列头 -->
+  <text x="115" y="52" font-size="11" fill="#8a8a84" text-anchor="middle">来源</text>
+  <text x="395" y="52" font-size="11" fill="#8a8a84" text-anchor="middle">走哪个调用</text>
+  <text x="745" y="52" font-size="11" fill="#8a8a84" text-anchor="middle">对 FM 的结果</text>
+
+  <!-- Row 1 · 歌单单曲 -->
+  <rect x="20" y="60" width="190" height="54" rx="8" fill="#eef3fb" stroke="#b9ccec"/>
+  <text x="115" y="91" font-size="12.5" fill="#1a2b45" text-anchor="middle">歌单页 · 单曲点击</text>
+  <line x1="210" y1="87" x2="270" y2="87" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="270" y="60" width="250" height="54" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="395" y="85" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">playFromFolder</text>
+  <text x="395" y="103" font-size="10.5" fill="#6b6b66" text-anchor="middle">按 FM 是否进行中分流</text>
+  <line x1="520" y1="87" x2="610" y2="87" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="610" y="60" width="270" height="54" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="624" y="84" font-size="11.5" fill="#7a3a28">FM 开 → stopAndReplace（结束 FM + 整队替换）</text>
+  <text x="624" y="103" font-size="11.5" fill="#153524">FM 关 → play 插播</text>
+
+  <!-- Row 2 · 播放全部 -->
+  <rect x="20" y="126" width="190" height="54" rx="8" fill="#eef3fb" stroke="#b9ccec"/>
+  <text x="115" y="157" font-size="12.5" fill="#1a2b45" text-anchor="middle">歌单页 · 播放全部</text>
+  <line x1="210" y1="153" x2="270" y2="153" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="270" y="126" width="250" height="54" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="395" y="151" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">playList 整队替换</text>
+  <text x="395" y="169" font-size="10.5" fill="#6b6b66" text-anchor="middle">play-list 内部 id 全变</text>
+  <line x1="520" y1="153" x2="610" y2="153" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="610" y="126" width="270" height="54" rx="8" fill="#fbece8" stroke="#e6b8a8"/>
+  <text x="745" y="151" font-size="12" fill="#7a3a28" text-anchor="middle" font-weight="600">续供订阅发现会话 id 全不在</text>
+  <text x="745" y="169" font-size="11" fill="#7a3a28" text-anchor="middle">→ 自动 stop（架构级兜底）</text>
+
+  <!-- Row 3 · 全网搜索 -->
+  <rect x="20" y="192" width="190" height="54" rx="8" fill="#eef3fb" stroke="#b9ccec"/>
+  <text x="115" y="223" font-size="12.5" fill="#1a2b45" text-anchor="middle">全网搜索 · 点歌</text>
+  <line x1="210" y1="219" x2="270" y2="219" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="270" y="192" width="250" height="54" rx="8" fill="#fff" stroke="#cfcfcb"/>
+  <text x="395" y="224" font-size="12" fill="#1a1a1a" text-anchor="middle" font-weight="600">play 插播</text>
+  <line x1="520" y1="219" x2="610" y2="219" stroke="#5b6470" stroke-width="1.4" marker-end="url(#af)"/>
+  <rect x="610" y="192" width="270" height="54" rx="8" fill="#eef7f0" stroke="#b9dcc4"/>
+  <text x="745" y="224" font-size="12" fill="#153524" text-anchor="middle" font-weight="600">保留 FM · 继续续供</text>
+
+  <!-- 图例 -->
+  <text x="22" y="272" font-size="11" fill="#6b6b66"><tspan fill="#7a3a28" font-weight="600">红</tspan> = 切走 FM（队列换成该歌单）　<tspan fill="#153524" font-weight="600">绿</tspan> = 保留 FM（插播、续供不停）　·　单曲点击必须显式走 helper；整队替换靠兜底</text>
+</svg>

@@ -12,6 +12,7 @@ declare global {
     [StoreNameMap.LocalFavItems]: Record<string, any>;
     [StoreNameMap.Tags]: Record<string, any>;
     [StoreNameMap.HeartbeatServed]: { bvids: string[]; keys: string[] };
+    [StoreNameMap.HeartbeatFavSeeds]: { items: { bvid: string; title?: string; ownerMid?: number }[] };
   };
 }
 
