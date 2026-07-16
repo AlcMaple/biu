@@ -394,6 +394,15 @@ const LocalFavorites = () => {
     [folderId, itemToPlayItem, onOpenConfirmModal, onRenameOpen, removeItem],
   );
 
+  const handleRenameConfirm = useCallback(() => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || !renameTarget || trimmed === renameTarget.title) return;
+    renameItem(folderId, renameTarget.rid, trimmed);
+    // 同步播放队列/播放栏中同一曲目的显示名，否则该曲目正在播放时播放栏仍显示旧名
+    usePlayList.getState().renameTrack(itemToPlayItem(renameTarget), trimmed);
+    onRenameClose();
+  }, [renameValue, renameTarget, renameItem, folderId, itemToPlayItem, onRenameClose]);
+
   const dropdownMenuItems = [
     {
       key: "clear-invalid",
@@ -530,13 +539,7 @@ const LocalFavorites = () => {
               value={renameValue}
               onValueChange={setRenameValue}
               onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === "Enter") {
-                  const trimmed = renameValue.trim();
-                  if (trimmed && renameTarget) {
-                    renameItem(folderId, renameTarget.rid, trimmed);
-                    onRenameClose();
-                  }
-                }
+                if (e.key === "Enter") handleRenameConfirm();
               }}
               placeholder="输入新标题"
               size="sm"
@@ -549,13 +552,7 @@ const LocalFavorites = () => {
             <Button
               color="primary"
               isDisabled={!renameValue.trim() || renameValue.trim() === renameTarget?.title}
-              onPress={() => {
-                const trimmed = renameValue.trim();
-                if (trimmed && renameTarget) {
-                  renameItem(folderId, renameTarget.rid, trimmed);
-                  onRenameClose();
-                }
-              }}
+              onPress={handleRenameConfirm}
             >
               确认
             </Button>

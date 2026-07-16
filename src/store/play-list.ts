@@ -140,6 +140,8 @@ interface Action {
   getAudio: () => HTMLAudioElement;
   getPlayItem: () => PlayData | undefined;
   setCustomArtist: (id: string, artist: string | undefined) => void;
+  /** 本地歌单重命名后，按曲目身份同步播放队列中的显示标题，避免播放栏/播放队列仍显示旧名 */
+  renameTrack: (target: Pick<PlayItem, "type" | "source" | "id" | "bvid" | "sid" | "cid">, newTitle: string) => void;
 }
 
 const idGenerator = () => `${Date.now()}${uniqueId()}`;
@@ -1329,6 +1331,20 @@ export const usePlayList = create<State & Action>()(
             const item = state.list.find(i => i.id === id);
             if (item) {
               item.customArtist = artist;
+            }
+          });
+        },
+        renameTrack: (target, newTitle) => {
+          set(state => {
+            for (const item of state.list) {
+              if (isSame(item, target)) {
+                item.title = newTitle;
+                // 播放栏/精美播放器显示 pageTitle || title（本地歌单曲目的显示名可能
+                // 落在 pageTitle 上，如多P分集或收藏时调整的名字），存在时一并更新才会生效
+                if (item.pageTitle !== undefined) {
+                  item.pageTitle = newTitle;
+                }
+              }
             }
           });
         },
