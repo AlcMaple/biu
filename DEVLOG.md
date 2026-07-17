@@ -10,9 +10,45 @@
 
 ## 私人FM / 心动模式
 
-> 网易云「心动模式」的复刻：从默认「我喜欢的音乐」红心歌单取种子 → 找相似**单曲** → 与红心歌交织、无限续供。
-> 核心认知：网易的「相似」本质是靠海量听歌行为算好的一张**协同过滤预计算查表**——那张表我们造不出，
-> 但能先用 B站原生信号自己凑一版（Phase 1），再把网易那张表当**第三条腿**借过来（Phase 2）。
+### 2026-07-17 fix: 私人 FM 重启后接着放（会话跨重启恢复）
+
+![私人FM 会话经 IPC 白名单落盘/取回的完整路径，之前卡在白名单缺分支](docs/devlog-assets/heartbeat-session-restart.svg)
+
+**效果**：
+
+1. 之前：FM 放着 → 关程序 → 过会儿重开，上次的队列还在、还能放（play-list 走 localStorage），但**它已经不是私人FM 了**——续供已死，播完只 Loop 这几十首、不再推新歌且无任何提示；点进 FM 页还会**重开一轮**把它打断。
+2. 现在：重开进 FM **接着放**，播到队尾**照常续上新歌**。已推历史照旧生效，不会重复推听过的。
+3. 反例不变：退出前若已点了别的歌单（队列被整队替换），重开进 FM 仍是**重开一轮**。
+
+**做了什么**（根因/坑见 [`docs/ideas/003-私人FM.md`](docs/ideas/003-私人FM.md)）：
+
+1. 补齐 Electron 端存储链——`electron/store.ts` 建三个 `Store` 实例、`electron/ipc/store.ts` 加 get/set/clear 分支（`HeartbeatServed / FavSeeds / Session`）。这条 IPC 白名单一直漏接，是重启不生效的真正卡点（图示）。
+2. 会话落盘 `HeartbeatSession`（`start / stop / maybeTopup` 三处），主窗启动 `restoreSession()` 恢复三件套：
+
+```ts
+// store/heartbeat.ts —— 主窗 PlayBar 启动即调；FM 页挂载也 await 它再决定「接着放/重开」
+export async function restoreSession() {
+  if (useHeartbeat.getState().active) return;
+  const { active, sessionIds } = await loadSession();
+  if (!active || !sessionIds.length) return;
+  const ids = new Set(sessionIds);
+  if (!usePlayList.getState().list.some(it => ids.has(it.id))) {
+    persistSession(false, new Set()); // 队列已被整队替换：清掉会话标记
+    return;
+  }
+  const hist = await loadServed();
+  useHeartbeat.setState({ active: true, sessionIds: ids, servedBvids: new Set(hist.bvids), servedKeys: new Set(hist.keys) }); // ①标记 ③已推历史
+  attachTopup(); // ②重挂续供订阅（原本只在 start() 里挂）
+}
+```
+
+### 2026-07-17 fix: 私人 FM 切走再回来不再重开一轮
+
+**效果**：
+
+1. 之前：FM 中点去别的歌单看看歌、再点回 FM → 清缓存 + 重置种子轮转 + 整队替换，当前这首被打断，等于每次点 FM 都从头开始。
+2. 现在：**在场就接着放**；FM 中全网搜索插播过也仍算在场。
+3. 原设计不变：**不在场**（从没开过 / 已被点歌单整队替换掉）才开新的一轮，仍是「进入即打断、直接开始」。
 
 ### 2026-07-15 feat: 私人FM 完善（接入网易相似表 · 切走时机 · 续供重构）
 

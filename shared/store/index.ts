@@ -10,4 +10,5 @@ export enum StoreNameMap {
   WindowState = "window-state",
   HeartbeatServed = "heartbeat-served",
   HeartbeatFavSeeds = "heartbeat-fav-seeds",
+  HeartbeatSession = "heartbeat-session",
 }

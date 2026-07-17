@@ -34,9 +34,9 @@ interface HeartbeatState {
   servedKeys: Set<string>;
   /** 本会话在播放队列里的 PlayData id 集合（判断当前队列是否仍属于本次心动会话） */
   sessionIds: Set<string>;
-  /** UP 反馈分：越高续供越优先；被「不喜欢」的 UP 会被压低 */
-  ownerScore: Record<number, number>;
-  /** 开始一次心动会话（每次进入都会重开，打断当前播放） */
+  /** 心动会话是否仍在场（进入 FM 页时用它决定「接着放」还是「重开一轮」） */
+  isSessionLive: () => boolean;
+  /** 开始一次心动会话（重开一轮，打断当前播放） */
   start: () => Promise<StartResult>;
   /** 结束心动会话 */
   stop: () => void;
@@ -121,6 +121,18 @@ function debugDumpQueue(pool: SongCandidate[], queue: PlayItem[], simBvids: Set<
   console.groupEnd();
 }
 
+/**
+ * 心动会话是否仍在场：active 且播放队列里仍有本会话的歌。
+ *
+ * 按 play-list 内部 id 判断（不看 bvid）：搜索 / 全网插播时会话原有 id 仍在 → 仍在场；
+ * 点歌单（播放全部或点单曲）整队替换 → id 全变 → 已离场。
+ */
+function sessionLive(): boolean {
+  const hb = useHeartbeat.getState();
+  if (!hb.active) return false;
+  return usePlayList.getState().list.some(it => hb.sessionIds.has(it.id));
+}
+
 // —— 红心种子上下文 ——
 
 function likedItems() {
@@ -187,13 +199,74 @@ function persistServed(bvids: Set<string>, keys: Set<string>) {
   });
 }
 
+// —— 会话持久化：重启后接着放 ——
+//
+// 本 store 是纯内存的，play-list 却是持久化的。不存会话，重启后两边就错位：上次 FM 的队列
+// 还在、还能播，但 active/sessionIds 归零、续供订阅也没挂 —— 那队歌就成了「看着是 FM、实则
+// 续供已死」的死循环，且进 FM 页会被重开一轮打断。
+
+async function loadSession(): Promise<{ active: boolean; sessionIds: string[] }> {
+  try {
+    const s = (await platform.getStore(StoreNameMap.HeartbeatSession)) as
+      | { active?: boolean; sessionIds?: string[] }
+      | undefined;
+    return { active: s?.active ?? false, sessionIds: s?.sessionIds ?? [] };
+  } catch {
+    return { active: false, sessionIds: [] };
+  }
+}
+
+function persistSession(active: boolean, sessionIds: Set<string>) {
+  // 只存当前队列里还在的 id：判「会话是否在场」只需要它们，而 sessionIds 会随会话一路累积
+  const live = active
+    ? usePlayList
+        .getState()
+        .list.map(it => it.id)
+        .filter(id => sessionIds.has(id))
+    : [];
+  void platform.setStore(StoreNameMap.HeartbeatSession, { active, sessionIds: live });
+}
+
+/**
+ * 重启后恢复上次的心动会话，让 FM「接着放」而不是重开一轮。
+ *
+ * 幂等：已在会话中直接返回；未恢复则重放同样的读取，多调一次只是重复一次只读 IPC。
+ * PlayBar 启动即调；FM 页挂载 `await restoreSession()` 后再判「接着放 / 重开」，杜绝
+ * 「恢复还没 settle 就被判成不在场而重开」的竞态（二者并发也安全：attachTopup 先 detach，不会重复订阅）。
+ *
+ * 只能在主窗触发（PlayBar 只在主窗挂载；FM 路由也只在主窗布局内）：三个窗口共用一个 bundle，
+ * 每个窗口都恢复的话会各挂一个续供订阅 → 队列见底时重复抓取、重复入队。
+ */
+export async function restoreSession() {
+  if (useHeartbeat.getState().active) return; // 已在会话中：不重复恢复
+  const { active, sessionIds } = await loadSession();
+  if (!active || !sessionIds.length) return;
+
+  // play-list 走默认 localStorage（同步水合），此处 list 已是恢复后的队列
+  const ids = new Set(sessionIds);
+  if (!usePlayList.getState().list.some(it => ids.has(it.id))) {
+    persistSession(false, new Set()); // 队列已被换掉（退出前点了别的歌单）：会话不在场，清掉标记
+    return;
+  }
+
+  const hist = await loadServed(); // 续供靠它去重，不载回会把听过的重新推一遍
+  useHeartbeat.setState({
+    active: true,
+    sessionIds: ids,
+    servedBvids: new Set(hist.bvids),
+    servedKeys: new Set(hist.keys),
+  });
+  attachTopup(); // 续供订阅原本只在 start() 里挂，重启后必须重挂，否则播完就成死循环
+}
+
 export const useHeartbeat = create<HeartbeatState>((set, get) => ({
   active: false,
   loading: false,
   servedBvids: new Set(),
   servedKeys: new Set(),
   sessionIds: new Set(),
-  ownerScore: {},
+
+  isSessionLive: () => sessionLive(),
 
   start: async () => {
     if (get().loading) return "error";
@@ -213,7 +286,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       const served = new Set<string>(hist.bvids);
       const servedKeys = new Set<string>(hist.keys);
 
-      const { likedBvids, ownerScore } = likedContext();
+      const { likedBvids } = likedContext();
       const seeds = nextSeeds(MAX_SEEDS);
       const exclude = new Set<string>([...likedBvids, ...served]); // 排除红心 + 历史已推
       const pool = await buildCandidatePool(seeds, { exclude, excludeKeys: servedKeys, doVerify: true });
@@ -235,8 +308,9 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       await usePlayList.getState().playList(queue);
       const sessionIds = new Set(usePlayList.getState().list.map(it => it.id));
 
-      set({ active: true, loading: false, servedBvids: served, servedKeys, sessionIds, ownerScore });
+      set({ active: true, loading: false, servedBvids: served, servedKeys, sessionIds });
       persistServed(served, servedKeys);
+      persistSession(true, sessionIds);
       attachTopup();
 
       return sims.length ? "ok" : "likes-only";
@@ -250,6 +324,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
   stop: () => {
     detachTopup();
     set({ active: false });
+    persistSession(false, new Set());
   },
 
   stopAndReplace: (medias, startFrom) => {
@@ -336,23 +411,20 @@ async function maybeTopup() {
   const hb = useHeartbeat.getState();
   if (!hb.active) return;
 
-  const { list, playId } = usePlayList.getState();
-
-  // 队列是否仍属于本会话：按 play-list 内部 id 判断（不看 bvid）。
-  // 搜索/全网插播时会话原有 id 仍在 → 继续；点歌单（播放全部或点单曲）整队替换 → id 全变 → 自动结束心动会话。
-  const inSession = list.some(it => hb.sessionIds.has(it.id));
-  if (!inSession) {
+  // 队列已被点歌单整队替换 → 自动结束心动会话
+  if (!sessionLive()) {
     useHeartbeat.getState().stop();
     return;
   }
 
+  const { list, playId } = usePlayList.getState();
   const idx = list.findIndex(it => it.id === playId);
   const remaining = idx < 0 ? list.length : list.length - idx - 1;
   if (remaining > TOPUP_THRESHOLD) return;
 
   toppingUp = true;
   try {
-    const { likedBvids } = likedContext();
+    const { likedBvids, ownerScore } = likedContext();
     // 二度扩展：先用「FM 里被收藏的推荐歌」（强正反馈，全元数据 → 喂三腿）；不够 SECOND_DEGREE_SEEDS 个时，
     // 用弱路径「最近已推候选随机抽」补齐剩余名额（仅带 bvid → 只喂看了又看；种子是 FM 自产、可能漂）。
     const favSeeds = await favoriteSeeds(SECOND_DEGREE_SEEDS);
@@ -379,10 +451,10 @@ async function maybeTopup() {
     });
     if (!pool.length) return;
 
-    // 反馈重排：偏好红心里出现更多的 UP（被「不喜欢」的 UP 会被压低）
-    const ranked = [...pool].sort(
-      (a, b) => (hb.ownerScore[b.ownerMid ?? -1] ?? 0) - (hb.ownerScore[a.ownerMid ?? -1] ?? 0),
-    );
+    // 反馈重排：偏好红心里出现更多的 UP（被「不喜欢」的 UP 会被压低）。
+    // 就地从红心算（likedContext 上面已调），不存快照：会话期间新加的红心即时生效，
+    // 重启恢复会话时也不必再把它捞回来。
+    const ranked = [...pool].sort((a, b) => (ownerScore[b.ownerMid ?? -1] ?? 0) - (ownerScore[a.ownerMid ?? -1] ?? 0));
 
     const picked = ranked.slice(0, TOPUP_BATCH);
     const batch = picked.map(candToPlayItem);
@@ -399,6 +471,7 @@ async function maybeTopup() {
     const sessionIds = new Set([...cur.sessionIds, ...usePlayList.getState().list.map(it => it.id)]);
     useHeartbeat.setState({ servedBvids: served, servedKeys, sessionIds });
     persistServed(served, servedKeys);
+    persistSession(true, sessionIds);
   } catch (e) {
     console.error("[heartbeat] top-up failed", e);
   } finally {

@@ -13,6 +13,7 @@ declare global {
     [StoreNameMap.Tags]: Record<string, any>;
     [StoreNameMap.HeartbeatServed]: { bvids: string[]; keys: string[] };
     [StoreNameMap.HeartbeatFavSeeds]: { items: { bvid: string; title?: string; ownerMid?: number }[] };
+    [StoreNameMap.HeartbeatSession]: { active: boolean; sessionIds: string[] };
   };
 }
 

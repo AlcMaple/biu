@@ -12,7 +12,7 @@ import {
 } from "@remixicon/react";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
-import { useHeartbeat } from "@/store/heartbeat";
+import { restoreSession, useHeartbeat } from "@/store/heartbeat";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList } from "@/store/play-list";
 
@@ -42,8 +42,20 @@ const Heartbeat = () => {
   };
 
   useEffect(() => {
-    // 进入私人FM 即开播（打断当前播放）；正在构建则不重复触发
-    if (!loading) void handleStart();
+    let cancelled = false;
+    // 先等重启恢复跑完（幂等，与 PlayBar 共用同一个 promise），再判「接着放 / 重开」，
+    // 否则冷启后极快点进 FM 可能抢在恢复 settle 之前，把可续播的会话误判成不在场而重开。
+    void (async () => {
+      await restoreSession();
+      if (cancelled) return;
+      // 会话还在场（切去别的歌单看了看又回来 / 重启恢复成功）：接着放，不重开一轮。
+      // 只有「从未开始」或「已被点歌单整队替换掉」时才开新的一轮（打断当前播放）。
+      if (useHeartbeat.getState().isSessionLive()) return;
+      if (!useHeartbeat.getState().loading) void handleStart();
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

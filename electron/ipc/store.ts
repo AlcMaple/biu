@@ -5,6 +5,9 @@ import { StoreNameMap } from "@shared/store";
 
 import {
   appSettingsStore,
+  heartbeatFavSeedsStore,
+  heartbeatServedStore,
+  heartbeatSessionStore,
   localFavItemsStore,
   localFavoritesStore,
   lyricsCacheStore,
@@ -76,6 +79,18 @@ export function registerStoreHandlers() {
     if (name === StoreNameMap.Tags) {
       return tagsStore.store;
     }
+
+    if (name === StoreNameMap.HeartbeatServed) {
+      return heartbeatServedStore.store;
+    }
+
+    if (name === StoreNameMap.HeartbeatFavSeeds) {
+      return heartbeatFavSeedsStore.store;
+    }
+
+    if (name === StoreNameMap.HeartbeatSession) {
+      return heartbeatSessionStore.store;
+    }
   });
 
   ipcMain.handle(channel.store.set, async (_, name: StoreName, value: any) => {
@@ -113,6 +128,18 @@ export function registerStoreHandlers() {
       if (name === StoreNameMap.Tags) {
         await setStoreWithRetry(name, tagsStore, value);
       }
+
+      if (name === StoreNameMap.HeartbeatServed) {
+        await setStoreWithRetry(name, heartbeatServedStore, value);
+      }
+
+      if (name === StoreNameMap.HeartbeatFavSeeds) {
+        await setStoreWithRetry(name, heartbeatFavSeedsStore, value);
+      }
+
+      if (name === StoreNameMap.HeartbeatSession) {
+        await setStoreWithRetry(name, heartbeatSessionStore, value);
+      }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
     }
@@ -145,6 +172,18 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.Tags) {
       tagsStore.clear();
+    }
+
+    if (name === StoreNameMap.HeartbeatServed) {
+      heartbeatServedStore.clear();
+    }
+
+    if (name === StoreNameMap.HeartbeatFavSeeds) {
+      heartbeatFavSeedsStore.clear();
+    }
+
+    if (name === StoreNameMap.HeartbeatSession) {
+      heartbeatSessionStore.clear();
     }
 
     return true;

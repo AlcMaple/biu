@@ -54,6 +54,29 @@ export const windowStateStore = new Store<{
   defaults: {},
 });
 
+// —— 私人FM（心动模式）持久化：均为推荐状态、非用户资料，放应用数据目录即可 ——
+
+/** 已推历史（跨会话/跨天不重复推荐） */
+export const heartbeatServedStore = new Store<{ bvids: string[]; keys: string[] }>({
+  name: StoreNameMap.HeartbeatServed,
+  cwd: getUserDataPath(),
+  defaults: { bvids: [], keys: [] },
+});
+
+/** 收藏动作种子（续供二度扩展） */
+export const heartbeatFavSeedsStore = new Store<{ items: { bvid: string; title?: string; ownerMid?: number }[] }>({
+  name: StoreNameMap.HeartbeatFavSeeds,
+  cwd: getUserDataPath(),
+  defaults: { items: [] },
+});
+
+/** 会话（重启后接着放） */
+export const heartbeatSessionStore = new Store<{ active: boolean; sessionIds: string[] }>({
+  name: StoreNameMap.HeartbeatSession,
+  cwd: getUserDataPath(),
+  defaults: { active: false, sessionIds: [] },
+});
+
 /** 本地收藏夹/歌曲/标签数据目录（用户可将其放进网盘同步目录实现跨端同步） */
 export const localDataPath = path.join(app.getPath("documents"), "Biu");
 
