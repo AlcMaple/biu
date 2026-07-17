@@ -1,15 +1,7 @@
 import { useEffect } from "react";
 
-import { addToast, Button, Tooltip } from "@heroui/react";
-import {
-  RiHeartPulseFill,
-  RiHeart3Fill,
-  RiHeart3Line,
-  RiPauseFill,
-  RiPlayFill,
-  RiSkipBackFill,
-  RiSkipForwardFill,
-} from "@remixicon/react";
+import { addToast, Button } from "@heroui/react";
+import { RiHeartPulseFill, RiHeart3Line } from "@remixicon/react";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import { restoreSession, useHeartbeat } from "@/store/heartbeat";
@@ -23,10 +15,6 @@ const Heartbeat = () => {
 
   const playId = usePlayList(s => s.playId);
   const list = usePlayList(s => s.list);
-  const isPlaying = usePlayList(s => s.isPlaying);
-  const togglePlay = usePlayList(s => s.togglePlay);
-  const prev = usePlayList(s => s.prev);
-  const next = usePlayList(s => s.next);
 
   const current = list.find(i => i.id === playId);
   const likedItems = useLocalFavItemsStore(s => s.folderItems[LIKED_FOLDER_ID] ?? []);
@@ -81,53 +69,30 @@ const Heartbeat = () => {
         )}
       </div>
 
-      <div className="flex max-w-md flex-col items-center gap-1 text-center">
-        <div className="line-clamp-2 text-lg font-semibold">{title}</div>
+      <div className="flex max-w-2xl flex-col items-center gap-1 text-center">
+        <div className="line-clamp-2 text-lg font-semibold text-balance">{title}</div>
         <div className="text-sm text-zinc-500">{owner}</div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <Tooltip closeDelay={0} content="上一首">
-          <Button isIconOnly variant="light" radius="full" size="lg" onPress={prev} isDisabled={!current}>
-            <RiSkipBackFill size={24} />
-          </Button>
-        </Tooltip>
+      {/* 播放控制交给底部播放栏，这里只保留 FM 的核心动作：把在听的歌收进「我喜欢的音乐」。
+          幽灵文字按钮，文本恒定；收藏与否只体现在文字微亮 + 心形着色，保持克制不抢镜。 */}
+      <Button
+        variant="light"
+        radius="full"
+        size="lg"
+        disableRipple
+        isLoading={loading}
+        isDisabled={!current}
+        onPress={handleLike}
+        startContent={!loading && <RiHeart3Line size={20} className={isLiked ? "text-[#f0607a]" : ""} />}
+        className={`px-4 font-medium data-[hover=true]:bg-transparent data-[pressed=true]:bg-transparent ${
+          isLiked ? "text-zinc-300" : "text-zinc-400"
+        }`}
+      >
+        加入{LIKED_FOLDER_TITLE}
+      </Button>
 
-        <Button
-          isIconOnly
-          color="primary"
-          radius="full"
-          size="lg"
-          className="h-16 w-16"
-          isLoading={loading}
-          onPress={togglePlay}
-          isDisabled={!current}
-        >
-          {isPlaying ? <RiPauseFill size={30} /> : <RiPlayFill size={30} />}
-        </Button>
-
-        <Tooltip closeDelay={0} content="下一首">
-          <Button isIconOnly variant="light" radius="full" size="lg" onPress={next} isDisabled={!current}>
-            <RiSkipForwardFill size={24} />
-          </Button>
-        </Tooltip>
-
-        <Tooltip closeDelay={0} content={isLiked ? `移出「${LIKED_FOLDER_TITLE}」` : `加入「${LIKED_FOLDER_TITLE}」`}>
-          <Button
-            isIconOnly
-            variant="light"
-            radius="full"
-            size="lg"
-            color={isLiked ? "danger" : "default"}
-            onPress={handleLike}
-            isDisabled={!current}
-          >
-            {isLiked ? <RiHeart3Fill size={24} /> : <RiHeart3Line size={24} />}
-          </Button>
-        </Tooltip>
-      </div>
-
-      <div className="max-w-md text-center text-xs text-zinc-400">
+      <div className="max-w-2xl text-center text-xs text-balance text-zinc-400">
         私人FM · 根据「{LIKED_FOLDER_TITLE}」为你不断推荐相似单曲，边听边用 ❤️ 收藏你喜欢的
       </div>
     </div>
