@@ -262,6 +262,8 @@ const api: ElectronAPI = {
   clearMediaDownloadTaskList: () => ipcRenderer.invoke(channel.download.clear),
   // 切换开发者工具
   toggleDevTools: () => ipcRenderer.send(channel.window.toggleDevTools),
+  // 【调试】私人FM 日志：reset=true 开新一轮（新文件），song=刚切走的一首、seq=它在队列里的序号（追加一行）
+  heartbeatDebugLog: payload => ipcRenderer.invoke(channel.heartbeat.debugLog, payload),
   // 识别音频
   recognizeSong: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke(channel.shazam.recognize, audioBuffer),
   // 获取桌面捕获源

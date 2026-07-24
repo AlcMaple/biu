@@ -80,6 +80,9 @@ export const channel = {
     get: "cookie:get",
     set: "cookie:set",
   },
+  heartbeat: {
+    debugLog: "heartbeat:debug-log",
+  },
   localMusic: {
     scan: "local-music:scan",
     deleteFile: "local-music:delete-file",
