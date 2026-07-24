@@ -33,6 +33,13 @@ export const toSeconds = (d: number | string | undefined | null): number => {
 const TITLE_BLOCK =
   /(合集|歌单|串烧|联唱|medley|mashup|混剪|直拍|翻跳|对比|测评|评测|开箱|拆箱|vlog|盘点|排行|top\s*\d|一小时|1\s*小时|半小时|\d{2,}\s*首|循环\s*歌|\bloop\b|repeat|教学|教程|扒谱|reaction|react\b|解说|讲解|直播|录播|回放|全专|专辑|电台|采访|剪辑|同台|演唱会|演唱會|the\s*first\s*take|ファースト・?テイク)/i;
 
+/**
+ * 中文听歌 reaction 常不写 reaction / 直播 / 切片，只用「让某人听某歌」「听完有什么反应」包装标题。
+ * 保留正常歌名里的「听」（如「听海」「让我听懂你的语言」），只拦带明确体验者或反应语义的组合。
+ */
+const LISTENING_REACTION_BLOCK =
+  /(?:让|讓|给|給).{1,24}(?:听|聽)(?:一?下)?(?:[《「『【“"]|.{0,40}(?:反[应應]|reaction))|(?:第一次|首次|初次).{0,6}(?:听|聽)(?!见|見)|(?:听|聽)(?:完|后|後|了)?.{0,40}(?:会有|會有|有什么|有什麼|怎样|怎樣|如何|的)反[应應]/i;
+
 /** 子分区名命中即排除：现场有大量前后摇/报幕/掌声，电台/教学为口播。 */
 const TNAME_BLOCK = /(现场|电台|教学|乐评|资讯|访谈)/;
 
@@ -44,6 +51,7 @@ export function isPureSongCandidate(c: SongCandidate): boolean {
   if (!c.bvid) return false;
   if (c.durationSec < SONG_MIN_SECONDS || c.durationSec > SONG_MAX_SECONDS) return false;
   if (TITLE_BLOCK.test(c.title)) return false;
+  if (LISTENING_REACTION_BLOCK.test(c.title)) return false;
   if (c.tname && TNAME_BLOCK.test(c.tname)) return false;
   return true;
 }

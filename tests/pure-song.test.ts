@@ -34,6 +34,10 @@ describe("isPureSongCandidate", () => {
       "华语经典串烧50首",
       "【路人re】苏新皓朱志鑫同舞台直拍对比",
       "reaction 第一次听",
+      "让日本萝莉听《派对浪客诸葛孔明》OP会有什么反应",
+      "给老外听周杰伦，他会有怎样的反应？",
+      "韩国音乐人第一次听《孤勇者》",
+      "听完 YOASOBI 新歌后的反應",
       "电吉他改装爱好者必看！拾音器测评",
       "【偶像活动】星宫莓 雾矢葵 初同台 アイドル活動！",
       "THE FIRST TAKE / 优里 - 大提灯",
@@ -50,6 +54,12 @@ describe("isPureSongCandidate", () => {
   it("accepts allowed subareas", () => {
     expect(isPureSongCandidate({ ...base, tname: "翻唱" })).toBe(true);
     expect(isPureSongCandidate({ ...base, tname: "MV" })).toBe(true);
+  });
+
+  it("keeps normal song titles containing 听 or 反应", () => {
+    for (const title of ["张学友 - 听海", "让我听懂你的语言", "化学反应 - 蔡依林", "第一次听见你"]) {
+      expect(isPureSongCandidate({ ...base, title })).toBe(true);
+    }
   });
 
   it("rejects when bvid is missing", () => {
