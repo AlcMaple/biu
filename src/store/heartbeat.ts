@@ -121,6 +121,38 @@ function debugDumpQueue(pool: SongCandidate[], queue: PlayItem[], simBvids: Set<
   console.groupEnd();
 }
 
+// ⚠️ 临时调试输出：私人FM 按切歌逐首写进 logs/heartbeat 文件（只在开发期），验证过后一并删除。
+// 不再一次性 dump 整个队列：重开一轮开新文件，之后每次切歌把「刚切走的那首」追加一行，行首带它在播放队列里的序号。
+// 按「队列项」去重（同一项只记一次）：反复上/下一首在同两首间来回切不会重复记；而续供真喂来重复歌是新队列项、
+// 序号不同 → 照记（例：第 1 首和第 6 首都叫 A，日志里就是两条不同序号的 A），不会被误当去重藏掉。
+function isDevLog() {
+  return !(typeof process !== "undefined" && process.env.NODE_ENV === "production");
+}
+
+/** 本轮已记过的「队列项 id」（去重用）：只挡同一项的反复切换，不挡续供喂来的新重复歌 */
+const loggedSongIds = new Set<string>();
+
+/** 重开一轮：清空去重集、让主进程开一个新日志文件（写轮次头） */
+function startFmDebugLog() {
+  if (!isDevLog()) return;
+  loggedSongIds.clear();
+  try {
+    void platform.heartbeatDebugLog({ reset: true });
+  } catch {
+    /* 纯调试，失败静默，不影响播放 */
+  }
+}
+
+/** 追加一条「刚切走的那首」到当前轮文件：seq = 它在播放队列里的序号（1 起） */
+function appendSwitchedSong(seq: number, title: string) {
+  if (!isDevLog()) return;
+  try {
+    void platform.heartbeatDebugLog({ seq, song: title });
+  } catch {
+    /* 纯调试，失败静默，不影响播放 */
+  }
+}
+
 /**
  * 心动会话是否仍在场：active 且播放队列里仍有本会话的歌。
  *
@@ -306,6 +338,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       debugDumpQueue(pool, queue, new Set(pool.map(c => c.bvid)));
 
       await usePlayList.getState().playList(queue);
+      startFmDebugLog(); // 重开一轮：开新日志文件（之后每首播放完追加一行）
       const sessionIds = new Set(usePlayList.getState().list.map(it => it.id));
 
       set({ active: true, loading: false, servedBvids: served, servedKeys, sessionIds });
@@ -389,7 +422,18 @@ function attachTopup() {
   lastPlayId = usePlayList.getState().playId;
   unsub = usePlayList.subscribe(state => {
     if (state.playId === lastPlayId) return; // 仅在切歌时处理，避免进度/播放态变更频繁触发
+    const leftId = lastPlayId; // 刚被切走的那首
     lastPlayId = state.playId;
+    // 按切歌记录：把刚切走那首追加一行，带它在播放队列里的序号；同一队列项只记一次
+    //（挡「反复上/下一首来回切」的重复；续供真喂来的重复歌是新队列项、序号不同 → 照记，不会被藏）。
+    // 按 id 回查队列位置：正常切歌能查到；队列被替换 / 该项已移除（失效跳过、bvid-only 占位解析换 id）时 -1 → 不记。
+    if (leftId && !loggedSongIds.has(leftId)) {
+      const idx = state.list.findIndex(it => it.id === leftId);
+      if (idx >= 0) {
+        loggedSongIds.add(leftId);
+        appendSwitchedSong(idx + 1, state.list[idx].title);
+      }
+    }
     void maybeTopup();
   });
 }

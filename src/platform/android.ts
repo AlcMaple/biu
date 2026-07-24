@@ -151,6 +151,7 @@ const platform: Platform = {
   readFancyPlayerSourceFile: async () => null,
   saveFancyPlayerThumb: async () => null,
   removeFancyPlayerThumb: async () => false,
+  heartbeatDebugLog: async () => null,
   recognizeSong: async () => ({}),
   getDesktopSources: async () => [],
   requestMicPermission: async () => false,

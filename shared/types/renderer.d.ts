@@ -142,6 +142,12 @@ declare global {
     saveFancyPlayerThumb: (sourcePath: string, data: Uint8Array) => Promise<string | null>;
     /** 删除精美播放器图片对应的缩略图缓存 */
     removeFancyPlayerThumb: (sourcePath: string) => Promise<boolean>;
+    /**
+     * 【调试】私人FM 按切歌逐首日志：每次切歌把切走的那首追加一行到 `logs/heartbeat/fm-<时间戳>.txt`，
+     * 行首带 `seq`（该歌在播放队列里的序号）。`reset: true` 开新一轮（新文件+轮次头）；`song` 为刚切走的歌名。
+     * 返回当前轮日志文件绝对路径（失败返回 null）。Android 端为 noop。
+     */
+    heartbeatDebugLog: (payload: { reset?: boolean; song?: string; seq?: number }) => Promise<string | null>;
     /** 识别音频（传入 ArrayBuffer，返回 node-shazam 识别结果） */
     recognizeSong: (audioBuffer: ArrayBuffer) => Promise<Record<string, unknown>>;
     /** 获取桌面捕获源列表（用于系统音频采集） */

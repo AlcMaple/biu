@@ -6,6 +6,7 @@ import { registerCookieIpcHandlers } from "./cookie";
 import { registerDialogHandlers } from "./dialog";
 import { registerDownloadHandlers } from "./download";
 import { registerFontHandlers } from "./font";
+import { registerHeartbeatHandlers } from "./heartbeat";
 import { registerLocalMusicHandlers } from "./local-music";
 import { registerLyricsHandlers } from "./lyrics";
 import { registerShazamHandlers } from "./shazam";
@@ -26,4 +27,5 @@ export function registerIpcHandlers(props: IpcHandlerProps) {
   registerLocalMusicHandlers();
   registerShazamHandlers();
   registerFancyPlayerThumbHandlers();
+  registerHeartbeatHandlers();
 }
