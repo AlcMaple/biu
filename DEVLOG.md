@@ -8,6 +8,10 @@
 > - **简单改动效果足以看懂，不必展开**；**复杂功能必须配图**（数据流 / 架构），SVG 放 `docs/devlog-assets/` 并在正文引用。
 > - **坑 / 反复权衡的设计决策不写这里**，归到 `docs/ideas/` 对应的 idea 文件。
 
+## 2026-07-27 docs: 修正 CLAUDE.md 过时命令与失效引用
+
+**效果**：对照当前仓库现状校准 CLAUDE.md——测试命令标明 `pnpm test` 是 watch 模式、CI 单次跑用 `pnpm run test -- --run`（与 AGENTS.md 上次修正对齐）；补 Lint 命令行；交叉引用 `AGENTS.md`（编码风格的事实源）；新增 `biu-windows-test/` 是一次性端到端实验目录的说明（不算入应用代码/死代码扫描）；修复两处指向不存在的 `docs/windows-setup.md` 的链接（实际为 `docs/Windows-依赖管理指南.md`）。
+
 ## 私人FM / 心动模式
 
 ### 2026-07-24 fix: 过滤新增中文听歌切片

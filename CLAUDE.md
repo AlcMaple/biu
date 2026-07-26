@@ -19,8 +19,9 @@ Package manager is **pnpm 10.24.0**, Node **22.17.1** (enforced by `engines`).
 | Production build (Electron, full installer) | `pnpm build` |
 | Sync built renderer into Android project | `pnpm build:android` |
 | Open Android Studio | `pnpm open:android` |
-| All tests | `pnpm test` |
-| Single test | `pnpm test play-list.test.ts` (vitest pattern match) |
+| All tests (CI-style single pass) | `pnpm run test -- --run` (`pnpm test` alone starts vitest **watch mode**) |
+| Single test | `pnpm run test -- --run play-list.test.ts` (vitest pattern match) |
+| Lint | `pnpm exec eslint .` (fix a file: `pnpm exec eslint --fix <file>`) |
 | Dead-code check | `pnpm knip` |
 | Tagged release (auto changelog + push) | `pnpm release` / `pnpm release:beta` / `pnpm release:alpha` |
 
@@ -35,7 +36,7 @@ This is non-obvious — there is no separate "build main process" step. The chai
 Same plugin, different hooks: `onBeforeBuild` compiles the main/preload bundles, then Rsbuild builds the renderer to `dist/web/`, then `onAfterBuild` invokes electron-builder. **electron-builder config is hard-coded inside `plugins/electron-build.ts`** (no `electron-builder.json`). Output: `dist/artifacts/`.
 
 ### Windows first-time setup
-**Run `node dev_tools/setup-win.js` instead of `pnpm install`** on a fresh Windows box. It rewrites Git protocol (avoids SSH), configures pnpm mirrors, and pre-fetches Electron binaries. Idempotent — re-runnable. See `docs/windows-setup.md` for troubleshooting.
+**Run `node dev_tools/setup-win.js` instead of `pnpm install`** on a fresh Windows box. It rewrites Git protocol (avoids SSH), configures pnpm mirrors, and pre-fetches Electron binaries. Idempotent — re-runnable. See `docs/Windows-依赖管理指南.md` for dependency/env troubleshooting.
 
 ## Architecture
 
@@ -90,7 +91,7 @@ React Router 7 in hash mode. `src/routes.tsx` declares the main app routes plus 
 ## Conventions
 
 ### Import order (ESLint perfectionist)
-Configured globally in `eslint.config.mjs`. Internal pattern is `^~/.+`, `^@/.+`, `^@shared/.+`. Don't fight the formatter — run `pnpm dlx eslint --fix <file>` if confused.
+Configured globally in `eslint.config.mjs`. Internal pattern is `^~/.+`, `^@/.+`, `^@shared/.+`. Don't fight the formatter — run `pnpm exec eslint --fix <file>` if confused.
 
 ### Path aliases
 - `@/*` → `src/*`
@@ -104,7 +105,7 @@ Defined in `tsconfig.json`, mirrored in `vitest.config.ts`.
 Do **not** add app-level auto-retry, periodic "did it recover yet?" probing, or silent `catch → return null` on rate-limit / 5xx failures — retrying inside the penalty window worsens throttling, and swallowed errors make users hammer manually. Surface failures to the UI with error-type-specific copy (playback errors should guide "switch quality / re-parse"). The only allowed code-level retry is a single transient transport blip (ECONNRESET-level), never a business failure. See `AI_GUIDELINES.md` for the full rationale.
 
 ### Tests
-Vitest + jsdom + globals enabled. `tests/setup.ts` mocks `MediaSession` and audio-element APIs. Add new test files under `tests/`. Run a single one with `pnpm test <pattern>`. Type/unit passing ≠ correct behavior — playback and cross-window sync must be driven in a real window before claiming a fix.
+Vitest + jsdom + globals enabled. `tests/setup.ts` mocks `MediaSession` and audio-element APIs. Add new test files under `tests/` named `*.test.ts(x)`. Run a single one with `pnpm run test -- --run <pattern>` (bare `pnpm test` is watch mode — it won't exit). Type/unit passing ≠ correct behavior — playback and cross-window sync must be driven in a real window before claiming a fix.
 
 ### Commits, DEVLOG, and releases
 - **Before every commit, add a `DEVLOG.md` entry** (per its format header) — this is a required delivery step, not optional. Group multiple commits of the same feature under one `##` heading; pits/design trade-offs go in the matching `docs/ideas/` file, not DEVLOG.
@@ -137,9 +138,13 @@ Bilibili `playurl` often returns `mcdn` / `szbdyd` (PCDN) nodes as the first `ba
 ### Persisted data must be portable
 Local favorites support export/backup (`docs/local-favorites-backup.md`). Never persist machine-absolute paths (`file:///C:/Users/...`) into syncable data — store portable identifiers (bvid, relative path, URL) and compute local paths per-device at display time.
 
+### Standalone test dir at repo root
+`biu-windows-test/` is a **throwaway end-to-end experiment** for lyrics-timeline alignment (Aliyun ASR → DTW → LRC), zero-dependency and self-contained. It is **not app code** — don't import from it, refactor it, or count it in dead-code sweeps. Context: `docs/ideas/002-歌词时间轴对齐.md`.
+
 ## See Also
 - `AI_GUIDELINES.md` — do/don't rules from real incidents (read alongside this file).
+- `AGENTS.md` — generic-agent repo guide; canonical source for **coding style** (2-space indent, double quotes, 120-char width, kebab-case files, PascalCase components) and PR expectations. Keep its command list in sync with this file.
 - `DEVLOG.md` — running development log; add an entry before each commit.
 - `docs/ideas/` — phased feature design notes.
-- `docs/windows-setup.md` — Windows env troubleshooting.
+- `docs/Windows-依赖管理指南.md` — Windows dependency/env troubleshooting.
 - `dev_tools/setup-win.js` — fresh-Windows automation.
