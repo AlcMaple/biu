@@ -1,0 +1,2 @@
+# git 钩子由 git 直接 spawn，Windows 上 CRLF 会导致 shebang 解析失败（Exec format error）
+/.husky/* text eol=lf
