@@ -43,6 +43,10 @@
   后果：相邻元素被挤一下，出现布局抖动，chip / tab / 歌单列表项 / 播放列表高发（本项目此类组件密集）。
   ✅ 两态之间 border 宽度、字重、padding、字号、宽高必须一致，只能变颜色 / 底色 / 阴影。
 
+- ❌ 只在“命中已配置快捷键”后释放按钮焦点；或为消除蓝色焦点圈给全项目加 `*:focus { outline: none }` / `focus-visible:outline-none`
+  后果：未配置为空格的情况下，空格仍会激活鼠标刚点过的按钮并把它切成 HeroUI `data-focus-visible`；全局删轮廓则会连真正用 Tab 导航时需要的键盘焦点反馈一起删掉。
+  ✅ `app.tsx` 通过 `createPointerFocusGuard()` 区分鼠标遗留焦点与 Tab 键盘焦点；capture 阶段在空格 / 回车或已配置快捷键执行前只释放前者。空格在页面背景或鼠标遗留焦点上始终作为播放器级播放 / 暂停键，焦点回到 `body` 后连续按仍须持续生效；Tab 聚焦控件时则保留该控件的原生空格操作。输入控件和 `contenteditable` 必须排除。
+
 ## 平台抽象与 IPC
 
 - ❌ 运行时用 `BIU_TARGET` 判断当前是不是 Android

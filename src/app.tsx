@@ -7,6 +7,12 @@ import moment from "moment";
 import platform, { isAndroid } from "@/platform";
 
 import { getCookitFromBSite } from "./common/utils/cookie";
+import {
+  blurActiveNonEditableElement,
+  createPointerFocusGuard,
+  isEditableElement,
+  shouldHandleSpaceAsPlayback,
+} from "./common/utils/focus";
 import { toggleMiniMode } from "./common/utils/mini-player";
 import { mapKeyToElectronAccelerator } from "./common/utils/shortcut";
 import Theme from "./components/theme";
@@ -104,34 +110,41 @@ function ElectronApp() {
   // 窗口重新激活时，将焦点从按钮等交互元素上移走，避免空格触发上次操作
   useEffect(() => {
     const handleWindowFocus = () => {
-      const active = document.activeElement as HTMLElement | null;
-      if (
-        active &&
-        active !== document.body &&
-        active.tagName !== "INPUT" &&
-        active.tagName !== "TEXTAREA" &&
-        !active.isContentEditable
-      ) {
-        active.blur();
-      }
+      blurActiveNonEditableElement();
     };
     window.addEventListener("focus", handleWindowFocus);
     return () => window.removeEventListener("focus", handleWindowFocus);
   }, []);
 
   useEffect(() => {
+    const pointerFocusGuard = createPointerFocusGuard();
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 忽略在输入框中的按键
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
+      // 忽略表单控件和富文本编辑区中的按键
+      if (isEditableElement(e.target)) return;
 
       const shortcut = mapKeyToElectronAccelerator(e);
       if (!shortcut) return;
 
       const { shortcuts } = useShortcutSettings.getState();
       const matched = shortcuts.find(s => s.shortcut === shortcut);
+
+      const releasedPointerFocus = pointerFocusGuard.releaseForKeyDown(e, Boolean(matched));
+
+      // 空格是持续可用的播放器级播放 / 暂停键：鼠标遗留焦点只负责判断来源，
+      // 释放到 body 后继续按空格仍会在播放和暂停之间切换。
+      if (!matched && shouldHandleSpaceAsPlayback(e, releasedPointerFocus)) {
+        e.preventDefault();
+        usePlayList.getState().togglePlay();
+        return;
+      }
+
+      // 回车不是播放器快捷键；释放鼠标焦点后补回原控件的一次原生激活。
+      if (!matched && releasedPointerFocus && e.key === "Enter") {
+        e.preventDefault();
+        releasedPointerFocus.click();
+        return;
+      }
 
       if (matched) {
         e.preventDefault();
@@ -161,8 +174,19 @@ function ElectronApp() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("pointerdown", pointerFocusGuard.handlePointerDown, true);
+    window.addEventListener("pointerup", pointerFocusGuard.handlePointerEnd, true);
+    window.addEventListener("pointercancel", pointerFocusGuard.handlePointerEnd, true);
+    window.addEventListener("focusin", pointerFocusGuard.handleFocusIn, true);
+    // capture 阶段先于 React Aria 的按键处理，避免鼠标遗留焦点被切成 focus-visible。
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", pointerFocusGuard.handlePointerDown, true);
+      window.removeEventListener("pointerup", pointerFocusGuard.handlePointerEnd, true);
+      window.removeEventListener("pointercancel", pointerFocusGuard.handlePointerEnd, true);
+      window.removeEventListener("focusin", pointerFocusGuard.handleFocusIn, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -177,7 +201,7 @@ function ElectronApp() {
     return () => {
       removeListener();
     };
-  }, []);
+  }, [setUpdate]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
