@@ -16,6 +16,24 @@
 
 **效果**：对照当前仓库现状校准 CLAUDE.md——测试命令标明 `pnpm test` 是 watch 模式、CI 单次跑用 `pnpm run test -- --run`（与 AGENTS.md 上次修正对齐）；补 Lint 命令行；交叉引用 `AGENTS.md`（编码风格的事实源）；新增 `biu-windows-test/` 是一次性端到端实验目录的说明（不算入应用代码/死代码扫描）；修复两处指向不存在的 `docs/windows-setup.md` 的链接（实际为 `docs/Windows-依赖管理指南.md`）。
 
+## 快捷键焦点反馈
+
+### 2026-07-27 fix: 键盘操控触发导航焦点
+
+![真实 Electron 三步验证：旧实现按空格出现蓝圈；修复后点击进入暂停；再按空格恢复播放且无蓝圈](docs/devlog-assets/focus-visible-before-after.png)
+
+**效果**：1图是旧实现按空格后的蓝圈；2图是修复后空格进入暂停；3图是随后按空格恢复播放且无蓝圈
+
+**关键代码**：
+
+1. [`src/app.tsx`](src/app.tsx) 在 capture 阶段监听 `pointerdown / focusin / pointerup`，把焦点来源交给
+   `createPointerFocusGuard()`；`keydown` 在 React Aria 处理前调用 `releaseForKeyDown()`。空格在页面背景或鼠标遗留焦点上始终调用播放器 `togglePlay()`，所以焦点回到 `BODY` 后连续按空格仍会持续切换；已配置快捷键释放焦点后走统一动作，不会重复触发。
+2. [`src/common/utils/focus.ts`](src/common/utils/focus.ts) 只记录 pointer 期间得到焦点的非输入元素。Tab 产生的焦点不会进入
+   `pointerFocusedElement`，所以正常键盘导航及其蓝色焦点提示仍保留；`input / textarea / select / contenteditable`
+   继续排除。
+3. [`tests/focus.test.ts`](tests/focus.test.ts) 覆盖三条边界：第一次空格释放鼠标焦点并进入播放快捷键路径；
+   焦点已在 `BODY` 时后续空格仍进入同一路径；Tab 来源焦点 + 空格不走全局播放快捷键。
+
 ## 私人FM / 心动模式
 
 ### 2026-07-24 fix: 过滤新增中文听歌切片
