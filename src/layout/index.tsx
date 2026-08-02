@@ -14,6 +14,7 @@ import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
 import { isAndroid, log } from "@/platform";
+import { initLocalPlaylistSync } from "@/service/sync";
 import { useUser } from "@/store/user";
 
 import Navbar from "./navbar";
@@ -28,6 +29,7 @@ const Layout = () => {
 
   useEffect(() => {
     updateUser();
+    initLocalPlaylistSync();
   }, []);
 
   return (

@@ -1,0 +1,49 @@
+<svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="14">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#555" />
+    </marker>
+  </defs>
+
+  <!-- Clients -->
+  <rect x="30" y="30" width="200" height="90" rx="8" fill="#eef2ff" stroke="#6366f1" />
+  <text x="130" y="60" text-anchor="middle" font-weight="bold">Electron 客户端 A（Mac）</text>
+  <text x="130" y="82" text-anchor="middle" font-size="12">favorite.ts / local-fav-items.ts / tags.ts</text>
+  <text x="130" y="100" text-anchor="middle" font-size="12">setState → 防抖 800ms</text>
+
+  <rect x="30" y="150" width="200" height="90" rx="8" fill="#eef2ff" stroke="#6366f1" />
+  <text x="130" y="180" text-anchor="middle" font-weight="bold">Electron 客户端 B（Win）</text>
+  <text x="130" y="202" text-anchor="middle" font-size="12">同一份 src/service/sync</text>
+
+  <!-- Arrow to server -->
+  <line x1="230" y1="75" x2="330" y2="140" stroke="#555" marker-end="url(#arrow)" />
+  <line x1="230" y1="195" x2="330" y2="160" stroke="#555" marker-end="url(#arrow)" />
+  <text x="255" y="120" font-size="12">HTTPS</text>
+  <text x="255" y="230" font-size="12">biu.alcmaple.cn</text>
+
+  <!-- Server -->
+  <rect x="340" y="90" width="230" height="120" rx="8" fill="#fef3c7" stroke="#d97706" />
+  <text x="455" y="115" text-anchor="middle" font-weight="bold">biu-sync-server</text>
+  <text x="455" y="140" text-anchor="middle" font-size="12">/api/auth/exchange（cookie → mid → JWT）</text>
+  <text x="455" y="160" text-anchor="middle" font-size="12">/api/sync/:store（GET 快照 / POST ops）</text>
+  <text x="455" y="180" text-anchor="middle" font-size="12">pm2 单实例 fork，每 mid 互斥队列</text>
+
+  <!-- Arrow to disk -->
+  <line x1="570" y1="150" x2="650" y2="150" stroke="#555" marker-end="url(#arrow)" />
+  <text x="580" y="140" font-size="12">原子写</text>
+
+  <!-- Disk -->
+  <rect x="660" y="90" width="210" height="120" rx="8" fill="#dcfce7" stroke="#16a34a" />
+  <text x="765" y="115" text-anchor="middle" font-weight="bold">/data/biu-sync/{mid}/</text>
+  <text x="765" y="140" text-anchor="middle" font-size="12">favorites.json</text>
+  <text x="765" y="160" text-anchor="middle" font-size="12">fav-items.json</text>
+  <text x="765" y="180" text-anchor="middle" font-size="12">tags.json（版本号 + 条目级快照）</text>
+
+  <!-- Migration box -->
+  <rect x="30" y="290" width="840" height="140" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="4 3" />
+  <text x="450" y="315" text-anchor="middle" font-weight="bold">首次同步（老用户数据迁移，防丢失）</text>
+  <text x="60" y="345" font-size="13">1. 拉云端当前快照（可能为空 = 这台设备第一次连，也可能已有别的设备同步过的数据）</text>
+  <text x="60" y="370" font-size="13">2. diffForMigration()：只产生 upsert，绝不产生 remove —— 本地独有的数据推上云，云端独有的数据留在原地</text>
+  <text x="60" y="395" font-size="13">3. 动手前先把本地现状备份进 PlaylistSyncMeta（本地文件，不经过合并逻辑），出问题也能手动找回</text>
+  <text x="60" y="420" font-size="13">4. 合并结果写回本地 store + 记下新 version，之后转入日常增量 diff（diffSnapshots，可产生 remove）</text>
+</svg>

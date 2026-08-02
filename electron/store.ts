@@ -94,3 +94,10 @@ export const tagsStore = new Store<Record<string, any>>({
   name: StoreNameMap.Tags,
   cwd: localDataPath,
 });
+
+/** 本地歌单云同步的记账信息（每 mid 的已同步版本号/快照），纯设备本地状态，放应用数据目录即可 */
+export const playlistSyncMetaStore = new Store<PlaylistSyncMetaData>({
+  name: StoreNameMap.PlaylistSyncMeta,
+  cwd: getUserDataPath(),
+  defaults: {},
+});
