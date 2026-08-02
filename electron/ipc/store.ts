@@ -11,6 +11,7 @@ import {
   localFavItemsStore,
   localFavoritesStore,
   lyricsCacheStore,
+  playlistSyncMetaStore,
   shortcutKeyStore,
   tagsStore,
   userStore,
@@ -91,6 +92,10 @@ export function registerStoreHandlers() {
     if (name === StoreNameMap.HeartbeatSession) {
       return heartbeatSessionStore.store;
     }
+
+    if (name === StoreNameMap.PlaylistSyncMeta) {
+      return playlistSyncMetaStore.store;
+    }
   });
 
   ipcMain.handle(channel.store.set, async (_, name: StoreName, value: any) => {
@@ -140,6 +145,10 @@ export function registerStoreHandlers() {
       if (name === StoreNameMap.HeartbeatSession) {
         await setStoreWithRetry(name, heartbeatSessionStore, value);
       }
+
+      if (name === StoreNameMap.PlaylistSyncMeta) {
+        await setStoreWithRetry(name, playlistSyncMetaStore, value);
+      }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
     }
@@ -184,6 +193,10 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.HeartbeatSession) {
       heartbeatSessionStore.clear();
+    }
+
+    if (name === StoreNameMap.PlaylistSyncMeta) {
+      playlistSyncMetaStore.clear();
     }
 
     return true;
