@@ -36,7 +36,7 @@ This is non-obvious — there is no separate "build main process" step. The chai
 Same plugin, different hooks: `onBeforeBuild` compiles the main/preload bundles, then Rsbuild builds the renderer to `dist/web/`, then `onAfterBuild` invokes electron-builder. **electron-builder config is hard-coded inside `plugins/electron-build.ts`** (no `electron-builder.json`). Output: `dist/artifacts/`.
 
 ### Windows first-time setup
-**Run `node dev_tools/setup-win.js` instead of `pnpm install`** on a fresh Windows box. It rewrites Git protocol (avoids SSH), configures pnpm mirrors, and pre-fetches Electron binaries. Idempotent — re-runnable. See `docs/Windows-依赖管理指南.md` for dependency/env troubleshooting.
+**Run `node dev_tools/setup-win.js` instead of `pnpm install`** on a fresh Windows box. It rewrites Git protocol (avoids SSH), configures pnpm mirrors, and pre-fetches Electron binaries. Idempotent — re-runnable. See `docs/windows/Windows-依赖管理指南.md` for dependency/env troubleshooting.
 
 ## Architecture
 
@@ -136,7 +136,7 @@ Bilibili `playurl` often returns `mcdn` / `szbdyd` (PCDN) nodes as the first `ba
 - ffmpeg is required for WebM → 16 kHz mono PCM WAV before feeding the WASM fingerprinter. The bundled ffmpeg is stripped (lacks wav/pcm encoders), so use `getFfmpegPath(true)` from `electron/utils.ts` which prefers a full-build binary.
 
 ### Persisted data must be portable
-Local favorites support export/backup (`docs/local-favorites-backup.md`). Never persist machine-absolute paths (`file:///C:/Users/...`) into syncable data — store portable identifiers (bvid, relative path, URL) and compute local paths per-device at display time.
+Local favorites support export/backup (`docs/sync/local-favorites-backup.md`). Never persist machine-absolute paths (`file:///C:/Users/...`) into syncable data — store portable identifiers (bvid, relative path, URL) and compute local paths per-device at display time.
 
 ### Standalone test dir at repo root
 `biu-windows-test/` is a **throwaway end-to-end experiment** for lyrics-timeline alignment (Aliyun ASR → DTW → LRC), zero-dependency and self-contained. It is **not app code** — don't import from it, refactor it, or count it in dead-code sweeps. Context: `docs/ideas/002-歌词时间轴对齐.md`.
@@ -145,6 +145,6 @@ Local favorites support export/backup (`docs/local-favorites-backup.md`). Never 
 - `AI_GUIDELINES.md` — do/don't rules from real incidents (read alongside this file).
 - `AGENTS.md` — generic-agent repo guide; canonical source for **coding style** (2-space indent, double quotes, 120-char width, kebab-case files, PascalCase components) and PR expectations. Keep its command list in sync with this file.
 - `DEVLOG.md` — running development log; add an entry before each commit.
-- `docs/ideas/` — phased feature design notes.
-- `docs/Windows-依赖管理指南.md` — Windows dependency/env troubleshooting.
+- `docs/` — categorized by topic: `ideas/`（phased feature design notes）, `android/`, `release/`（打包/发布/升级）, `windows/`, `lyrics/`, `player-ui/`, `sync/`（本地歌单云同步）；`devlog-assets/` holds DEVLOG-referenced images/diagrams only, don't drop unrelated docs in there. `docs/功能与文件索引.md` is the whole-project feature/file index. Single-topic docs with no siblings (`Git.md`, `dev-ctrl-c-优雅退出.md`) stay directly under `docs/`.
+- `docs/windows/Windows-依赖管理指南.md` — Windows dependency/env troubleshooting.
 - `dev_tools/setup-win.js` — fresh-Windows automation.

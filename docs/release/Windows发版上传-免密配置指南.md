@@ -11,7 +11,7 @@
 - 你现在要在 **Windows** 上做的事：
   1. **（一次性）配置 SSH 密钥免密** —— 解决「每次 `node dev_tools/upload-update.js` 都要输密码」的痛点。**这是本次重点，先做这个。**
   2. 拉最新代码 → `pnpm build` 打 Windows 安装包 → 上传到服务器。
-- 免密原理（无需理解也能操作）：上传脚本启动时会找私钥 `C:\Users\<你>\.ssh\biu_deploy`，找到就免密；找不到才回退到输密码。所以只要把这把私钥配好、并把对应公钥登记到服务器一次，以后永久免密。完整说明见 `docs/自动更新部署指南.md` 第二节。
+- 免密原理（无需理解也能操作）：上传脚本启动时会找私钥 `C:\Users\<你>\.ssh\biu_deploy`，找到就免密；找不到才回退到输密码。所以只要把这把私钥配好、并把对应公钥登记到服务器一次，以后永久免密。完整说明见 `docs/release/自动更新部署指南.md` 第二节。
 
 ---
 
@@ -218,4 +218,4 @@ curl http://8.163.0.99/biu/updates/latest.yml
 - **`ssh-keygen` 设了 passphrase 怎么办** → 删掉 `biu_deploy` 和 `biu_deploy.pub` 重做 1.2，passphrase 两次都留空；然后重做 1.3。
 - **换新电脑** → 免密绑定的是「本机私钥 ↔ 服务器公钥」，新机器要重新走整个第一部分。
 - **找不到 `dist\artifacts\`** → 还没 `pnpm build` 或打包失败。
-- 更完整的服务器/Apache/各平台说明见 `docs/自动更新部署指南.md`。
+- 更完整的服务器/Apache/各平台说明见 `docs/release/自动更新部署指南.md`。

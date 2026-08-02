@@ -3,7 +3,7 @@ import { FONT_STACK, T } from "@/common/styles/android-tokens";
 import { version as APP_VERSION } from "../../../../package.json";
 
 /**
- * 应用层启动闪屏，对应设计稿 docs/android-design/biu-base.jsx 的 ScreenSplash。
+ * 应用层启动闪屏，对应设计稿 `docs/android/android-design/Biu Android (单文件).html` 内嵌的 ScreenSplash。
  *
  * 功能层（token 检查、路由跳转、显示时长策略）后续单独迭代，本组件**只负责视觉**。
  *

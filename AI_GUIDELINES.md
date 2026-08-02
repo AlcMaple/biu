@@ -30,7 +30,7 @@
 ## 数据持久化
 
 - ❌ 把本机绝对路径（如 `file:///C:/Users/xxx/cover.jpg`）写进要跨设备同步 / 备份的数据
-  后果：本地收藏支持导出备份（见 `docs/local-favorites-backup.md`），绝对路径换台设备 / 换平台就失效，封面、本地文件全裂。
+  后果：本地收藏支持导出备份（见 `docs/sync/local-favorites-backup.md`），绝对路径换台设备 / 换平台就失效，封面、本地文件全裂。
   ✅ 落盘只存可移植标识（bvid、相对路径、URL），本地化路径显示时按设备现算。
 
 - ❌ 新增持久化状态时只接一端（只写 Electron 的 `electron-store`，忘了 Android）
