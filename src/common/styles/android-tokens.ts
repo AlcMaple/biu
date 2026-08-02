@@ -1,5 +1,5 @@
 /**
- * Android UI 设计 token，与 docs/android-design/biu-shared.jsx 的 `T` 保持一致。
+ * Android UI 设计 token，与 `docs/android/android-design/Biu Android (单文件).html` 内嵌的 `T` 保持一致。
  *
  * 设计稿用 inline style + 这套 token；Android 端实现时，颜色 / 圆角等具体数值
  * 沿用同一份，避免散落的硬编码 `#1ed760` `#0a0a0a` 在多个文件里漂移。

@@ -1,5 +1,5 @@
 /**
- * biu-sync-server 部署地址，见 docs/本地歌单同步-服务器部署指南.md。
+ * biu-sync-server
  * 走 HTTPS（Let's Encrypt，certbot 自动续期）——B 站登录 cookie 会经这个接口传输，
  * 不能走明文 HTTP。
  */

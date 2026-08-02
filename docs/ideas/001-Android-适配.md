@@ -20,13 +20,13 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
 - [ ] Android 启动流程 + token 路由（splash → 登录 / 首页分支）
 - [ ] Android 登录页 UI（账号密码 + 短信验证码，省略扫码）
 - [ ] Android 后台播放 + MediaSession（通知栏 / 锁屏 / 耳机线控 / AudioFocus）
-- [ ] Android 各模块 UI 重写（首页 / 歌单 / 搜索 / 播放器，按 `docs/android-design/` 设计稿）
+- [ ] Android 各模块 UI 重写（首页 / 歌单 / 搜索 / 播放器，按 `docs/android/android-design/` 设计稿）
 - [ ] Android 听歌识曲 WebView 端移植（剥离 `node-shazam` 的 Node 依赖，Web Audio 重采样）
 - [ ] Android Release 构建签名
 
 ## 📖 详细说明
 
-> Android 全量任务细分见 [`docs/Android 适配 TODO.md`](../Android%20适配%20TODO.md)。这里只记当前阶段
+> Android 全量任务细分见 [`docs/android/Android 适配 TODO.md`](../android/Android%20适配%20TODO.md)。这里只记当前阶段
 > 的关键决策和已经否过的方向，避免下次回来重新走一遍。
 
 ### Android 存储层 + Cookie 桥接
@@ -71,7 +71,7 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
   但 UX 不达预期（拖拽过程中 currentTime 还在前进，松手时算出来的
   offset 总是滞后 1~2 秒；视觉上拖拽态下视口冻结、活跃行不动，又跟
   播放进度脱节让人困惑）。**整体方案已撤**，下次别再走这条路；要做
-  时间轴对齐换 ASR + DTW 方向，见 `docs/lyrics-alignment-spec.md`
+  时间轴对齐换 ASR + DTW 方向，见 `docs/lyrics/lyrics-alignment-spec.md`
 
 ### Android 后台播放 + MediaSession
 **目标效果**：锁屏继续播放；通知栏可控制（标题 / 歌手 / 封面 / 播放暂停 /

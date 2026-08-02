@@ -10,11 +10,11 @@
 
 | 文件 | 用途 |
 |---|---|
-| `docs/Biu_Android__.html` | 单文件 HTML 预览（内嵌 TSX，浏览器打开即可看所有屏幕） |
-| `docs/android-design/*.jsx` | 设计稿源代码，每屏幕一个 `Screen*` 函数；细节按这里来 |
-| `docs/android-design/biu-shared.jsx` | 设计 token（`T`）、图标（`I`）、容器（`Phone`/`TopBar`/`MiniPlaybar`/`TabBar` 等）、`Cover`/`HiResBadge`/`SourceTag` 等基础组件 |
+| `docs/android/android-design/Biu Android (单文件).html` | 单文件 HTML 预览（内嵌 TSX + 全部组件源码，浏览器打开即可看所有屏幕，也是唯一保留的设计稿源） |
 
-### 视觉系统速查（来自 `biu-shared.jsx` 的 `T`）
+> 早期拆分成多个 `.jsx` 的设计稿源文件已删除（Android 端本轮不实现，留着一堆碎文件没有维护意义）；单文件版本身就内嵌了全部组件代码，浏览器里搜索 `Screen*` / `const T =` 就能定位到对应部分，不影响后续按这份设计稿实现 UI。
+
+### 视觉系统速查（来自单文件 HTML 内嵌的 `T`）
 
 - 主色 `#1ed760`（Spotify 绿）/ 主色文字 `#000`
 - 背景 `#0a0a0a` / 表面 `#18181b` / 表面提升 `#232328`
@@ -57,7 +57,7 @@
 
 > 用户打开 App 第一眼看到的画面，逻辑上先于所有其他模块。
 >
-> **UI 参考**：`biu-base.jsx` 的 `ScreenSplash`
+> **UI 参考**：单文件设计稿里的 `ScreenSplash`
 
 启动包含两层：**原生层闪屏**（WebView 还没起来时由 OS 显示静态帧，避免白屏）+ **应用层闪屏**（WebView 起来后由 React 渲染的 Biu 品牌帧，期间做 token 检查与 store hydration，再决定跳哪个屏）。
 
@@ -78,7 +78,7 @@
 
 > Electron 端有扫码 / 账号密码 / 短信三种登录；移动端**省略扫码**（手机扫电脑屏才合理，反过来不实用）。
 >
-> **UI 参考**：`biu-login.jsx` 的 `ScreenLoginPwd`（账号密码） / `ScreenLoginSms`（短信验证码）
+> **UI 参考**：单文件设计稿里的 `ScreenLoginPwd`（账号密码） / `ScreenLoginSms`（短信验证码）
 
 - [ ] 登录页 UI（账号密码 + 短信验证码）  
   逻辑参考：`src/layout/navbar/login/password-login.tsx`、`code-login.tsx`、`src/store/user.ts`、`src/store/token.ts`
@@ -90,7 +90,7 @@
 
 ## 二、歌单模块
 
-> **UI 参考**：`biu-playlist.jsx` 的 `ScreenPlaylistList`（列表）/ `ScreenPlaylistDetail`（详情）/ `ScreenSongMenu`（三点菜单）/ `ScreenCreatePlaylist`（新建）
+> **UI 参考**：单文件设计稿里的 `ScreenPlaylistList`（列表）/ `ScreenPlaylistDetail`（详情）/ `ScreenSongMenu`（三点菜单）/ `ScreenCreatePlaylist`（新建）
 
 ### 歌单列表页
 
@@ -122,7 +122,7 @@
 
 ## 三、播放器模块
 
-> **UI 参考**：`biu-player.jsx` 的 `ScreenFullPlayer`（全屏播放）/ `ScreenQueueDrawer`（播放队列）/ `ScreenLockNotif`（锁屏 + 通知栏样式预览）；迷你播放栏见 `biu-shared.jsx` 的 `MiniPlaybar`
+> **UI 参考**：单文件设计稿里的 `ScreenFullPlayer`（全屏播放）/ `ScreenQueueDrawer`（播放队列）/ `ScreenLockNotif`（锁屏 + 通知栏样式预览）；迷你播放栏见 单文件设计稿里的 `MiniPlaybar`
 
 ### 渲染层（UI 重新设计）
 
@@ -152,7 +152,7 @@
 
 > Electron 端用 Node 包 `node-shazam`（内部 `shazamio-core` WASM + ffmpeg WebM→WAV）；Android 需移植到 WebView 纯前端方案。
 >
-> **UI 参考**：`biu-shazam.jsx` 的 `ScreenShazamListen`（录音中）/ `ScreenShazamFound`（识别结果）/ `ScreenShazamHistory`（历史记录）
+> **UI 参考**：单文件设计稿里的 `ScreenShazamListen`（录音中）/ `ScreenShazamFound`（识别结果）/ `ScreenShazamHistory`（历史记录）
 
 - [ ] 识曲入口 UI（首页快捷按钮 / 麦克风图标）  
   逻辑参考：`src/components/shazam-modal/`
@@ -166,7 +166,7 @@
 
 ## 五、搜索模块
 
-> **UI 参考**：`biu-search.jsx` 的 `ScreenSearchEmpty`（搜索历史 + 热门）/ `ScreenSearchTyping`（输入联想）/ `ScreenSearchResults`（结果列表）
+> **UI 参考**：单文件设计稿里的 `ScreenSearchEmpty`（搜索历史 + 热门）/ `ScreenSearchTyping`（输入联想）/ `ScreenSearchResults`（结果列表）
 
 - [ ] 搜索入口 / 输入框 UI  
   逻辑参考：`src/pages/search/`、`src/components/search-button/`
@@ -180,7 +180,7 @@
 
 ## 六、基础体验
 
-> **UI 参考**：`biu-base.jsx` 的 `ScreenHome`（首页）/ `ScreenEmpty`（空状态：`network` / `loading` / `empty` 三种 kind）。启动闪屏 `ScreenSplash` 见**零、启动流程**。
+> **UI 参考**：单文件设计稿里的 `ScreenHome`（首页）/ `ScreenEmpty`（空状态：`network` / `loading` / `empty` 三种 kind）。启动闪屏 `ScreenSplash` 见**零、启动流程**。
 
 - [ ] 首页布局（Android 首页：搜索栏 + 歌单入口 + 识曲入口；推荐 / 排行省略）
 - [ ] 网络异常 / 空状态 / 加载中占位 UI  

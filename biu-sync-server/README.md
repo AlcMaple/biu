@@ -91,7 +91,7 @@ pm2 start ecosystem.config.cjs
 pm2 install pm2-logrotate    # 必须装，否则 pm2 日志无限增长吃磁盘
 ```
 
-Apache 侧新增反代（参考 `docs/自动更新部署指南.md` 里已有的静态目录配置
+Apache 侧新增反代（参考 `docs/release/自动更新部署指南.md` 里已有的静态目录配置
 手法，新增一段 `ProxyPass`，不要动原有的 `updates/` 配置）：
 
 ```
