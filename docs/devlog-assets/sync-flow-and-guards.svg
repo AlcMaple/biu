@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" width="1180" height="760" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#059669"/>
+    </marker>
+  </defs>
+
+  <style>
+    .t { font-size: 13px; fill: #0f172a; }
+    .s { font-size: 11.5px; fill: #475569; }
+    .h { font-size: 14px; font-weight: 700; fill: #0f172a; }
+    .lb { font-size: 11px; fill: #64748b; }
+    .gd { font-size: 12px; font-weight: 700; fill: #b91c1c; }
+    .box { fill: #fff; stroke: #cbd5e1; stroke-width: 1.5; rx: 8; }
+    .guard { fill: #fef2f2; stroke: #fca5a5; stroke-width: 1.5; rx: 8; }
+    .bk { fill: #f0fdf4; stroke: #86efac; stroke-width: 1.5; rx: 8; }
+    .zone { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1.5; rx: 10; }
+    .ln { stroke: #64748b; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+    .lnr { stroke: #dc2626; stroke-width: 1.6; fill: none; marker-end: url(#ar); }
+    .lng { stroke: #059669; stroke-width: 1.6; fill: none; marker-end: url(#ag); stroke-dasharray: 5 3; }
+  </style>
+
+  <!-- 显式白底：GitHub / 编辑器深色主题下透明底会让标题文字看不见 -->
+  <rect x="0" y="0" width="1180" height="760" fill="#ffffff"/>
+
+  <text x="24" y="30" class="h" font-size="17">本地歌单云同步：完整链路与三道数据保护闸门</text>
+
+  <!-- 客户端区 -->
+  <rect x="24" y="52" width="640" height="470" class="zone"/>
+  <text x="40" y="76" class="h">客户端（Electron 渲染进程）</text>
+
+  <rect x="44" y="92" width="180" height="46" class="box"/>
+  <text x="56" y="112" class="t">用户操作</text>
+  <text x="56" y="128" class="s">加歌 / 建夹 / 打标签</text>
+
+  <path d="M224,115 L268,115" class="ln"/>
+  <rect x="268" y="92" width="180" height="46" class="box"/>
+  <text x="280" y="112" class="t">zustand store 变更</text>
+  <text x="280" y="128" class="s">subscribe → 防抖 800ms</text>
+
+  <path d="M448,115 L492,115" class="ln"/>
+  <rect x="492" y="92" width="150" height="46" class="box"/>
+  <text x="504" y="112" class="t">runSync()</text>
+  <text x="504" y="128" class="s">同 store 串行，不并发</text>
+
+  <!-- 闸门 1 -->
+  <path d="M567,138 L567,168" class="ln"/>
+  <rect x="404" y="168" width="238" height="56" class="guard"/>
+  <text x="416" y="188" class="gd">闸门① await waitReady()</text>
+  <text x="416" y="205" class="s">等 persist rehydrate 完成再 encode</text>
+  <text x="416" y="219" class="s">否则空状态会被 diff 成"全删"</text>
+
+  <path d="M523,224 L523,254" class="ln"/>
+  <rect x="404" y="254" width="238" height="40" class="box"/>
+  <text x="416" y="279" class="t">pull：拉云端当前快照</text>
+
+  <path d="M523,294 L523,324" class="ln"/>
+  <rect x="404" y="324" width="238" height="52" class="box"/>
+  <text x="416" y="344" class="t">diff（基线 ↔ 本地）</text>
+  <text x="416" y="362" class="s">产出 upsert / remove 操作列表</text>
+
+  <!-- 闸门 2 -->
+  <path d="M523,376 L523,406" class="ln"/>
+  <rect x="404" y="406" width="238" height="56" class="guard"/>
+  <text x="416" y="426" class="gd">闸门② 空快照拒推</text>
+  <text x="416" y="443" class="s">本地空 + 基线非空 + 本次会话没见过数据</text>
+  <text x="416" y="457" class="s">用户真删光（先有后无）照常放行</text>
+
+  <!-- 本地备份 -->
+  <path d="M404,434 L300,434" class="lng"/>
+  <rect x="60" y="330" width="240" height="76" class="bk"/>
+  <text x="72" y="352" class="h" font-size="13">本地备份（推送前 / 启动时）</text>
+  <text x="72" y="371" class="s">playlist-sync-backups.json ×10</text>
+  <text x="72" y="387" class="s">userData/data-backups/ ×10（启动快照）</text>
+  <text x="72" y="401" class="s">→ dev_tools/restore-local-playlist.mjs 还原</text>
+
+  <text x="306" y="428" class="lb">推送前先留一份</text>
+
+  <!-- 服务端区 -->
+  <rect x="700" y="52" width="456" height="470" class="zone"/>
+  <text x="716" y="76" class="h">服务端（阿里云 ECS · 单进程 fork）</text>
+
+  <path d="M642,434 L740,434 L740,398" class="ln"/>
+  <text x="652" y="426" class="lb">push ops</text>
+
+  <!-- 闸门 3 -->
+  <rect x="720" y="330" width="410" height="60" class="guard"/>
+  <text x="732" y="352" class="gd">闸门③ 全量删除拒绝（409）</text>
+  <text x="732" y="369" class="s">删光全部活条目且无新增、又没带 allowFullDelete → 拒绝</text>
+  <text x="732" y="383" class="s">客户端确认是用户本人删的则放行；&lt; 5 条不启用</text>
+
+  <path d="M925,330 L925,300" class="ln"/>
+  <rect x="720" y="244" width="410" height="56" class="bk"/>
+  <text x="732" y="264" class="h" font-size="13">写前留历史版本</text>
+  <text x="732" y="282" class="s">{mid}/history/{store}-v000123-{ts}.json ×10</text>
+  <text x="732" y="295" class="s">墓碑丢 payload，没历史就不可逆</text>
+
+  <path d="M925,244 L925,214" class="ln"/>
+  <rect x="720" y="158" width="410" height="56" class="box"/>
+  <text x="732" y="178" class="t">applyOps 条目级合并 → 原子写</text>
+  <text x="732" y="196" class="s">同 id 冲突取 updatedAt 更晚者；删除打墓碑</text>
+  <text x="732" y="209" class="s">每 mid 串行队列，避免并发读改写踩踏</text>
+
+  <path d="M925,158 L925,128" class="ln"/>
+  <rect x="720" y="92" width="410" height="40" class="box"/>
+  <text x="732" y="117" class="t">notifyChange(mid) → 唤醒长轮询</text>
+
+  <!-- 长轮询回路 -->
+  <rect x="24" y="546" width="1132" height="186" class="zone"/>
+  <text x="40" y="570" class="h">跨设备实时：长轮询（不是定时轮询）</text>
+
+  <rect x="44" y="586" width="230" height="60" class="box"/>
+  <text x="56" y="608" class="t">Mac 客户端</text>
+  <text x="56" y="626" class="s">GET /watch?versions=...</text>
+  <text x="56" y="640" class="s">挂起等待，空闲不耗 CPU</text>
+
+  <path d="M274,616 L360,616" class="ln"/>
+  <rect x="360" y="586" width="250" height="60" class="box"/>
+  <text x="372" y="608" class="t">服务端事件总线</text>
+  <text x="372" y="626" class="s">有变更 → 立刻返回新版本号</text>
+  <text x="372" y="640" class="s">无变更 → 挂到 25s 超时再返回</text>
+
+  <path d="M610,616 L696,616" class="ln"/>
+  <rect x="696" y="586" width="230" height="60" class="box"/>
+  <text x="708" y="608" class="t">Windows 端写入</text>
+  <text x="708" y="626" class="s">触发 notifyChange</text>
+  <text x="708" y="640" class="s">Mac 被唤醒 → 拉取 → UI 更新</text>
+
+  <path d="M926,616 L1012,616" class="ln"/>
+  <rect x="1012" y="586" width="124" height="60" class="box"/>
+  <text x="1024" y="612" class="t">延迟 ≈ 一次</text>
+  <text x="1024" y="630" class="t">请求往返</text>
+
+  <text x="44" y="676" class="s">为什么不按 800ms 定时轮询：3 个 store × 每 800ms = 225 请求/分钟，撞服务端限流（60/min），也白烧这台 1.8G 内存机器的 CPU。</text>
+  <text x="44" y="696" class="s">长轮询空闲时只占一个连接、零轮询开销，改动瞬间由事件总线唤醒，延迟反而更低。</text>
+  <text x="44" y="716" class="s">没有定时轮询：通道是唯一常驻机制，断线按 2s→5s→15s→30s 退避重连；窗口 focus 补一次（防休眠唤醒后死连接）。前提是 pm2 单进程 fork 模式。</text>
+</svg>
