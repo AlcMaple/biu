@@ -23,7 +23,7 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
-import { getAllFavMedia, getLocalFavMedia } from "@/common/utils/fav";
+import { getAllFavMedia, getLocalFavMedia, getLocalFolderLatestCover } from "@/common/utils/fav";
 import { type ContextMenuItem } from "@/components/context-menu";
 import MenuGroup from "@/components/menu/menu-group";
 import SortableMenuItem from "@/layout/side/collection/sortable-menu-item";
@@ -57,6 +57,7 @@ interface CollectionMenuItem {
 
 const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Props) => {
   const clearLocalFolder = useLocalFavItemsStore(s => s.clearFolder);
+  const localFolderItems = useLocalFavItemsStore(s => s.folderItems);
   const user = useUser(state => state.user);
   const createdFavorites = useFavoritesStore(state => state.createdFavorites);
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
@@ -491,7 +492,8 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
       id: item.id,
       title: item.title,
       href: item.isLocal ? `/local-collection/${item.id}` : `/collection/${item.id}?mid=${item?.mid}`,
-      cover: item.cover,
+      // 本地歌单封面跟随最新收藏的一首，避免和歌单详情页头图一样出现旧封面
+      cover: item.isLocal ? (getLocalFolderLatestCover(localFolderItems[item.id]) ?? item.cover) : item.cover,
       className: "px-2 py-1 h-auto",
       type: item.type,
       mid: item.mid,
