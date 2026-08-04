@@ -47,7 +47,7 @@ export interface FavResourceInfo {
   duration: number;
   /** UP 主信息 */
   upper: FavResourceInfoUpper;
-  /** 属性：0:正常 1:失效 */
+  /** 属性位掩码：仅第 0 位（attr & 1）表示已失效，其余位含义未知（分P/推广等），不能按 attr !== 0 整体判定失效 */
   attr: number;
   /** 状态数 */
   cnt_info: FavResourceInfoCntInfo;

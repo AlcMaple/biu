@@ -8,6 +8,32 @@
 > - **简单改动效果足以看懂，不必展开**；**复杂功能必须配图**（数据流 / 架构），SVG 放 `docs/devlog-assets/` 并在正文引用。
 > - **坑 / 反复权衡的设计决策不写这里**，归到 `docs/ideas/` 对应的 idea 文件。
 
+## 2026-08-04 fix: 部分歌曲「失效」误判
+
+![旧逻辑 attr !== 0 把 attr=4 误判失效；新逻辑只看第 0 位 attr & 1，缺席条目留到下次重新检测](docs/devlog-assets/fav-invalid-attr-bitmask-fix.svg)
+
+**效果**：本地收藏夹里部分实际正常可播的视频被错误打上「失效」角标（灰显 + 红框），例如 `BV1Xx411c7Dm` 在 B 站网页端能正常播放，App 里却显示失效。
+
+**根因**：`/x/v3/fav/resource/infos` 的 `attr` 字段实测是**位掩码**，不是文档写的「0:正常 1:失效」二元值——直接查该接口拿到 `attr: 4`，第 0 位（`attr & 1`）是 0，视频本身完全正常；旧代码却按 `attr !== 0` 整体判定失效，把第 2 位这种无关标记（分P/推广等，含义未知）也当成了失效信号，一起误杀。另外接口对部分资源（尤其老视频）批量查询时可能整条不返回，旧代码把「不在有效集合里」直接等同「已失效」，把接口偶发缺席也算成了永久失效。
+
+**关键代码**：
+
+```ts
+// src/common/utils/fav.ts —— detectInvalidLocalFavItems
+// attr 是位掩码：仅第 0 位表示已失效，其余位是分P/推广等无关标记
+const returnedKeys = new Set(infos.map(info => `${info.id}:${info.type}`));
+const invalidKeys = new Set(infos.filter(info => (info.attr & 1) === 1).map(info => `${info.id}:${info.type}`));
+for (const key of chunks[i]) {
+  if (!returnedKeys.has(key)) continue; // 接口没返回：本轮不计入 checked，留到下次重新打开收藏夹再判
+  for (const rid of resourceToRids.get(key) ?? []) {
+    checked.add(rid);
+    if (invalidKeys.has(key)) invalid.add(rid); // 只有明确返回且第 0 位为 1 才判失效
+  }
+}
+```
+
+`fetchLocalFavPlayCount`（单项播放量回查）、`getAllFavMedia`（在线收藏夹播放全部）两处同样把 `attr === 0` 的写法改成 `(attr & 1) === 0`，判断口径统一。`src/service/fav-resource-infos.ts` 里 `attr` 字段的过时注释也一并更正。之前被误标的本地数据不用手动改——下次打开对应收藏夹，后台重新检测会自动清除旧的错误 `invalid` 标记。
+
 ## 本地歌单云同步
 
 ### 2026-08-02 feat: 本地歌单云同步
@@ -18,11 +44,9 @@
 
 ## 2026-07-27 chore: 修复 Windows 下 git 提交钩子无法执行
 
-**效果**：Windows 上 `git commit` 不再报 `cannot spawn .husky/pre-commit: Exec format error`，lint-staged / commitlint 两道门真正生效（此前钩子文件无 shebang 且被 autocrlf 检出成 CRLF，Windows 的 git 无法直接 spawn；macOS 有 ENOEXEC→sh 回退所以从未暴露）。改法：两个钩子文件补 `#!/bin/sh`，新增 `.gitattributes` 把 `.husky/*` 钉成 LF 检出，杜绝换行符复发。
+**效果**：Windows 上 `git commit` 不再报 `cannot spawn .husky/pre-commit: Exec format error`，lint-staged / commitlint 两道门真正生效（此前钩子文件无 shebang 且被 autocrlf 检出成 CRLF，Windows 的 git 无法直接 spawn；macOS 有 ENOEXEC→sh 回退所以从未暴露）。
 
-## 2026-07-27 docs: 修正 CLAUDE.md 过时命令与失效引用
-
-**效果**：对照当前仓库现状校准 CLAUDE.md——测试命令标明 `pnpm test` 是 watch 模式、CI 单次跑用 `pnpm run test -- --run`（与 AGENTS.md 上次修正对齐）；补 Lint 命令行；交叉引用 `AGENTS.md`（编码风格的事实源）；新增 `biu-windows-test/` 是一次性端到端实验目录的说明（不算入应用代码/死代码扫描）；修复两处指向不存在的 `docs/windows-setup.md` 的链接（实际为 `docs/Windows-依赖管理指南.md`）。
+改法：两个钩子文件补 `#!/bin/sh`，新增 `.gitattributes` 把 `.husky/*` 钉成 LF 检出，杜绝换行符复发。
 
 ## 快捷键焦点反馈
 
