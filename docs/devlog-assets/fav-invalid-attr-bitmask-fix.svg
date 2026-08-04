@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" role="img">
+  <title>收藏夹「失效」误判：attr 位掩码判断修正</title>
+  <desc>旧逻辑把 attr !== 0 整体当失效，attr=4（分P等无关位）被误杀；新逻辑只看第 0 位 attr &amp; 1，且响应缺席的条目不再直接判失效，留到下次重新检测。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="879" height="439" rx="12" fill="#f6f8fa" stroke="#d0d7de"/>
+
+  <text x="40" y="34" font-size="18" font-weight="700" fill="#1f2328">收藏夹「失效」误判：attr 是位掩码，不是 0/1</text>
+
+  <text x="42" y="60" font-size="13" fill="#57606a">实测 BV1Xx411c7Dm（正常可播）：接口 <tspan font-family="monospace">/x/v3/fav/resource/infos</tspan> 返回 <tspan font-family="monospace" font-weight="700">attr: 4</tspan></text>
+
+  <!-- 起点：接口响应 -->
+  <rect x="330" y="78" width="220" height="46" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+  <text x="440" y="106" font-size="12.5" text-anchor="middle" fill="#1f2328" font-weight="600">infos 响应单条：attr: 4</text>
+
+  <line x1="440" y1="124" x2="440" y2="148" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 分叉说明 -->
+  <text x="60" y="168" font-size="13" font-weight="700" fill="#cf222e">旧逻辑</text>
+  <text x="500" y="168" font-size="13" font-weight="700" fill="#1a7f37">新逻辑</text>
+
+  <!-- 旧逻辑左侧 -->
+  <rect x="42" y="180" width="380" height="46" rx="8" fill="#ffebe9" stroke="#cf222e"/>
+  <text x="232" y="208" font-size="12" text-anchor="middle" fill="#82071e" font-family="monospace">attr !== 0 → 判定失效</text>
+
+  <line x1="232" y1="226" x2="232" y2="250" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="42" y="252" width="380" height="54" rx="8" fill="#ffebe9" stroke="#cf222e"/>
+  <text x="232" y="274" font-size="12.5" text-anchor="middle" fill="#82071e" font-weight="600">4 !== 0 为真 → 误判失效</text>
+  <text x="232" y="292" font-size="11" text-anchor="middle" fill="#82071e">灰显 + 红色「失效」角标，实际能正常播放</text>
+
+  <!-- 新逻辑右侧 -->
+  <rect x="458" y="180" width="380" height="46" rx="8" fill="#dafbe1" stroke="#1a7f37"/>
+  <text x="648" y="208" font-size="12" text-anchor="middle" fill="#0f5026" font-family="monospace">(attr &amp; 1) === 1 → 判定失效</text>
+
+  <line x1="648" y1="226" x2="648" y2="250" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="458" y="252" width="380" height="54" rx="8" fill="#dafbe1" stroke="#1a7f37"/>
+  <text x="648" y="274" font-size="12.5" text-anchor="middle" fill="#0f5026" font-weight="600">(4 &amp; 1) === 0 → 判定正常</text>
+  <text x="648" y="292" font-size="11" text-anchor="middle" fill="#0f5026">第 0 位才是「已失效」，其余位是分P/推广等无关标记</text>
+
+  <!-- 缺席条目说明 -->
+  <line x1="440" y1="330" x2="440" y2="330" stroke="none"/>
+  <text x="42" y="336" font-size="13" font-weight="600" fill="#57606a">另一条路径 —— 接口批量查询里该资源整条不返回</text>
+
+  <rect x="42" y="348" width="796" height="42" rx="8" fill="#eaeef2" stroke="#57606a"/>
+  <text x="440" y="374" font-size="12.5" text-anchor="middle" fill="#1f2328">旧：不在有效集合里 = 视为失效（永久误判）　→　新：本轮不计入 checked，跳过，留到下次打开收藏夹重新检测</text>
+
+  <rect x="42" y="404" width="796" height="26" rx="6" fill="none"/>
+  <text x="440" y="422" font-size="11.5" text-anchor="middle" fill="#57606a">src/common/utils/fav.ts：detectInvalidLocalFavItems / fetchLocalFavPlayCount / getAllFavMedia 三处统一改用 attr &amp; 1</text>
+</svg>

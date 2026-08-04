@@ -25,7 +25,8 @@ export const isLocalSourceItem = (item: LocalFavItem) =>
  * 批量检测本地收藏夹中 B 站资源的失效状态。
  * - 分集收藏的 rid 是 cid，不能直接查资源接口，统一用 bvid 转 avid 查询（同视频多分集共享检测结果）。
  * - 本地歌曲不参与检测。
- * - 网络失败/接口报错的分片不计入 checked，避免把网络问题误判成失效。
+ * - 网络失败/接口报错的分片、以及响应里缺席的条目都不计入 checked，避免把网络问题或接口偶发缺失误判成失效；
+ *   只有接口明确返回该资源且 attr !== 0 才判定失效。
  * - 顺带从同一批 infos 响应里取播放量（playByRid），供本地歌单补全「-」用，不额外发请求。
  * @returns checked: 实际完成检测的 rid 集合；invalid: 其中已失效的 rid 集合；playByRid: rid -> 播放量
  */
@@ -58,20 +59,25 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
   results.forEach((result, i) => {
     if (result.status !== "fulfilled" || result.value.code !== 0) return;
     const infos = result.value.data ?? [];
-    // 接口对已删除资源可能直接不返回该条目，因此「不在有效集合里」即视为失效
-    const validKeys = new Set(infos.filter(info => info.attr === 0).map(info => `${info.id}:${info.type}`));
+    // attr 是位掩码而非单纯 0/1：仅第 0 位（attr & 1）表示「已失效」，其余位是分P/推广等无关标记，
+    // 实测存在 attr=4 但视频本身完全正常可播的情况，不能按 attr !== 0 整体判定失效。
+    // 接口对部分资源（尤其老视频）可能整条不返回，这未必代表已失效，也可能是接口本身的疏漏，
+    // 因此缺席的条目本次不计入 checked，留待下次重试，避免把接口的偶发缺失误判成永久失效。
+    const returnedKeys = new Set(infos.map(info => `${info.id}:${info.type}`));
+    const invalidKeys = new Set(infos.filter(info => (info.attr & 1) === 1).map(info => `${info.id}:${info.type}`));
     // 资源 -> 播放量（同一资源的所有分集 rid 共享此值）
     const playByKey = new Map<string, number>();
     for (const info of infos) {
-      if (info.attr !== 0) continue;
+      if ((info.attr & 1) === 1) continue;
       const play = resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt);
       if (play > 0) playByKey.set(`${info.id}:${info.type}`, play);
     }
     for (const key of chunks[i]) {
+      if (!returnedKeys.has(key)) continue;
       const play = playByKey.get(key);
       for (const rid of resourceToRids.get(key) ?? []) {
         checked.add(rid);
-        if (!validKeys.has(key)) invalid.add(rid);
+        if (invalidKeys.has(key)) invalid.add(rid);
         if (play !== undefined) playByRid.set(rid, play);
       }
     }
@@ -135,7 +141,7 @@ export const fetchLocalFavPlayCount = async (item: {
   if (resourceId == null) return 0;
   try {
     const res = await getFavResourceInfos({ resources: `${resourceId}:${item.type}`, platform: "web" });
-    const info = (res.data ?? []).find(i => i.attr === 0);
+    const info = (res.data ?? []).find(i => (i.attr & 1) === 0);
     return info ? resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt) : 0;
   } catch {
     return 0;
@@ -226,7 +232,7 @@ export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {
   }
 
   return allInfos
-    .filter(item => [2, 12].includes(item.type) && item.attr === 0)
+    .filter(item => [2, 12].includes(item.type) && (item.attr & 1) === 0)
     .map(item => {
       if (item.type === 2) {
         return {
