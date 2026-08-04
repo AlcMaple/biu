@@ -30,11 +30,25 @@ const TARGETS = {
   tags: { file: "tags.json", decode: decodeTags },
 };
 
+/**
+ * userData 目录名各平台/各构建不一致：macOS 生产是 `Biu`（productName），dev 是 `biu-dev`，
+ * Windows 上实测是 `biu`。挨个探测哪个真的存在，别写死——写死会让工具"找不到备份"，
+ * 而这工具恰恰是数据出事时才会用到的。
+ */
 function userDataDir() {
   if (process.env.BIU_DATA_DIR) return process.env.BIU_DATA_DIR;
-  if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", "biu");
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "biu");
-  return path.join(os.homedir(), ".config", "biu");
+
+  const roots =
+    process.platform === "win32"
+      ? [process.env.APPDATA ?? ""]
+      : process.platform === "darwin"
+        ? [path.join(os.homedir(), "Library", "Application Support")]
+        : [path.join(os.homedir(), ".config")];
+
+  const candidates = roots.flatMap(root => ["Biu", "biu", "biu-dev"].map(name => path.join(root, name)));
+  // 优先选真的有同步记账文件的那个（可能同时存在生产和 dev 两份目录）
+  const withMeta = candidates.find(dir => fs.existsSync(path.join(dir, "playlist-sync-meta.json")));
+  return withMeta ?? candidates.find(dir => fs.existsSync(dir)) ?? candidates[0];
 }
 
 function readJson(file) {

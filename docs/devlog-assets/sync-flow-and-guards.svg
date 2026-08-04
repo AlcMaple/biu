@@ -42,7 +42,7 @@
   <path d="M224,115 L268,115" class="ln"/>
   <rect x="268" y="92" width="180" height="46" class="box"/>
   <text x="280" y="112" class="t">zustand store 变更</text>
-  <text x="280" y="128" class="s">subscribe → 防抖 800ms</text>
+  <text x="280" y="128" class="s">subscribe → 防抖 400ms（上限 1.2s）</text>
 
   <path d="M448,115 L492,115" class="ln"/>
   <rect x="492" y="92" width="150" height="46" class="box"/>

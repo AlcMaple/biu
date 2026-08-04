@@ -124,17 +124,19 @@ export function initLocalPlaylistSync(): void {
     if (state.tags !== prev.tags || state.itemTags !== prev.itemTags) tagsController.scheduleSync();
   });
 
-  const triggerAll = () => allControllers.forEach(controller => controller.scheduleSync());
+  // 外部触发（被通知 / 登录 / 回到前台）一律立即同步，不走防抖——防抖是为了合并
+  // 用户的连续操作，这些场景没有后续变更要合并，多等一个窗口纯属增加跨设备延迟。
+  const syncAllNow = () => allControllers.forEach(controller => controller.syncNow());
 
   // 通知通道：另一台设备一改动，服务端立刻唤醒这里。这是唯一的常驻机制——
   // 没有定时轮询，断线由 startWatchLoop 自己退避重连补齐。
-  void startWatchLoop(triggerAll);
+  void startWatchLoop(syncAllNow);
   // 系统休眠唤醒后挂着的连接可能已经死了但还没超时，回到前台补一次，成本可忽略
-  window.addEventListener("focus", triggerAll);
+  window.addEventListener("focus", syncAllNow);
 
   // 登录态从无到有时触发一次（涵盖"冷启动时本地已缓存登录态"和"刚登录"两种情况）
   useUser.subscribe((state, prev) => {
-    if (state.user?.mid && state.user.mid !== prev.user?.mid) triggerAll();
+    if (state.user?.mid && state.user.mid !== prev.user?.mid) syncAllNow();
   });
-  if (useUser.getState().user?.mid) triggerAll();
+  if (useUser.getState().user?.mid) syncAllNow();
 }

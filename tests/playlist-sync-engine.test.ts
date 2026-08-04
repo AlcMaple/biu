@@ -32,7 +32,7 @@ vi.mock("@/service/sync/client", () => ({
 }));
 
 const { StoreSyncController } = await import("@/service/sync/engine");
-const { SYNC_DEBOUNCE_MS, SYNC_META_EPOCH } = await import("@/service/sync/config");
+const { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH } = await import("@/service/sync/config");
 const { StoreNameMap } = await import("@shared/store");
 
 const SONG: LiveSnapshot = { "-1:111": { updatedAt: 0, payload: { folderId: -1, item: { rid: 111 } } } };
@@ -230,5 +230,43 @@ describe("同步引擎的数据保护", () => {
 
     const ops = pushOps.mock.calls.flatMap(call => call[2]);
     expect(ops.filter(op => op.type === "remove")).toEqual([]); // 绝不能删掉另一台设备的数据
+  });
+
+  it("连续操作不会把推送饿死：超过最长等待上限就强制推一次", async () => {
+    // 真实反馈：快速连收第 4/5/6 首后同步卡住，停手很久才 6 首一起到——
+    // 纯防抖每次变更都重置计时器，用户手快时推送被无限往后顺延。
+    seedSyncedMeta();
+    let songs: LiveSnapshot = SONG;
+    pushOps.mockResolvedValue({ version: 4, updatedAt: 0, data: SONG });
+
+    const { controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => songs,
+    });
+
+    // 每 200ms 收藏一首（快于 400ms 防抖窗口），持续到超过最长等待上限
+    for (let i = 0; i < Math.ceil(SYNC_MAX_WAIT_MS / 200) + 1; i++) {
+      songs = { ...songs, [`-1:${900 + i}`]: { updatedAt: 0, payload: { folderId: -1, item: { rid: 900 + i } } } };
+      controller.scheduleSync();
+      await vi.advanceTimersByTimeAsync(200);
+    }
+    await vi.waitFor(() => expect(true).toBe(true));
+
+    // 关键：连续操作期间就已经推过，不是等到停手才一次性全推
+    expect(pushOps).toHaveBeenCalled();
+  });
+
+  it("syncNow 不走防抖，被通知时立刻同步", async () => {
+    seedSyncedMeta();
+    pullSnapshot.mockResolvedValue({ version: 9, updatedAt: 0, data: SONG }); // 别的设备推进过版本
+
+    const { applyRemote, controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => SONG,
+    });
+
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0); // 没有前进任何防抖时长
+    await vi.waitFor(() => expect(applyRemote).toHaveBeenCalled());
   });
 });

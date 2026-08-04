@@ -6,7 +6,7 @@ import type { FlatSnapshot, LiveSnapshot, SyncStoreName } from "./types";
 import { pushLocalBackup } from "./backup";
 import { getCurrentMid, pullSnapshot, pushOps } from "./client";
 import { diffForMigration, diffSnapshots } from "./codec";
-import { SYNC_DEBOUNCE_MS, SYNC_META_EPOCH } from "./config";
+import { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH } from "./config";
 
 /** 快照里还活着的条目数（墓碑不算） */
 function liveCount(flat: FlatSnapshot): number {
@@ -45,6 +45,8 @@ export interface SyncBinding {
  */
 export class StoreSyncController {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 本轮防抖里第一次未处理变更的时间，用于计算是否已到最长等待上限 */
+  private firstPendingAt: number | null = null;
   private running = false;
   private pendingRerun = false;
   /**
@@ -58,12 +60,41 @@ export class StoreSyncController {
 
   constructor(private binding: SyncBinding) {}
 
+  /**
+   * 本地变更后排一次同步：防抖合并连续操作，但**带最长等待上限**。
+   *
+   * 纯防抖会被连续操作饿死（每次变更都重置计时器，用户手快时推送被无限顺延），
+   * 所以记住第一次未处理变更的时间，超过 SYNC_MAX_WAIT_MS 就立刻推，不再等安静。
+   */
   scheduleSync(): void {
+    const now = Date.now();
+    this.firstPendingAt ??= now;
+
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+
+    const waited = now - this.firstPendingAt;
+    const delay = Math.max(0, Math.min(SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS - waited));
+
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
+      this.firstPendingAt = null;
       void this.runSync();
-    }, SYNC_DEBOUNCE_MS);
+    }, delay);
+  }
+
+  /**
+   * 立刻同步，不走防抖。
+   *
+   * 用于"被服务端通知别的设备改了"这类外部触发——那不是用户连续操作，没有需要合并的
+   * 后续变更，再等一个防抖窗口纯属白白增加跨设备延迟（实测这一层就占了 800ms）。
+   */
+  syncNow(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.firstPendingAt = null;
+    void this.runSync();
   }
 
   private async runSync(): Promise<void> {

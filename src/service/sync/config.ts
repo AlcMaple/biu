@@ -18,7 +18,18 @@ export const SYNC_SERVER_BASE_URL = "https://biu.alcmaple.cn/api";
 export const SYNC_META_EPOCH = 2;
 
 /** 本地变更后防抖多久才上报，避免用户连续操作时每次都打一次请求 */
-export const SYNC_DEBOUNCE_MS = 800;
+export const SYNC_DEBOUNCE_MS = 400;
+
+/**
+ * 防抖的**最长等待上限**：距离第一次未处理的变更超过这个时间就强制推送，
+ * 不再等"安静下来"。
+ *
+ * Why: 纯防抖会被连续操作饿死——每次新变更都重置计时器，用户以小于防抖时长的
+ * 间隔连续收藏时，推送被无限往后顺延，直到停手才一次性全推（真实反馈：连续收藏
+ * 第 4/5/6 首后同步卡住，过一会儿 6 首一起到）。加上限后，连续操作期间也能按
+ * 固定节奏推上去。
+ */
+export const SYNC_MAX_WAIT_MS = 1_200;
 
 /**
  * 每个 store 保留多少份推送前的本地备份。
