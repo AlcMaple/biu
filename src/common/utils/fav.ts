@@ -21,6 +21,12 @@ export const isDefaultFav = (attr?: number) => {
 export const isLocalSourceItem = (item: LocalFavItem) =>
   item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName);
 
+/** 本地歌单封面：取最新收藏的一首的封面，而非创建/迁移时写死的 favorite.cover */
+export const getLocalFolderLatestCover = (items?: LocalFavItem[]): string | undefined => {
+  if (!items?.length) return undefined;
+  return items.reduce((latest, item) => (item.fav_time > latest.fav_time ? item : latest)).cover;
+};
+
 /**
  * 批量检测本地收藏夹中 B 站资源的失效状态。
  * - 分集收藏的 rid 是 cid，不能直接查资源接口，统一用 bvid 转 avid 查询（同视频多分集共享检测结果）。

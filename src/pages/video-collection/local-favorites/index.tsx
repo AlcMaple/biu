@@ -31,7 +31,7 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
-import { detectInvalidLocalFavItems, isLocalSourceItem } from "@/common/utils/fav";
+import { detectInvalidLocalFavItems, getLocalFolderLatestCover, isLocalSourceItem } from "@/common/utils/fav";
 import { formatMillisecond } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -99,6 +99,9 @@ const LocalFavorites = () => {
   const rmCreatedFavorite = useFavoritesStore(s => s.rmCreatedFavorite);
 
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
+
+  // 封面始终跟随歌单内最新收藏的一首，而非创建/迁移时写死的 folder.cover（否则增删歌曲后封面不再同步）
+  const latestCover = useMemo(() => getLocalFolderLatestCover(rawItems), [rawItems]);
 
   const items = useMemo(() => {
     let result = rawItems;
@@ -435,7 +438,7 @@ const LocalFavorites = () => {
     <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={folderIdStr} className="h-full w-full px-4 pb-6">
       <Header
         type={CollectionType.Favorite}
-        cover={folder?.cover}
+        cover={latestCover ?? folder?.cover}
         title={folder?.title}
         desc={folder?.intro}
         mediaCount={rawItems.length}

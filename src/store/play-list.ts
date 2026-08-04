@@ -760,7 +760,20 @@ export const usePlayList = create<State & Action>()(
               const pagesInQueue = bvid ? list.filter(item => item.bvid === bvid).length : 1;
               const allPagesLoaded = !existItem.hasMultiPart || pagesInQueue >= (existItem.totalPage ?? 1);
               if (allPagesLoaded) {
-                set({ playId: existItem.id });
+                set(state => {
+                  // 同一视频可能已因别的入口（如收藏夹重命名）带着旧标题/封面在队列里，
+                  // 这里跟随本次点击来源刷新，避免播放栏与当前点击的列表显示不一致
+                  const target = state.list.find(item => item.id === existItem.id);
+                  if (target) {
+                    if (sanitizedTitle) {
+                      target.pageTitle = sanitizedTitle;
+                    }
+                    if (cover) {
+                      target.pageCover = formatUrlProtocol(cover);
+                    }
+                  }
+                  state.playId = existItem.id;
+                });
                 try {
                   await ensureAudioSrcValid();
                   await playAudioSafely();
