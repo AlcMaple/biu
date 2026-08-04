@@ -49,3 +49,9 @@ export const WATCH_REQUEST_TIMEOUT_MS = 35_000;
  * 常驻机制，所以它自己的恢复速度直接决定实时性。
  */
 export const WATCH_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
+
+/** 一轮同步超过这个时长就打日志：正常几百毫秒，明显超出说明请求在排队或网络异常 */
+export const SYNC_SLOW_LOG_MS = 3_000;
+
+/** 传输层失败后补一次重试的等待时长（只补一次，不是失败轮询） */
+export const SYNC_RETRY_DELAY_MS = 3_000;
