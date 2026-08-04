@@ -6,7 +6,7 @@ import type { FlatSnapshot, LiveSnapshot, SyncStoreName } from "./types";
 import { pushLocalBackup } from "./backup";
 import { getCurrentMid, pullSnapshot, pushOps } from "./client";
 import { diffForMigration, diffSnapshots } from "./codec";
-import { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH } from "./config";
+import { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH, SYNC_RETRY_DELAY_MS, SYNC_SLOW_LOG_MS } from "./config";
 
 /** 快照里还活着的条目数（墓碑不算） */
 function liveCount(flat: FlatSnapshot): number {
@@ -49,6 +49,8 @@ export class StoreSyncController {
   private firstPendingAt: number | null = null;
   private running = false;
   private pendingRerun = false;
+  /** 本轮失败是否已经补过一次重试，防止失败时无限重试打请求 */
+  private retriedOnce = false;
   /**
    * 本进程启动以来，是否**亲眼见过**这个 store 有内容。
    *
@@ -104,22 +106,42 @@ export class StoreSyncController {
       return;
     }
     this.running = true;
+
+    const startedAt = Date.now();
+    let ok = false;
     try {
-      await this.syncOnce();
+      ok = await this.syncOnce();
     } catch (err) {
       log.warn(`[sync] ${this.binding.store} sync failed`, err);
     } finally {
       this.running = false;
+
+      // 慢同步要留痕：正常一轮是几百毫秒，明显超出说明请求在排队或网络有问题，
+      // 没有这行日志就只能靠用户描述"感觉很慢"来猜。
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > SYNC_SLOW_LOG_MS) {
+        log.warn(`[sync] ${this.binding.store} 本轮耗时 ${elapsed}ms（正常应在 1s 内）`);
+      }
+
       if (this.pendingRerun) {
         this.pendingRerun = false;
         void this.runSync();
+      } else if (!ok && !this.retriedOnce) {
+        // 传输层失败（超时/断网）补一次，且只补一次：本地变更此刻还没上云，
+        // 不重试的话要等到用户下次操作才会再推，中间这段时间另一台设备看不到。
+        // 单次重试是 AI_GUIDELINES 允许的"瞬时抖动"范畴，不是失败轮询。
+        this.retriedOnce = true;
+        setTimeout(() => void this.runSync(), SYNC_RETRY_DELAY_MS);
+      } else {
+        this.retriedOnce = false;
       }
     }
   }
 
-  private async syncOnce(): Promise<void> {
+  /** @returns false 表示传输层失败（拉取/推送没成功），调用方据此决定要不要补一次重试 */
+  private async syncOnce(): Promise<boolean> {
     const mid = await getCurrentMid();
-    if (!mid) return; // 未登录，本地歌单同步依附登录态，跳过不算失败
+    if (!mid) return true; // 未登录，本地歌单同步依附登录态，跳过不算失败
 
     // 必须在任何 encodeNow 之前：读盘没完成时的空状态不能进入 diff（见 SyncBinding.waitReady）
     await this.binding.waitReady();
@@ -135,8 +157,7 @@ export class StoreSyncController {
     }
 
     if (!hasSyncedBefore) {
-      await this.migrate(mid, meta, userMeta);
-      return;
+      return this.migrate(mid, meta, userMeta);
     }
 
     const baseline = (userMeta.snapshots[this.binding.store] ?? {}) as FlatSnapshot;
@@ -152,7 +173,7 @@ export class StoreSyncController {
       log.error(
         `[sync] ${this.binding.store} 本地快照为空但基线有 ${liveCount(baseline)} 条，且本次会话从未见过数据，已拒绝推送（疑似状态未就绪）`,
       );
-      return;
+      return true; // 主动拒绝，不是传输失败，重试也没用
     }
 
     const baseVersion = userMeta.versions[this.binding.store] ?? 0;
@@ -161,7 +182,7 @@ export class StoreSyncController {
     // 否则同步是单向的——只推不拉，另一台设备的新增永远看不到（首次迁移之后就再没拉过，
     // 用户表现为"在另一台机器上等一天都不同步，重新登录才生效"，因为重登会重走迁移分支）。
     const remote = await pullSnapshot(this.binding.store);
-    if (!remote) return; // 拉取失败：不在没看到云端现状的情况下贸然推送
+    if (!remote) return false; // 拉取失败：不在没看到云端现状的情况下贸然推送
 
     const ops = diffSnapshots(baseline, localFlat, Date.now());
 
@@ -171,14 +192,15 @@ export class StoreSyncController {
       await pushLocalBackup(mid, this.binding.store, localFlat);
 
       const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe);
-      if (!pushed) return; // 网络/鉴权失败：静默放弃，不做轮询重试，等下次本地变更再触发
+      if (!pushed) return false; // 网络/鉴权失败：由 runSync 补一次重试
       envelope = pushed;
     } else if (remote.version === baseVersion) {
-      return; // 两边都没动：不写回本地，避免 setState 触发订阅又排一轮同步，空转不停
+      return true; // 两边都没动：不写回本地，避免 setState 触发订阅又排一轮同步，空转不停
     }
 
     this.binding.applyRemote(envelope.data);
     await this.persistMeta(mid, meta, userMeta, envelope.version, envelope.data);
+    return true;
   }
 
   /**
@@ -190,9 +212,9 @@ export class StoreSyncController {
     mid: string,
     meta: PlaylistSyncMetaData,
     userMeta: PlaylistSyncMetaData[string],
-  ): Promise<void> {
+  ): Promise<boolean> {
     const remote = await pullSnapshot(this.binding.store);
-    if (!remote) return; // 拉取失败：绝不能在没见过云端数据的情况下就往上推，等下次重试
+    if (!remote) return false; // 拉取失败：绝不能在没见过云端数据的情况下就往上推
 
     const localFlat = this.binding.encodeNow();
 
@@ -215,12 +237,13 @@ export class StoreSyncController {
     let finalEnvelope = remote;
     if (migrationOps.length > 0) {
       const pushed = await pushOps(this.binding.store, remote.version, migrationOps);
-      if (!pushed) return; // 推送失败：不落地"已迁移"标记，下次启动会完整重试这套迁移流程
+      if (!pushed) return false; // 推送失败：不落地"已迁移"标记，下次会完整重试这套迁移流程
       finalEnvelope = pushed;
     }
 
     this.binding.applyRemote(finalEnvelope.data);
     await this.persistMeta(mid, meta, userMeta, finalEnvelope.version, finalEnvelope.data);
+    return true;
   }
 
   private async persistMeta(

@@ -32,7 +32,8 @@ vi.mock("@/service/sync/client", () => ({
 }));
 
 const { StoreSyncController } = await import("@/service/sync/engine");
-const { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH } = await import("@/service/sync/config");
+const { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH, SYNC_RETRY_DELAY_MS } =
+  await import("@/service/sync/config");
 const { StoreNameMap } = await import("@shared/store");
 
 const SONG: LiveSnapshot = { "-1:111": { updatedAt: 0, payload: { folderId: -1, item: { rid: 111 } } } };
@@ -268,5 +269,30 @@ describe("同步引擎的数据保护", () => {
     controller.syncNow();
     await vi.advanceTimersByTimeAsync(0); // 没有前进任何防抖时长
     await vi.waitFor(() => expect(applyRemote).toHaveBeenCalled());
+  });
+
+  it("推送失败后补一次重试，且只补一次", async () => {
+    seedSyncedMeta();
+    pushOps.mockResolvedValue(null); // 传输层失败（超时/断网）
+
+    const twoSongs: LiveSnapshot = {
+      ...SONG,
+      "-1:222": { updatedAt: 0, payload: { folderId: -1, item: { rid: 222 } } },
+    };
+    const { controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => twoSongs,
+    });
+
+    await runSync(controller);
+    expect(pushOps).toHaveBeenCalledTimes(1);
+
+    // 补一次重试
+    await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
+    await vi.waitFor(() => expect(pushOps).toHaveBeenCalledTimes(2));
+
+    // 之后不再无限重试
+    await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 5);
+    expect(pushOps).toHaveBeenCalledTimes(2);
   });
 });
