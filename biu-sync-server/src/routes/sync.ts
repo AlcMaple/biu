@@ -1,10 +1,23 @@
 import { Router } from "express";
 
+import { waitForChange } from "../lib/events.js";
 import { applyOps, type SyncOp } from "../lib/merge.js";
 import { syncRateLimiter } from "../lib/rate-limit.js";
 import { type AuthedRequest, requireAuth } from "../lib/require-auth.js";
-import { getEnvelope, mutateEnvelope } from "../lib/storage.js";
+import { getEnvelope, getVersions, mutateEnvelope } from "../lib/storage.js";
 import { isStoreName } from "../lib/store-names.js";
+
+/**
+ * 少于这个条目数时不启用全量删除闸门——用户手上只有一两条时把它们删掉是完全正常的
+ * 操作，拦下来只会让人莫名其妙同步不了。真正要防的是"几十上百条一次性归零"。
+ */
+const WIPE_GUARD_MIN_ENTRIES = 5;
+
+/**
+ * 长轮询挂起上限。取 25s 是为了留在常见反代/网关的 30s 空闲超时之内，
+ * 让服务端主动收尾而不是被中间层掐断（被掐断客户端会当成网络错误退避重连）。
+ */
+const WATCH_TIMEOUT_MS = 25_000;
 
 function isValidOp(op: unknown): op is SyncOp {
   if (typeof op !== "object" || op === null) return false;
@@ -17,6 +30,48 @@ export function createSyncRouter(): Router {
   const router = Router();
 
   router.use(requireAuth, syncRateLimiter);
+
+  /**
+   * 长轮询：客户端带上自己已知的各 store 版本号，服务端在版本发生变化时立刻返回，
+   * 否则挂起到 WATCH_TIMEOUT_MS 再返回（客户端随即发起下一轮）。
+   *
+   * 这是"另一台设备一改就看到"的实现方式。空闲时不消耗 CPU（挂在事件总线上，不轮询），
+   * 每个客户端只占一个连接；改动发生时由 notifyChange 即时唤醒，端到端延迟约等于一次
+   * 请求往返。注意：Apache 反代的 ProxyTimeout 必须大于 WATCH_TIMEOUT_MS。
+   */
+  router.get("/watch", async (req: AuthedRequest, res) => {
+    const known = typeof req.query.versions === "string" ? req.query.versions : "";
+    const knownMap = Object.fromEntries(
+      known
+        .split(",")
+        .filter(Boolean)
+        .map(pair => {
+          const [store, version] = pair.split(":");
+          return [store, Number(version)];
+        }),
+    );
+
+    const differs = (current: Record<string, number>) =>
+      Object.entries(current).some(([store, version]) => knownMap[store] !== version);
+
+    const current = await getVersions(req.mid!);
+    if (differs(current)) {
+      res.json({ changed: true, versions: current });
+      return;
+    }
+
+    // 客户端断开（关窗口/切网络）时立刻释放等待，不留悬挂的监听器
+    let aborted = false;
+    req.on("close", () => {
+      aborted = true;
+    });
+
+    await waitForChange(req.mid!, WATCH_TIMEOUT_MS);
+    if (aborted) return;
+
+    const latest = await getVersions(req.mid!);
+    res.json({ changed: differs(latest), versions: latest });
+  });
 
   router.get("/sync/:store", async (req: AuthedRequest, res) => {
     const { store } = req.params;
@@ -50,6 +105,34 @@ export function createSyncRouter(): Router {
     if (ops.length === 0) {
       const envelope = await getEnvelope(req.mid!, store);
       res.json(envelope);
+      return;
+    }
+
+    // 全量删除闸门：一批操作把当前所有活条目删光（且没有任何新增）时拒绝执行。
+    // 服务端不能假设客户端永远正确——客户端在状态未就绪时把整个歌单 diff 成全量
+    // 删除，已经真实发生过一次，而墓碑会连 payload 一起丢弃，云端不可逆。
+    //
+    // 但用户**真的**删光是合法操作（比如只有一个歌单、里面 200 首歌，整个删掉），
+    // 拦下来会让这台设备之后每次同步都被拒、彻底卡死。客户端能区分两者：真删是
+    // 「本次会话里先见过内容、现在没了」，故障是「一上来就是空的」。前者会带
+    // allowFullDelete=true，服务端认这个确认，只挡没有确认的。
+    const current = await getEnvelope(req.mid!, store);
+    const liveIds = new Set(
+      Object.entries(current.data)
+        .filter(([, entry]) => !entry.__deleted)
+        .map(([id]) => id),
+    );
+    const typedOps = ops as SyncOp[];
+    const removedLive = typedOps.filter(op => op.type === "remove" && liveIds.has(op.id));
+    const hasUpsert = typedOps.some(op => op.type === "upsert");
+    if (
+      req.body?.allowFullDelete !== true &&
+      liveIds.size >= WIPE_GUARD_MIN_ENTRIES &&
+      !hasUpsert &&
+      removedLive.length === liveIds.size
+    ) {
+      console.error(`[sync] 拒绝全量删除 mid=${req.mid} store=${store}：一次性删除全部 ${liveIds.size} 条活条目`);
+      res.status(409).json({ error: "refused: this batch would delete every live entry", code: "wipe_guard" });
       return;
     }
 

@@ -49,6 +49,19 @@ for (const key of chunks[i]) {
 
 ## 本地歌单云同步
 
+### 2026-08-04 fix: 同步把本地歌单数据清空
+
+![同步完整链路与三道数据保护闸门](docs/devlog-assets/sync-flow-and-guards.svg)
+
+**效果**：修复 2.5.0 的数据丢失事故（云端歌单夹被删空）；补上跨设备实时同步；本地 + 服务端各留 10 份数据快照。
+
+**两个根因**：
+
+1. **状态未就绪就 diff**——store 是 zustand `persist`，rehydrate 走 IPC 读盘是异步的，同步只等了 800ms 防抖。冷启动排队超时就拿到空状态，被 diff 成"全部删除"推上云；服务端墓碑丢弃 payload，云端不可逆。
+2. **同步是单向的**——`pullSnapshot` 只在首次迁移调过一次，之后本机无变更就直接 return，从不拉取。表现为"另一台设备改了，这台等一天都不动，重新登录才生效"（重登重走迁移分支）。
+
+**改法**：见上图三道闸门 + 每次先拉后推；跨设备实时改用长轮询（`/watch` + 进程内事件总线），不用定时轮询
+
 ### 2026-08-02 feat: 本地歌单云同步
 
 ![客户端条目级合并同步到 biu-sync-server，首次同步走 diffForMigration 只增不删防丢数据](docs/devlog-assets/local-playlist-sync.svg)

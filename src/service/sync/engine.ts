@@ -3,9 +3,15 @@ import { StoreNameMap } from "@shared/store";
 
 import type { FlatSnapshot, LiveSnapshot, SyncStoreName } from "./types";
 
+import { pushLocalBackup } from "./backup";
 import { getCurrentMid, pullSnapshot, pushOps } from "./client";
 import { diffForMigration, diffSnapshots } from "./codec";
-import { SYNC_DEBOUNCE_MS } from "./config";
+import { SYNC_DEBOUNCE_MS, SYNC_META_EPOCH } from "./config";
+
+/** 快照里还活着的条目数（墓碑不算） */
+function liveCount(flat: FlatSnapshot): number {
+  return Object.values(flat).filter(entry => !entry.__deleted).length;
+}
 
 async function readMeta(): Promise<PlaylistSyncMetaData> {
   return (await platform.getStore(StoreNameMap.PlaylistSyncMeta)) ?? {};
@@ -17,6 +23,16 @@ async function writeMeta(meta: PlaylistSyncMetaData): Promise<void> {
 
 export interface SyncBinding {
   store: SyncStoreName;
+  /**
+   * 等这个 store 的持久化数据 rehydrate 完成。
+   *
+   * ⚠️ 同步的一切都建立在"encodeNow 取到的是用户真实数据"之上。zustand persist 的
+   * rehydrate 走 platform.getStore → IPC → 主进程读盘，是**异步**的；冷启动时主进程
+   * 同时在建窗口/初始化，这条 IPC 排队超过防抖时长很正常。没等它就 encodeNow 会拿到
+   * 初始空值，被 diff 解读成"用户删光了全部数据"，把云端和本地一起清空——这是真实
+   * 发生过的事故，任何新增 binding 都必须实现这个方法，不能省。
+   */
+  waitReady: () => Promise<void>;
   /** 把当前 zustand store 状态编码成扁平快照，随时可调用，取的是"现在"的状态 */
   encodeNow: () => LiveSnapshot;
   /** 把服务端合并后的快照写回本地 zustand store（必须是"合并"语义，不能整体替换用户其他未参与同步的字段） */
@@ -31,6 +47,14 @@ export class StoreSyncController {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private pendingRerun = false;
+  /**
+   * 本进程启动以来，是否**亲眼见过**这个 store 有内容。
+   *
+   * 这是区分"用户真的把东西删光了"和"状态没就绪所以看起来是空的"的关键信号：
+   * 前者一定是「先有后无」——本次会话里先编码到过非空快照，用户再一条条删掉；
+   * 后者是「一上来就是空的」，从没见过内容。事故当天正是后者。
+   */
+  private witnessedNonEmpty = false;
 
   constructor(private binding: SyncBinding) {}
 
@@ -66,9 +90,18 @@ export class StoreSyncController {
     const mid = await getCurrentMid();
     if (!mid) return; // 未登录，本地歌单同步依附登录态，跳过不算失败
 
+    // 必须在任何 encodeNow 之前：读盘没完成时的空状态不能进入 diff（见 SyncBinding.waitReady）
+    await this.binding.waitReady();
+
     const meta = await readMeta();
     const userMeta = meta[mid] ?? { versions: {}, snapshots: {} };
-    const hasSyncedBefore = userMeta.versions[this.binding.store] !== undefined;
+    // 世代号对不上 = 从有已知缺陷的旧版本升上来，基线不可信：作废一次，走只增不删的迁移
+    const baselineUsable = userMeta.epoch === SYNC_META_EPOCH;
+    const hasSyncedBefore = baselineUsable && userMeta.versions[this.binding.store] !== undefined;
+
+    if (!baselineUsable && userMeta.versions[this.binding.store] !== undefined) {
+      log.warn(`[sync] ${this.binding.store} 基线世代号过期，本次走只增不删的迁移路径`);
+    }
 
     if (!hasSyncedBefore) {
       await this.migrate(mid, meta, userMeta);
@@ -77,15 +110,44 @@ export class StoreSyncController {
 
     const baseline = (userMeta.snapshots[this.binding.store] ?? {}) as FlatSnapshot;
     const localFlat = this.binding.encodeNow();
-    const ops = diffSnapshots(baseline, localFlat, Date.now());
-    if (ops.length === 0) return;
+    if (Object.keys(localFlat).length > 0) this.witnessedNonEmpty = true;
+
+    // 闸门：本地空、基线不空 = "把这个 store 的全部内容删光"。
+    // 只有在本次会话**从没见过这个 store 有内容**时才拦——那是"状态没就绪"的形态。
+    // 用户真的删光（先有后无，witnessedNonEmpty 为 true）照常放行，否则删掉自己
+    // 唯一的歌单会永远同步不出去。
+    const isEmptyWipe = Object.keys(localFlat).length === 0 && liveCount(baseline) > 0;
+    if (isEmptyWipe && !this.witnessedNonEmpty) {
+      log.error(
+        `[sync] ${this.binding.store} 本地快照为空但基线有 ${liveCount(baseline)} 条，且本次会话从未见过数据，已拒绝推送（疑似状态未就绪）`,
+      );
+      return;
+    }
 
     const baseVersion = userMeta.versions[this.binding.store] ?? 0;
-    const result = await pushOps(this.binding.store, baseVersion, ops);
-    if (!result) return; // 网络/鉴权失败：静默放弃，不做轮询重试，等下次本地变更再触发
 
-    this.binding.applyRemote(result.data);
-    await this.persistMeta(mid, meta, userMeta, result.version, result.data);
+    // 先拉后推。**每次都要拉**：本机没有任何本地变更时，别的设备推上去的改动也必须能下来，
+    // 否则同步是单向的——只推不拉，另一台设备的新增永远看不到（首次迁移之后就再没拉过，
+    // 用户表现为"在另一台机器上等一天都不同步，重新登录才生效"，因为重登会重走迁移分支）。
+    const remote = await pullSnapshot(this.binding.store);
+    if (!remote) return; // 拉取失败：不在没看到云端现状的情况下贸然推送
+
+    const ops = diffSnapshots(baseline, localFlat, Date.now());
+
+    let envelope = remote;
+    if (ops.length > 0) {
+      // 推送前留一份本地现状：这是数据被意外清空后唯一能回溯到"最近状态"的地方
+      await pushLocalBackup(mid, this.binding.store, localFlat);
+
+      const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe);
+      if (!pushed) return; // 网络/鉴权失败：静默放弃，不做轮询重试，等下次本地变更再触发
+      envelope = pushed;
+    } else if (remote.version === baseVersion) {
+      return; // 两边都没动：不写回本地，避免 setState 触发订阅又排一轮同步，空转不停
+    }
+
+    this.binding.applyRemote(envelope.data);
+    await this.persistMeta(mid, meta, userMeta, envelope.version, envelope.data);
   }
 
   /**
@@ -115,6 +177,8 @@ export class StoreSyncController {
       userMeta = backedUpMeta;
     }
 
+    await pushLocalBackup(mid, this.binding.store, localFlat);
+
     const migrationOps = diffForMigration(remote.data, localFlat, Date.now());
 
     let finalEnvelope = remote;
@@ -137,6 +201,7 @@ export class StoreSyncController {
   ): Promise<void> {
     const nextUserMeta: PlaylistSyncMetaData[string] = {
       ...userMeta,
+      epoch: SYNC_META_EPOCH,
       versions: { ...userMeta.versions, [this.binding.store]: version },
       snapshots: { ...userMeta.snapshots, [this.binding.store]: snapshot },
     };

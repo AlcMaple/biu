@@ -5,6 +5,8 @@ import type { StoreData } from "./merge.js";
 import type { StoreName } from "./store-names.js";
 
 import { config } from "./config.js";
+import { notifyChange } from "./events.js";
+import { STORE_NAMES } from "./store-names.js";
 
 export interface Envelope {
   version: number;
@@ -13,6 +15,9 @@ export interface Envelope {
 }
 
 const EMPTY_ENVELOPE: Envelope = { version: 0, updatedAt: 0, data: {} };
+
+/** 每个 store 保留多少份历史版本（覆盖写之前另存，见 saveHistory） */
+const HISTORY_KEEP = 10;
 
 /** mid 必须是纯数字（B 站 uid），拒绝一切非数字值，防止路径穿越 */
 export function assertValidMid(mid: string): asserts mid is string {
@@ -78,6 +83,32 @@ async function writeEnvelope(mid: string, store: StoreName, envelope: Envelope):
   }
 }
 
+/**
+ * 覆盖写之前，把当前版本另存到 `{mid}/history/` 下。
+ *
+ * Why: 墓碑机制只保留"这条被删了"，payload 是直接丢弃的——一旦客户端因为任何 bug
+ * 推上来一批 remove，服务端如实执行后数据在云端就**不可逆**了（真实事故：客户端在
+ * store 未就绪时把整个歌单 diff 成全量删除，云端只剩墓碑）。历史版本是最后一道防线：
+ * 客户端可以出错，服务端不能因此丢失用户数据。
+ *
+ * 单份历史就是一份完整快照（单用户几百 KB 量级），保留 HISTORY_KEEP 份；机器磁盘
+ * 还有 28G 空闲，这个量级完全撑得住，比丢数据划算得多。
+ */
+async function saveHistory(mid: string, store: StoreName, envelope: Envelope): Promise<void> {
+  // 空 envelope（用户第一次同步，文件还不存在）没有保存价值
+  if (envelope.version === 0 && Object.keys(envelope.data).length === 0) return;
+
+  const dir = path.join(userDir(mid), "history");
+  await fs.mkdir(dir, { recursive: true });
+  const name = `${store}-v${String(envelope.version).padStart(6, "0")}-${envelope.updatedAt}.json`;
+  await fs.writeFile(path.join(dir, name), JSON.stringify(envelope), "utf-8");
+
+  const entries = (await fs.readdir(dir)).filter(f => f.startsWith(`${store}-`)).sort(); // 版本号定长补零，字典序即版本序
+  for (const stale of entries.slice(0, Math.max(0, entries.length - HISTORY_KEEP))) {
+    await fs.unlink(path.join(dir, stale)).catch(() => undefined);
+  }
+}
+
 export async function getEnvelope(mid: string, store: StoreName): Promise<Envelope> {
   return withMutex(`${mid}:${store}`, () => readEnvelope(mid, store));
 }
@@ -94,9 +125,23 @@ export async function mutateEnvelope(
   return withMutex(`${mid}:${store}`, async () => {
     const current = await readEnvelope(mid, store);
     const next = mutate(current);
+    // 覆盖前先存历史：历史保存失败绝不能阻断正常同步，但要留日志
+    await saveHistory(mid, store, current).catch(err =>
+      console.error(`[storage] history save failed mid=${mid} store=${store}`, err),
+    );
     await writeEnvelope(mid, store, next);
+    // 落盘之后再广播，保证被唤醒的 watch 请求一定读得到新版本
+    notifyChange(mid);
     return next;
   });
+}
+
+/** 三个 store 的当前版本号，供长轮询比对（只读 version 字段，但文件本来就整份读，无额外成本） */
+export async function getVersions(mid: string): Promise<Record<string, number>> {
+  const entries = await Promise.all(
+    STORE_NAMES.map(async store => [store, (await readEnvelope(mid, store)).version] as const),
+  );
+  return Object.fromEntries(entries);
 }
 
 /** 供每日清理任务遍历所有用户目录用 */

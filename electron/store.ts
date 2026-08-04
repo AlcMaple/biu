@@ -101,3 +101,10 @@ export const playlistSyncMetaStore = new Store<PlaylistSyncMetaData>({
   cwd: getUserDataPath(),
   defaults: {},
 });
+
+/** 同步推送前的滚动备份，独立成文件：它会比 meta 大得多，不能拖慢每次同步都要读的 meta */
+export const playlistSyncBackupsStore = new Store<PlaylistSyncBackupsData>({
+  name: StoreNameMap.PlaylistSyncBackups,
+  cwd: getUserDataPath(),
+  defaults: {},
+});

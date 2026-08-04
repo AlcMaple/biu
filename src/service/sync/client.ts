@@ -2,6 +2,7 @@ import platform, { log } from "@/platform";
 
 import type { Envelope, SyncOp, SyncStoreName } from "./types";
 
+import { WATCH_REQUEST_TIMEOUT_MS } from "./config";
 import { syncHttp } from "./http";
 
 interface CachedToken {
@@ -72,13 +73,44 @@ export async function pullSnapshot(store: SyncStoreName): Promise<Envelope | nul
   );
 }
 
-export async function pushOps(store: SyncStoreName, baseVersion: number, ops: SyncOp[]): Promise<Envelope | null> {
+/**
+ * @param allowFullDelete 这批操作会删光该 store 的全部条目，且客户端**确认这是用户
+ * 本人删的**（本次会话里亲眼见过它有内容、现在被删空了）。服务端的全量删除闸门只在
+ * 没有这个确认时才拦截——用于挡住"状态没就绪所以看起来是空的"这类客户端故障。
+ */
+export async function pushOps(
+  store: SyncStoreName,
+  baseVersion: number,
+  ops: SyncOp[],
+  allowFullDelete = false,
+): Promise<Envelope | null> {
   return withAuthRetry(token =>
     syncHttp.post<Envelope>(
       `/sync/${store}`,
-      { baseVersion, ops },
+      { allowFullDelete, baseVersion, ops },
       { headers: { Authorization: `Bearer ${token.token}` } },
     ),
+  );
+}
+
+export interface WatchResult {
+  changed: boolean;
+  versions: Record<string, number>;
+}
+
+/**
+ * 长轮询：带上本机已知的各 store 版本号，服务端在有变化时立刻返回、否则挂起约 25s。
+ * 超时属于正常返回（`changed: false`），调用方直接发起下一轮即可。
+ */
+export async function watchVersions(known: Record<string, number>): Promise<WatchResult | null> {
+  const query = Object.entries(known)
+    .map(([store, version]) => `${store}:${version}`)
+    .join(",");
+  return withAuthRetry(token =>
+    syncHttp.get<WatchResult>(`/watch?versions=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Bearer ${token.token}` },
+      timeout: WATCH_REQUEST_TIMEOUT_MS,
+    }),
   );
 }
 
