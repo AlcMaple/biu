@@ -38,8 +38,8 @@ export const SYNC_MAX_WAIT_MS = 1_200;
  */
 export const SYNC_BACKUP_KEEP = 10;
 
-/** 通知通道请求的客户端超时：必须大于服务端挂起上限（25s），否则每轮都被本地判超时 */
-export const WATCH_REQUEST_TIMEOUT_MS = 35_000;
+/** 通知通道请求的客户端超时：必须大于服务端挂起上限（50s），否则每轮都被本地判超时 */
+export const WATCH_REQUEST_TIMEOUT_MS = 65_000;
 
 /**
  * 通知通道断线后的重连退避（连续失败第 n 次取第 n 项，超出取最后一项）。

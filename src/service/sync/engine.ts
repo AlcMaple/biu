@@ -1,7 +1,7 @@
 import platform, { log } from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
-import type { FlatSnapshot, LiveSnapshot, SyncStoreName } from "./types";
+import type { Envelope, FlatSnapshot, LiveSnapshot, SyncStoreName } from "./types";
 
 import { pushLocalBackup } from "./backup";
 import { getCurrentMid, pullSnapshot, pushOps } from "./client";
@@ -70,7 +70,28 @@ export class StoreSyncController {
    */
   private applyingRemote = false;
 
+  /**
+   * 通知通道告知的云端版本号（`null` = 不知道）。
+   *
+   * 有了它，"本机没变更"的那轮同步就能直接判断要不要拉，不必为了确认云端状态再多打一个
+   * 请求；同时也能识破"自己推送把自己叫醒"——那个版本号就是本机刚推上去的，无需再拉。
+   */
+  private remoteVersionHint: number | null = null;
+
+  /** 本机最近一次成功同步到的版本，用来跳过自己造成的通知回声 */
+  private lastSyncedVersion = -1;
+
   constructor(private binding: SyncBinding) {}
+
+  /**
+   * 这个版本号本机是否已经同步过了。
+   *
+   * 自己推送成功后服务端会广播变更，本机挂着的通知通道会被自己叫醒一次——那条通知
+   * 携带的正是本机刚写上去的版本号，再同步一轮纯属多打一个请求。
+   */
+  hasSynced(version: number): boolean {
+    return this.lastSyncedVersion >= version;
+  }
 
   /** 这个控制器负责的 store，供外部按"哪个 store 真的变了"精确触发 */
   get storeName(): SyncStoreName {
@@ -109,6 +130,8 @@ export class StoreSyncController {
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
       this.firstPendingAt = null;
+      // 本地变更触发的这轮没有云端版本信息，清掉上一次通知留下的，避免据此误判"不用拉"
+      this.remoteVersionHint = null;
       void this.runSync();
     }, delay);
   }
@@ -119,12 +142,13 @@ export class StoreSyncController {
    * 用于"被服务端通知别的设备改了"这类外部触发——那不是用户连续操作，没有需要合并的
    * 后续变更，再等一个防抖窗口纯属白白增加跨设备延迟（实测这一层就占了 800ms）。
    */
-  syncNow(): void {
+  syncNow(remoteVersionHint: number | null = null): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
     this.firstPendingAt = null;
+    this.remoteVersionHint = remoteVersionHint;
     void this.runSync();
   }
 
@@ -206,16 +230,19 @@ export class StoreSyncController {
     }
 
     const baseVersion = userMeta.versions[this.binding.store] ?? 0;
-
-    // 先拉后推。**每次都要拉**：本机没有任何本地变更时，别的设备推上去的改动也必须能下来，
-    // 否则同步是单向的——只推不拉，另一台设备的新增永远看不到（首次迁移之后就再没拉过，
-    // 用户表现为"在另一台机器上等一天都不同步，重新登录才生效"，因为重登会重走迁移分支）。
-    const remote = await pullSnapshot(this.binding.store);
-    if (!remote) return false; // 拉取失败：不在没看到云端现状的情况下贸然推送
-
     const ops = diffSnapshots(baseline, localFlat, Date.now());
 
-    let envelope = remote;
+    // 一轮同步**最多只发一个请求**，三种情况互斥：
+    //
+    // 1. 有本地变更 → 只 push。推送的响应本身就返回合并后的完整快照（含别的设备的改动），
+    //    所以推之前那次 pull 是纯浪费——服务端的合并是按条目做的，不需要客户端先看一眼。
+    // 2. 无本地变更、但云端版本比基线新 → 只 pull。
+    // 3. 两边都没动 → 一个请求都不发。
+    //
+    // 请求数直接决定能撑多少用户：接口只有 3 个，但请求数 = 接口 × store × 设备 × 触发次数，
+    // 放大得很快（真实事故：一次操作曾打出约 17 个请求，几次操作就打满限流）。
+    let envelope: Envelope;
+
     if (ops.length > 0) {
       // 推送前留一份本地现状：这是数据被意外清空后唯一能回溯到"最近状态"的地方
       await pushLocalBackup(mid, this.binding.store, localFlat);
@@ -223,8 +250,16 @@ export class StoreSyncController {
       const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe);
       if (!pushed) return false; // 网络/鉴权失败：由 runSync 补一次重试
       envelope = pushed;
-    } else if (remote.version === baseVersion) {
-      return true; // 两边都没动：不写回本地，避免 setState 触发订阅又排一轮同步，空转不停
+    } else {
+      // 没有本地变更时才需要判断"要不要拉"。remoteVersionHint 来自通知通道返回的版本号，
+      // 有它就不必为了确认"云端有没有变"再多打一个请求；没有它（登录/focus 触发）才盲拉一次。
+      if (this.remoteVersionHint !== null && this.remoteVersionHint <= baseVersion) {
+        return true; // 云端不比基线新，无事可做
+      }
+      const pulled = await pullSnapshot(this.binding.store);
+      if (!pulled) return false;
+      if (pulled.version === baseVersion) return true; // 两边都没动，不写回本地，避免空转
+      envelope = pulled;
     }
 
     this.applyRemote(envelope.data);
@@ -282,6 +317,7 @@ export class StoreSyncController {
     version: number,
     snapshot: FlatSnapshot,
   ): Promise<void> {
+    this.lastSyncedVersion = version;
     const nextUserMeta: PlaylistSyncMetaData[string] = {
       ...userMeta,
       epoch: SYNC_META_EPOCH,
