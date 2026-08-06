@@ -1,3 +1,4 @@
+import { log } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useTagStore } from "@/store/tags";
@@ -84,22 +85,44 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 有没有落下的通知"，有就拉。断线时按 2s→5s→15s→30s 退避重连：瞬断能立刻恢复
  * （否则每次断线都留一个几十秒的通知盲区），服务真挂了也不会空转打请求。
  */
-async function startWatchLoop(onChanged: () => void): Promise<void> {
+async function startWatchLoop(onChanged: (changedStores: Set<string>) => void): Promise<void> {
   let known: Record<string, number> = {};
   let failures = 0;
 
+  log.info("[sync/watch] 通知通道启动");
+
   for (;;) {
-    const result = await watchVersions(known).catch(() => null);
+    const startedAt = Date.now();
+    // 失败必须留痕：这条通道是跨设备实时的唯一来源，静默吞掉异常的话，
+    // 它挂了在日志上完全看不出来，只能看到"同步很慢"这种没法排查的现象。
+    const result = await watchVersions(known).catch(err => {
+      log.warn(`[sync/watch] 请求失败（挂了 ${Date.now() - startedAt}ms，第 ${failures + 1} 次）`, err);
+      return null;
+    });
 
     if (!result) {
-      await sleep(WATCH_RETRY_DELAYS_MS[Math.min(failures, WATCH_RETRY_DELAYS_MS.length - 1)]);
+      const delay = WATCH_RETRY_DELAYS_MS[Math.min(failures, WATCH_RETRY_DELAYS_MS.length - 1)];
+      log.warn(`[sync/watch] ${delay}ms 后重连`);
+      await sleep(delay);
       failures += 1;
       continue;
     }
 
+    if (failures > 0) log.info(`[sync/watch] 已恢复（之前失败 ${failures} 次）`);
     failures = 0;
+
+    // 哪几个 store 的版本号真的变了——只叫醒它们，别的不动
+    const changedStores = new Set(
+      Object.entries(result.versions)
+        .filter(([store, version]) => known[store] !== version)
+        .map(([store]) => store),
+    );
     known = result.versions;
-    if (result.changed) onChanged();
+
+    log.info(
+      `[sync/watch] 挂起 ${Date.now() - startedAt}ms 后返回 changed=${result.changed} 变化的 store=[${[...changedStores].join(",")}]`,
+    );
+    if (result.changed) onChanged(changedStores);
   }
 }
 
@@ -114,14 +137,22 @@ export function initLocalPlaylistSync(): void {
   if (initialized) return;
   initialized = true;
 
+  // 注意判空：applyRemote 写回本地时也会触发订阅，那轮数据刚从服务端拿到，
+  // 再同步一次是纯空转，而且会让每次变更的请求量翻倍（撞限流的主因之一）。
   useFavoritesStore.subscribe((state, prev) => {
-    if (state.createdFavorites !== prev.createdFavorites) favoritesController.scheduleSync();
+    if (state.createdFavorites !== prev.createdFavorites && !favoritesController.isApplyingRemote()) {
+      favoritesController.scheduleSync();
+    }
   });
   useLocalFavItemsStore.subscribe((state, prev) => {
-    if (state.folderItems !== prev.folderItems) favItemsController.scheduleSync();
+    if (state.folderItems !== prev.folderItems && !favItemsController.isApplyingRemote()) {
+      favItemsController.scheduleSync();
+    }
   });
   useTagStore.subscribe((state, prev) => {
-    if (state.tags !== prev.tags || state.itemTags !== prev.itemTags) tagsController.scheduleSync();
+    if ((state.tags !== prev.tags || state.itemTags !== prev.itemTags) && !tagsController.isApplyingRemote()) {
+      tagsController.scheduleSync();
+    }
   });
 
   // 外部触发（被通知 / 登录 / 回到前台）一律立即同步，不走防抖——防抖是为了合并
@@ -130,7 +161,13 @@ export function initLocalPlaylistSync(): void {
 
   // 通知通道：另一台设备一改动，服务端立刻唤醒这里。这是唯一的常驻机制——
   // 没有定时轮询，断线由 startWatchLoop 自己退避重连补齐。
-  void startWatchLoop(syncAllNow);
+  //
+  // 只叫醒**版本号真的变了**的那个 store：服务端返回的 versions 已经精确告诉我们是谁
+  // 变了，无脑三个全跑等于每次通知多打两倍请求，两台设备叠加很容易撞满服务端限流。
+  void startWatchLoop(changedStores => {
+    const targets = allControllers.filter(controller => changedStores.has(controller.storeName));
+    (targets.length > 0 ? targets : allControllers).forEach(controller => controller.syncNow());
+  });
   // 系统休眠唤醒后挂着的连接可能已经死了但还没超时，回到前台补一次，成本可忽略
   window.addEventListener("focus", syncAllNow);
 

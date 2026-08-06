@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { type NextFunction, type Request, type Response, Router } from "express";
 
 import { waitForChange } from "../lib/events.js";
 import { applyOps, type SyncOp } from "../lib/merge.js";
@@ -26,10 +26,29 @@ function isValidOp(op: unknown): op is SyncOp {
   return candidate.type === "upsert" || candidate.type === "remove";
 }
 
+/**
+ * 同步接口一律不可缓存。
+ *
+ * Why: Express 的 res.json() 默认带 ETag，Chromium 会把 GET 当可缓存资源，
+ * 下次带 If-None-Match 来重新验证，服务端回 304 + 空 body（真实事故：日志里
+ * 长轮询全是 304，客户端拿到的是缓存副本而不是这次的真实结果）。
+ */
+function noStore(_req: Request, res: Response, next: NextFunction): void {
+  res.set("Cache-Control", "no-store");
+  next();
+}
+
 export function createSyncRouter(): Router {
   const router = Router();
+  router.use(noStore);
 
-  router.use(requireAuth, syncRateLimiter);
+  router.use(requireAuth);
+
+  // 通知通道不计入限流：它是跨设备实时的唯一来源，一旦被 429 拒掉，另一台设备的改动
+  // 就彻底收不到了。而且它本身就是低频的（挂起 25s 才回一次），不是需要限流的对象。
+  // 真正要防的是同步接口被异常客户端刷爆，所以限流只加在 /sync 上。
+  router.get("/watch", noStore, watchHandler);
+  router.use(syncRateLimiter);
 
   /**
    * 长轮询：客户端带上自己已知的各 store 版本号，服务端在版本发生变化时立刻返回，
@@ -39,7 +58,7 @@ export function createSyncRouter(): Router {
    * 每个客户端只占一个连接；改动发生时由 notifyChange 即时唤醒，端到端延迟约等于一次
    * 请求往返。注意：Apache 反代的 ProxyTimeout 必须大于 WATCH_TIMEOUT_MS。
    */
-  router.get("/watch", async (req: AuthedRequest, res) => {
+  async function watchHandler(req: AuthedRequest, res: Response): Promise<void> {
     const known = typeof req.query.versions === "string" ? req.query.versions : "";
     const knownMap = Object.fromEntries(
       known
@@ -71,7 +90,7 @@ export function createSyncRouter(): Router {
 
     const latest = await getVersions(req.mid!);
     res.json({ changed: differs(latest), versions: latest });
-  });
+  }
 
   router.get("/sync/:store", async (req: AuthedRequest, res) => {
     const { store } = req.params;
