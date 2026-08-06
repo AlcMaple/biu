@@ -60,7 +60,36 @@ export class StoreSyncController {
    */
   private witnessedNonEmpty = false;
 
+  /**
+   * 正在把服务端数据写回本地 store。
+   *
+   * `applyRemote` 会 setState，而 setState 会触发 store 订阅 → 再排一轮同步。但这轮
+   * 数据本来就是刚从服务端拿的，再同步一次纯属空转，且**每次变更都会翻倍请求量**——
+   * 两台设备加起来很容易撞满服务端限流（真实事故：一次操作打十几个请求，连做几次
+   * 全部 429，表现为"同步很久不动"）。订阅回调据此跳过。
+   */
+  private applyingRemote = false;
+
   constructor(private binding: SyncBinding) {}
+
+  /** 这个控制器负责的 store，供外部按"哪个 store 真的变了"精确触发 */
+  get storeName(): SyncStoreName {
+    return this.binding.store;
+  }
+
+  isApplyingRemote(): boolean {
+    return this.applyingRemote;
+  }
+
+  /** 写回本地时屏蔽自身订阅触发的同步，避免每次变更请求量翻倍 */
+  private applyRemote(flat: FlatSnapshot): void {
+    this.applyingRemote = true;
+    try {
+      this.binding.applyRemote(flat);
+    } finally {
+      this.applyingRemote = false;
+    }
+  }
 
   /**
    * 本地变更后排一次同步：防抖合并连续操作，但**带最长等待上限**。
@@ -198,7 +227,7 @@ export class StoreSyncController {
       return true; // 两边都没动：不写回本地，避免 setState 触发订阅又排一轮同步，空转不停
     }
 
-    this.binding.applyRemote(envelope.data);
+    this.applyRemote(envelope.data);
     await this.persistMeta(mid, meta, userMeta, envelope.version, envelope.data);
     return true;
   }
@@ -241,7 +270,7 @@ export class StoreSyncController {
       finalEnvelope = pushed;
     }
 
-    this.binding.applyRemote(finalEnvelope.data);
+    this.applyRemote(finalEnvelope.data);
     await this.persistMeta(mid, meta, userMeta, finalEnvelope.version, finalEnvelope.data);
     return true;
   }
