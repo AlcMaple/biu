@@ -295,4 +295,66 @@ describe("同步引擎的数据保护", () => {
     await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 5);
     expect(pushOps).toHaveBeenCalledTimes(2);
   });
+
+  it("有本地变更时只推不拉：推送响应已含合并结果，推前那次拉是纯浪费", async () => {
+    seedSyncedMeta();
+    const twoSongs: LiveSnapshot = {
+      ...SONG,
+      "-1:222": { updatedAt: 0, payload: { folderId: -1, item: { rid: 222 } } },
+    };
+    pushOps.mockResolvedValue({ version: 4, updatedAt: 0, data: twoSongs });
+
+    const { applyRemote, controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => twoSongs,
+    });
+
+    await runSync(controller);
+
+    expect(pushOps).toHaveBeenCalledTimes(1);
+    expect(pullSnapshot).not.toHaveBeenCalled(); // 一个请求解决
+    expect(applyRemote).toHaveBeenCalledWith(twoSongs);
+  });
+
+  it("被通知的版本本机已同步过（自己推送的回声）时，一个请求都不发", async () => {
+    seedSyncedMeta();
+    pushOps.mockResolvedValue({ version: 9, updatedAt: 0, data: SONG });
+
+    const twoSongs: LiveSnapshot = {
+      ...SONG,
+      "-1:222": { updatedAt: 0, payload: { folderId: -1, item: { rid: 222 } } },
+    };
+    let current: LiveSnapshot = twoSongs;
+    const { controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => current,
+    });
+
+    await runSync(controller); // 本机推送到 v9
+    expect(controller.hasSynced(9)).toBe(true);
+
+    // 服务端广播 v9 —— 正是本机刚写上去的那一版
+    pushOps.mockClear();
+    pullSnapshot.mockClear();
+    current = twoSongs;
+    if (!controller.hasSynced(9)) controller.syncNow(9);
+
+    expect(pushOps).not.toHaveBeenCalled();
+    expect(pullSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("本机无变更且云端版本不比基线新时，不发请求", async () => {
+    seedSyncedMeta(); // 基线 v3
+    const { controller } = makeController({
+      waitReady: async () => undefined,
+      encodeNow: () => SONG,
+    });
+
+    controller.syncNow(3); // 通知说云端也是 v3
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.waitFor(() => expect(true).toBe(true));
+
+    expect(pullSnapshot).not.toHaveBeenCalled();
+    expect(pushOps).not.toHaveBeenCalled();
+  });
 });

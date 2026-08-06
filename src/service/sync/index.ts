@@ -85,7 +85,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 有没有落下的通知"，有就拉。断线时按 2s→5s→15s→30s 退避重连：瞬断能立刻恢复
  * （否则每次断线都留一个几十秒的通知盲区），服务真挂了也不会空转打请求。
  */
-async function startWatchLoop(onChanged: (changedStores: Set<string>) => void): Promise<void> {
+async function startWatchLoop(onChanged: (versions: Record<string, number>) => void): Promise<void> {
   let known: Record<string, number> = {};
   let failures = 0;
 
@@ -111,18 +111,15 @@ async function startWatchLoop(onChanged: (changedStores: Set<string>) => void): 
     if (failures > 0) log.info(`[sync/watch] 已恢复（之前失败 ${failures} 次）`);
     failures = 0;
 
-    // 哪几个 store 的版本号真的变了——只叫醒它们，别的不动
-    const changedStores = new Set(
-      Object.entries(result.versions)
-        .filter(([store, version]) => known[store] !== version)
-        .map(([store]) => store),
-    );
+    const changedStores = Object.keys(result.versions).filter(store => known[store] !== result.versions[store]);
     known = result.versions;
 
     log.info(
-      `[sync/watch] 挂起 ${Date.now() - startedAt}ms 后返回 changed=${result.changed} 变化的 store=[${[...changedStores].join(",")}]`,
+      `[sync/watch] 挂起 ${Date.now() - startedAt}ms 后返回 changed=${result.changed} 变化的 store=[${changedStores.join(",")}]`,
     );
-    if (result.changed) onChanged(changedStores);
+    // 把版本号一起交给控制器：它据此判断"要不要拉"和"是不是自己造成的回声"，
+    // 这两个判断各省掉一个请求
+    if (result.changed) onChanged(result.versions);
   }
 }
 
@@ -164,9 +161,14 @@ export function initLocalPlaylistSync(): void {
   //
   // 只叫醒**版本号真的变了**的那个 store：服务端返回的 versions 已经精确告诉我们是谁
   // 变了，无脑三个全跑等于每次通知多打两倍请求，两台设备叠加很容易撞满服务端限流。
-  void startWatchLoop(changedStores => {
-    const targets = allControllers.filter(controller => changedStores.has(controller.storeName));
-    (targets.length > 0 ? targets : allControllers).forEach(controller => controller.syncNow());
+  void startWatchLoop(versions => {
+    for (const controller of allControllers) {
+      const remoteVersion = versions[controller.storeName];
+      if (remoteVersion === undefined) continue;
+      // 已经同步到这个版本了 = 这条通知是本机自己推送造成的回声，不必再拉
+      if (controller.hasSynced(remoteVersion)) continue;
+      controller.syncNow(remoteVersion);
+    }
   });
   // 系统休眠唤醒后挂着的连接可能已经死了但还没超时，回到前台补一次，成本可忽略
   window.addEventListener("focus", syncAllNow);

@@ -14,10 +14,11 @@ import { isStoreName } from "../lib/store-names.js";
 const WIPE_GUARD_MIN_ENTRIES = 5;
 
 /**
- * 长轮询挂起上限。取 25s 是为了留在常见反代/网关的 30s 空闲超时之内，
+ * 长轮询挂起上限。挂得越久，空闲时的请求数越少（50s 时每设备约 1.2 次/分钟，25s 时翻倍）；
+ * 上限受反代空闲超时约束——本机 Apache `Timeout 300`，50s 有充足余量。
  * 让服务端主动收尾而不是被中间层掐断（被掐断客户端会当成网络错误退避重连）。
  */
-const WATCH_TIMEOUT_MS = 25_000;
+const WATCH_TIMEOUT_MS = 50_000;
 
 function isValidOp(op: unknown): op is SyncOp {
   if (typeof op !== "object" || op === null) return false;
