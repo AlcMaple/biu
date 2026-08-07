@@ -21,6 +21,74 @@ export const isDefaultFav = (attr?: number) => {
 export const isLocalSourceItem = (item: LocalFavItem) =>
   item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName);
 
+/**
+ * 将本地歌单条目转换为收藏弹窗的数据。
+ * 本地歌单条目的 rid（分P时就是 cid）和标题是用户当前看到的事实，二次收藏时必须沿用，不能重新按 B 站标题推导。
+ */
+export const toLocalFavoriteModalData = (item: LocalFavItem) => {
+  const isLocal = isLocalSourceItem(item);
+  return {
+    rid: item.rid,
+    type: item.type,
+    fromLocalFavorite: true as const,
+    title: `收藏「${item.title}」`,
+    itemInfo: {
+      title: item.title,
+      cover: item.cover,
+      bvid: item.bvid,
+      audioUrl: item.audioUrl,
+      source: isLocal ? ("local" as const) : ("online" as const),
+      ownerName: item.ownerName,
+      ownerMid: item.ownerMid,
+      duration: item.duration,
+      playCount: item.playCount,
+      cid: item.cid,
+      page: item.page,
+      partTitle: item.partTitle,
+    },
+  };
+};
+
+interface FavPageSelection {
+  cid: string | number;
+  page: number;
+  part?: string;
+  duration?: number;
+}
+
+/**
+ * 计算收藏弹窗最终写入本地歌单的条目身份与显示字段。
+ * `preserveExistingPage` 只给“来自本地歌单”的路径使用，避免普通全网收藏在选择“整个视频”时误把当前播放 cid 带进去。
+ */
+export const resolveLocalFavoriteSelection = ({
+  rid,
+  itemInfo,
+  pageInfo,
+  preserveExistingPage,
+}: {
+  rid: string | number;
+  itemInfo: {
+    title: string;
+    duration?: number | string;
+    cid?: string;
+    page?: number;
+    partTitle?: string;
+  };
+  pageInfo?: FavPageSelection | null;
+  preserveExistingPage: boolean;
+}) => {
+  const cid = pageInfo ? String(pageInfo.cid) : preserveExistingPage && itemInfo.cid ? String(itemInfo.cid) : undefined;
+
+  return {
+    localRid: cid ?? rid,
+    title: pageInfo ? `${itemInfo.title}-P${pageInfo.page}` : itemInfo.title,
+    duration: pageInfo?.duration ?? itemInfo.duration,
+    cid,
+    page: pageInfo?.page ?? (preserveExistingPage ? itemInfo.page : undefined),
+    partTitle: pageInfo?.part ?? (preserveExistingPage ? itemInfo.partTitle : undefined),
+  };
+};
+
 /** 本地歌单封面：取最新收藏的一首的封面，而非创建/迁移时写死的 favorite.cover */
 export const getLocalFolderLatestCover = (items?: LocalFavItem[]): string | undefined => {
   if (!items?.length) return undefined;
