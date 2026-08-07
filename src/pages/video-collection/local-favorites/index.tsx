@@ -31,7 +31,12 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
-import { detectInvalidLocalFavItems, getLocalFolderLatestCover, isLocalSourceItem } from "@/common/utils/fav";
+import {
+  detectInvalidLocalFavItems,
+  getLocalFolderLatestCover,
+  isLocalSourceItem,
+  toLocalFavoriteModalData,
+} from "@/common/utils/fav";
 import { formatMillisecond } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -324,20 +329,7 @@ const LocalFavorites = () => {
       const isUnplayableLocal = playItem.source === "local" && !playItem.audioUrl;
       switch (key) {
         case "favorite":
-          useModalStore.getState().onOpenFavSelectModal({
-            rid: item.rid,
-            type: item.type,
-            title: `收藏「${item.title}」`,
-            itemInfo: {
-              title: item.title,
-              cover: item.cover,
-              bvid: item.bvid,
-              ownerName: item.ownerName,
-              ownerMid: item.ownerMid,
-              duration: item.duration,
-              playCount: item.playCount,
-            },
-          });
+          useModalStore.getState().onOpenFavSelectModal(toLocalFavoriteModalData(item));
           break;
         case "play-next":
           if (item.invalid) {

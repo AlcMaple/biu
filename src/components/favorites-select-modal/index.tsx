@@ -17,7 +17,7 @@ import { useRequest } from "ahooks";
 
 import type { Page } from "@/service/web-interface-view";
 
-import { addOnlineItemToLocalFav } from "@/common/utils/fav";
+import { addOnlineItemToLocalFav, resolveLocalFavoriteSelection } from "@/common/utils/fav";
 import { formatDuration } from "@/common/utils/time";
 import { TagPanel } from "@/components/tag-popover";
 import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-all";
@@ -52,7 +52,7 @@ const FavoritesSelectModal = () => {
   const isFavSelectModalOpen = useModalStore(s => s.isFavSelectModalOpen);
   const onFavSelectModalOpenChange = useModalStore(s => s.onFavSelectModalOpenChange);
   const favSelectModalData = useModalStore(s => s.favSelectModalData);
-  const { rid, type = 2, title, itemInfo, isLocal, onSuccess } = favSelectModalData || {};
+  const { rid, type = 2, title, itemInfo, isLocal, fromLocalFavorite, onSuccess } = favSelectModalData || {};
 
   // 用 createdFavorites（引用稳定）再在 render 里 filter，避免 selector 每次返回新数组引用导致无限渲染
   const createdFavorites = useFavoritesStore(s => s.createdFavorites);
@@ -81,7 +81,7 @@ const FavoritesSelectModal = () => {
   const [step, setStep] = useState<0 | 1>(1);
   const showPagePicker = step === 0;
   // 正在请求分集数据时为 true，避免先闪现收藏夹列表再切换到选集步骤
-  const needsFetchPages = Boolean(type === 2 && !isLocal && itemInfo?.bvid);
+  const needsFetchPages = Boolean(type === 2 && !isLocal && !fromLocalFavorite && itemInfo?.bvid);
   const [isPagesLoading, setIsPagesLoading] = useState(false);
 
   useEffect(() => {
@@ -89,17 +89,15 @@ const FavoritesSelectModal = () => {
       setSelectedIds([]);
       setSelectedTagIds([]);
       setVideoPages([]);
-      setPickedCid("whole");
+      setPickedCid(fromLocalFavorite ? (itemInfo?.cid ?? "whole") : "whole");
       setStep(1);
       setIsPagesLoading(false);
       prevSelectedRef.current = [];
     } else {
       // 对多P视频提前进入加载态，防止收藏夹列表闪现
-      if (needsFetchPages) {
-        setIsPagesLoading(true);
-      }
+      setIsPagesLoading(needsFetchPages);
     }
-  }, [isFavSelectModalOpen, rid, needsFetchPages]);
+  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, needsFetchPages, rid]);
 
   // 标签初始状态：分集收藏时标签挂在分集 cid 上，整个视频挂在 rid 上
   useEffect(() => {
@@ -117,8 +115,8 @@ const FavoritesSelectModal = () => {
       return res?.data?.pages ?? [];
     },
     {
-      ready: Boolean(isFavSelectModalOpen && type === 2 && !isLocal && itemInfo?.bvid),
-      refreshDeps: [isFavSelectModalOpen, itemInfo?.bvid],
+      ready: Boolean(isFavSelectModalOpen && type === 2 && !isLocal && !fromLocalFavorite && itemInfo?.bvid),
+      refreshDeps: [isFavSelectModalOpen, itemInfo?.bvid, fromLocalFavorite],
       onSuccess: pages => {
         setIsPagesLoading(false);
         if (pages && pages.length > 1) {
@@ -137,8 +135,8 @@ const FavoritesSelectModal = () => {
   // 本地收藏夹的初始选中状态（选集步骤完成后再初始化）
   useEffect(() => {
     if (!isFavSelectModalOpen || !rid || showPagePicker) return;
-    // 当有选集时，使用分集 cid 作为 localRid；否则用 aid (rid)
-    const localRid = pickedCid !== "whole" ? pickedCid : rid;
+    // 当有选集时，使用分集 cid 作为 localRid；本地歌单来源即使状态尚未切到 cid，也优先读原条目的 cid。
+    const localRid = pickedCid !== "whole" ? pickedCid : fromLocalFavorite ? (itemInfo?.cid ?? rid) : rid;
     const localSelectedIds = localFolders
       .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(localRid)))
       .map(f => f.id);
@@ -150,11 +148,11 @@ const FavoritesSelectModal = () => {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFavSelectModalOpen, rid, showPagePicker, pickedCid]);
+  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, rid, showPagePicker, pickedCid]);
 
   const { data } = useRequest(
     async () => {
-      if (!rid) return [];
+      if (!rid || fromLocalFavorite) return [];
 
       let list: any[] = [];
       if (type === 12) {
@@ -185,8 +183,8 @@ const FavoritesSelectModal = () => {
       return list;
     },
     {
-      ready: Boolean(isFavSelectModalOpen && user?.mid && rid && !isLocal),
-      refreshDeps: [isFavSelectModalOpen, rid],
+      ready: Boolean(isFavSelectModalOpen && user?.mid && rid && !isLocal && !fromLocalFavorite),
+      refreshDeps: [isFavSelectModalOpen, rid, fromLocalFavorite],
     },
   );
 
@@ -204,10 +202,22 @@ const FavoritesSelectModal = () => {
     // 区分 B站 收藏夹 ID（正数）和本地收藏夹 ID（负数）
     const localFolderIdSet = new Set(localFolders.map(f => f.id));
 
-    // 计算分集信息（选了具体分集时生效）
+    // 计算分集信息（选了具体分集时生效）。本地歌单来源没有重新请求 pages，直接沿用已有 cid/page/title。
     const pageInfo = pickedCid !== "whole" ? videoPages.find(p => String(p.cid) === pickedCid) : null;
-    // 本地存储用的 rid：分集收藏时用 cid，整个视频时用 aid
-    const localRid: string | number = pageInfo ? String(pageInfo.cid) : (rid as string | number);
+    const selection = resolveLocalFavoriteSelection({
+      rid: rid as string | number,
+      itemInfo: {
+        title: itemInfo?.title ?? "",
+        duration: itemInfo?.duration,
+        cid: itemInfo?.cid,
+        page: itemInfo?.page,
+        partTitle: itemInfo?.partTitle,
+      },
+      pageInfo,
+      preserveExistingPage: Boolean(fromLocalFavorite),
+    });
+    // 本地存储用的 rid：分集收藏时用 cid，整个视频时用 aid；本地歌单来源优先沿用原条目身份。
+    const { localRid } = selection;
 
     const biliPrevIds = prevSelectedRef.current.filter(id => !localFolderIdSet.has(id));
     const localPrevIds = localFolders
@@ -227,7 +237,7 @@ const FavoritesSelectModal = () => {
       setSubmitting(true);
 
       // 处理 B站 收藏夹（本地歌曲跳过）
-      if (!isLocal && (biliAddIds || biliDelIds)) {
+      if (!isLocal && !fromLocalFavorite && (biliAddIds || biliDelIds)) {
         let res: any;
         if (type === 12) {
           res = await postCollResourceDeal({
@@ -260,18 +270,18 @@ const FavoritesSelectModal = () => {
             rid: localRid,
             type,
             source: itemInfo.source,
-            title: pageInfo ? `${itemInfo.title}-P${pageInfo.page}` : itemInfo.title,
+            title: selection.title,
             cover: itemInfo.cover,
             bvid: itemInfo.bvid,
             audioUrl: itemInfo.audioUrl,
             ownerName: itemInfo.ownerName,
             ownerMid: itemInfo.ownerMid,
-            duration: pageInfo?.duration ?? itemInfo.duration,
+            duration: selection.duration,
             playCount: itemInfo.playCount,
             // 分集信息
-            cid: pageInfo ? String(pageInfo.cid) : undefined,
-            page: pageInfo?.page,
-            partTitle: pageInfo?.part,
+            cid: selection.cid,
+            page: selection.page,
+            partTitle: selection.partTitle,
           });
           // 更新收藏夹封面为最新添加的内容封面
           if (itemInfo.cover && !pageInfo) {
@@ -333,7 +343,7 @@ const FavoritesSelectModal = () => {
 
   const allItems = [
     // 收藏具体分集时不显示 B站收藏夹（分集仅允许存入本地收藏夹）
-    ...(pickedCid === "whole"
+    ...(pickedCid === "whole" && !fromLocalFavorite
       ? (data ?? [])
           .filter(item => !hiddenMenuKeys.includes(String(item.id)))
           .map(item => ({ ...item, isLocal: false }))
