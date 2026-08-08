@@ -14,7 +14,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 import eslintReact from "@eslint-react/eslint-plugin";
 
 export default defineConfig([
-  globalIgnores(["dist", ".electron"]),
+  globalIgnores(["dist", ".electron", "**/dist/**", "**/node_modules/**", "android/**"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
