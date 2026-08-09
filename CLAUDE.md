@@ -108,7 +108,7 @@ Do **not** add app-level auto-retry, periodic "did it recover yet?" probing, or 
 Vitest + jsdom + globals enabled. `tests/setup.ts` mocks `MediaSession` and audio-element APIs. Add new test files under `tests/` named `*.test.ts(x)`. Run a single one with `pnpm run test -- --run <pattern>` (bare `pnpm test` is watch mode — it won't exit). Type/unit passing ≠ correct behavior — playback and cross-window sync must be driven in a real window before claiming a fix.
 
 ### Commits, DEVLOG, and releases
-- **Before every commit, add a `DEVLOG.md` entry** (per its format header) — this is a required delivery step, not optional. Group multiple commits of the same feature under one `##` heading; pits/design trade-offs go in the matching `docs/ideas/` file, not DEVLOG.
+- **Before every commit, add a DEVLOG record through `DEVLOG.md`** — this is a required delivery step, not optional. Classified work goes in `docs/devlog/<year>-<topic>.md`; a one-off stays in the root log until monthly archival. Pits/design trade-offs go in the matching `docs/ideas/` file, not DEVLOG.
 - `commitlint.config.mjs` enforces Conventional Commits with **Chinese descriptions**: `<type>(<scope>): <描述>`. Title states the user/dev-visible symptom or result, not low-level terms (those go in the body). See `docs/Git.md`.
 - **Do NOT add an AI-signature trailer** (e.g. `Co-Authored-By: Claude ...`) — commit history is presented uniformly as the developer, matching existing `git log`. (This overrides the default Claude Code co-author convention.)
 - Only commit / push when the user explicitly asks; on the default branch, create a branch first.
@@ -144,7 +144,7 @@ Local favorites support export/backup (`docs/sync/local-favorites-backup.md`). N
 ## See Also
 - `AI_GUIDELINES.md` — do/don't rules from real incidents (read alongside this file).
 - `AGENTS.md` — generic-agent repo guide; canonical source for **coding style** (2-space indent, double quotes, 120-char width, kebab-case files, PascalCase components) and PR expectations. Keep its command list in sync with this file.
-- `DEVLOG.md` — running development log; add an entry before each commit.
-- `docs/` — categorized by topic: `ideas/`（phased feature design notes）, `android/`, `release/`（打包/发布/升级）, `windows/`, `lyrics/`, `player-ui/`, `sync/`（本地歌单云同步）；`devlog-assets/` holds DEVLOG-referenced images/diagrams only, don't drop unrelated docs in there. `docs/功能与文件索引.md` is the whole-project feature/file index. Single-topic docs with no siblings (`Git.md`, `dev-ctrl-c-优雅退出.md`) stay directly under `docs/`.
+- `DEVLOG.md` — development-log entry point and current one-off records; add an entry before each commit according to its rules.
+- `docs/` — categorized by topic: `ideas/`（phased feature design notes）, `devlog/`（按专题按年记录，`archive/` 收纳按月归档的单次记录）, `android/`, `release/`（打包/发布/升级）, `windows/`, `lyrics/`, `player-ui/`, `sync/`（本地歌单云同步）；`devlog-assets/` holds DEVLOG-referenced images/diagrams only, don't drop unrelated docs in there. `docs/功能与文件索引.md` is the whole-project feature/file index. Single-topic docs with no siblings (`Git.md`, `dev-ctrl-c-优雅退出.md`) stay directly under `docs/`.
 - `docs/windows/Windows-依赖管理指南.md` — Windows dependency/env troubleshooting.
 - `dev_tools/setup-win.js` — fresh-Windows automation.
