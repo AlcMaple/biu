@@ -26,4 +26,4 @@ Tests use Vitest, jsdom, and Testing Library setup from `tests/setup.ts`. Name t
 
 ## Commit & Pull Request Guidelines
 
-Follow Conventional Commits with concise Chinese descriptions: `feat: 新增播放模式` or `fix(lyrics): 修复时间轴偏移`. Allowed types are documented in `docs/Git.md`; scopes are optional. Update `DEVLOG.md` for substantive work. PRs should explain the user-visible result, link relevant issues, list verification performed, and include screenshots or recordings for UI changes. Ensure tests, ESLint, Knip, and applicable platform builds pass.
+Follow Conventional Commits with concise Chinese descriptions: `feat: 新增播放模式` or `fix(lyrics): 修复时间轴偏移`. Allowed types are documented in `docs/Git.md`; scopes are optional. For substantive work, add a record through `DEVLOG.md` (the relevant topic file when classified, the root file when it is a one-off). PRs should explain the user-visible result, link relevant issues, list verification performed, and include screenshots or recordings for UI changes. Ensure tests, ESLint, Knip, and applicable platform builds pass.
