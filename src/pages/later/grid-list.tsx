@@ -46,6 +46,7 @@ const GridList: React.FC<GridListProps> = ({ items, hasMore, loading, onLoadMore
                     cover: item.pic,
                     ownerName: item.owner?.name,
                     ownerMid: item.owner?.mid,
+                    duration: item.duration,
                   });
                 }
           }

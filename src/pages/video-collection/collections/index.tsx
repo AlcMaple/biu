@@ -103,6 +103,7 @@ const VideoCollections = () => {
           cover: item.cover,
           ownerMid: item.upper?.mid,
           ownerName: item.upper?.name,
+          duration: item.duration,
         })),
       );
     }
@@ -118,6 +119,7 @@ const VideoCollections = () => {
           cover: item.cover,
           ownerMid: item.upper?.mid,
           ownerName: item.upper?.name,
+          duration: item.duration,
         })),
       );
     }
@@ -164,6 +166,7 @@ const VideoCollections = () => {
           sid: item.id,
           ownerName: item.upper?.name,
           ownerMid: item.upper?.mid,
+          duration: item.duration,
         });
         break;
       case "add-to-playlist":
@@ -176,6 +179,7 @@ const VideoCollections = () => {
             sid: item.id,
             ownerName: item.upper?.name,
             ownerMid: item.upper?.mid,
+            duration: item.duration,
           },
         ]);
         break;

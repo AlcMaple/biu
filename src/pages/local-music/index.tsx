@@ -71,6 +71,7 @@ const LocalMusicPage = () => {
         id: i.id,
         title: i.title,
         audioUrl: toFileUrl(i.path),
+        duration: i.duration,
       })),
     );
   };
@@ -83,6 +84,7 @@ const LocalMusicPage = () => {
       id: i.id,
       title: i.title,
       audioUrl: toFileUrl(i.path),
+      duration: i.duration,
     }));
     usePlayList.getState().addList?.(items);
     addToast({
@@ -135,6 +137,7 @@ const LocalMusicPage = () => {
       type: "audio" as const,
       title: song.title,
       audioUrl: toFileUrl(song.path),
+      duration: song.duration,
     });
   };
 
@@ -145,6 +148,7 @@ const LocalMusicPage = () => {
       type: "audio" as const,
       title: song.title,
       audioUrl: toFileUrl(song.path),
+      duration: song.duration,
     });
   };
 
@@ -171,7 +175,7 @@ const LocalMusicPage = () => {
       type: 12,
       isLocal: true,
       title: "收藏",
-      itemInfo: { title: song.title, audioUrl: toFileUrl(song.path), source: "local" },
+      itemInfo: { title: song.title, audioUrl: toFileUrl(song.path), source: "local", duration: song.duration },
     });
   };
 

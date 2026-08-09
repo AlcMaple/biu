@@ -173,6 +173,7 @@ const MusicRecommend = () => {
           ownerName: item.author,
           ownerMid: item.authorMid,
           playCount: item.playCount,
+          duration: item.duration,
         };
       })
       .filter(item => Boolean(item.bvid));
@@ -221,6 +222,7 @@ const MusicRecommend = () => {
           sid: Number(item.id) || undefined,
           ownerName: item.author,
           playCount: item.playCount,
+          duration: item.duration,
         });
         break;
       case "add-to-playlist":
@@ -233,6 +235,7 @@ const MusicRecommend = () => {
             sid: Number(item.id) || undefined,
             ownerName: item.author,
             playCount: item.playCount,
+            duration: item.duration,
           },
         ]);
         break;

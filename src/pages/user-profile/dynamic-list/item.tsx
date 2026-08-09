@@ -17,6 +17,7 @@ import moment from "moment";
 import type { WebDynamicItem } from "@/service/web-dynamic";
 
 import { formatNumber } from "@/common/utils/number";
+import { parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import IconButton from "@/components/icon-button";
 import Image from "@/components/image";
@@ -53,6 +54,7 @@ const DynamicItem = ({ item }: DynamicItemProps) => {
         cover: archive.cover,
         ownerName: author?.name || "",
         ownerMid: author?.mid || 0,
+        duration: parseDuration(archive.duration_text),
         type: "mv",
       });
     }

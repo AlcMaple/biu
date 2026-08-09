@@ -12,6 +12,7 @@ export function mediaToPlayItem(m: Media): PlayItem {
     cover: m.cover,
     ownerName: m.upper?.name,
     ownerMid: m.upper?.mid,
+    duration: m.duration,
   };
 }
 

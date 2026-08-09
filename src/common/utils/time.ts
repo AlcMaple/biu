@@ -15,6 +15,19 @@ export function formatDuration(seconds: number) {
   }
 }
 
+/** 将秒数或 B 站返回的 mm:ss / hh:mm:ss 字符串统一转换为秒数。 */
+export const parseDuration = (value?: number | string): number | undefined => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  }
+  if (!value?.trim()) return undefined;
+
+  const parts = value.split(":").map(Number);
+  if (parts.some(part => !Number.isFinite(part) || part < 0)) return undefined;
+  const seconds = parts.reduce((total, part) => total * 60 + part, 0);
+  return seconds > 0 ? seconds : undefined;
+};
+
 export const formatSecondsToDate = (s?: number) => (s ? moment.unix(s).format("YYYY-MM-DD") : "");
 
 export const formatMillisecond = (s?: number) => (s ? moment(s).format("YYYY-MM-DD") : "");

@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 
 import type { SpaceArcVListItem } from "@/service/space-wbi-arc-search";
 
+import { parseDuration } from "@/common/utils/time";
 import MusicCard from "@/components/music-card";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
 import { usePlayList } from "@/store/play-list";
@@ -49,6 +50,7 @@ const PostGridList: React.FC<PostGridListProps> = ({
               cover: item.pic,
               ownerName: item.author,
               ownerMid: item.mid,
+              duration: parseDuration(item.length),
             });
           }}
         />

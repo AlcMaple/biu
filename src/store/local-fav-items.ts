@@ -67,6 +67,11 @@ interface Action {
    * 不覆盖已有快照。用于「点心动/播放栏收藏」入口存入时未带播放量的历史数据。
    */
   updatePlayCounts: (folderId: number, playByRid: Map<string, number>) => void;
+  /**
+   * 补全缺失的时长：仅对当前 duration 为空的项写入 durationByRid 中的值，
+   * 不覆盖已有快照。用于修复旧版播放栏收藏未保存时长的数据。
+   */
+  updateDurations: (folderId: number, durationByRid: Map<string, number>) => void;
 }
 
 export const useLocalFavItemsStore = create<State & Action>()(
@@ -157,6 +162,21 @@ export const useLocalFavItemsStore = create<State & Action>()(
             if (!play) return item;
             changed = true;
             return { ...item, playCount: play };
+          });
+          if (!changed) return {};
+          return { folderItems: { ...state.folderItems, [folderId]: updated } };
+        }),
+      updateDurations: (folderId, durationByRid) =>
+        set(state => {
+          const current = state.folderItems[folderId];
+          if (!current?.length || !durationByRid.size) return {};
+          let changed = false;
+          const updated = current.map(item => {
+            if (item.duration) return item; // 已有时长则保留原快照，不覆盖
+            const duration = durationByRid.get(String(item.rid));
+            if (!duration) return item;
+            changed = true;
+            return { ...item, duration };
           });
           if (!changed) return {};
           return { folderItems: { ...state.folderItems, [folderId]: updated } };

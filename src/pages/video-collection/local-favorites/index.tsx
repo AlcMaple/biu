@@ -37,7 +37,7 @@ import {
   isLocalSourceItem,
   toLocalFavoriteModalData,
 } from "@/common/utils/fav";
-import { formatMillisecond } from "@/common/utils/time";
+import { formatMillisecond, parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
@@ -57,11 +57,7 @@ import { useTagStore } from "@/store/tags";
 import Header from "../header";
 
 const durationToSeconds = (d: number | string | undefined): number => {
-  if (d == null) return 0;
-  if (typeof d === "number") return d;
-  const parts = d.split(":").map(Number);
-  if (parts.some(Number.isNaN)) return 0;
-  return parts.reduce((acc, p) => acc * 60 + p, 0);
+  return parseDuration(d) ?? 0;
 };
 
 // 本次启动内已后台检测过失效状态的收藏夹，避免来回切换页面时反复请求
@@ -100,6 +96,7 @@ const LocalFavorites = () => {
   const renameItem = useLocalFavItemsStore(s => s.renameItem);
   const updateInvalidFlags = useLocalFavItemsStore(s => s.updateInvalidFlags);
   const updatePlayCounts = useLocalFavItemsStore(s => s.updatePlayCounts);
+  const updateDurations = useLocalFavItemsStore(s => s.updateDurations);
   const clearFolder = useLocalFavItemsStore(s => s.clearFolder);
   const rmCreatedFavorite = useFavoritesStore(s => s.rmCreatedFavorite);
 
@@ -157,7 +154,7 @@ const LocalFavorites = () => {
     setActiveTagIds([]);
   }, [folderIdStr]);
 
-  // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量
+  // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量和时长
   // （二者共用同一批 infos 请求；每次启动每个收藏夹只检测一次）
   useEffect(() => {
     if (!folderId || invalidCheckedFolders.has(folderId)) return;
@@ -165,7 +162,7 @@ const LocalFavorites = () => {
     if (!allItems?.length) return;
     invalidCheckedFolders.add(folderId);
     detectInvalidLocalFavItems(allItems)
-      .then(({ checked, invalid, playByRid }) => {
+      .then(({ checked, invalid, playByRid, durationByRid }) => {
         // 一个都没检测成功（如断网）时允许下次进入重试
         if (!checked.size) {
           invalidCheckedFolders.delete(folderId);
@@ -174,9 +171,11 @@ const LocalFavorites = () => {
         updateInvalidFlags(folderId, invalid, checked);
         // 「点播放栏收藏」入口存入时没有播放量，这里用 infos 的真实播放量补全「-」
         updatePlayCounts(folderId, playByRid);
+        // 旧版播放栏收藏入口没有把时长写入本地歌单，这里用同一批 infos 数据补全
+        updateDurations(folderId, durationByRid);
       })
       .catch(() => invalidCheckedFolders.delete(folderId));
-  }, [folderId, updateInvalidFlags, updatePlayCounts]);
+  }, [folderId, updateInvalidFlags, updatePlayCounts, updateDurations]);
 
   const handleSort = useCallback((key: MusicListSortKey) => {
     setSortKey(prev => {
@@ -198,6 +197,7 @@ const LocalFavorites = () => {
         title: item.title,
         cover: item.cover,
         audioUrl: item.audioUrl,
+        duration: parseDuration(item.duration),
       };
     }
     // 兼容旧数据：type=12 且无 ownerMid/ownerName 的项是添加 source 字段前存入的本地歌曲
@@ -209,6 +209,7 @@ const LocalFavorites = () => {
         title: item.title,
         cover: item.cover,
         audioUrl: item.audioUrl, // 旧数据无 audioUrl，播放时会提示重新收藏
+        duration: parseDuration(item.duration),
       };
     }
     if (item.type === 2) {
@@ -223,6 +224,7 @@ const LocalFavorites = () => {
         ownerMid: item.ownerMid,
         ownerName: item.ownerName,
         playCount: item.playCount,
+        duration: parseDuration(item.duration),
       };
     }
     return {
@@ -233,6 +235,7 @@ const LocalFavorites = () => {
       ownerMid: item.ownerMid,
       ownerName: item.ownerName,
       playCount: item.playCount,
+      duration: parseDuration(item.duration),
     };
   }, []);
 

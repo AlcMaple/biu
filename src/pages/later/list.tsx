@@ -39,6 +39,7 @@ const LaterList: React.FC<LaterListProps> = ({
       cover: item.pic,
       ownerName: item.owner?.name,
       ownerMid: item.owner?.mid,
+      duration: item.duration,
     });
   }, []);
 

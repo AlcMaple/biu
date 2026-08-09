@@ -2,6 +2,7 @@ import { chunk } from "es-toolkit/array";
 
 import { bv2av } from "@/common/utils/bv";
 import { resolvePlayCount } from "@/common/utils/number";
+import { parseDuration } from "@/common/utils/time";
 import { getFavResourceIds, type FavMedia } from "@/service/fav-resource";
 import { getFavResourceInfos, type FavResourceInfo } from "@/service/fav-resource-infos";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -101,8 +102,8 @@ export const getLocalFolderLatestCover = (items?: LocalFavItem[]): string | unde
  * - 本地歌曲不参与检测。
  * - 网络失败/接口报错的分片、以及响应里缺席的条目都不计入 checked，避免把网络问题或接口偶发缺失误判成失效；
  *   只有接口明确返回该资源且 attr !== 0 才判定失效。
- * - 顺带从同一批 infos 响应里取播放量（playByRid），供本地歌单补全「-」用，不额外发请求。
- * @returns checked: 实际完成检测的 rid 集合；invalid: 其中已失效的 rid 集合；playByRid: rid -> 播放量
+ * - 顺带从同一批 infos 响应里取播放量和时长，供本地歌单补全，不额外发请求。
+ * @returns checked: 实际完成检测的 rid 集合；invalid: 其中已失效的 rid 集合；playByRid: rid -> 播放量；durationByRid: rid -> 时长
  */
 export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
   // resource key（"avid:2" / "auid:12"）-> 该资源对应的所有 rid（分集会多对一）
@@ -125,6 +126,7 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
   const checked = new Set<string>();
   const invalid = new Set<string>();
   const playByRid = new Map<string, number>();
+  const durationByRid = new Map<string, number>();
   const chunks = chunk([...resourceToRids.keys()], 50);
   const results = await Promise.allSettled(
     chunks.map(keys => getFavResourceInfos({ resources: keys.join(","), platform: "web" })),
@@ -141,23 +143,28 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
     const invalidKeys = new Set(infos.filter(info => (info.attr & 1) === 1).map(info => `${info.id}:${info.type}`));
     // 资源 -> 播放量（同一资源的所有分集 rid 共享此值）
     const playByKey = new Map<string, number>();
+    const durationByKey = new Map<string, number>();
     for (const info of infos) {
       if ((info.attr & 1) === 1) continue;
       const play = resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt);
       if (play > 0) playByKey.set(`${info.id}:${info.type}`, play);
+      const duration = parseDuration(info.duration);
+      if (duration !== undefined) durationByKey.set(`${info.id}:${info.type}`, duration);
     }
     for (const key of chunks[i]) {
       if (!returnedKeys.has(key)) continue;
       const play = playByKey.get(key);
+      const duration = durationByKey.get(key);
       for (const rid of resourceToRids.get(key) ?? []) {
         checked.add(rid);
         if (invalidKeys.has(key)) invalid.add(rid);
         if (play !== undefined) playByRid.set(rid, play);
+        if (duration !== undefined) durationByRid.set(rid, duration);
       }
     }
   });
 
-  return { checked, invalid, playByRid };
+  return { checked, invalid, playByRid, durationByRid };
 };
 
 /**
@@ -196,15 +203,20 @@ export const fillFavMediaPlayCount = async (medias: FavMedia[]): Promise<FavMedi
   });
 };
 
+interface LocalFavRemoteInfo {
+  playCount: number;
+  duration?: number;
+}
+
 /**
- * 拉取单个在线收藏项的真实播放量（拿不到返回 0）。
+ * 拉取单个在线收藏项的播放量与时长（拿不到返回空值）。
  * type 2 优先用 bvid 转 avid（兼容分集收藏时 rid 为 cid 的情况），type 12 用 rid（auid）。
  */
-export const fetchLocalFavPlayCount = async (item: {
+const fetchLocalFavRemoteInfo = async (item: {
   rid: string | number;
   type: number;
   bvid?: string;
-}): Promise<number> => {
+}): Promise<LocalFavRemoteInfo> => {
   let resourceId: number | null = null;
   if (item.type === 2) {
     const avid = item.bvid ? bv2av(item.bvid) : Number(item.rid);
@@ -212,27 +224,43 @@ export const fetchLocalFavPlayCount = async (item: {
   } else if (item.type === 12 && Number.isFinite(Number(item.rid))) {
     resourceId = Number(item.rid);
   }
-  if (resourceId == null) return 0;
+  if (resourceId == null) return { playCount: 0 };
   try {
     const res = await getFavResourceInfos({ resources: `${resourceId}:${item.type}`, platform: "web" });
     const info = (res.data ?? []).find(i => (i.attr & 1) === 0);
-    return info ? resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt) : 0;
+    return info
+      ? {
+          playCount: resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt),
+          duration: parseDuration(info.duration),
+        }
+      : { playCount: 0 };
   } catch {
-    return 0;
+    return { playCount: 0 };
   }
 };
 
+/** 拉取单个在线收藏项的真实播放量（拿不到返回 0）。 */
+export const fetchLocalFavPlayCount = async (item: {
+  rid: string | number;
+  type: number;
+  bvid?: string;
+}): Promise<number> => (await fetchLocalFavRemoteInfo(item)).playCount;
+
 /**
- * 收藏在线资源到本地歌单：立刻入库（UI 即时响应），若该项没带播放量则**异步回查补上**，
- * 不必等下次重开歌单。播放栏星标 / 心动收藏走的是 `PlayItem`，本身没有播放量字段，
- * 都应经此入口而非直接 `addItem`。回查失败（私密/删除/限流）则保持为空，留待下次打开歌单时兜底补全。
+ * 收藏在线资源到本地歌单：立刻入库（UI 即时响应），若该项没带播放量或时长则**异步回查补上**，
+ * 不必等下次重开歌单。播放栏星标 / 心动收藏走的是 `PlayItem`，应经此入口而非直接 `addItem`。
+ * 回查失败（私密/删除/限流）则保持为空，留待下次打开歌单时兜底补全。
  */
 export const addOnlineItemToLocalFav = (folderId: number, item: Omit<LocalFavItem, "fav_time">): void => {
   useLocalFavItemsStore.getState().addItem(folderId, item);
-  if (item.playCount || item.source === "local" || ![2, 12].includes(item.type)) return;
-  void fetchLocalFavPlayCount(item).then(play => {
-    if (play > 0) {
-      useLocalFavItemsStore.getState().updatePlayCounts(folderId, new Map([[String(item.rid), play]]));
+  if ((item.playCount && item.duration) || item.source === "local" || ![2, 12].includes(item.type)) return;
+  void fetchLocalFavRemoteInfo(item).then(({ playCount, duration }) => {
+    const store = useLocalFavItemsStore.getState();
+    if (playCount > 0) {
+      store.updatePlayCounts(folderId, new Map([[String(item.rid), playCount]]));
+    }
+    if (duration !== undefined) {
+      store.updateDurations(folderId, new Map([[String(item.rid), duration]]));
     }
   });
 };
@@ -253,6 +281,7 @@ export const getLocalFavMedia = (folderId: number) => {
           ownerMid: item.ownerMid,
           ownerName: item.ownerName,
           playCount: item.playCount,
+          duration: parseDuration(item.duration),
         };
       }
       return {
@@ -263,6 +292,7 @@ export const getLocalFavMedia = (folderId: number) => {
         ownerMid: item.ownerMid,
         ownerName: item.ownerName,
         playCount: item.playCount,
+        duration: parseDuration(item.duration),
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -317,6 +347,7 @@ export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {
           ownerMid: item.upper?.mid,
           ownerName: item.upper?.name,
           playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
+          duration: parseDuration(item.duration),
         };
       }
       return {
@@ -327,6 +358,7 @@ export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {
         ownerMid: item.upper?.mid,
         ownerName: item.upper?.name,
         playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
+        duration: parseDuration(item.duration),
       };
     });
 };

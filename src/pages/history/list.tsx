@@ -40,6 +40,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
         cover: item.cover,
         ownerName: item.author_name,
         ownerMid: item.author_mid,
+        duration: item.duration,
       });
     }
   }, []);

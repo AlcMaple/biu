@@ -148,6 +148,7 @@ const Later = () => {
           bvid: item.bvid,
           ownerName: item.owner?.name,
           ownerMid: item.owner?.mid,
+          duration: item.duration,
         });
         break;
       case "add-to-playlist":
@@ -159,6 +160,7 @@ const Later = () => {
             bvid: item.bvid,
             ownerName: item.owner?.name,
             ownerMid: item.owner?.mid,
+            duration: item.duration,
           },
         ]);
         break;
