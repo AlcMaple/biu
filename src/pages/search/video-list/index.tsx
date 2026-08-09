@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { addToast, Spinner } from "@heroui/react";
 
 import { stripHtml } from "@/common/utils/str";
+import { parseDuration } from "@/common/utils/time";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Empty from "@/components/empty";
 import platform from "@/platform";
@@ -97,6 +98,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       ownerName: item.author,
       ownerMid: item.mid,
       playCount: item.play,
+      duration: parseDuration(item.duration),
     }));
 
     usePlayList.getState().addList(items);
@@ -112,6 +114,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       ownerName: item.author,
       ownerMid: item.mid,
       playCount: item.play,
+      duration: parseDuration(item.duration),
     };
 
     switch (key) {

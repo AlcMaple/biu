@@ -47,7 +47,7 @@ describe("detectInvalidLocalFavItems", () => {
     mockedInfos.mockReset();
   });
 
-  test("普通视频/音频按 rid 检测，接口未返回或 attr!=0 视为失效", async () => {
+  test("普通视频/音频按 rid 检测，接口未返回的条目不计入本次检测", async () => {
     const items = [
       makeItem({ rid: 100, type: 2, bvid: "BV1xx411c7mD" }), // avid=2，有效
       makeItem({ rid: 200, type: 2, bvid: "BV17x411w7KC" }), // avid=170001，attr=1 失效
@@ -58,18 +58,19 @@ describe("detectInvalidLocalFavItems", () => {
       code: 0,
       message: "0",
       data: [
-        { id: 2, type: 2, attr: 0 },
+        { id: 2, type: 2, attr: 0, duration: 274 },
         { id: 170001, type: 2, attr: 1 },
       ],
     } as never);
 
-    const { checked, invalid } = await detectInvalidLocalFavItems(items);
+    const { checked, invalid, durationByRid } = await detectInvalidLocalFavItems(items);
 
     expect(mockedInfos).toHaveBeenCalledTimes(1);
     const { resources } = mockedInfos.mock.calls[0][0];
     expect(resources.split(",").sort()).toEqual(["170001:2", "2:2", "300:12"]);
-    expect(checked).toEqual(new Set(["100", "200", "300"]));
-    expect(invalid).toEqual(new Set(["200", "300"]));
+    expect(checked).toEqual(new Set(["100", "200"]));
+    expect(invalid).toEqual(new Set(["200"]));
+    expect(durationByRid).toEqual(new Map([["100", 274]]));
   });
 
   test("分集收藏（rid=cid）通过 bvid 转 avid 检测，同视频多分集共享结果", async () => {
@@ -120,5 +121,31 @@ describe("updateInvalidFlags", () => {
     expect(items.find(i => i.rid === 100)?.invalid).toBe(true);
     expect(items.find(i => i.rid === 200)?.invalid).toBeUndefined();
     expect(items.find(i => i.rid === 300)?.invalid).toBe(true);
+  });
+});
+
+describe("updateDurations", () => {
+  beforeEach(() => {
+    useLocalFavItemsStore.setState({ folderItems: {} });
+  });
+
+  test("只补全缺失时长，不覆盖已有时长", () => {
+    useLocalFavItemsStore.setState({
+      folderItems: {
+        1: [makeItem({ rid: 100 }), makeItem({ rid: 200, duration: 99 })],
+      },
+    });
+
+    useLocalFavItemsStore.getState().updateDurations(
+      1,
+      new Map([
+        ["100", 274],
+        ["200", 300],
+      ]),
+    );
+
+    const items = useLocalFavItemsStore.getState().folderItems[1];
+    expect(items.find(i => i.rid === 100)?.duration).toBe(274);
+    expect(items.find(i => i.rid === 200)?.duration).toBe(99);
   });
 });

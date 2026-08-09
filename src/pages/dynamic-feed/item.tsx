@@ -9,6 +9,7 @@ import { twMerge } from "tailwind-merge";
 import type { WebDynamicItem } from "@/service/web-dynamic";
 
 import { formatNumber } from "@/common/utils/number";
+import { parseDuration } from "@/common/utils/time";
 import Image from "@/components/image";
 import platform from "@/platform";
 import { postDynamicFeedThumb } from "@/service/web-dynamic-feed-thumb";
@@ -125,6 +126,7 @@ const DynamicItem: React.FC<DynamicItemProps> = ({ item, className }) => {
                   cover: archive.cover,
                   ownerName: author.name,
                   ownerMid: author.mid,
+                  duration: parseDuration(archive.duration_text),
                 });
                 addToast({
                   title: "已添加到下一首播放",
@@ -149,6 +151,7 @@ const DynamicItem: React.FC<DynamicItemProps> = ({ item, className }) => {
               cover: archive?.cover || "",
               ownerName: author?.name || "",
               ownerMid: author?.mid || 0,
+              duration: parseDuration(archive?.duration_text),
               type: "mv",
             });
           }}

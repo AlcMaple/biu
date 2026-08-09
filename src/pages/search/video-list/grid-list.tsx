@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 
 import { stripHtml } from "@/common/utils/str";
+import { parseDuration } from "@/common/utils/time";
 import MusicCard from "@/components/music-card";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
 import { type SearchVideoItem } from "@/service/web-interface-search-type";
@@ -43,6 +44,7 @@ const GridList: React.FC<GridListProps> = ({ items, getScrollElement, onMenuActi
               ownerName: item.author,
               ownerMid: item.mid,
               playCount: item.play,
+              duration: parseDuration(item.duration),
             });
           }}
         />

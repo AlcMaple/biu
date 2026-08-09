@@ -67,6 +67,7 @@ function candToPlayItem(c: SongCandidate): PlayItem {
     ownerMid: c.ownerMid,
     ownerName: c.ownerName,
     playCount: c.play,
+    duration: c.durationSec,
   };
 }
 

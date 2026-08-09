@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 
 import { stripHtml } from "@/common/utils/str";
-import { formatSecondsToDate } from "@/common/utils/time";
+import { formatSecondsToDate, parseDuration } from "@/common/utils/time";
 import { formatUrlProtocol } from "@/common/utils/url";
 import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
@@ -34,6 +34,7 @@ const List: React.FC<ListProps> = ({ items, getScrollElement, onMenuAction, load
       ownerName: item.author,
       ownerMid: item.mid,
       playCount: item.play,
+      duration: parseDuration(item.duration),
     });
   }, []);
 

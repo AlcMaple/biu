@@ -177,6 +177,7 @@ const History = () => {
             bvid: item.history.bvid,
             ownerName: item.author_name,
             ownerMid: item.author_mid,
+            duration: item.duration,
           });
           break;
         case "add-to-playlist":
@@ -188,6 +189,7 @@ const History = () => {
               bvid: item.history.bvid,
               ownerName: item.author_name,
               ownerMid: item.author_mid,
+              duration: item.duration,
             },
           ]);
           break;

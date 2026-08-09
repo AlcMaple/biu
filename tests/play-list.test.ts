@@ -113,6 +113,42 @@ describe("play-list store", () => {
     expect(navigator.mediaSession.playbackState).toBe("playing");
   });
 
+  test("play preserves the duration supplied by a search/list result", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    await s.play({
+      type: "mv",
+      bvid: "BVx",
+      title: "mv",
+      cover: "https://cover.test/m.png",
+      ownerName: "owner",
+      ownerMid: 1,
+      duration: 274,
+    });
+
+    expect(usePlayList.getState().getPlayItem()?.duration).toBe(274);
+  });
+
+  test("playback state prefers the Bilibili duration over the media stream duration", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    await s.play({
+      type: "mv",
+      bvid: "BVx",
+      title: "mv",
+      cover: "https://cover.test/m.png",
+      ownerName: "owner",
+      ownerMid: 1,
+      duration: 274,
+    });
+
+    const media = s.getAudio() as HTMLAudioElement & { ondurationchange?: () => void };
+    media.duration = 273.4;
+    media.ondurationchange?.();
+
+    expect(usePlayList.getState().duration).toBe(274);
+  });
+
   test("playList sets list and next/prev in sequence", async () => {
     const s = usePlayList.getState();
     await s.init();

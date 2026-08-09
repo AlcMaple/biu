@@ -231,6 +231,7 @@ const Favorites = () => {
         cover: item.cover,
         ownerName: item.upper?.name,
         ownerMid: item.upper?.mid,
+        duration: item.duration,
         playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
       };
       // 心动模式进行中：从收藏夹点歌视为「转去播放这个收藏夹」——结束私人FM，整队替换成整个收藏夹
@@ -433,6 +434,7 @@ const Favorites = () => {
             sid: item.id,
             ownerName: item.upper?.name,
             ownerMid: item.upper?.mid,
+            duration: item.duration,
             playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
           });
           break;
@@ -446,6 +448,7 @@ const Favorites = () => {
               sid: item.id,
               ownerName: item.upper?.name,
               ownerMid: item.upper?.mid,
+              duration: item.duration,
               playCount: resolvePlayCount(item.cnt_info?.play, item.cnt_info?.vt),
             },
           ]);

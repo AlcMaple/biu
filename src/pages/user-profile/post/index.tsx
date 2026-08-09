@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import { addToast, Spinner } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
+import { parseDuration } from "@/common/utils/time";
 import AsyncButton from "@/components/async-button";
 import SearchWithSort from "@/components/search-with-sort";
 import platform from "@/platform";
@@ -106,6 +107,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
           bvid: item.bvid,
           ownerName: item.author,
           ownerMid: item.mid,
+          duration: parseDuration(item.length),
         });
         break;
       case "add-to-playlist":
@@ -117,6 +119,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
             bvid: item.bvid,
             ownerName: item.author,
             ownerMid: item.mid,
+            duration: parseDuration(item.length),
           },
         ]);
         break;
@@ -222,6 +225,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
           cover: item.pic,
           ownerName: item.author,
           ownerMid: item.mid,
+          duration: parseDuration(item.length),
         }))
         .filter(item => Boolean(item.bvid));
 

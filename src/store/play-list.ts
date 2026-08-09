@@ -114,6 +114,8 @@ export interface PlayItem {
   cid?: string;
   /** 播放量快照（随歌曲一路带下来，收藏时直接沿用，无需回查 infos） */
   playCount?: number;
+  /** 视频/音频时长（秒，收藏时直接沿用，无需重新请求详情） */
+  duration?: number;
 }
 
 interface Action {
@@ -492,7 +494,15 @@ export const usePlayList = create<State & Action>()(
             audio.ondurationchange = () => {
               const dur = audio.duration;
               if (!Number.isNaN(dur) && dur !== Infinity) {
-                set({ duration: Math.round(dur * 100) / 100 });
+                const staticDuration = get().getPlayItem?.()?.duration;
+                const normalizedDuration = Math.round(dur * 100) / 100;
+                set({
+                  // B 站接口的时长是列表展示的权威值，避免音频流的 273.x 秒被格式化成 04:33。
+                  duration:
+                    typeof staticDuration === "number" && Number.isFinite(staticDuration) && staticDuration > 0
+                      ? staticDuration
+                      : normalizedDuration,
+                });
                 updatePositionState();
               }
             };
@@ -698,6 +708,7 @@ export const usePlayList = create<State & Action>()(
           source,
           audioUrl,
           playCount,
+          duration,
           cid: targetCid,
         }: PlayItem) => {
           const { list, playId } = get();
@@ -717,6 +728,9 @@ export const usePlayList = create<State & Action>()(
                 }
                 if (cover) {
                   target.pageCover = formatUrlProtocol(cover);
+                }
+                if (duration && !target.duration) {
+                  target.duration = duration;
                 }
               });
             }
@@ -745,6 +759,9 @@ export const usePlayList = create<State & Action>()(
                   if (cover) {
                     target.pageCover = formatUrlProtocol(cover);
                   }
+                  if (duration && !target.duration) {
+                    target.duration = duration;
+                  }
                 }
                 state.playId = existItem.id;
               });
@@ -770,6 +787,9 @@ export const usePlayList = create<State & Action>()(
                     }
                     if (cover) {
                       target.pageCover = formatUrlProtocol(cover);
+                    }
+                    if (duration && !target.duration) {
+                      target.duration = duration;
                     }
                   }
                   state.playId = existItem.id;
@@ -797,6 +817,7 @@ export const usePlayList = create<State & Action>()(
                     source,
                     audioUrl,
                     title: sanitizedTitle,
+                    duration,
                   },
                 ]
               : [
@@ -810,6 +831,7 @@ export const usePlayList = create<State & Action>()(
                     ownerName,
                     ownerMid,
                     playCount,
+                    duration,
                   },
                 ];
           // 补充缺失信息（有 targetCid 时也需要获取完整分集列表）
@@ -1107,7 +1129,20 @@ export const usePlayList = create<State & Action>()(
             });
           }
         },
-        addToNext: async ({ type, title, bvid, sid, cover, ownerName, ownerMid, id, source, audioUrl, playCount }) => {
+        addToNext: async ({
+          type,
+          title,
+          bvid,
+          sid,
+          cover,
+          ownerName,
+          ownerMid,
+          id,
+          source,
+          audioUrl,
+          playCount,
+          duration,
+        }) => {
           const { playId, nextId: currentNextId, list } = get();
           const currentItem = list.find(item => item.id === playId);
           const sanitizedTitle = sanitizeTitle(title);
@@ -1154,6 +1189,7 @@ export const usePlayList = create<State & Action>()(
                     cover: cover ? formatUrlProtocol(cover) : undefined,
                     ownerName,
                     ownerMid,
+                    duration,
                   },
                 ]
               : [
@@ -1167,6 +1203,7 @@ export const usePlayList = create<State & Action>()(
                     ownerName,
                     ownerMid,
                     playCount,
+                    duration,
                   },
                 ];
           if (source !== "local" && (!cover || !ownerName || !ownerMid)) {

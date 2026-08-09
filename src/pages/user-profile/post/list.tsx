@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 
 import type { SpaceArcVListItem } from "@/service/space-wbi-arc-search";
 
-import { formatSecondsToDate } from "@/common/utils/time";
+import { formatSecondsToDate, parseDuration } from "@/common/utils/time";
 import MusicListItem from "@/components/music-list-item";
 import MusicListHeader from "@/components/music-list-item/header";
 import VirtualPageList from "@/components/virtual-page-list";
@@ -32,6 +32,7 @@ const PostList: React.FC<PostListProps> = ({ items, hasMore, loading, onLoadMore
       cover: item.pic,
       ownerName: item.author,
       ownerMid: item.mid,
+      duration: parseDuration(item.length),
     });
   }, []);
 
