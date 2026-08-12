@@ -15,12 +15,11 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
 > 标记说明：`[ ]` 待做 · `[进行中]` 正在做（同时最多一条）· `[x]` 已完成 ·
 > `[等 Win]` 要 Windows 才能验证 · `[阻塞]` 因其他原因卡住
 
-- [阻塞] 实机回归：v2.3.0 PC 两项（桌面歌词关闭重开位置 / 打开无白闪）+ Android Splash UI 视觉效果（无 Android 设备）
+- [阻塞] 实机回归：v2.3.0 PC 两项（桌面歌词关闭重开位置 / 打开无白闪）+ Android 共享 UI 逐屏走查（无 Android 设备）
 - [ ] Android 存储层 + Cookie 桥接（`@capacitor/preferences` + `CapacitorCookies`，代码已落主线，等实机回归通过后划掉）
-- [ ] Android 启动流程 + token 路由（splash → 登录 / 首页分支）
-- [ ] Android 登录页 UI（账号密码 + 短信验证码，省略扫码）
-- [ ] Android 后台播放 + MediaSession（通知栏 / 锁屏 / 耳机线控 / AudioFocus）
-- [ ] Android 各模块 UI 重写（首页 / 歌单 / 搜索 / 播放器，按 `docs/android/android-design/` 设计稿）
+- [ ] Android 后台播放 + MediaSession（通知栏 / 锁屏 / 耳机线控 / AudioFocus）—— **当前唯一阻塞性缺失**
+- [ ] Android 共享 UI 真机走查（触控热区 / 横向溢出 / 安全区遮挡，逐个补 `isAndroid` 分支）
+- [ ] Android 冷启动闪屏（`@capacitor/splash-screen`，纯原生配置）
 - [ ] Android 听歌识曲 WebView 端移植（剥离 `node-shazam` 的 Node 依赖，Web Audio 重采样）
 - [ ] Android Release 构建签名
 
@@ -73,6 +72,29 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
   播放进度脱节让人困惑）。**整体方案已撤**，下次别再走这条路；要做
   时间轴对齐换 ASR + DTW 方向，见 `docs/lyrics/lyrics-alignment-spec.md`
 
+### Android UI 路线
+**目标效果**：Android 端界面可用，且不额外制造一套需要长期维护的代码。
+
+**结论：共享 Electron 端那份 renderer，UI 不重写。** `capacitor.config.ts`
+的 `webDir: "dist/web"` 装的就是 Electron 端构建产物；形态差异用组件内
+`isAndroid` 分支处理（Layout 骨架、侧栏抽屉化、移动端顶栏、
+`playbar/android.tsx`、`full-screen-player/android.tsx`），能力差异下沉到
+`src/platform/android.ts`。细则见
+[`docs/android/Android 适配 TODO.md`](../android/Android%20适配%20TODO.md) 的「技术路线」。
+
+**已经否过的方向**：
+- `a33f62e` 「Android UI 从零重写」：在 `src/app.tsx` 里
+  `if (isAndroid) return <AndroidApp />` 早返到一棵独立路由树，配独立设计
+  token（`android-tokens.ts`）和从零搭的屏幕组件，参照一份 1.2MB 的单文件
+  HTML 设计稿。**已整体撤除**，原因有三：
+  ① 独立路由树只做到 Splash 一屏就搁置，而那句早返把此前 `fbb7b9c` 已完成
+  的全部共享组件适配架空了 —— Android 端实际只剩一个开屏页，歌单 / 播放器 /
+  搜索全部不可达；
+  ② 平行的设计 token 与 HeroUI / Tailwind 主题必然漂移，深色模式尤其对不齐；
+  ③ 同一份 renderer 后续还要供 Web / iOS 用，每端一套 UI 等于四份屎山。
+  下次别再走这条路；某个屏幕形态差异过大时，照 `playbar/android.tsx` 的样子
+  给那个组件加分支，而不是分叉整棵路由树。
+
 ### Android 后台播放 + MediaSession
 **目标效果**：锁屏继续播放；通知栏可控制（标题 / 歌手 / 封面 / 播放暂停 /
 上下首 / 进度）；耳机线控映射；切到其他 App / 来电时按 AudioFocus 规则
@@ -97,10 +119,11 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
 
 ## ✍️ 当前在做
 
-**整个阶段搁置**：手头没有 Android 设备 / 真机，模拟器 Splash + 持久化
+**整个阶段搁置**：手头没有 Android 设备 / 真机，共享 UI 逐屏走查 + 持久化
 全链路验证都跑不起来；PC 两项的实机回归同时延期等下次集中验证窗口。
 工作焦点切到 [`002-歌词时间轴对齐.md`](./002-歌词时间轴对齐.md)。
 
-拿到 Android 设备后重启的入口动作：装一个 release apk，启动看 Splash
-是否按设计稿渲染，再跑「登录 → token 写 Preferences → 杀进程重启 →
-自动登录」验证存储 + cookie 桥接。
+拿到 Android 设备后重启的入口动作：装一个 release apk，启动确认共享 UI
+正常渲染（顶栏 + 抽屉侧栏 + 移动端播放栏），再跑「登录 → token 写
+Preferences → 杀进程重启 → 自动登录」验证存储 + cookie 桥接；两项通过后
+直接开 MediaSession。
