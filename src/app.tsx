@@ -4,7 +4,7 @@ import { useHref, useNavigate, useRoutes } from "react-router";
 import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import moment from "moment";
 
-import platform, { isAndroid } from "@/platform";
+import platform from "@/platform";
 
 import { getCookitFromBSite } from "./common/utils/cookie";
 import {
@@ -16,7 +16,6 @@ import {
 import { toggleMiniMode } from "./common/utils/mini-player";
 import { mapKeyToElectronAccelerator } from "./common/utils/shortcut";
 import Theme from "./components/theme";
-import AndroidApp from "./pages/android";
 import routes from "./routes";
 import { useAppUpdateStore } from "./store/app-update";
 import { usePlayList } from "./store/play-list";
@@ -31,17 +30,15 @@ import "./app.css";
 moment.locale("zh-cn");
 
 /**
- * 顶层 App 仅做平台分叉。Electron / Android 两套 shell 几乎完全独立
- * （路由树、布局、主进程依赖、快捷键监听），混在同一个组件里会让
- * Hooks 列表在两端都跑一遍 — 无意义且维护成本高。早返分叉到位后，
- * 各端 useEffect 各自独立。
+ * 顶层 App 全平台共用一棵路由树与一套 shell，形态差异下沉到组件内的
+ * `isAndroid` 分支（见 `layout/index.tsx`、`layout/playbar`、`full-screen-player`）。
+ *
+ * 不要在这里按平台早返到独立的路由树 —— 那样会让移动端整棵共享 UI 失效，
+ * 等于把 Electron 端已实现的页面重做一遍。平台能力差异走 `platform/`，
+ * 移动端不存在的能力（快捷键、托盘、更新器等）在那里是 noop，
+ * 对应的 useEffect 挂上去也不会有副作用。
  */
 export function App() {
-  if (isAndroid) return <AndroidApp />;
-  return <ElectronApp />;
-}
-
-function ElectronApp() {
   const routeElement = useRoutes(routes);
   const navigate = useNavigate();
   const setUpdate = useAppUpdateStore(s => s.setUpdate);

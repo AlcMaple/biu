@@ -1,33 +1,36 @@
 # Biu Android 适配 TODO
 
 > Android 端定位：**保留基础必要功能，不追 Electron 广度**。整体参考网易云音乐做基础体验，但**只兜 Electron 应用已有的能力**——Electron 不存在的功能不在 Android 落地。
->
-> **本轮 UI 全部重新设计**：HTML 设计稿已就位（见下"UI 参考"），Electron 端已有的实现（store / service / IPC / 平台抽象 / 业务逻辑）可以**当作功能参考**直接复用，但 UI 层（页面、组件、样式、交互）**从零搭**，不复用现有 React 组件。
 
-## UI 参考
+## 技术路线（最重要的一节，动手前先读）
 
-本轮 Android UI 严格按下面的设计稿实现：
+**Android 与 Electron 共用同一份 renderer bundle，UI 层不重写。**
 
-| 文件 | 用途 |
-|---|---|
-| `docs/android/android-design/Biu Android (单文件).html` | 单文件 HTML 预览（内嵌 TSX + 全部组件源码，浏览器打开即可看所有屏幕，也是唯一保留的设计稿源） |
+`webDir: "dist/web"`（见 `capacitor.config.ts`）——Capacitor 装的就是 Electron 端那份构建产物。所以：
 
-> 早期拆分成多个 `.jsx` 的设计稿源文件已删除（Android 端本轮不实现，留着一堆碎文件没有维护意义）；单文件版本身就内嵌了全部组件代码，浏览器里搜索 `Screen*` / `const T =` 就能定位到对应部分，不影响后续按这份设计稿实现 UI。
+- **路由树只有一棵**：`src/routes.tsx`。不要按平台分叉出第二棵。
+- **形态差异下沉到组件内**，用 `isAndroid` 条件渲染，落在真正需要变形的那几处：
+  - `src/layout/index.tsx` — 移动端去掉常驻侧栏，改为顶栏 + 抽屉
+  - `src/layout/side/index.tsx` — 侧栏在移动端变 `Drawer`
+  - `src/layout/navbar/index.tsx` — 移动端顶栏（汉堡菜单 + 搜索）
+  - `src/layout/playbar/android.tsx`、`src/components/full-screen-player/android.tsx` — 差异大到值得独立组件的两处
+  - `src/pages/settings/index.tsx` 等 — 间距 / 尺寸微调
+- **能力差异下沉到 `src/platform/`**：`android.ts` 对移动端无意义的能力（托盘、窗口控制、全局快捷键、更新器、桌面歌词）返回 noop，调用方无需感知。
+- **Electron 独有的 UI 入口用 `isElectron` 隐藏**，不做半吊子降级实现。
 
-### 视觉系统速查（来自单文件 HTML 内嵌的 `T`）
+### ⚠️ 已经踩过的坑：不要再按平台分叉路由树
 
-- 主色 `#1ed760`（Spotify 绿）/ 主色文字 `#000`
-- 背景 `#0a0a0a` / 表面 `#18181b` / 表面提升 `#232328`
-- 文字 `#fafafa` / 次级 `#a1a1aa` / 微弱 `#71717a`
-- 圆角 `rSm 8` / `rMd 12` / `rLg 16`
-- 字体栈：PingFang SC → Hiragino Sans GB → Microsoft YaHei → 系统
+历史上有过一次「Android UI 从零重写」的尝试（`a33f62e`）：在 `src/app.tsx` 里 `if (isAndroid) return <AndroidApp />` 早返到一棵独立路由树，配一套独立的设计 token（`android-tokens.ts`）和从零搭的屏幕组件。
 
-### 全局结构
+结果：那棵独立路由树只做到 Splash 一屏就停了，而早返直接**架空了此前 `fbb7b9c` 已完成的全部共享组件适配**——Android 端跑起来只剩一个开屏页，歌单 / 播放器 / 搜索全部不可达。已于本次清理中撤销（删除 `src/pages/android/`、`src/common/styles/android-tokens.ts`、平台早返，以及配套的单文件 HTML 设计稿）。
 
-- 底部 4 Tab：**首页 / 歌单 / 搜索 / 我的**（`TabBar`）
-- 多数页面底部停驻 `MiniPlaybar`（封面 + 标题 + 播放/下一首/队列 + 进度细线）
-- 顶部统一 `TopBar`（`left` + `title/sub` + `right`）
-- 每屏幕外层用 `Phone`（含 `StatusBar` + `NavBar`）
+教训有三条：
+
+1. **重写 UI 的成本被严重低估**。Electron 端几十个页面 / 组件，从零搭一遍等于把项目重做，中途必然放弃，留下半成品垃圾。
+2. **平行的设计 token 一定会漂移**。`android-tokens.ts` 那套硬编码色板与 HeroUI / Tailwind 主题并存，两边各改各的，深色模式尤其对不齐。要调视觉就改主题，别另起一套。
+3. **同一份 renderer 还要供 Web / iOS 用**（见根 `CLAUDE.md` 的多端规划）。每分叉一个平台就多一套 UI 的话，四端就是四份屎山。
+
+> 如果将来确实有某个屏幕移动端形态差异过大，做法是**给那个组件加平台分支或独立子组件**（照 `playbar/android.tsx` 的样子），而不是分叉整棵路由树。
 
 ## 不做清单（明确省略）
 
@@ -43,6 +46,8 @@
 - 自定义封面、自定义歌手编辑、花式全屏播放器装饰
 - 首页音乐推荐与排行
 
+这些在 UI 上用 `isElectron` 隐藏入口即可，无需在 Android 侧写任何代码。
+
 ## 状态图例
 
 | 标记 | 含义 |
@@ -53,178 +58,87 @@
 
 ---
 
-## 零、启动流程
+## 零、平台基础设施
 
-> 用户打开 App 第一眼看到的画面，逻辑上先于所有其他模块。
->
-> **UI 参考**：单文件设计稿里的 `ScreenSplash`
+- [x] 平台抽象层（`src/platform/android.ts`）—— 能力接口按 `ElectronAPI` 齐平，无意义的返回 noop
+- [x] 存储持久化 —— `@capacitor/preferences`（key 前缀 `biu:`），覆盖 token / 本地歌单 / 设置 / 歌词缓存
+- [x] Cookie 桥接 —— `CapacitorCookies` 对准 `.bilibili.com`，与 `electron/ipc/cookie.ts` 对等
+- [x] HTTP 跨域 —— `CapacitorHttp` 启用（同时 patch 全局 fetch/XHR），渲染端 axios 经 `src/service/request/android-adapter.ts` 走原生通道
+- [x] B 站 CDN 请求 Referer 注入（`37fc190`）
+- [ ] 原生层冷启动闪屏 —— `@capacitor/splash-screen`，配 Biu 品牌静态帧（纯配置，无需 React 组件）
 
-启动包含两层：**原生层闪屏**（WebView 还没起来时由 OS 显示静态帧，避免白屏）+ **应用层闪屏**（WebView 起来后由 React 渲染的 Biu 品牌帧，期间做 token 检查与 store hydration，再决定跳哪个屏）。
+## 一、共享 UI 的移动端适配
 
-- [ ] 原生层冷启动闪屏 — `@capacitor/splash-screen`，配 Biu 品牌静态帧
-- [~] 应用层 Splash 屏（React）— 严格按 `ScreenSplash` 实现：（代码已落，**待视觉验证**）
-  - [~] Biu Logo（绿色渐变方块 + TV+播放键 SVG）
-  - [~] 主标 "Biu"
-  - [~] 副标 "基于 Bilibili 的音乐播放器"
-  - [~] 底部版本号 + "非官方 · 仅供学习研究"（版本号从 `package.json` 注入）
-- [ ] 启动路由：splash 期间检查 token 与 cookie 状态
-  - [ ] 有效 token → 进首页（`ScreenHome`）
-  - [ ] 无 token / token 失效 → 进登录页（`ScreenLoginPwd`）
-- [ ] Splash 显示时长：等待 store hydration（Preferences 读完）+ 最短显示时间（避免一闪而过显得突兀）
+> 这些**不是重写**，是在共享组件里补 `isAndroid` 分支。改动前先在 Electron 端确认组件现状。
 
----
+- [x] Layout 骨架 —— 顶栏 + 内容区 + 播放栏，侧栏改抽屉（`src/layout/index.tsx`）
+- [x] 侧栏抽屉化（`src/layout/side/index.tsx`）
+- [x] 移动端顶栏（`src/layout/navbar/index.tsx`）
+- [x] 迷你播放栏（`src/layout/playbar/android.tsx`）
+- [x] 全屏播放页（`src/components/full-screen-player/android.tsx`）
+- [x] 设置页移动端布局 + 隐藏快捷键 Tab（`src/pages/settings/index.tsx`）
+- [x] 歌曲列表项 / 播放队列抽屉的移动端形态
+- [ ] **真机走查**：逐屏在真机上过一遍，记录触控热区过小、横向溢出、安全区（刘海 / 手势条）遮挡等问题，逐个补分支
+- [ ] 下拉刷新手势同步 B 站收藏夹（Electron 端是按钮触发，移动端补手势）
+- [ ] 深色模式在真机的实际表现验证（`src/store/settings.ts` 的 `themeMode`）
 
-## 一、登录与账号
+## 二、原生能力（Electron 不存在，必须补）
 
-> Electron 端有扫码 / 账号密码 / 短信三种登录；移动端**省略扫码**（手机扫电脑屏才合理，反过来不实用）。
->
-> **UI 参考**：单文件设计稿里的 `ScreenLoginPwd`（账号密码） / `ScreenLoginSms`（短信验证码）
+### MediaSession —— 当前唯一的阻塞性缺失
 
-- [ ] 登录页 UI（账号密码 + 短信验证码）  
-  逻辑参考：`src/layout/navbar/login/password-login.tsx`、`code-login.tsx`、`src/store/user.ts`、`src/store/token.ts`
-- [ ] Token / Cookie 持久化  
-  - [ ] `@capacitor/preferences` 接入 `src/platform/android.ts` 的 `getStore/setStore/clearStore`
-  - [ ] `CapacitorCookies` 桥接 WebView 系统 cookie jar，让 `platform.getCookie/setCookie` 落到原生层
-  - [ ] 移除 `src/common/utils/cookie.ts` 的 `if (isAndroid) return false` 短路，跑通 refreshCookie 流程
-- [ ] 退出登录 + cookie 清理（清干净 `.bilibili.com` 域 + Preferences token）
+Electron 端用 Web `MediaSession` API；Android WebView 里不可靠，需 `@capacitor-community/media-session`。
 
-## 二、歌单模块
+- [ ] 通知栏 / 锁屏控制（标题 / 歌手 / 封面 / 播放暂停 / 上下首 / 进度）
+- [ ] 状态同步到 `audio.onplay/onpause/ondurationchange`
+- [ ] 耳机线控（headset hook / 媒体键映射）
+- [ ] 音频焦点 —— 来电 / 其他 App 抢占时自动暂停，恢复时按需恢复（该插件通常一并处理，需验证）
+- [ ] 后台存活策略验证（WebView 被系统回收时的表现）
 
-> **UI 参考**：单文件设计稿里的 `ScreenPlaylistList`（列表）/ `ScreenPlaylistDetail`（详情）/ `ScreenSongMenu`（三点菜单）/ `ScreenCreatePlaylist`（新建）
+> 这一项做完，Android 版才算「能当音乐播放器用」。优先级高于任何 UI 打磨。
 
-### 歌单列表页
+### 听歌识曲移植（低优先级）
 
-- [ ] 我的歌单总览（B 站收藏夹 + 本地收藏夹，按 Tab 区分）  
-  逻辑参考：`src/pages/video-collection/`、`src/store/favorite.ts`、`src/store/local-fav-items.ts`
-- [ ] 封面 / 名称 / 歌曲数 / 来源标识（B 站 / 本地）
-- [ ] 下拉刷新同步 B 站收藏夹（移动端手势，Electron 端是按钮触发）
+Electron 端用 `node-shazam`（内部 `shazamio-core` WASM + ffmpeg 做 WebM→WAV）；Android 需纯前端方案。
 
-### 歌单详情页
-
-- [ ] 封面 / 标题 / 描述 / 歌曲总数  
-  逻辑参考：`src/pages/video-collection/header.tsx`
-- [ ] 歌曲列表（歌名 / 歌手）
-- [ ] 播放全部 / 随机播放
-- [ ] 单曲点击播放
-- [ ] 三点菜单：
-  - [ ] 下一首播放
-  - [ ] 加入其他歌单 / 移动到本地收藏夹  
-    逻辑参考：`src/components/favorites-select-modal/`
-  - [ ] 删除（取消收藏）
-- [ ] 歌单内搜索过滤  
-  逻辑参考：`src/components/search-with-sort/`
-
-### 歌单管理
-
-- [ ] 新建本地歌单
-- [ ] 重命名 / 删除本地歌单
-- [ ] 歌曲在歌单间移动 / 复制（B 站源用多选复制，本地源用移动）
-
-## 三、播放器模块
-
-> **UI 参考**：单文件设计稿里的 `ScreenFullPlayer`（全屏播放）/ `ScreenQueueDrawer`（播放队列）/ `ScreenLockNotif`（锁屏 + 通知栏样式预览）；迷你播放栏见 单文件设计稿里的 `MiniPlaybar`
-
-### 渲染层（UI 重新设计）
-
-- [ ] 迷你播放栏（底部常驻：当前歌曲 + 播放/暂停 + 下一首）  
-  逻辑参考：`src/layout/playbar/index.tsx`
-- [ ] 全屏播放页（封面、歌名、歌手、进度条、控制按钮）  
-  逻辑参考：`src/components/full-screen-player/index.tsx`
-- [ ] 播放控制（播放/暂停 / 上一首/下一首 / 进度拖动）  
-  逻辑参考：`src/components/music-play-control/`、`src/components/music-play-progress/`
-- [ ] 四种播放模式（顺序 / 列表循环 / 随机 / 单曲循环）  
-  逻辑参考：`PlayMode.Sequence / Loop / Random / Single`，`src/components/music-play-mode/`
-- [ ] 播放队列查看与管理  
-  逻辑参考：`src/components/music-playlist-drawer/`
-
-### 原生层（Android 必须补，Electron 不存在）
-
-- [ ] **后台播放 + 通知栏控制（MediaSession）**  
-  Electron 端用 Web `MediaSession` API；Android WebView 里不可靠，需 `@capacitor-community/media-session`：
-  - 通知栏 / 锁屏控制（标题 / 歌手 / 封面 / 播放暂停 / 上下首 / 进度）
-  - 状态同步到 `audio.onplay/onpause/ondurationchange`
-- [ ] 锁屏控制（MediaSession 衍生）
-- [ ] 耳机线控（MediaSession 衍生：headset hook / 媒体键映射）
-- [ ] 音频焦点处理 — 来电 / 其他 App 抢占音频时自动暂停，焦点恢复时按需恢复  
-  通常 `@capacitor-community/media-session` 同时处理 audio focus，需验证
-
-## 四、听歌识曲模块
-
-> Electron 端用 Node 包 `node-shazam`（内部 `shazamio-core` WASM + ffmpeg WebM→WAV）；Android 需移植到 WebView 纯前端方案。
->
-> **UI 参考**：单文件设计稿里的 `ScreenShazamListen`（录音中）/ `ScreenShazamFound`（识别结果）/ `ScreenShazamHistory`（历史记录）
-
-- [ ] 识曲入口 UI（首页快捷按钮 / 麦克风图标）  
-  逻辑参考：`src/components/shazam-modal/`
-- [ ] 录音中状态 UI（动效）
-- [ ] 识别结果展示（歌曲信息、封面）
-- [ ] 识别失败重试
-- [ ] **WebView 端识曲底层移植**：
-  - [ ] 验证 `node-shazam` 入口能否剥离 Node 依赖；不行就降级到直接调 `shazamio-core` WASM
-  - [ ] WebM → 16kHz mono PCM 重采样改用 Web Audio API（避免引入 25MB 的 ffmpeg.wasm）
-  - [ ] 录音权限申请（`<uses-permission android:name="android.permission.RECORD_AUDIO" />`）
-
-## 五、搜索模块
-
-> **UI 参考**：单文件设计稿里的 `ScreenSearchEmpty`（搜索历史 + 热门）/ `ScreenSearchTyping`（输入联想）/ `ScreenSearchResults`（结果列表）
-
-- [ ] 搜索入口 / 输入框 UI  
-  逻辑参考：`src/pages/search/`、`src/components/search-button/`
-- [ ] 搜索建议 / 联想  
-  逻辑参考：`src/service/main-suggest.ts`
-- [ ] 搜索历史 + 清空（依赖 Preferences 持久化才有意义，否则杀进程即丢）  
-  逻辑参考：`src/store/search-history.ts`
-- [ ] 搜索结果点击播放
-- [ ] 搜索结果加入歌单  
-  逻辑参考：`src/components/favorites-select-modal/`
-
-## 六、基础体验
-
-> **UI 参考**：单文件设计稿里的 `ScreenHome`（首页）/ `ScreenEmpty`（空状态：`network` / `loading` / `empty` 三种 kind）。启动闪屏 `ScreenSplash` 见**零、启动流程**。
-
-- [ ] 首页布局（Android 首页：搜索栏 + 歌单入口 + 识曲入口；推荐 / 排行省略）
-- [ ] 网络异常 / 空状态 / 加载中占位 UI  
-  逻辑参考：`src/components/empty/`
-- [ ] 深色模式（系统主题感知 + Tailwind dark 类切换）  
-  逻辑参考：`src/store/settings.ts` 的 `themeMode`
-- [ ] 竖屏完整布局
-- [ ] HTTP 跨域（B 站 API 在 WebView 里 CORS 受限）
-  - [ ] CapacitorHttp 启用 + 渲染端 axios 适配  
-    逻辑参考：`src/service/request/android-adapter.ts`、`src/platform/http-android.ts`
-  - [ ] B 站 CDN 请求 Referer 注入  
-    逻辑参考：`37fc190` commit 的实现
+- [ ] 验证 `node-shazam` 入口能否剥离 Node 依赖；不行就直接调 `shazamio-core` WASM
+- [ ] WebM → 16kHz mono PCM 重采样改用 Web Audio API（避免引入 25MB 的 ffmpeg.wasm）
+- [ ] 录音权限申请（`<uses-permission android:name="android.permission.RECORD_AUDIO" />`）
+- [ ] 移植完成前，识曲入口在 Android 上保持隐藏
 
 ---
 
 ## 附录：Android 平台依赖一览
 
-各模块涉及的 Capacitor / 原生依赖集中索引，方便分批接入：
+| 依赖 | 用途 | 状态 |
+|---|---|---|
+| `@capacitor/preferences` | 登录态 / 本地歌单 / 搜索历史 / 应用设置持久化 | 已接入 |
+| `@capacitor/core`（CapacitorCookies）| WebView 系统 cookie jar 桥接 | 已接入 |
+| `@capacitor/core`（CapacitorHttp）| 绕过 WebView CORS 限制访问 B 站 API | 已接入 |
+| `@capacitor-community/media-session` | 后台播放、通知栏、锁屏、耳机线控、音频焦点 | 待接入 |
+| `@capacitor/splash-screen` | 冷启动闪屏 | 待接入 |
+| `shazamio-core` | 听歌识曲 WASM 指纹库（剥离 `node-shazam` 的 Node 依赖） | 待评估 |
+| Web Audio API | WebM 录音 → 16kHz mono PCM 重采样 | 待评估 |
+| Android Manifest | `RECORD_AUDIO` 权限 | 随识曲一起 |
 
-| 依赖 | 用途 |
-|---|---|
-| `@capacitor/preferences` | 登录态 / 本地歌单 / 搜索历史 / 应用设置持久化 |
-| `@capacitor/core`（CapacitorCookies）| WebView 系统 cookie jar 桥接 |
-| `@capacitor/core`（CapacitorHttp）| 绕过 WebView CORS 限制访问 B 站 API |
-| `@capacitor-community/media-session` | 后台播放、通知栏、锁屏、耳机线控、音频焦点 |
-| `shazamio-core` | 听歌识曲 WASM 指纹库（直引，剥离 `node-shazam` 的 Node 依赖） |
-| Web Audio API | WebM 录音 → 16kHz mono PCM 重采样 |
-| `@capacitor/splash-screen` | 冷启动闪屏 |
-| Android Manifest | `RECORD_AUDIO` 权限 |
-
-## 附录：Electron 侧路径速查（功能逻辑参考用）
+## 附录：关键路径速查
 
 | 文件 / 目录 | 说明 |
 |---|---|
+| `capacitor.config.ts` | Capacitor 配置（appId / `webDir` / 插件启用 / Live Reload） |
+| `android/` | Capacitor Android 工程（不进入 Windows 打包） |
 | `src/platform/detect.ts` | `isAndroid = !navigator.userAgent.includes("Electron")`（runtime UA 判定） |
-| `src/platform/android.ts` | Android 平台抽象实现（store / cookie / mediaSession / shazam 等） |
+| `src/platform/android.ts` | Android 平台能力实现（store / cookie / 其余 noop） |
 | `src/platform/http-android.ts` | Android HTTP 客户端封装 |
 | `src/service/request/android-adapter.ts` | 渲染端 axios → CapacitorHttp 适配 |
-| `src/store/play-list.ts` | 播放队列 / 播放模式 / audio.onerror 自动跳过 等核心逻辑 |
-| `src/store/play-progress.ts` | 播放进度 |
-| `src/store/local-fav-items.ts` | 本地收藏夹 |
-| `src/store/favorite.ts`、`src/store/fav-folder-items.ts` | B 站收藏夹 |
-| `src/store/search-history.ts` | 搜索历史 |
+| `src/layout/playbar/android.tsx` | 移动端迷你播放栏 |
+| `src/components/full-screen-player/android.tsx` | 移动端全屏播放页 |
+| `src/store/play-list.ts` | 播放队列 / 播放模式 / `audio.onerror` 自动跳过 |
 | `src/store/settings.ts` | 主题 / 深色模式 |
-| `src/service/` | 所有 B 站 API 封装 |
-| `capacitor.config.ts` | Capacitor 配置（appId / 插件启用） |
-| `android/` | Capacitor Android 工程（不进入 Windows 打包） |
+
+## 附录：开发与调试
+
+- 渲染层单独起：`pnpm dev:android`（设 `BIU_TARGET=android`，跳过 Electron 主进程编译）
+- Live Reload 真机联调：设 `BIU_DEV_URL` 指向本机 Rsbuild dev server，见 `capacitor.config.ts`
+- 构建产物同步进 Android 工程：`pnpm build:android`
+- 打开 Android Studio：`pnpm open:android`
+- 更多见 `docs/android/Android 调试.md`
