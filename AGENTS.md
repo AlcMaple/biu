@@ -17,7 +17,8 @@ Use Node `22.17.1` and pnpm `10.24.0`.
 - `pnpm build:android` builds the web bundle and syncs it into Capacitor.
 - `pnpm build:android:apk` generates an installable debug APK in `dist/artifacts/`.
 - `pnpm build:ios` builds the shared renderer and syncs it into the iOS project.
-- `pnpm build:web` creates renderer-only static assets in `dist/web/`.
+- `pnpm build:web` creates renderer assets in `dist/web/` and the same-origin BFF in `dist/server/`.
+- `pnpm start:web` serves the production Web renderer, authentication/API BFF, and media Range proxy together.
 - `pnpm test` runs Vitest in watch mode; use `pnpm run test -- --run` for a single CI-style pass.
 - `pnpm exec eslint .` checks TypeScript/JavaScript, and `pnpm knip` reports unused code and dependencies.
 
