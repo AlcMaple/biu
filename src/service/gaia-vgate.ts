@@ -2,7 +2,6 @@ import { apiRequest } from "./request";
 
 export interface GaiaVGateRegisterRequestParams {
   v_voucher: string;
-  csrf?: string;
 }
 
 export interface GaiaVGateRegisterResponse {
@@ -27,7 +26,6 @@ export interface GaiaVGateValidateRequestParams {
   token: string;
   validate: string;
   seccode: string;
-  csrf?: string;
 }
 
 export interface GaiaVGateValidateResponse {
@@ -48,6 +46,8 @@ export const postGaiaVGateRegister = (params: GaiaVGateRegisterRequestParams) =>
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
+    useFormData: true,
+    useOptionalCSRF: true,
   });
 };
 
@@ -59,5 +59,7 @@ export const postGaiaVGateValidate = (params: GaiaVGateValidateRequestParams) =>
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
+    useFormData: true,
+    useOptionalCSRF: true,
   });
 };

@@ -9,6 +9,7 @@ import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/common/utils/audio";
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
+import { isSamePlaybackUrl, normalizePlaybackUrl, sanitizePersistedPlaybackUrls } from "@/common/utils/playback-url";
 import { stripHtml } from "@/common/utils/str";
 import { formatUrlProtocol } from "@/common/utils/url";
 import platform from "@/platform";
@@ -322,7 +323,7 @@ export const usePlayList = create<State & Action>()(
         const { playId, list } = get();
         const currentPlayItem = list.find(item => item.id === playId);
         if (currentPlayItem?.source === "local" && currentPlayItem?.audioUrl) {
-          if (audio.src !== currentPlayItem.audioUrl) {
+          if (!isSamePlaybackUrl(audio.src, currentPlayItem.audioUrl)) {
             audio.src = currentPlayItem.audioUrl;
           }
           const currentTime = usePlayProgress.getState().currentTime;
@@ -332,7 +333,7 @@ export const usePlayList = create<State & Action>()(
           return;
         }
         if (isUrlValid(currentPlayItem?.audioUrl)) {
-          if (audio.src !== currentPlayItem.audioUrl) {
+          if (!isSamePlaybackUrl(audio.src, currentPlayItem.audioUrl)) {
             audio.src = currentPlayItem.audioUrl;
           }
           const currentTime = usePlayProgress.getState().currentTime;
@@ -344,8 +345,9 @@ export const usePlayList = create<State & Action>()(
 
         if (currentPlayItem?.type === "mv" && currentPlayItem?.bvid && currentPlayItem?.cid) {
           const mvPlayData = await getDashUrl(currentPlayItem.bvid, currentPlayItem.cid);
+          if (get().playId !== playId) return;
           if (mvPlayData?.audioUrl) {
-            if (audio.src !== mvPlayData.audioUrl) {
+            if (!isSamePlaybackUrl(audio.src, mvPlayData.audioUrl)) {
               audio.src = mvPlayData.audioUrl;
               const currentTime = usePlayProgress.getState().currentTime;
               if (typeof currentTime === "number") {
@@ -353,7 +355,7 @@ export const usePlayList = create<State & Action>()(
               }
             }
             set(state => {
-              const listItem = state.list.find(item => item.id === state.playId);
+              const listItem = state.list.find(item => item.id === playId);
               if (listItem) {
                 listItem.audioUrl = mvPlayData.audioUrl;
                 listItem.audioUrlCandidates = mvPlayData.audioUrlCandidates;
@@ -378,8 +380,9 @@ export const usePlayList = create<State & Action>()(
 
         if (currentPlayItem?.type === "audio" && currentPlayItem?.sid) {
           const musicPlayData = await getAudioUrl(currentPlayItem.sid);
+          if (get().playId !== playId) return;
           if (musicPlayData?.audioUrl) {
-            if (audio.src !== musicPlayData.audioUrl) {
+            if (!isSamePlaybackUrl(audio.src, musicPlayData.audioUrl)) {
               audio.src = musicPlayData.audioUrl;
               const currentTime = usePlayProgress.getState().currentTime;
               if (typeof currentTime === "number") {
@@ -387,7 +390,7 @@ export const usePlayList = create<State & Action>()(
               }
             }
             set(state => {
-              const listItem = state.list.find(item => item.id === state.playId);
+              const listItem = state.list.find(item => item.id === playId);
               if (listItem) {
                 listItem.audioUrl = musicPlayData.audioUrl;
                 listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
@@ -1404,11 +1407,15 @@ export const usePlayList = create<State & Action>()(
       name: "play-list-store",
       // v1：移除「顺序播放」（旧枚举值 1）。已持久化为顺序播放的机器回落到循环播放，
       // 否则 playMode=1 不再匹配任何分支，播完当前歌将无法自动续播。
-      version: 1,
+      // v2：同源媒体 token 只对当前 Web 服务进程有效，持久队列恢复时必须重新解析。
+      version: 2,
       migrate: (persisted, version) => {
-        const state = persisted as { playMode?: number } | undefined;
+        const state = persisted as { list?: PlayData[]; playMode?: number } | undefined;
         if (state && version < 1 && state.playMode === 1) {
           state.playMode = PlayMode.Loop;
+        }
+        if (state?.list && version < 2) {
+          state.list = state.list.map(sanitizePersistedPlaybackUrls);
         }
         return state as never;
       },
@@ -1418,7 +1425,7 @@ export const usePlayList = create<State & Action>()(
         playMode: state.playMode,
         rate: state.rate,
         duration: state.duration,
-        list: state.list,
+        list: state.list.map(sanitizePersistedPlaybackUrls),
         playId: state.playId,
         nextId: state.nextId,
         shouldKeepPagesOrderInRandomPlayMode: state.shouldKeepPagesOrderInRandomPlayMode,
@@ -1444,7 +1451,7 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
     failoverRefreshed = false;
   }
   if (failedSrc) {
-    failoverTriedUrls.add(failedSrc);
+    failoverTriedUrls.add(normalizePlaybackUrl(failedSrc));
   }
 
   const state = usePlayList.getState();
@@ -1456,10 +1463,10 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
 
   const resumeTime = usePlayProgress.getState().currentTime || 0;
 
-  const nextUrl = playItem.audioUrlCandidates?.find(url => !failoverTriedUrls.has(url));
+  const nextUrl = playItem.audioUrlCandidates?.find(url => !failoverTriedUrls.has(normalizePlaybackUrl(url)));
   if (nextUrl) {
-    log.warn("音频播放失败，自动切换备用地址重试", { playId, failedSrc, nextUrl });
-    failoverTriedUrls.add(nextUrl);
+    log.warn("音频播放失败，自动切换备用地址重试", { playId });
+    failoverTriedUrls.add(normalizePlaybackUrl(nextUrl));
     toastInfo("播放卡顿，正在切换播放源…");
     resumeAudioFrom(nextUrl, resumeTime);
     return true;
@@ -1467,10 +1474,10 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
 
   if (!failoverRefreshed) {
     failoverRefreshed = true;
-    log.warn("音频播放失败，候选地址已用尽，重新获取播放地址重试", { playId, failedSrc });
+    log.warn("音频播放失败，候选地址已用尽，重新获取播放地址重试", { playId });
     const refreshed = await refreshCurrentAudioSource();
-    if (refreshed && !failoverTriedUrls.has(audio.src)) {
-      failoverTriedUrls.add(audio.src);
+    if (refreshed && !failoverTriedUrls.has(normalizePlaybackUrl(audio.src))) {
+      failoverTriedUrls.add(normalizePlaybackUrl(audio.src));
       toastInfo("播放卡顿，正在重新获取播放源…");
       resumeAudioFrom(audio.src, resumeTime);
       return true;
@@ -1490,21 +1497,35 @@ function resumeAudioFrom(url: string, resumeTime: number) {
   void playAudioSafely();
 }
 
-async function refreshCurrentAudioSource(): Promise<boolean> {
-  const { getPlayItem } = usePlayList.getState?.() ?? {};
+const audioSourceRefreshFlights = new Map<string, Promise<boolean>>();
+
+export function refreshCurrentAudioSource(): Promise<boolean> {
+  const { getPlayItem, playId: requestedPlayId } = usePlayList.getState?.() ?? {};
   const playItem = getPlayItem?.();
+  if (!playItem || !requestedPlayId) return Promise.resolve(false);
 
-  if (!playItem) {
-    return false;
-  }
+  const existing = audioSourceRefreshFlights.get(requestedPlayId);
+  if (existing) return existing;
 
+  const refresh = resolveCurrentAudioSource(requestedPlayId, playItem).finally(() => {
+    if (audioSourceRefreshFlights.get(requestedPlayId) === refresh) {
+      audioSourceRefreshFlights.delete(requestedPlayId);
+    }
+  });
+  audioSourceRefreshFlights.set(requestedPlayId, refresh);
+  return refresh;
+}
+
+async function resolveCurrentAudioSource(requestedPlayId: string, playItem: PlayData): Promise<boolean> {
   try {
     if (playItem.type === "mv" && playItem.bvid && playItem.cid) {
       const mvPlayData = await getDashUrl(playItem.bvid, playItem.cid);
+      if (usePlayList.getState().playId !== requestedPlayId) return false;
       if (mvPlayData?.audioUrl) {
         audio.src = mvPlayData.audioUrl;
         usePlayList.setState(state => {
-          const listItem = state.list.find(item => item.id === state.playId);
+          if (state.playId !== requestedPlayId) return;
+          const listItem = state.list.find(item => item.id === requestedPlayId);
           if (listItem) {
             listItem.audioUrl = mvPlayData.audioUrl;
             listItem.audioUrlCandidates = mvPlayData.audioUrlCandidates;
@@ -1519,10 +1540,12 @@ async function refreshCurrentAudioSource(): Promise<boolean> {
 
     if (playItem.type === "audio" && playItem.sid) {
       const musicPlayData = await getAudioUrl(playItem.sid);
+      if (usePlayList.getState().playId !== requestedPlayId) return false;
       if (musicPlayData?.audioUrl) {
         audio.src = musicPlayData.audioUrl;
         usePlayList.setState(state => {
-          const listItem = state.list.find(item => item.id === state.playId);
+          if (state.playId !== requestedPlayId) return;
+          const listItem = state.list.find(item => item.id === requestedPlayId);
           if (listItem) {
             listItem.audioUrl = musicPlayData.audioUrl;
             listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
@@ -1612,6 +1635,7 @@ usePlayList.subscribe(async (state, prevState) => {
     usePlayProgress.getState().setCurrentTime(0);
     // 切换歌曲
     if (state.playId) {
+      const requestedPlayId = state.playId;
       const playItem = state.list.find(item => item.id === state.playId);
       if (playItem) {
         if (shouldReportPlayRecord(playItem)) {
@@ -1630,6 +1654,7 @@ usePlayList.subscribe(async (state, prevState) => {
       if (playItem?.type === "mv") {
         if (playItem?.bvid && playItem?.cid) {
           const mvPlayData = await getDashUrl(playItem.bvid, playItem.cid);
+          if (usePlayList.getState().playId !== requestedPlayId) return;
           if (mvPlayData?.audioUrl) {
             resetAudioAndPlay(mvPlayData?.audioUrl);
 
@@ -1640,7 +1665,8 @@ usePlayList.subscribe(async (state, prevState) => {
             });
 
             usePlayList.setState(state => {
-              const listItem = state.list.find(item => item.id === state.playId);
+              if (state.playId !== requestedPlayId) return;
+              const listItem = state.list.find(item => item.id === requestedPlayId);
               if (listItem) {
                 listItem.audioUrl = mvPlayData?.audioUrl;
                 listItem.audioUrlCandidates = mvPlayData?.audioUrlCandidates;
@@ -1663,25 +1689,24 @@ usePlayList.subscribe(async (state, prevState) => {
           }
         } else if (playItem?.bvid) {
           const mvData = await getMVData(playItem.bvid);
+          if (usePlayList.getState().playId !== requestedPlayId) return;
           const [firstMV, ...restMV] = mvData;
           if (firstMV?.cid) {
             const mvPlayData = await getDashUrl(playItem.bvid, firstMV.cid);
+            if (usePlayList.getState().playId !== requestedPlayId) return;
             if (mvPlayData?.audioUrl) {
-              resetAudioAndPlay(mvPlayData?.audioUrl);
-
-              updateMediaSession({
-                title: firstMV.pageTitle || firstMV.title,
-                artist: firstMV.ownerName,
-                cover: firstMV.pageCover,
-              });
-
+              let applied = false;
               usePlayList.setState(state => {
+                if (state.playId !== playItem.id) return;
                 const listItemIndex = state.list.findIndex(item => item.id === state.playId);
+                if (listItemIndex < 0) return;
                 state.list.splice(
                   listItemIndex,
                   1,
                   {
                     ...firstMV,
+                    // 保留占位项 id，避免解析多P后改变 playId 再触发一次订阅与媒体请求。
+                    id: playItem.id,
                     ...{
                       audioUrl: mvPlayData?.audioUrl,
                       audioUrlCandidates: mvPlayData?.audioUrlCandidates,
@@ -1692,8 +1717,16 @@ usePlayList.subscribe(async (state, prevState) => {
                   },
                   ...restMV,
                 );
-                state.playId = firstMV.id;
+                applied = true;
               });
+              if (!applied) return;
+
+              updateMediaSession({
+                title: firstMV.pageTitle || firstMV.title,
+                artist: firstMV.ownerName,
+                cover: firstMV.pageCover,
+              });
+              resetAudioAndPlay(mvPlayData?.audioUrl);
             } else {
               log.error("无法获取音频播放链接", {
                 type: "mv",
@@ -1722,6 +1755,7 @@ usePlayList.subscribe(async (state, prevState) => {
 
       if (playItem?.type === "audio" && playItem?.sid) {
         const musicPlayData = await getAudioUrl(playItem.sid);
+        if (usePlayList.getState().playId !== requestedPlayId) return;
         if (musicPlayData?.audioUrl) {
           resetAudioAndPlay(musicPlayData?.audioUrl);
 
@@ -1732,7 +1766,8 @@ usePlayList.subscribe(async (state, prevState) => {
           });
 
           usePlayList.setState(state => {
-            const listItem = state.list.find(item => item.id === state.playId);
+            if (state.playId !== requestedPlayId) return;
+            const listItem = state.list.find(item => item.id === requestedPlayId);
             if (listItem) {
               listItem.audioUrl = musicPlayData?.audioUrl;
               listItem.audioUrlCandidates = musicPlayData?.audioUrlCandidates;
