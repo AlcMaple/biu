@@ -55,7 +55,7 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5678,
     strictPort: true,
-    printUrls: false,
+    printUrls: process.env.BIU_TARGET === "web",
     open: false,
     compress: false,
   },
