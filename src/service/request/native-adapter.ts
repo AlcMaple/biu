@@ -35,7 +35,7 @@ const normalizeHeaders = (raw: unknown): Record<string, string> => {
   return out;
 };
 
-export const androidAdapter: AxiosAdapter = async config => {
+export const nativeAdapter: AxiosAdapter = async config => {
   const baseURL = config.baseURL ?? "";
   const path = config.url ?? "";
   const url = /^https?:\/\//.test(path) ? path : `${baseURL}${path}`;

@@ -7,7 +7,7 @@
 
 - ❌ 渲染进程直接用 axios 发需要 cookie / UA 伪装的 B 站请求
   后果：WebView 有 CORS，且带不上登录 cookie / 签名头，请求要么被拦要么拿到匿名结果。
-  ✅ Electron 上走 main IPC（`got` v14，无 CORS 限制，见 `src/service/request/`）；Android 上走 `service/request/android-adapter.ts`（Capacitor HTTP 绕过 WebView CORS）。WBI 签名统一在 `electron/network/`。
+  ✅ Electron 上走 main IPC（`got` v14，无 CORS 限制，见 `src/service/request/`）；Android / iOS 原生端走 `service/request/native-adapter.ts`（Capacitor HTTP 绕过 WebView CORS）。WBI 签名统一在 `electron/network/`。
 
 - ❌ 选流时直接用 playurl 返回的第一个 `baseUrl`
   后果：真实事故——B 站 playurl 的 baseUrl 常是 `mcdn` / `szbdyd` 这类 PCDN 节点，Clash 等代理下会卡死/超时，表现为「能拿到流但播不动」。
@@ -85,13 +85,13 @@
 
 - ❌ 新增持久化状态时只接一端（只写 Electron 的 `electron-store`，忘了 Android）
   后果：同一份状态 Android 上不落盘，重启即丢。
-  ✅ 一律走 `platform.getStore/setStore/clearStore`——Electron 落 `electron-store`，Android 落 `@capacitor/preferences`（`biu:` 前缀），两端自动通。新增 store 参考 `src/store/` 现有写法。
+  ✅ 一律走 `platform.getStore/setStore/clearStore`——Electron 落 `electron-store`，Android / iOS 落 `@capacitor/preferences`（`biu:` 前缀），各端自动通。新增 store 参考 `src/store/` 现有写法。
 
 ## UI / 样式
 
 - ❌ 在共享渲染层新增只靠 `hover` / Tooltip / DOM `title` 才能发现或执行的操作
   后果：Web 版统一关闭悬停反馈；Tailwind 和 HeroUI 样式会被根平台标记门控，隐藏按钮将永久不可达，Tooltip 里的滑块或菜单也打不开。
-  ✅ `hover:` 只作为 Electron/Android 的附加反馈；操作本身必须在 Web 常显或通过点击 Popover 可达。提示型 Tooltip 使用 `PlatformTooltip` / `IconButton tooltip`，交互型浮层显式写 `isWeb` 点击分支；不要用全局事件拦截破坏拖拽、长按取消和 `focus-visible`。
+  ✅ `hover:` 只作为 Electron / 原生移动端的附加反馈；操作本身必须在 Web 常显或通过点击 Popover 可达。提示型 Tooltip 使用 `PlatformTooltip` / `IconButton tooltip`，交互型浮层显式写 `isWeb` 点击分支；不要用全局事件拦截破坏拖拽、长按取消和 `focus-visible`。
 
 - ❌ 选中态 / hover 态切换时改变盒模型尺寸（只在选中态加 border、加粗字重、改 padding）
   后果：相邻元素被挤一下，出现布局抖动，chip / tab / 歌单列表项 / 播放列表高发（本项目此类组件密集）。
@@ -105,15 +105,15 @@
 
 - ❌ 运行时用 `BIU_TARGET` 判断当前是不是 Android / Web，或继续把所有非 Electron 环境都当成 Android
   后果：`BIU_TARGET` 只是 Rsbuild 插件的**构建期**变量；普通浏览器会误用 Capacitor HTTP 和移动端布局，Android 浏览器也会被误认为原生 App。
-  ✅ 运行时统一读取 `src/platform/detect.ts` 的 `isElectron` / `isAndroid` / `isWeb`：Electron 看 UA，Android 还必须命中 Capacitor 原生桥，其余才是 Web；平台能力统一从 `src/platform/index.ts` 的 `platform` 对象取。
+  ✅ 运行时统一读取 `src/platform/detect.ts` 的 `isElectron` / `isAndroid` / `isIOS` / `isNativeMobile` / `isWeb`：Electron 看 UA，Android / iOS 还必须命中对应的 Capacitor 原生桥，其余才是 Web；移动端共享 UI 用 `isNativeMobile`，真正的平台差异才用 `isAndroid` / `isIOS`。
 
 - ❌ 新增 IPC channel 只改一两处
   后果：类型对不上、preload 没暴露、或 Android 上调到不存在的方法直接崩。
-  ✅ 五处齐改（单一事实源见 `CLAUDE.md`）：`electron/ipc/channel.ts` → `electron/ipc/<topic>.ts` handler → `electron/ipc/index.ts` 注册 → `electron/preload.ts` 暴露 → `shared/types/renderer.d.ts` 补类型。Android 也可达的话，`src/platform/android.ts` 加一条（常是 noop）以满足 Platform 类型。
+  ✅ 五处齐改（单一事实源见 `CLAUDE.md`）：`electron/ipc/channel.ts` → `electron/ipc/<topic>.ts` handler → `electron/ipc/index.ts` 注册 → `electron/preload.ts` 暴露 → `shared/types/renderer.d.ts` 补类型。原生移动端也可达的话，`src/platform/mobile.ts` 加一条（常是 noop）以满足 Platform 类型。
 
-- ❌ 假设 Android 平台层某个 native 能力已经通了
-  后果：storage / cookie 已实现，但 Shazam、MediaSession（后台播放 / 通知 / 锁屏 / 耳机键）、字体、窗口控制、下载等**仍是 noop**，当成能用会静默无效果。
-  ✅ 除 storage / cookie 外，任何 Android native 能力先当作未实现，验证过再用（见 `CLAUDE.md` Gotchas）。
+- ❌ 假设原生移动平台层某个 native 能力已经通了
+  后果：storage / cookie / HTTP 已接入，但 Shazam、MediaSession（后台播放 / 通知 / 锁屏 / 耳机键 / AudioFocus）、字体、窗口控制、下载等**仍是 noop**，当成能用会静默无效果。
+  ✅ 除 storage / cookie / HTTP 外，任何 Android / iOS native 能力先当作未实现，且必须分别在对应平台验证（见 `CLAUDE.md` Gotchas）。
 
 ## 桌面歌词窗口（严格规则）
 
@@ -134,12 +134,12 @@
 
 ## 技术栈与架构边界
 
-- 构建用 Rsbuild + 自定义 `pluginElectron`（`plugins/`），不换 webpack / Vite——一套配置管三窗 + Android，electron-builder 配置写死在 `plugins/electron-build.ts`。
+- 构建用 Rsbuild + 自定义 `pluginElectron`（`plugins/`），不换 webpack / Vite——一套配置管三窗 + Android + iOS + Web，electron-builder 配置写死在 `plugins/electron-build.ts`。
 - TypeScript 5 `strict`，不关 strict、不甩 `any`——类型是唯一防线。
 - UI 用 React 19 + TailwindCSS 4 + HeroUI 函数组件 + hooks，不加新 UI 库 / CSS-in-JS / class 组件——两套风格混用心智翻倍。动画统一 framer-motion。
 - 状态管理用 Zustand（`src/store/`），持久化一律走 `platform.getStore/setStore`，不另起一套状态库 / 直接读写 localStorage。
-- HTTP：主进程 `got` v14；渲染进程 `axios`（`src/service/request/`）；Android 走 `android-adapter`（Capacitor HTTP）。抓取需要 cookie / UA 的走 IPC，不在渲染进程裸发。
-- 一份渲染 bundle 跑 3 个 Electron 窗（main / mini-player / desktop-lyrics）+ Android WebView，靠 hash route（`/`、`#mini-player`、`#desktop-lyrics`）区分；跨窗同步用 `BroadcastChannel`（渲染 ↔ 渲染）+ IPC 事件（主 ↔ 渲染），不自造第二套通道。
+- HTTP：主进程 `got` v14；渲染进程 `axios`（`src/service/request/`）；Android / iOS 走 `native-adapter`（Capacitor HTTP）。抓取需要 cookie / UA 的走 IPC，不在渲染进程裸发。
+- 一份渲染 bundle 跑 3 个 Electron 窗（main / mini-player / desktop-lyrics）+ Android / iOS WebView + Web，靠 hash route（`/`、`#mini-player`、`#desktop-lyrics`）区分；跨窗同步用 `BroadcastChannel`（渲染 ↔ 渲染）+ IPC 事件（主 ↔ 渲染），不自造第二套通道。
 - 测试用 Vitest + jsdom（`tests/`，globals 开启，`tests/setup.ts` mock 了 MediaSession / audio），新测试放 `tests/`。
 - 渲染进程不碰网络 / 文件 / Node API，一律走 IPC——渲染层只能请求 IPC 写死的能力，读任意文件 / 执行任意命令这种做不到，是安全边界。
 - 不为不存在的需求（多租户、插件系统等）预留扩展点——YAGNI。

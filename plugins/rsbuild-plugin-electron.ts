@@ -5,7 +5,7 @@ import { buildElectron } from "./electron-build";
 import { buildElectronConfig } from "./electron-config-build";
 import { startElectronDev } from "./electron-dev";
 
-const isElectronTarget = () => !["android", "web"].includes(process.env.BIU_TARGET ?? "");
+const isElectronTarget = () => !["android", "ios", "web"].includes(process.env.BIU_TARGET ?? "");
 
 export const pluginElectron = (): RsbuildPlugin => ({
   name: "plugin-electron",

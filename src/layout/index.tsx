@@ -13,7 +13,7 @@ import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
-import { isAndroid, log } from "@/platform";
+import { isNativeMobile, log } from "@/platform";
 import { initLocalPlaylistSync } from "@/service/sync";
 import { useUser } from "@/store/user";
 
@@ -41,15 +41,15 @@ const Layout = () => {
       }}
     >
       <SideDrawerContext.Provider value={{ openSideDrawer }}>
-        {isAndroid ? (
-          <div className="flex h-full flex-col">
-            <div className="h-16 w-full flex-none">
+        {isNativeMobile ? (
+          <div className="flex h-full flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+            <div className="h-[calc(4rem+env(safe-area-inset-top))] w-full flex-none pt-[env(safe-area-inset-top)]">
               <Navbar />
             </div>
             <div className="min-h-0 w-full flex-1 overflow-hidden">
               <Outlet />
             </div>
-            <div className="relative z-50 h-[88px] w-full flex-none shadow-2xl">
+            <div className="relative z-50 h-[calc(88px+env(safe-area-inset-bottom))] w-full flex-none pb-[env(safe-area-inset-bottom)] shadow-2xl">
               <PlayBar />
             </div>
             <SideNav isDrawerOpen={isSideDrawerOpen} onDrawerOpenChange={onSideDrawerOpenChange} />

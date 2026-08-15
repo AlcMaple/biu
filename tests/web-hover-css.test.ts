@@ -58,7 +58,7 @@ describe("hover platform marker", () => {
   const originalUserAgent = navigator.userAgent;
   const originalCapacitor = Reflect.get(globalThis, "Capacitor");
 
-  const setRuntime = (userAgent: string, platform?: "android", native = false) => {
+  const setRuntime = (userAgent: string, platform?: "android" | "ios", native = false) => {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: userAgent });
     if (platform) {
       Reflect.set(globalThis, "Capacitor", {
@@ -93,6 +93,13 @@ describe("hover platform marker", () => {
       native: true,
       platform: "android" as const,
       userAgent: "Mozilla/5.0 Linux; Android 16",
+    },
+    {
+      expectedMarker: "enabled",
+      label: "native iOS",
+      native: true,
+      platform: "ios" as const,
+      userAgent: "Mozilla/5.0 iPhone",
     },
   ])("sets the root marker before React for $label", async ({ expectedMarker, native, platform, userAgent }) => {
     const markerAtCreateRoot: Array<string | undefined> = [];

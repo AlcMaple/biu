@@ -5,7 +5,7 @@ import { RiMenuLine } from "@remixicon/react";
 import clx from "classnames";
 
 import ShazamModal from "@/components/shazam-modal";
-import platform, { isAndroid, isElectron } from "@/platform";
+import platform, { isElectron, isNativeMobile } from "@/platform";
 import { useUser } from "@/store/user";
 
 import WindowAction from "../../components/window-action";
@@ -27,7 +27,7 @@ const LayoutNavbar = () => {
 
   const isNoDrag = isSearchFocused || isUserDropdownOpen;
 
-  if (isAndroid) {
+  if (isNativeMobile) {
     return (
       <div className="flex h-full items-center gap-2 px-2">
         <Button isIconOnly variant="light" size="sm" aria-label="打开菜单" onPress={() => sideDrawer?.openSideDrawer()}>

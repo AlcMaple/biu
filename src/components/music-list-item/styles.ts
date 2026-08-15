@@ -1,7 +1,7 @@
-import { isAndroid } from "@/platform";
+import { isNativeMobile } from "@/platform";
 
 export const getMusicListItemGrid = (isCompact?: boolean, hidePubTime?: boolean) => {
-  if (isAndroid) {
+  if (isNativeMobile) {
     return "grid-cols-[auto_1fr_auto]";
   }
   return isCompact

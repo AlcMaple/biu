@@ -5,7 +5,7 @@ import { Tab, Tabs } from "@heroui/react";
 import { useShallow } from "zustand/react/shallow";
 
 import ScrollContainer from "@/components/scroll-container";
-import platform, { isAndroid } from "@/platform";
+import platform, { isNativeMobile } from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useSettings } from "@/store/settings";
 
@@ -122,14 +122,22 @@ const SettingsPage = () => {
 
   return (
     <ScrollContainer enableBackToTop className="h-full w-full">
-      <div className={isAndroid ? "m-auto mb-6 w-full max-w-[900px] px-4 py-4" : "m-auto mb-6 max-w-[900px] px-8 py-4"}>
+      <div
+        className={
+          isNativeMobile ? "m-auto mb-6 w-full max-w-[900px] px-4 py-4" : "m-auto mb-6 max-w-[900px] px-8 py-4"
+        }
+      >
         <div className="space-y-6">
-          {!isAndroid && <h1>设置</h1>}
+          {!isNativeMobile && <h1>设置</h1>}
           <Tabs
             aria-label="设置选项"
-            classNames={{ panel: "px-1 py-0", cursor: "rounded-medium", tabList: isAndroid ? "overflow-x-auto" : "" }}
-            fullWidth={isAndroid}
-            size={isAndroid ? "sm" : "md"}
+            classNames={{
+              panel: "px-1 py-0",
+              cursor: "rounded-medium",
+              tabList: isNativeMobile ? "overflow-x-auto" : "",
+            }}
+            fullWidth={isNativeMobile}
+            size={isNativeMobile ? "sm" : "md"}
           >
             <Tab key="system" title="常规设置">
               <SystemSettingsTab {...system} />
@@ -137,7 +145,7 @@ const SettingsPage = () => {
             <Tab key="menu" title="菜单设置">
               <MenuSettings control={system.control} />
             </Tab>
-            {!isAndroid && (
+            {!isNativeMobile && (
               <Tab key="shortcut" title="快捷键设置">
                 <ShortcutSettingsPage />
               </Tab>

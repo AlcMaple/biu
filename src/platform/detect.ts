@@ -11,7 +11,9 @@ const getCapacitorRuntime = (): CapacitorRuntime | undefined => {
 export const isElectron = typeof navigator !== "undefined" && navigator.userAgent.includes("Electron");
 
 const capacitor = getCapacitorRuntime();
-export const isAndroid =
-  !isElectron && capacitor?.getPlatform?.() === "android" && capacitor.isNativePlatform?.() === true;
+const nativePlatform = !isElectron && capacitor?.isNativePlatform?.() === true ? capacitor.getPlatform?.() : undefined;
 
-export const isWeb = !isElectron && !isAndroid;
+export const isAndroid = nativePlatform === "android";
+export const isIOS = nativePlatform === "ios";
+export const isNativeMobile = isAndroid || isIOS;
+export const isWeb = !isElectron && !isNativeMobile;

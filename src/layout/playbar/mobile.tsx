@@ -10,7 +10,7 @@ import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
-const AndroidPlayBar = () => {
+const MobilePlayBar = () => {
   const list = usePlayList(s => s.list);
   const playId = usePlayList(s => s.playId);
   const togglePlay = usePlayList(s => s.togglePlay);
@@ -77,4 +77,4 @@ const AndroidPlayBar = () => {
   );
 };
 
-export default AndroidPlayBar;
+export default MobilePlayBar;

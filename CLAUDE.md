@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Biu — Bilibili-API-based cross-platform music player. Electron (desktop) + Capacitor (Android) + Web. React 19 + Rsbuild for the renderer; the same renderer source and route tree ship to all platforms. License is PolyForm Noncommercial 1.0.0.
+Biu — Bilibili-API-based cross-platform music player. Electron (desktop) + Capacitor (Android / iOS) + Web. React 19 + Rsbuild for the renderer; the same renderer source and route tree ship to all platforms. License is PolyForm Noncommercial 1.0.0.
 
 Package manager is **pnpm 10.24.0**, Node **22.17.1** (enforced by `engines`).
 
@@ -16,11 +16,15 @@ Package manager is **pnpm 10.24.0**, Node **22.17.1** (enforced by `engines`).
 |---|---|
 | Dev (Electron) | `pnpm dev` |
 | Dev (Android renderer only) | `pnpm dev:android` (sets `BIU_TARGET=android`, skips Electron compile) |
+| Dev (iOS renderer only) | `pnpm dev:ios` (sets `BIU_TARGET=ios`, skips Electron compile) |
 | Dev (Web renderer only) | `pnpm dev:web` (sets `BIU_TARGET=web`, skips Electron compile) |
 | Production build (Electron, full installer) | `pnpm build` |
 | Production build (Web static assets) | `pnpm build:web` |
 | Sync built renderer into Android project | `pnpm build:android` |
+| Build installable Android debug APK | `pnpm build:android:apk` |
+| Sync built renderer into iOS project | `pnpm build:ios` |
 | Open Android Studio | `pnpm open:android` |
+| Open iOS project | `pnpm open:ios` |
 | All tests (CI-style single pass) | `pnpm run test -- --run` (`pnpm test` alone starts vitest **watch mode**) |
 | Single test | `pnpm run test -- --run play-list.test.ts` (vitest pattern match) |
 | Lint | `pnpm exec eslint .` (fix a file: `pnpm exec eslint --fix <file>`) |
@@ -30,12 +34,12 @@ Package manager is **pnpm 10.24.0**, Node **22.17.1** (enforced by `engines`).
 ### How `pnpm dev` actually works
 This is non-obvious — there is no separate "build main process" step. The chain:
 1. `rsbuild dev` starts the renderer dev server on port **5678** (`writeToDisk: true` so Electron can `file://` load).
-2. The custom `pluginElectron` (`plugins/rsbuild-plugin-electron.ts`) hooks `onAfterDevCompile`. **Skipped when `BIU_TARGET=android` or `BIU_TARGET=web`.**
+2. The custom `pluginElectron` (`plugins/rsbuild-plugin-electron.ts`) hooks `onAfterDevCompile`. **Skipped when `BIU_TARGET=android`, `ios`, or `web`.**
 3. On first compile it runs Rollup (`plugins/electron-config-build.ts`) to bundle `electron/main.ts` → `.electron/main.mjs` (ESM) and `electron/preload.ts` → `.electron/preload.cjs` (CJS).
 4. `plugins/electron-dev.ts` then `spawn`s Electron pointing at `.electron/main.mjs`, and a chokidar watcher restarts it on any change under `electron/`.
 
 ### How `pnpm build` actually works
-Same plugin, different hooks: default `pnpm build` compiles the main/preload bundles, builds the renderer to `dist/web/`, then invokes electron-builder. **electron-builder config is hard-coded inside `plugins/electron-build.ts`** (no `electron-builder.json`). Output: `dist/artifacts/`. `build:web` and `build:android` are renderer-only targets and skip both Electron hooks.
+Same plugin, different hooks: default `pnpm build` compiles the main/preload bundles, builds the renderer to `dist/web/`, then invokes electron-builder. **electron-builder config is hard-coded inside `plugins/electron-build.ts`** (no `electron-builder.json`). Output: `dist/artifacts/`. `build:web`, `build:android`, and `build:ios` are renderer-only targets and skip both Electron hooks.
 
 ### Windows first-time setup
 **Run `node dev_tools/setup-win.js` instead of `pnpm install`** on a fresh Windows box. It rewrites Git protocol (avoids SSH), configures pnpm mirrors, and pre-fetches Electron binaries. Idempotent — re-runnable. See `docs/windows/Windows-依赖管理指南.md` for dependency/env troubleshooting.
@@ -44,17 +48,18 @@ Same plugin, different hooks: default `pnpm build` compiles the main/preload bun
 
 ### Three processes, one renderer bundle
 - **Electron main** (`electron/`) — IPC handlers, native APIs, window management, downloads.
-- **Renderer** (`src/`) — React 19 + Zustand + TailwindCSS 4 + HeroUI. **One shared source and route tree** is built for 3 Electron windows (main, mini-player, desktop-lyrics), Capacitor Android, and ordinary Web. Windows differ only by hash route (`/`, `#mini-player`, `#desktop-lyrics`).
-- **Android (Capacitor)** — wraps the same `dist/web/` renderer in a WebView.
+- **Renderer** (`src/`) — React 19 + Zustand + TailwindCSS 4 + HeroUI. **One shared source and route tree** is built for 3 Electron windows (main, mini-player, desktop-lyrics), Capacitor Android / iOS, and ordinary Web. Windows differ only by hash route (`/`, `#mini-player`, `#desktop-lyrics`).
+- **Android / iOS (Capacitor)** — wrap the same `dist/web/` renderer in native WebViews and share the mobile layout / platform adapter.
 - **Web** — deploys the renderer-only `dist/web/` output and uses the Web platform adapter.
 
 ### Platform abstraction (the linchpin)
-At runtime, `src/platform/detect.ts` distinguishes Electron, native Capacitor Android, and ordinary Web; everything else in the platform layer flows from this:
-- `src/platform/index.ts` exports a single `platform` object that picks `electron.ts`, `android.ts`, or `web.ts` (only the native Android HTTP branch dynamically imports `http-android`).
+At runtime, `src/platform/detect.ts` distinguishes Electron, native Capacitor Android / iOS, and ordinary Web; everything else in the platform layer flows from this:
+- `src/platform/index.ts` exports a single `platform` object that picks `electron.ts`, `mobile.ts`, or `web.ts` (only the native mobile HTTP branch dynamically imports `http-native`).
 - `src/platform/electron.ts` is a thin pass-through to `window.electron` (the preload bridge).
-- `src/platform/android.ts` has **real implementations for storage and cookies** (`getStore/setStore/clearStore` via `@capacitor/preferences`, `getCookie/setCookie` via `CapacitorCookies`); most other methods (`recognizeSong`, MediaSession, fonts, window controls, downloads, etc.) are still noops — see Gotchas below.
+- `src/platform/mobile.ts` has **real implementations for storage and cookies** (`getStore/setStore/clearStore` via `@capacitor/preferences`, `getCookie/setCookie` via `CapacitorCookies`); most other methods (`recognizeSong`, MediaSession, fonts, window controls, downloads, etc.) are still noops — see Gotchas below.
 - `src/platform/web.ts` persists shared stores in origin-scoped `localStorage`, opens safe HTTP(S) links with the browser, and returns explicit no-op values for native-only APIs.
-- `BIU_TARGET=android|web` is **only a build-time env var** for the Rsbuild plugin. Never branch on it at runtime; it doesn't exist in the renderer bundle.
+- `isNativeMobile` selects shared Android / iOS layout behavior; use `isAndroid` or `isIOS` only for an actual OS difference.
+- `BIU_TARGET=android|ios|web` is **only a build-time env var** for the Rsbuild plugin. Never branch on it at runtime; it doesn't exist in the renderer bundle.
 
 ### The IPC contract — 5 places to touch when adding a channel
 1. `electron/ipc/channel.ts` — add the channel name (single source of truth).
@@ -63,19 +68,19 @@ At runtime, `src/platform/detect.ts` distinguishes Electron, native Capacitor An
 4. `electron/preload.ts` — expose the API method via `contextBridge` (uses `ipcRenderer.invoke` / `send` / `on`).
 5. `shared/types/renderer.d.ts` — add the typed signature on the `ElectronAPI` interface.
 
-If the API is also reachable from Android, also add an entry (often a noop) to `src/platform/android.ts` to satisfy the Platform type.
+If the API is also reachable from native mobile, also add an entry (often a noop) to `src/platform/mobile.ts` to satisfy the Platform type.
 
 ### Multi-window sync
 The three Electron windows share renderer state via Zustand stores. Cross-window communication uses **`BroadcastChannel`** (renderer ↔ renderer) and **IPC events** (main ↔ renderer). Examples: download progress (`channel.download.sync`), desktop-lyrics broadcaster (`src/components/lyrics/broadcaster.tsx`), playback-state forwarding to mini player.
 
 ### HTTP — main vs renderer
 - Main process: **`got` v14** (`got.get(url).json<T>()`, `got.stream(url, opts)`). No CORS issues.
-- Renderer: **`axios`** in `src/service/request/`. On Electron, requests that need cookies/UA-spoofing typically go through main IPC; on Android, `service/request/android-adapter.ts` uses Capacitor HTTP to bypass WebView CORS; ordinary Web uses the browser transport and therefore remains subject to browser CORS/cookie rules.
+- Renderer: **`axios`** in `src/service/request/`. On Electron, requests that need cookies/UA-spoofing typically go through main IPC; on Android / iOS, `service/request/native-adapter.ts` uses Capacitor HTTP to bypass WebView CORS; ordinary Web uses the browser transport and therefore remains subject to browser CORS/cookie rules.
 - Bilibili API signing (WBI) lives in `electron/network/`.
 - **Never fire cookie/UA-dependent Bilibili requests with raw renderer axios** — WebView CORS blocks them and login cookies/signatures won't attach.
 
 ### Zustand stores
-Top-level stores in `src/store/` cover playback (`play-list`, `play-progress`, `lyrics-state`), session (`token`, `user`), persisted user data (`local-fav-items`, `settings`, `search-history`), and shortcuts. **Persistence on Electron** goes through `platform.getStore/setStore` → IPC → `electron-store`; **on Android** the same calls hit `@capacitor/preferences`; **on Web** the adapter uses origin-scoped `localStorage`. Always persist through `platform.*`, never access the backend directly from stores. Modal-only stores live under `src/store/modal/`.
+Top-level stores in `src/store/` cover playback (`play-list`, `play-progress`, `lyrics-state`), session (`token`, `user`), persisted user data (`local-fav-items`, `settings`, `search-history`), and shortcuts. **Persistence on Electron** goes through `platform.getStore/setStore` → IPC → `electron-store`; **on Android / iOS** the same calls hit `@capacitor/preferences`; **on Web** the adapter uses origin-scoped `localStorage`. Always persist through `platform.*`, never access the backend directly from stores. Modal-only stores live under `src/store/modal/`.
 
 ### Routing
 React Router 7 in hash mode. `src/routes.tsx` declares the main app routes plus the two special standalone-window routes (`/mini-player`, `/desktop-lyrics`) that the corresponding Electron windows load by hash.
@@ -126,8 +131,8 @@ Phased development notes live in `docs/ideas/` (numbered `NNN-<topic>.md`). The 
 
 ## Gotchas
 
-### Android platform layer is partially wired
-**Storage and cookies work** on Android (`getStore/setStore/clearStore` → `@capacitor/preferences` with a `biu:` key prefix; `getCookie/setCookie` → `CapacitorCookies` against `.bilibili.com`, mirroring `electron/ipc/cookie.ts`). This unblocks token / local-fav / settings / lyrics-cache persistence. **Still noops**: Shazam (`recognizeSong`), MediaSession (no background play / notification / lock-screen / headset / AudioFocus), fonts, window controls, downloads, and the WhisperX/desktop-lyrics methods. Android-specific UI lives in `src/layout/playbar/android.tsx` and `src/components/full-screen-player/android.tsx`. Treat any *other* Android feature as an unimplemented port until verified.
+### Native mobile platform layer is partially wired
+**Storage, cookies, and HTTP work at the adapter level** on Android / iOS (`getStore/setStore/clearStore` → `@capacitor/preferences` with a `biu:` key prefix; `getCookie/setCookie` → `CapacitorCookies`; axios → `CapacitorHttp`). This unblocks token / local-fav / settings / lyrics-cache persistence. **Still noops**: Shazam (`recognizeSong`), MediaSession (no background play / notification / lock-screen / headset / AudioFocus), fonts, window controls, downloads, and the WhisperX/desktop-lyrics methods. Mobile-specific UI is selected through `isNativeMobile`. Treat any other native-mobile feature as unimplemented until it has been verified separately on Android and iOS. iOS Cookie/CDN playback behavior and native compilation are not proven by renderer build success.
 
 ### Stream selection — avoid PCDN stalls
 Bilibili `playurl` often returns `mcdn` / `szbdyd` (PCDN) nodes as the first `baseUrl`; under proxies (Clash etc.) these stall — the stream downloads but won't play. **Prefer `upos` domains and demote PCDN nodes to fallback.** First step when debugging playback is always `%APPDATA%\biu\logs\main.log`. (See memory `bilibili-pcdn-stream-stalls`.)

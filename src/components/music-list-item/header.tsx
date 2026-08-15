@@ -1,7 +1,7 @@
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
 import clx from "classnames";
 
-import { isAndroid, isWeb } from "@/platform";
+import { isNativeMobile, isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import { getMusicListItemGrid } from "./styles";
@@ -54,7 +54,7 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
     );
   };
 
-  if (isAndroid) {
+  if (isNativeMobile) {
     return (
       <div
         className={clx(

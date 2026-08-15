@@ -5,7 +5,7 @@ import { RiPlayFill } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
-import platform, { isAndroid } from "@/platform";
+import platform, { isNativeMobile } from "@/platform";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
 import { useModalStore } from "@/store/modal";
@@ -278,7 +278,7 @@ const MusicRecommend = () => {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <Tabs
           variant="solid"
-          size={isAndroid ? "md" : "lg"}
+          size={isNativeMobile ? "md" : "lg"}
           radius="md"
           classNames={{
             cursor: "rounded-medium",
@@ -299,7 +299,7 @@ const MusicRecommend = () => {
         </Tabs>
         <AsyncButton
           color="primary"
-          size={isAndroid ? "sm" : "md"}
+          size={isNativeMobile ? "sm" : "md"}
           startContent={<RiPlayFill size={18} />}
           isDisabled={initialLoading || list.length === 0}
           onPress={handlePlayAll}

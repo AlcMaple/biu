@@ -3,7 +3,7 @@ import React, { useCallback } from "react";
 import { Divider, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 import moment from "moment";
 
-import { isAndroid } from "@/platform";
+import { isNativeMobile } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useToken } from "@/store/token";
 import { useUser } from "@/store/user";
@@ -49,7 +49,7 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
     [updateCollectedFavorites, updateCreatedFavorites, updateToken, updateUser],
   );
 
-  if (isAndroid) {
+  if (isNativeMobile) {
     return (
       <Modal
         size="sm"

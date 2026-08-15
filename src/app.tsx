@@ -31,7 +31,7 @@ moment.locale("zh-cn");
 
 /**
  * 顶层 App 全平台共用一棵路由树与一套 shell，形态差异下沉到组件内的
- * `isAndroid` 分支（见 `layout/index.tsx`、`layout/playbar`、`full-screen-player`）。
+ * `isNativeMobile` 分支（见 `layout/index.tsx`、`layout/playbar`、`full-screen-player`）。
  *
  * 不要在这里按平台早返到独立的路由树 —— 那样会让移动端整棵共享 UI 失效，
  * 等于把 Electron 端已实现的页面重做一遍。平台能力差异走 `platform/`，

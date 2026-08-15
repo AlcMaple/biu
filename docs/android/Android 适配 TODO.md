@@ -9,13 +9,13 @@
 `webDir: "dist/web"`（见 `capacitor.config.ts`）——Capacitor 装的就是 Electron 端那份构建产物。所以：
 
 - **路由树只有一棵**：`src/routes.tsx`。不要按平台分叉出第二棵。
-- **形态差异下沉到组件内**，用 `isAndroid` 条件渲染，落在真正需要变形的那几处：
+- **形态差异下沉到组件内**，Android / iOS 共用的移动形态用 `isNativeMobile` 条件渲染，真正的系统差异才用 `isAndroid` / `isIOS`：
   - `src/layout/index.tsx` — 移动端去掉常驻侧栏，改为顶栏 + 抽屉
   - `src/layout/side/index.tsx` — 侧栏在移动端变 `Drawer`
   - `src/layout/navbar/index.tsx` — 移动端顶栏（汉堡菜单 + 搜索）
-  - `src/layout/playbar/android.tsx`、`src/components/full-screen-player/android.tsx` — 差异大到值得独立组件的两处
+  - `src/layout/playbar/mobile.tsx`、`src/components/full-screen-player/mobile.tsx` — 差异大到值得独立组件的两处
   - `src/pages/settings/index.tsx` 等 — 间距 / 尺寸微调
-- **能力差异下沉到 `src/platform/`**：`android.ts` 对移动端无意义的能力（托盘、窗口控制、全局快捷键、更新器、桌面歌词）返回 noop，调用方无需感知。
+- **能力差异下沉到 `src/platform/`**：`mobile.ts` 对移动端无意义的能力（托盘、窗口控制、全局快捷键、更新器、桌面歌词）返回 noop，调用方无需感知。
 - **Electron 独有的 UI 入口用 `isElectron` 隐藏**，不做半吊子降级实现。
 
 ### ⚠️ 已经踩过的坑：不要再按平台分叉路由树
@@ -30,7 +30,7 @@
 2. **平行的设计 token 一定会漂移**。`android-tokens.ts` 那套硬编码色板与 HeroUI / Tailwind 主题并存，两边各改各的，深色模式尤其对不齐。要调视觉就改主题，别另起一套。
 3. **同一份 renderer 还要供 Web / iOS 用**（见根 `CLAUDE.md` 的多端规划）。每分叉一个平台就多一套 UI 的话，四端就是四份屎山。
 
-> 如果将来确实有某个屏幕移动端形态差异过大，做法是**给那个组件加平台分支或独立子组件**（照 `playbar/android.tsx` 的样子），而不是分叉整棵路由树。
+> 如果将来确实有某个屏幕移动端形态差异过大，做法是**给那个组件加平台分支或独立子组件**（照 `playbar/mobile.tsx` 的样子），而不是分叉整棵路由树。
 
 ## 不做清单（明确省略）
 
@@ -60,22 +60,22 @@
 
 ## 零、平台基础设施
 
-- [x] 平台抽象层（`src/platform/android.ts`）—— 能力接口按 `ElectronAPI` 齐平，无意义的返回 noop
+- [x] 原生移动平台抽象层（`src/platform/mobile.ts`）—— Android / iOS 共用 Capacitor 能力，无意义的返回 noop
 - [x] 存储持久化 —— `@capacitor/preferences`（key 前缀 `biu:`），覆盖 token / 本地歌单 / 设置 / 歌词缓存
 - [x] Cookie 桥接 —— `CapacitorCookies` 对准 `.bilibili.com`，与 `electron/ipc/cookie.ts` 对等
-- [x] HTTP 跨域 —— `CapacitorHttp` 启用（同时 patch 全局 fetch/XHR），渲染端 axios 经 `src/service/request/android-adapter.ts` 走原生通道
+- [x] HTTP 跨域 —— `CapacitorHttp` 启用（同时 patch 全局 fetch/XHR），渲染端 axios 经 `src/service/request/native-adapter.ts` 走原生通道
 - [x] B 站 CDN 请求 Referer 注入（`37fc190`）
 - [ ] 原生层冷启动闪屏 —— `@capacitor/splash-screen`，配 Biu 品牌静态帧（纯配置，无需 React 组件）
 
 ## 一、共享 UI 的移动端适配
 
-> 这些**不是重写**，是在共享组件里补 `isAndroid` 分支。改动前先在 Electron 端确认组件现状。
+> 这些**不是重写**，是在共享组件里补 `isNativeMobile` 分支。改动前先在 Electron 端确认组件现状。
 
 - [x] Layout 骨架 —— 顶栏 + 内容区 + 播放栏，侧栏改抽屉（`src/layout/index.tsx`）
 - [x] 侧栏抽屉化（`src/layout/side/index.tsx`）
 - [x] 移动端顶栏（`src/layout/navbar/index.tsx`）
-- [x] 迷你播放栏（`src/layout/playbar/android.tsx`）
-- [x] 全屏播放页（`src/components/full-screen-player/android.tsx`）
+- [x] 迷你播放栏（`src/layout/playbar/mobile.tsx`）
+- [x] 全屏播放页（`src/components/full-screen-player/mobile.tsx`）
 - [x] 设置页移动端布局 + 隐藏快捷键 Tab（`src/pages/settings/index.tsx`）
 - [x] 歌曲列表项 / 播放队列抽屉的移动端形态
 - [ ] **真机走查**：逐屏在真机上过一遍，记录触控热区过小、横向溢出、安全区（刘海 / 手势条）遮挡等问题，逐个补分支
@@ -126,12 +126,12 @@ Electron 端用 `node-shazam`（内部 `shazamio-core` WASM + ffmpeg 做 WebM→
 |---|---|
 | `capacitor.config.ts` | Capacitor 配置（appId / `webDir` / 插件启用 / Live Reload） |
 | `android/` | Capacitor Android 工程（不进入 Windows 打包） |
-| `src/platform/detect.ts` | `isAndroid = !navigator.userAgent.includes("Electron")`（runtime UA 判定） |
-| `src/platform/android.ts` | Android 平台能力实现（store / cookie / 其余 noop） |
-| `src/platform/http-android.ts` | Android HTTP 客户端封装 |
-| `src/service/request/android-adapter.ts` | 渲染端 axios → CapacitorHttp 适配 |
-| `src/layout/playbar/android.tsx` | 移动端迷你播放栏 |
-| `src/components/full-screen-player/android.tsx` | 移动端全屏播放页 |
+| `src/platform/detect.ts` | Electron / Android / iOS / Web 原生桥判定，移动端共享 `isNativeMobile` |
+| `src/platform/mobile.ts` | Android / iOS 平台能力实现（store / cookie / 其余 noop） |
+| `src/platform/http-native.ts` | 原生移动端 HTTP 客户端封装 |
+| `src/service/request/native-adapter.ts` | 渲染端 axios → CapacitorHttp 适配 |
+| `src/layout/playbar/mobile.tsx` | 移动端迷你播放栏 |
+| `src/components/full-screen-player/mobile.tsx` | 移动端全屏播放页 |
 | `src/store/play-list.ts` | 播放队列 / 播放模式 / `audio.onerror` 自动跳过 |
 | `src/store/settings.ts` | 主题 / 深色模式 |
 
