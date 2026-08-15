@@ -99,9 +99,9 @@
 
 ## 平台抽象与 IPC
 
-- ❌ 运行时用 `BIU_TARGET` 判断当前是不是 Android
-  后果：`BIU_TARGET` 只是 Rsbuild 插件的**构建期**变量（决定跳不跳 Electron 主进程编译），运行时它不存在，判断永远错。
-  ✅ 运行时平台分派一律靠 UA：`src/platform/detect.ts` 的 `isElectron = navigator.userAgent.includes("Electron")`，其余从 `src/platform/index.ts` 的 `platform` 对象取。
+- ❌ 运行时用 `BIU_TARGET` 判断当前是不是 Android / Web，或继续把所有非 Electron 环境都当成 Android
+  后果：`BIU_TARGET` 只是 Rsbuild 插件的**构建期**变量；普通浏览器会误用 Capacitor HTTP 和移动端布局，Android 浏览器也会被误认为原生 App。
+  ✅ 运行时统一读取 `src/platform/detect.ts` 的 `isElectron` / `isAndroid` / `isWeb`：Electron 看 UA，Android 还必须命中 Capacitor 原生桥，其余才是 Web；平台能力统一从 `src/platform/index.ts` 的 `platform` 对象取。
 
 - ❌ 新增 IPC channel 只改一两处
   后果：类型对不上、preload 没暴露、或 Android 上调到不存在的方法直接崩。

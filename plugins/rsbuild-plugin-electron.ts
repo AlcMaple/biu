@@ -5,11 +5,13 @@ import { buildElectron } from "./electron-build";
 import { buildElectronConfig } from "./electron-config-build";
 import { startElectronDev } from "./electron-dev";
 
+const isElectronTarget = () => !["android", "web"].includes(process.env.BIU_TARGET ?? "");
+
 export const pluginElectron = (): RsbuildPlugin => ({
   name: "plugin-electron",
   setup(api) {
     api.onAfterDevCompile(async ({ isFirstCompile }) => {
-      if (isFirstCompile && process.env.BIU_TARGET !== "android") {
+      if (isFirstCompile && isElectronTarget()) {
         logger.info("[electron] Bundle the typescript configuration for electron...");
         await buildElectronConfig("development");
 
@@ -18,6 +20,8 @@ export const pluginElectron = (): RsbuildPlugin => ({
     });
 
     api.onBeforeBuild(async () => {
+      if (!isElectronTarget()) return;
+
       logger.info("Cleaning dist directory...");
       try {
         rimrafSync("dist");
@@ -30,6 +34,8 @@ export const pluginElectron = (): RsbuildPlugin => ({
     });
 
     api.onAfterBuild(async () => {
+      if (!isElectronTarget()) return;
+
       await buildElectron();
     });
   },

@@ -13,7 +13,7 @@ import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
-import platform, { isAndroid } from "@/platform";
+import platform, { isAndroid, isElectron } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -336,7 +336,7 @@ const FullScreenPlayer = () => {
                   </Popover>
                 </div>
                 <div className="window-no-drag top-0 right-0">
-                  {appPlatform === "linux" || appPlatform === "windows" ? <WindowAction /> : null}
+                  {isElectron && (appPlatform === "linux" || appPlatform === "windows") ? <WindowAction /> : null}
                 </div>
               </div>
 

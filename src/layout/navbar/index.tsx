@@ -5,7 +5,7 @@ import { RiMenuLine } from "@remixicon/react";
 import clx from "classnames";
 
 import ShazamModal from "@/components/shazam-modal";
-import platform, { isAndroid } from "@/platform";
+import platform, { isAndroid, isElectron } from "@/platform";
 import { useUser } from "@/store/user";
 
 import WindowAction from "../../components/window-action";
@@ -58,7 +58,7 @@ const LayoutNavbar = () => {
         <Dev />
         {Boolean(user?.isLogin) && <UserFeed />}
         <UserCard onDropdownOpenChange={setIsUserDropdownOpen} />
-        {["linux", "windows"].includes(appPlatform) && <WindowAction />}
+        {isElectron && ["linux", "windows"].includes(appPlatform) && <WindowAction />}
       </div>
     </div>
   );
