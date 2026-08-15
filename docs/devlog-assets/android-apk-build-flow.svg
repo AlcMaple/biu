@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="390" viewBox="0 0 980 390" role="img" aria-labelledby="title desc">
+  <title id="title">Android APK 构建流程</title>
+  <desc id="desc">共享 React 渲染层经过 Android 目标构建、Capacitor 同步和 Gradle 打包，最终输出带应用版本的 debug 或签名 release APK。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .title { font-size: 22px; font-weight: 700; }
+    .label { font-size: 15px; font-weight: 650; }
+    .small { font-size: 13px; fill: #5f6368; }
+    .box { fill: #fff; stroke: #c7c9d1; stroke-width: 1.5; rx: 12; }
+    .shared { fill: #f1edff; stroke: #7c5ce7; }
+    .android { fill: #eaf8ee; stroke: #4f9d69; }
+    .debug { fill: #e8f4ff; stroke: #4f87c7; }
+    .release { fill: #fff4dc; stroke: #c58b25; }
+    .arrow { fill: none; stroke: #747780; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#747780" />
+    </marker>
+  </defs>
+  <text x="40" y="42" class="title">一条命令得到可识别、可安装的 APK</text>
+  <rect x="40" y="86" width="220" height="82" class="box shared" />
+  <text x="150" y="116" text-anchor="middle" class="label">共享 React 渲染层</text>
+  <text x="150" y="142" text-anchor="middle" class="small">BIU_TARGET=android</text>
+  <path d="M 260 127 L 310 127" class="arrow" />
+  <rect x="312" y="86" width="220" height="82" class="box android" />
+  <text x="422" y="116" text-anchor="middle" class="label">Capacitor sync</text>
+  <text x="422" y="142" text-anchor="middle" class="small">dist/web → android assets</text>
+  <path d="M 532 127 L 582 127" class="arrow" />
+  <rect x="584" y="86" width="220" height="82" class="box android" />
+  <text x="694" y="116" text-anchor="middle" class="label">Gradle wrapper</text>
+  <text x="694" y="142" text-anchor="middle" class="small">读取 package.json 版本</text>
+  <path d="M 694 168 L 694 210" class="arrow" />
+  <path d="M 694 210 C 640 230 500 230 430 254" class="arrow" />
+  <path d="M 694 210 C 748 230 830 230 850 254" class="arrow" />
+  <rect x="292" y="256" width="276" height="92" class="box debug" />
+  <text x="430" y="286" text-anchor="middle" class="label">debug APK</text>
+  <text x="430" y="311" text-anchor="middle" class="small">开发签名，可直接装模拟器</text>
+  <text x="430" y="333" text-anchor="middle" class="small">Biu-&lt;version&gt;-android-debug.apk</text>
+  <rect x="712" y="256" width="236" height="92" class="box release" />
+  <text x="830" y="286" text-anchor="middle" class="label">release APK</text>
+  <text x="830" y="311" text-anchor="middle" class="small">仅使用本机 keystore 签名</text>
+  <text x="830" y="333" text-anchor="middle" class="small">凭据不进入 Git</text>
+  <text x="490" y="380" text-anchor="middle" class="small">两个产物都统一复制到 dist/artifacts；不存在或未签名时不会宣称成功</text>
+</svg>
