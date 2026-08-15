@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="430" viewBox="0 0 980 430" role="img" aria-labelledby="title desc">
+  <title id="title">Web 构建与运行时平台分流</title>
+  <desc id="desc">同一套 React 界面在构建时分为 Electron 安装包、Android 渲染层和 Web 静态资源，运行时再选择对应平台适配器。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .title { font-size: 22px; font-weight: 700; }
+    .label { font-size: 15px; font-weight: 650; }
+    .small { font-size: 13px; fill: #5f6368; }
+    .box { fill: #fff; stroke: #c7c9d1; stroke-width: 1.5; rx: 12; }
+    .shared { fill: #f1edff; stroke: #7c5ce7; }
+    .electron { fill: #e8f4ff; stroke: #4f87c7; }
+    .android { fill: #eaf8ee; stroke: #4f9d69; }
+    .web { fill: #fff4dc; stroke: #c58b25; }
+    .arrow { fill: none; stroke: #747780; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#747780" />
+    </marker>
+  </defs>
+  <text x="40" y="42" class="title">一套渲染逻辑，两层平台分流</text>
+  <rect x="320" y="68" width="340" height="76" class="box shared" />
+  <text x="490" y="98" text-anchor="middle" class="label">React + HashRouter + Zustand</text>
+  <text x="490" y="123" text-anchor="middle" class="small">共用 App、routes、Layout 与业务状态</text>
+  <path d="M 490 144 L 490 178" class="arrow" />
+  <rect x="335" y="180" width="310" height="62" class="box" />
+  <text x="490" y="207" text-anchor="middle" class="label">构建期：BIU_TARGET</text>
+  <text x="490" y="229" text-anchor="middle" class="small">只决定是否执行 Electron 构建钩子</text>
+  <path d="M 390 242 C 330 270 220 270 170 294" class="arrow" />
+  <path d="M 490 242 L 490 294" class="arrow" />
+  <path d="M 590 242 C 650 270 760 270 810 294" class="arrow" />
+  <rect x="45" y="296" width="250" height="96" class="box electron" />
+  <text x="170" y="326" text-anchor="middle" class="label">默认目标：Electron</text>
+  <text x="170" y="351" text-anchor="middle" class="small">renderer + main/preload</text>
+  <text x="170" y="373" text-anchor="middle" class="small">electron-builder 安装包</text>
+  <rect x="365" y="296" width="250" height="96" class="box android" />
+  <text x="490" y="326" text-anchor="middle" class="label">android</text>
+  <text x="490" y="351" text-anchor="middle" class="small">renderer-only → Capacitor</text>
+  <text x="490" y="373" text-anchor="middle" class="small">原生桥 + Preferences</text>
+  <rect x="685" y="296" width="250" height="96" class="box web" />
+  <text x="810" y="326" text-anchor="middle" class="label">web</text>
+  <text x="810" y="351" text-anchor="middle" class="small">renderer-only 静态资源</text>
+  <text x="810" y="373" text-anchor="middle" class="small">浏览器 API + localStorage</text>
+  <text x="490" y="418" text-anchor="middle" class="small">运行时 detect.ts 再选择 electron / android / web adapter；不读取 BIU_TARGET</text>
+</svg>

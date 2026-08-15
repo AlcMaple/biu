@@ -11,8 +11,10 @@ Use Node `22.17.1` and pnpm `10.24.0`.
 - `pnpm install --frozen-lockfile` installs the locked dependency set.
 - `pnpm dev` starts the desktop development build with Rsbuild.
 - `pnpm dev:android` serves the Android-targeted renderer.
+- `pnpm dev:web` serves the ordinary Web renderer without starting Electron.
 - `pnpm build` type-checks/builds the application and creates platform artifacts.
 - `pnpm build:android` builds the web bundle and syncs it into Capacitor.
+- `pnpm build:web` creates renderer-only static assets in `dist/web/`.
 - `pnpm test` runs Vitest in watch mode; use `pnpm run test -- --run` for a single CI-style pass.
 - `pnpm exec eslint .` checks TypeScript/JavaScript, and `pnpm knip` reports unused code and dependencies.
 

@@ -13,7 +13,7 @@ import Lyrics from "@/components/lyrics";
 import MusicPlayControl from "@/components/music-play-control";
 import MusicPlayProgress from "@/components/music-play-progress";
 import WindowAction from "@/components/window-action";
-import platform from "@/platform";
+import platform, { isElectron } from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -365,7 +365,9 @@ const FancyFullScreenPlayer = () => {
                     </Popover>
                   </div>
                   <div className="window-no-drag">
-                    {(appPlatform === "linux" || appPlatform === "windows") && isUiVisible && <WindowAction />}
+                    {isElectron && (appPlatform === "linux" || appPlatform === "windows") && isUiVisible && (
+                      <WindowAction />
+                    )}
                   </div>
                 </header>
 
