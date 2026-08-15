@@ -2,8 +2,11 @@ import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 import { pluginSvgr } from "@rsbuild/plugin-svgr";
 
+import { createBilibiliWebProxyConfig } from "./plugins/bilibili-web-proxy";
 import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
+
+const isWebTarget = process.env.BIU_TARGET === "web";
 
 export default defineConfig({
   output: {
@@ -55,8 +58,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5678,
     strictPort: true,
-    printUrls: process.env.BIU_TARGET === "web",
+    printUrls: isWebTarget,
     open: false,
     compress: false,
+    ...(isWebTarget ? { proxy: createBilibiliWebProxyConfig() } : {}),
   },
 });

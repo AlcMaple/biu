@@ -1,6 +1,7 @@
 import axios, { type CreateAxiosDefaults } from "axios";
 
-import { isNativeMobile } from "@/platform/detect";
+import { isNativeMobile, isWeb } from "@/platform/detect";
+import { resolveBilibiliBaseURL } from "@shared/bilibili-web-proxy";
 
 import { nativeAdapter } from "./native-adapter";
 import { requestInterceptors } from "./request-interceptors";
@@ -16,27 +17,27 @@ export const axiosInstance = axios.create(axiosConfig);
 
 export const searchRequest = axios.create({
   ...axiosConfig,
-  baseURL: "https://s.search.bilibili.com",
+  baseURL: resolveBilibiliBaseURL("search", isWeb),
 });
 
 export const biliRequest = axios.create({
   ...axiosConfig,
-  baseURL: "https://www.bilibili.com",
+  baseURL: resolveBilibiliBaseURL("www", isWeb),
 });
 
 export const memberRequest = axios.create({
   ...axiosConfig,
-  baseURL: "https://member.bilibili.com",
+  baseURL: resolveBilibiliBaseURL("member", isWeb),
 });
 
 export const apiRequest = axios.create({
   ...axiosConfig,
-  baseURL: "https://api.bilibili.com",
+  baseURL: resolveBilibiliBaseURL("api", isWeb),
 });
 
 export const passportRequest = axios.create({
   ...axiosConfig,
-  baseURL: "https://passport.bilibili.com",
+  baseURL: resolveBilibiliBaseURL("passport", isWeb),
 });
 
 apiRequest.interceptors.request.use(requestInterceptors);
