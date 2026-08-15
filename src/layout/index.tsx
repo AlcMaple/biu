@@ -13,7 +13,7 @@ import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
-import { isNativeMobile, log } from "@/platform";
+import { isNativeMobile, isWeb, log } from "@/platform";
 import { initLocalPlaylistSync } from "@/service/sync";
 import { useUser } from "@/store/user";
 
@@ -28,9 +28,14 @@ const Layout = () => {
   const { isOpen: isSideDrawerOpen, onOpen: openSideDrawer, onOpenChange: onSideDrawerOpenChange } = useDisclosure();
 
   useEffect(() => {
-    updateUser();
-    initLocalPlaylistSync();
-  }, []);
+    void updateUser().catch(error => {
+      log.warn("[startup] 更新用户信息失败", error);
+    });
+
+    // Web 平台没有可供同步服务换取令牌的 B 站 Cookie，启动通知通道只会形成空重连循环。
+    // Electron 与 Capacitor 原生端均具备 Cookie 能力，继续保留本地歌单跨设备同步。
+    if (!isWeb) initLocalPlaylistSync();
+  }, [updateUser]);
 
   return (
     <ErrorBoundary
