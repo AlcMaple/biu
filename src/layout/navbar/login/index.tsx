@@ -3,7 +3,7 @@ import React, { useCallback } from "react";
 import { Divider, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 import moment from "moment";
 
-import { isNativeMobile } from "@/platform";
+import { isNativeMobile, isWeb } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useToken } from "@/store/token";
 import { useUser } from "@/store/user";
@@ -39,11 +39,12 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
 
         const user = useUser.getState().user;
 
-        if (user?.mid) {
-          await Promise.allSettled([updateCreatedFavorites(user.mid), updateCollectedFavorites(user.mid)]);
-        }
+        if (!user?.isLogin || !user.mid) return false;
+        await Promise.allSettled([updateCreatedFavorites(user.mid), updateCollectedFavorites(user.mid)]);
+        return true;
       } catch {
         addToast({ title: "更新用户信息失败", color: "danger" });
+        return false;
       }
     },
     [updateCollectedFavorites, updateCreatedFavorites, updateToken, updateUser],
@@ -76,6 +77,19 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
                 <PasswordLogin onClose={onClose} updateUserData={updateUserData} />
               </Tab>
             </Tabs>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    );
+  }
+
+  if (isWeb) {
+    return (
+      <Modal size="sm" radius="md" isOpen={isOpen} isDismissable={false} onOpenChange={onOpenChange}>
+        <ModalContent>
+          <ModalHeader className="justify-center pb-0 text-lg">登录</ModalHeader>
+          <ModalBody className="items-center justify-center pt-0 pb-6">
+            <QrcodeLogin onClose={onClose} updateUserData={updateUserData} />
           </ModalBody>
         </ModalContent>
       </Modal>

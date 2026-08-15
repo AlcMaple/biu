@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from "vitest";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
-import { usePlayList } from "@/store/play-list";
+import { refreshCurrentAudioSource, usePlayList } from "@/store/play-list";
 
 vi.mock("@/common/utils/audio", () => ({
   getAudioUrl: vi.fn(async () => ({ audioUrl: "https://audio.test/a.mp3", isLossless: false })),
@@ -127,6 +127,98 @@ describe("play-list store", () => {
     });
 
     expect(usePlayList.getState().getPlayItem()?.duration).toBe(274);
+  });
+
+  test("resolving a multi-page placeholder starts its media source only once", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const audio = s.getAudio();
+    const load = vi.spyOn(audio, "load");
+
+    await s.play({ type: "mv", bvid: "BVx", title: "mv" });
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(usePlayList.getState().list).toHaveLength(2);
+    expect(usePlayList.getState().playId).toBe(usePlayList.getState().list[0].id);
+  });
+
+  test("a late source resolution cannot overwrite a newer selected song", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getDashUrl } = await import("@/common/utils/audio");
+    let resolveFirst: (value: { audioUrl: string; isLossless: boolean }) => void = () => {};
+    let resolveSecond: (value: { audioUrl: string; isLossless: boolean }) => void = () => {};
+    vi.mocked(getDashUrl)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSecond = resolve;
+          }),
+      );
+
+    usePlayList.setState({
+      list: [
+        { bvid: "BV-first", cid: "1", id: "first", title: "first", type: "mv" },
+        { bvid: "BV-second", cid: "2", id: "second", title: "second", type: "mv" },
+      ],
+      playId: undefined,
+    });
+    usePlayList.setState({ playId: "first" });
+    await Promise.resolve();
+    usePlayList.setState({ playId: "second" });
+    await Promise.resolve();
+
+    resolveSecond({ audioUrl: "https://audio.test/second.m4s", isLossless: false });
+    await vi.waitFor(() => expect(s.getAudio().src).toContain("second.m4s"));
+    resolveFirst({ audioUrl: "https://audio.test/first.m4s", isLossless: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(s.getAudio().src).toContain("second.m4s");
+    expect(usePlayList.getState().list.find(item => item.id === "first")?.audioUrl).toBeUndefined();
+    expect(usePlayList.getState().list.find(item => item.id === "second")?.audioUrl).toContain("second.m4s");
+  });
+
+  test("concurrent playback failures single-flight source refresh by play id", async () => {
+    const { getDashUrl } = await import("@/common/utils/audio");
+    usePlayList.setState({
+      list: [
+        {
+          audioUrl: "https://audio.test/current.m4s?deadline=9999999999",
+          bvid: "BV-refresh",
+          cid: "1",
+          id: "refresh",
+          title: "refresh",
+          type: "mv",
+        },
+      ],
+      playId: "refresh",
+    });
+    await Promise.resolve();
+    usePlayList.setState({
+      list: [{ bvid: "BV-refresh", cid: "1", id: "refresh", title: "refresh", type: "mv" }],
+    });
+
+    let resolveRefresh: (value: { audioUrl: string; isLossless: boolean }) => void = () => {};
+    vi.mocked(getDashUrl).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const first = refreshCurrentAudioSource();
+    const concurrent = refreshCurrentAudioSource();
+    expect(getDashUrl).toHaveBeenCalledTimes(1);
+    resolveRefresh({ audioUrl: "https://audio.test/refreshed.m4s", isLossless: false });
+
+    await expect(Promise.all([first, concurrent])).resolves.toEqual([true, true]);
+    expect(getDashUrl).toHaveBeenCalledTimes(1);
   });
 
   test("playback state prefers the Bilibili duration over the media stream duration", async () => {

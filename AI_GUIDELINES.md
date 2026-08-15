@@ -9,6 +9,14 @@
   后果：WebView 有 CORS，且带不上登录 cookie / 签名头，请求要么被拦要么拿到匿名结果。
   ✅ Electron 上走 main IPC（`got` v14，无 CORS 限制，见 `src/service/request/`）；Android / iOS 原生端走 `service/request/native-adapter.ts`（Capacitor HTTP 绕过 WebView CORS）。WBI 签名统一在 `electron/network/`。
 
+- ❌ 把 Web 版当成纯静态站点部署，或让浏览器直接请求 B 站 API / 需要 Referer 的媒体 CDN
+  后果：API 被 CORS 拦截，登录 Cookie / CSRF 无法安全携带；媒体请求因 Referer 限制返回 403，页面会空转或播放失败。
+  ✅ `pnpm build:web` 后必须用 `pnpm start:web` 托管同源服务；Web API 只走五个固定 B 站上游的 BFF，B 站 Cookie 保存在服务端 HttpOnly 会话中，上游 `Set-Cookie` 永不回传 renderer。
+
+- ❌ 做 `media?url=<任意地址>` 的媒体代理，自动跟随重定向，或把 playurl 的签名长 URL 直接暴露给 renderer
+  后果：会变成可滥用的开放代理 / SSRF 跳板，签名地址泄露；Range、拖动和浏览器取消也容易被缓冲层破坏，持续浪费部署方带宽。
+  ✅ BFF 只把固定 allowlist 的 UPOS 地址登记为绑定匿名媒体会话的短期 opaque token；媒体端点只接收 token，每跳重定向都重验 allowlist，并流式保留 Range / 206 / Content-Range、在下游取消时立即中止上游。
+
 - ❌ 选流时直接用 playurl 返回的第一个 `baseUrl`
   后果：真实事故——B 站 playurl 的 baseUrl 常是 `mcdn` / `szbdyd` 这类 PCDN 节点，Clash 等代理下会卡死/超时，表现为「能拿到流但播不动」。
   ✅ 选流优先 `upos` 域名，把 PCDN 节点降级兜底（见 memory `bilibili-pcdn-stream-stalls`）。排查播放问题第一步永远是看 `%APPDATA%\biu\logs\main.log`。
