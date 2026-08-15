@@ -13,7 +13,6 @@ import {
   Radio,
   RadioGroup,
   TableRow,
-  Tooltip,
 } from "@heroui/react";
 import { RiDeleteBinLine, RiExternalLinkLine, RiFolderLine } from "@remixicon/react";
 import { filesize } from "filesize";
@@ -22,6 +21,7 @@ import { formatMillisecond } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import Empty from "@/components/empty";
 import Image from "@/components/image";
+import PlatformTooltip from "@/components/platform-tooltip";
 import ScrollContainer from "@/components/scroll-container";
 import platform from "@/platform";
 import { useSettings } from "@/store/settings";
@@ -126,11 +126,11 @@ const DownloadList = () => {
                     <Radio value="video">视频</Radio>
                   </RadioGroup>
                   {Boolean(downloadList.length) && (
-                    <Tooltip content="清空记录" closeDelay={0}>
-                      <Button size="sm" isIconOnly onPress={clearDownloadList}>
+                    <PlatformTooltip content="清空记录" closeDelay={0}>
+                      <Button size="sm" isIconOnly onPress={clearDownloadList} aria-label="清空记录">
                         <RiDeleteBinLine size={18} />
                       </Button>
-                    </Tooltip>
+                    </PlatformTooltip>
                   )}
                 </div>
               }

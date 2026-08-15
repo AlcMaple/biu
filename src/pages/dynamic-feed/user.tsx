@@ -4,6 +4,8 @@ import { Avatar } from "@heroui/react";
 import { RiAppsLine, RiSendInsLine } from "@remixicon/react";
 import clsx from "classnames";
 
+import { isWeb } from "@/platform";
+
 export interface AuthorItem {
   mid: number;
   face: string;
@@ -22,7 +24,8 @@ const UserItem: React.FC<UserItemProps> = ({ author, isSelected, onSelect }) => 
   const isAll = author === null;
   return (
     <div
-      title={displayName}
+      title={isWeb ? undefined : displayName}
+      aria-label={displayName}
       className={`group flex w-full flex-row items-center gap-3 px-2 py-2 ${
         isSelected ? "text-primary" : "text-default-500"
       } cursor-pointer`}

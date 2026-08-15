@@ -86,11 +86,11 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
   },
   {
     path: "mini-player",
-    element: <MiniPlayer />,
+    element: web ? <Navigate replace to="/" /> : <MiniPlayer />,
   },
   {
     path: "desktop-lyrics",
-    element: <DesktopLyrics />,
+    element: web ? <Navigate replace to="/" /> : <DesktopLyrics />,
   },
   {
     path: "*",

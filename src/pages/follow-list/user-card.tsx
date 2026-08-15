@@ -7,6 +7,7 @@ import { RiFlashlightFill, RiGroupLine, RiUserUnfollowLine } from "@remixicon/re
 import type { RelationListItem } from "@/service/relation-followings";
 import type { RelationTagUser } from "@/service/relation-tag";
 
+import { isWeb } from "@/platform";
 import { UserRelationAction, postRelationModify } from "@/service/relation-modify";
 import { useModalStore } from "@/store/modal";
 
@@ -61,7 +62,7 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
       key={u.mid}
       radius="md"
       as="div"
-      isHoverable
+      isHoverable={!isWeb}
       isPressable
       onPress={() => navigate(`/user/${u.mid}`)}
       className="group relative h-full w-full overflow-hidden"
@@ -86,14 +87,18 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
         </div>
       </CardBody>
 
-      <div className="bg-background/70 absolute bottom-4 left-1/2 flex w-max -translate-x-1/2 translate-y-20 items-center justify-center rounded-full border border-white/10 px-1 py-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 ease-in-out group-hover:translate-y-0">
+      <div
+        className={`bg-background/70 absolute bottom-4 left-1/2 flex w-max -translate-x-1/2 items-center justify-center rounded-full border border-white/10 px-1 py-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 ${
+          isWeb ? "translate-y-0" : "translate-y-20 transition-all duration-300 ease-in-out group-hover:translate-y-0"
+        }`}
+      >
         <Button
           size="sm"
           variant="light"
           radius="full"
           onPress={handleSetGroup}
           aria-label="设置分组"
-          title="设置分组"
+          title={isWeb ? undefined : "设置分组"}
           startContent={<RiGroupLine size={18} />}
         >
           设置分组
@@ -105,7 +110,7 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
           radius="full"
           onPress={handleUnfollow}
           aria-label="取消关注"
-          title="取消关注"
+          title={isWeb ? undefined : "取消关注"}
           startContent={<RiUserUnfollowLine size={18} />}
         >
           取消关注

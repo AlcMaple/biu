@@ -1,7 +1,7 @@
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
 import clx from "classnames";
 
-import { isAndroid } from "@/platform";
+import { isAndroid, isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import { getMusicListItemGrid } from "./styles";
@@ -44,7 +44,12 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
         )}
       >
         <span>{label}</span>
-        <ArrowIcon size={14} className="opacity-0 transition-opacity group-hover:opacity-60" />
+        <ArrowIcon
+          size={14}
+          className={
+            isWeb ? (active ? "opacity-60" : "opacity-30") : "opacity-0 transition-opacity group-hover:opacity-60"
+          }
+        />
       </button>
     );
   };

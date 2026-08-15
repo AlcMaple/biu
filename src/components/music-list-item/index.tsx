@@ -8,7 +8,7 @@ import clx from "classnames";
 import { formatNumber } from "@/common/utils/number";
 import { formatDuration } from "@/common/utils/time";
 import Image from "@/components/image";
-import { isAndroid } from "@/platform";
+import { isAndroid, isWeb } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 
@@ -90,8 +90,8 @@ const MusicListItem = ({
         disableAnimation
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
-        onDoubleClick={!isAndroid ? onPress : undefined}
-        onPress={isAndroid ? onPress : undefined}
+        onDoubleClick={!isAndroid && !isWeb ? onPress : undefined}
+        onPress={isAndroid || isWeb ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
           isCompact ? "h-9 min-h-9 min-w-0 px-0 text-sm" : "h-auto min-h-auto min-w-auto space-y-2 p-2",

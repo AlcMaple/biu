@@ -9,6 +9,7 @@ import { openBiliVideoLink } from "@/common/utils/url";
 import Image from "@/components/image";
 import MusicFavButton from "@/components/music-fav-button";
 import MusicThumb from "@/components/music-thumb";
+import { isWeb } from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -39,14 +40,21 @@ const LeftControl = () => {
           params="672w_378h_1c.avif"
           emptyPlaceholder={<RiMusic2Line />}
         />
-        <div className="text-primary absolute top-0 left-0 z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-md bg-[rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100">
-          <RiArrowUpSLine size={32} />
+        <div
+          className={clsx(
+            "text-primary absolute z-10 flex items-center justify-center overflow-hidden bg-[rgba(0,0,0,0.5)]",
+            isWeb
+              ? "right-1 bottom-1 size-6 rounded-full"
+              : "top-0 left-0 h-full w-full rounded-md opacity-0 group-hover:opacity-100",
+          )}
+        >
+          <RiArrowUpSLine size={isWeb ? 18 : 32} />
         </div>
       </div>
       <div className="flex min-w-0 flex-col items-start space-y-1">
         <span className="flex w-full items-center">
           <span
-            title={playItem?.pageTitle || playItem?.title}
+            title={isWeb ? undefined : playItem?.pageTitle || playItem?.title}
             className={clsx("min-w-0 flex-1 truncate", {
               "cursor-pointer": isClickable,
               "hover:underline": isClickable,

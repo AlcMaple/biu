@@ -4,6 +4,7 @@ import { addToast, Button, Divider, Input } from "@heroui/react";
 import { RiArrowDownSLine, RiDeleteBinLine, RiPriceTag3Line } from "@remixicon/react";
 import clx from "classnames";
 
+import { isWeb } from "@/platform";
 import { useTagStore } from "@/store/tags";
 
 /** 收起状态的标签区最大高度（约两行胶囊），超出出现渐隐与「展开全部」 */
@@ -80,7 +81,10 @@ const TagSettings = () => {
                 type="button"
                 aria-label={`删除标签 ${tag.name}`}
                 onClick={() => removeTag(tag.id)}
-                className="text-foreground-400 hover:bg-danger/15 hover:text-danger flex size-[22px] items-center justify-center rounded-full opacity-0 group-hover:opacity-100"
+                className={clx(
+                  "text-foreground-400 hover:bg-danger/15 hover:text-danger flex size-[22px] items-center justify-center rounded-full",
+                  isWeb ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                )}
               >
                 <RiDeleteBinLine size={13} />
               </button>

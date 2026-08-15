@@ -1,6 +1,8 @@
 import { Progress } from "@heroui/react";
 import { RiCheckboxCircleLine } from "@remixicon/react";
 
+import { isWeb } from "@/platform";
+
 interface Props {
   data: MediaDownloadTask;
 }
@@ -66,7 +68,7 @@ const StageProgress = ({ data }: Props) => {
       {showMergeBar && <PhaseBar label="合并" value={mergeValue} isActive={isMergeActive} isFailed={isFailed} />}
       {showConvertBar && <PhaseBar label="转换" value={convertValue} isActive={true} isFailed={isFailed} />}
       {isFailed && data.error && (
-        <p title={data.error} className="text-danger line-clamp-2 text-xs break-all">
+        <p title={isWeb ? undefined : data.error} className="text-danger line-clamp-2 text-xs break-all">
           {data.error}
         </p>
       )}

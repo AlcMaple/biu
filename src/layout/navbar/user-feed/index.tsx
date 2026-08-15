@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { Tooltip, Button, Badge } from "@heroui/react";
+import { Badge, Button } from "@heroui/react";
 import { RiTeamLine } from "@remixicon/react";
 import { useRequest } from "ahooks";
 
+import PlatformTooltip from "@/components/platform-tooltip";
 import { getWebDynamicFeedAllUpdate } from "@/service/web-dynamic";
 
 const UserFeed = () => {
@@ -40,14 +41,14 @@ const UserFeed = () => {
   };
 
   const button = (
-    <Button isIconOnly size="sm" variant="light" onPress={handleOpen} className="hover:text-primary">
+    <Button isIconOnly size="sm" variant="light" onPress={handleOpen} aria-label="动态" className="hover:text-primary">
       <RiTeamLine size={20} />
     </Button>
   );
 
   return (
     <>
-      <Tooltip closeDelay={0} content="动态">
+      <PlatformTooltip closeDelay={0} content="动态">
         {updateCount > 0 ? (
           <Badge
             isDot
@@ -63,7 +64,7 @@ const UserFeed = () => {
         ) : (
           button
         )}
-      </Tooltip>
+      </PlatformTooltip>
     </>
   );
 };

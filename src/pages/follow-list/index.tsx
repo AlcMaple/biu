@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { addToast, Button, Input, Spinner, Tooltip, useDisclosure } from "@heroui/react";
+import { addToast, Button, Input, Spinner, useDisclosure } from "@heroui/react";
 import { RiAddLine, RiDeleteBinLine, RiEditLine, RiSearchLine } from "@remixicon/react";
 
+import PlatformTooltip from "@/components/platform-tooltip";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
 import { getRelationFollowings, type RelationListItem } from "@/service/relation-followings";
@@ -205,11 +206,18 @@ const FollowList = () => {
             <div className="mb-2 flex items-center justify-between space-x-1 px-4">
               <h1 className="min-w-0 truncate">{activeTab === "all" ? "全部关注" : activeTag?.name || "我的关注"}</h1>
               <div className="flex items-center">
-                <Tooltip content="创建分组" closeDelay={0}>
-                  <Button size="sm" radius="md" onPress={handleOpenCreate} isIconOnly variant="light">
+                <PlatformTooltip content="创建分组" closeDelay={0}>
+                  <Button
+                    size="sm"
+                    radius="md"
+                    onPress={handleOpenCreate}
+                    isIconOnly
+                    variant="light"
+                    aria-label="创建分组"
+                  >
                     <RiAddLine size={20} />
                   </Button>
-                </Tooltip>
+                </PlatformTooltip>
               </div>
             </div>
             <ScrollContainer className="h-full min-h-0 w-full flex-1 px-2">
@@ -251,18 +259,19 @@ const FollowList = () => {
                 <div className="flex items-center space-x-1">
                   {isCustomTag && activeTag && (
                     <>
-                      <Tooltip content="修改分组名称" closeDelay={0}>
+                      <PlatformTooltip content="修改分组名称" closeDelay={0}>
                         <Button
                           onPress={() => handleOpenRename(activeTag)}
                           isIconOnly
                           radius="md"
                           size="sm"
                           variant="light"
+                          aria-label="修改分组名称"
                         >
                           <RiEditLine size={18} />
                         </Button>
-                      </Tooltip>
-                      <Tooltip content="删除分组" closeDelay={0}>
+                      </PlatformTooltip>
+                      <PlatformTooltip content="删除分组" closeDelay={0}>
                         <Button
                           onPress={() => handleOpenDelete(activeTag)}
                           isIconOnly
@@ -270,10 +279,11 @@ const FollowList = () => {
                           size="sm"
                           radius="md"
                           color="danger"
+                          aria-label="删除分组"
                         >
                           <RiDeleteBinLine size={18} />
                         </Button>
-                      </Tooltip>
+                      </PlatformTooltip>
                     </>
                   )}
                 </div>

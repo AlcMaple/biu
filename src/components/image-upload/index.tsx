@@ -4,6 +4,8 @@ import { Image as HeroImage } from "@heroui/react";
 import { RiEdit2Line } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
+import { isWeb } from "@/platform";
+
 import CropModal from "./crop-modal";
 
 export interface ImageUploadProps {
@@ -148,10 +150,17 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
             <span className="text-sm">点击上传图片</span>
           )}
           {previewUrl && !disabled && (
-            <div className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
-              <div className="flex flex-col items-center gap-2">
-                <RiEdit2Line size={28} />
-                <span className="text-sm">选择照片</span>
+            <div
+              className={twMerge(
+                "absolute z-10 flex cursor-pointer items-center justify-center bg-black/60 text-white",
+                isWeb
+                  ? "right-2 bottom-2 rounded-full px-3 py-2 shadow-md"
+                  : "inset-0 rounded-md opacity-0 transition-opacity group-hover:opacity-100",
+              )}
+            >
+              <div className={twMerge("flex items-center", isWeb ? "gap-1.5" : "flex-col gap-2")}>
+                <RiEdit2Line size={isWeb ? 16 : 28} />
+                <span className={isWeb ? "text-xs" : "text-sm"}>{isWeb ? "更换" : "选择照片"}</span>
               </div>
             </div>
           )}

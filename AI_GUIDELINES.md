@@ -89,6 +89,10 @@
 
 ## UI / 样式
 
+- ❌ 在共享渲染层新增只靠 `hover` / Tooltip / DOM `title` 才能发现或执行的操作
+  后果：Web 版统一关闭悬停反馈；Tailwind 和 HeroUI 样式会被根平台标记门控，隐藏按钮将永久不可达，Tooltip 里的滑块或菜单也打不开。
+  ✅ `hover:` 只作为 Electron/Android 的附加反馈；操作本身必须在 Web 常显或通过点击 Popover 可达。提示型 Tooltip 使用 `PlatformTooltip` / `IconButton tooltip`，交互型浮层显式写 `isWeb` 点击分支；不要用全局事件拦截破坏拖拽、长按取消和 `focus-visible`。
+
 - ❌ 选中态 / hover 态切换时改变盒模型尺寸（只在选中态加 border、加粗字重、改 padding）
   后果：相邻元素被挤一下，出现布局抖动，chip / tab / 歌单列表项 / 播放列表高发（本项目此类组件密集）。
   ✅ 两态之间 border 宽度、字重、padding、字号、宽高必须一致，只能变颜色 / 底色 / 阴影。

@@ -2,6 +2,7 @@ import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, useDiscl
 import { RiDeleteBinLine, RiExternalLinkLine, RiMoreFill } from "@remixicon/react";
 
 import { openBiliVideoLink } from "@/common/utils/url";
+import { isWeb } from "@/platform";
 import { usePlayList, type PlayData } from "@/store/play-list";
 
 interface Props {
@@ -27,7 +28,12 @@ const Menus = ({ data }: Props) => {
             isIconOnly
             variant="light"
             size="sm"
-            className={`flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`}
+            className={
+              isWeb
+                ? "flex-none"
+                : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
+            }
+            aria-label="播放列表操作菜单"
           >
             <RiMoreFill size={16} />
           </Button>

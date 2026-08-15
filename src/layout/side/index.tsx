@@ -6,7 +6,7 @@ import clx from "classnames";
 
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer from "@/components/scroll-container";
-import { isAndroid } from "@/platform";
+import { isAndroid, isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import Collection from "./collection";
@@ -52,8 +52,10 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
     onOpenChangeFavoritesEditModal();
   };
 
+  const effectiveSideMenuCollapsed = sideMenuCollapsed && !isWeb;
+
   const sidebarWidth = (() => {
-    if (sideMenuCollapsed) return COLLAPSED_WIDTH;
+    if (effectiveSideMenuCollapsed) return COLLAPSED_WIDTH;
     const width = sideMenuWidth ?? 200;
     if (width < MIN_WIDTH) return MIN_WIDTH;
     if (width > MAX_WIDTH) return MAX_WIDTH;
@@ -62,7 +64,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
 
   const [renderWidth, setRenderWidth] = useState(sidebarWidth);
   const [isDragging, setIsDragging] = useState(false);
-  const isCollapsedVisual = isDragging ? renderWidth < MIN_WIDTH : sideMenuCollapsed;
+  const isCollapsedVisual = isDragging ? !isWeb && renderWidth < MIN_WIDTH : effectiveSideMenuCollapsed;
 
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -91,9 +93,9 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   };
 
   const computeWidth = (delta: number) => {
-    const rawWidth = Math.max(COLLAPSED_WIDTH, startWidthRef.current + delta);
+    const rawWidth = Math.max(isWeb ? MIN_WIDTH : COLLAPSED_WIDTH, startWidthRef.current + delta);
     const cappedWidth = Math.min(rawWidth, MAX_WIDTH);
-    const willCollapse = cappedWidth < MIN_WIDTH;
+    const willCollapse = !isWeb && cappedWidth < MIN_WIDTH;
     const widthForView = willCollapse ? COLLAPSED_WIDTH : Math.max(MIN_WIDTH, cappedWidth);
     const widthToPersist = Math.max(MIN_WIDTH, cappedWidth);
 
@@ -204,16 +206,18 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
             onOpenEditFavorite={handleOpenEditFavorite}
           />
         </ScrollContainer>
-        <Button
-          size="sm"
-          isIconOnly
-          fullWidth
-          radius="none"
-          onPress={onToggleCollapsed}
-          className="bg-background border-divider/30 h-auto w-full flex-none border-y py-1"
-        >
-          {isCollapsedVisual ? <RiArrowRightDoubleLine size={16} /> : <RiArrowLeftDoubleLine size={16} />}
-        </Button>
+        {!isWeb && (
+          <Button
+            size="sm"
+            isIconOnly
+            fullWidth
+            radius="none"
+            onPress={onToggleCollapsed}
+            className="bg-background border-divider/30 h-auto w-full flex-none border-y py-1"
+          >
+            {isCollapsedVisual ? <RiArrowRightDoubleLine size={16} /> : <RiArrowLeftDoubleLine size={16} />}
+          </Button>
+        )}
         <div
           className="hover:bg-foreground/10 absolute top-0 right-0 h-full w-2 cursor-col-resize bg-transparent"
           onMouseDown={onStartResize}

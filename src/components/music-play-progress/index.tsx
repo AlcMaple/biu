@@ -4,6 +4,7 @@ import { Slider } from "@heroui/react";
 import { twMerge } from "tailwind-merge";
 
 import { formatDuration } from "@/common/utils/time";
+import { isWeb } from "@/platform";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
@@ -19,7 +20,7 @@ const MusicPlayProgress = memo(({ isDisabled, className, trackClassName }: Props
   const duration = usePlayList(s => s.duration);
   const seek = usePlayList(s => s.seek);
 
-  const showThumb = !isDisabled && hovered;
+  const showThumb = !isDisabled && (isWeb || hovered);
 
   return (
     <div className={twMerge("flex w-3/4 items-center space-x-2", className)}>
@@ -36,8 +37,8 @@ const MusicPlayProgress = memo(({ isDisabled, className, trackClassName }: Props
         isDisabled={isDisabled}
         size="sm"
         color={showThumb ? "primary" : "foreground"}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={isWeb ? undefined : () => setHovered(true)}
+        onMouseLeave={isWeb ? undefined : () => setHovered(false)}
         className="flex-1"
         classNames={{
           track: twMerge("h-[4px] cursor-pointer", trackClassName),

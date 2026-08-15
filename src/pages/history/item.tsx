@@ -8,6 +8,7 @@ import { formatDuration } from "@/common/utils/time";
 import ContextMenu, { type ContextMenuItem } from "@/components/context-menu";
 import Image from "@/components/image";
 import OperationMenu from "@/components/music-list-item/operation";
+import { isWeb } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 
 interface Props {
@@ -95,7 +96,7 @@ const HistoryListItem = ({
                 className={clx("w-full truncate text-left text-sm font-medium", {
                   "text-primary": isPlay,
                 })}
-                title={typeof title === "string" ? title : undefined}
+                title={!isWeb && typeof title === "string" ? title : undefined}
               >
                 {title}
               </span>
