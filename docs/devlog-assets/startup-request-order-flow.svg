@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="470" viewBox="0 0 1080 470" role="img" aria-labelledby="title desc">
+  <title id="title">Web 与 Electron 启动请求的稳定化顺序</title>
+  <desc id="desc">Web 启动时跳过无 Cookie 能力的初始化与同步长轮询，只保留可捕获失败的匿名用户请求；Electron 先安装会话请求拦截器，再创建窗口和注入 Cookie。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+    <style>
+      .title { font: 700 25px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #e5e7eb; }
+      .label { font: 600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #f8fafc; }
+      .small { font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #cbd5e1; }
+      .box { stroke-width: 2; rx: 14; }
+      .line { fill: none; stroke: #64748b; stroke-width: 3; marker-end: url(#arrow); }
+      .web-line { fill: none; stroke: #38bdf8; stroke-width: 3; marker-end: url(#arrow); }
+      .desktop-line { fill: none; stroke: #22c55e; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1080" height="470" fill="#0f172a" rx="20" />
+  <text x="42" y="48" class="title">启动稳定性：平台先分流，再启动有能力支撑的请求</text>
+
+  <rect x="42" y="84" width="174" height="70" fill="#334155" stroke="#64748b" class="box" />
+  <text x="129" y="116" text-anchor="middle" class="label">应用启动</text>
+  <text x="129" y="138" text-anchor="middle" class="small">isWeb 分流</text>
+
+  <rect x="284" y="82" width="172" height="74" fill="#0c4a6e" stroke="#38bdf8" class="box" />
+  <text x="370" y="114" text-anchor="middle" class="label">普通 Web</text>
+  <text x="370" y="137" text-anchor="middle" class="small">匿名同源代理</text>
+
+  <rect x="520" y="82" width="220" height="74" fill="#0c4a6e" stroke="#38bdf8" class="box" />
+  <text x="630" y="110" text-anchor="middle" class="label">跳过无效能力</text>
+  <text x="630" y="133" text-anchor="middle" class="small">首页 Cookie 种子 / 同步 watch</text>
+
+  <rect x="804" y="82" width="232" height="74" fill="#0c4a6e" stroke="#38bdf8" class="box" />
+  <text x="920" y="110" text-anchor="middle" class="label">匿名用户请求</text>
+  <text x="920" y="133" text-anchor="middle" class="small">失败 catch + 日志，不冒泡</text>
+
+  <path d="M 216 119 L 284 119" class="web-line" />
+  <path d="M 456 119 L 520 119" class="web-line" />
+  <path d="M 740 119 L 804 119" class="web-line" />
+
+  <rect x="284" y="248" width="172" height="74" fill="#064e3b" stroke="#22c55e" class="box" />
+  <text x="370" y="280" text-anchor="middle" class="label">Electron</text>
+  <text x="370" y="303" text-anchor="middle" class="small">完整会话能力</text>
+
+  <rect x="520" y="236" width="220" height="98" fill="#064e3b" stroke="#22c55e" class="box" />
+  <text x="630" y="268" text-anchor="middle" class="label">先安装请求拦截器</text>
+  <text x="630" y="292" text-anchor="middle" class="small">Origin / Referer / UA</text>
+  <text x="630" y="314" text-anchor="middle" class="small">首屏请求不能抢跑</text>
+
+  <rect x="804" y="236" width="232" height="98" fill="#064e3b" stroke="#22c55e" class="box" />
+  <text x="920" y="268" text-anchor="middle" class="label">再创建窗口</text>
+  <text x="920" y="292" text-anchor="middle" class="small">注入 Cookie / 用户请求</text>
+  <text x="920" y="314" text-anchor="middle" class="small">异步失败均被记录</text>
+
+  <path d="M 129 154 L 129 285 L 284 285" class="desktop-line" />
+  <path d="M 456 285 L 520 285" class="desktop-line" />
+  <path d="M 740 285 L 804 285" class="desktop-line" />
+
+  <rect x="284" y="382" width="752" height="46" fill="#1e293b" stroke="#64748b" class="box" />
+  <text x="660" y="411" text-anchor="middle" class="small">结果：Web 不再空轮询；Electron 首轮请求已受会话拦截器保护；两端均无未处理 Promise</text>
+  <path d="M 920 334 L 920 382" class="line" />
+</svg>

@@ -154,10 +154,13 @@ if (!gotTheLock) {
     // 启动即快照本地数据，独立于网盘同步兜底（防双向同步把收藏夹冲掉无法找回）
     backupLocalData(localDataPath);
 
-    createWindow();
-    injectAuthCookie();
-
+    // 必须先于 BrowserWindow.loadFile 安装；否则首屏请求会抢跑，绕过 Origin / Referer / UA 修正。
     installWebRequestInterceptors();
+
+    createWindow();
+    void injectAuthCookie().catch(error => {
+      log.error("[main] Failed to initialize auth cookies:", error);
+    });
 
     registerIpcHandlers({
       getMainWindow: () => mainWindow,

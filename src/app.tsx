@@ -4,7 +4,7 @@ import { useHref, useNavigate, useRoutes } from "react-router";
 import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import moment from "moment";
 
-import platform from "@/platform";
+import platform, { isWeb, log } from "@/platform";
 
 import { getCookitFromBSite } from "./common/utils/cookie";
 import {
@@ -44,7 +44,12 @@ export function App() {
   const setUpdate = useAppUpdateStore(s => s.setUpdate);
 
   useEffect(() => {
-    getCookitFromBSite();
+    // Web 代理采用匿名会话，不转发 Cookie；请求首页无法种下可用登录态，只会多一次网络请求。
+    if (isWeb) return;
+
+    void getCookitFromBSite().catch(error => {
+      log.warn("[startup] 获取 B 站初始 Cookie 失败", error);
+    });
   }, []);
 
   useEffect(() => {
