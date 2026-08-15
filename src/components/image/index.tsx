@@ -11,13 +11,29 @@ interface Props extends ImageProps {
   emptyPlaceholder?: React.ReactNode;
 }
 
-const Image = ({ params, width, height, src, className, emptyPlaceholder, ...rest }: Props) => {
-  const [isError, setIsError] = useState(false);
-  const formatSrc = formatUrlProtocol(src);
+const BILIBILI_IMAGE_HOST_PATTERN = /^http:\/\/(?:[^/]+\.)?hdslb\.com\//i;
+
+const Image = ({
+  params,
+  width,
+  height,
+  src,
+  className,
+  emptyPlaceholder,
+  onError,
+  referrerPolicy,
+  ...rest
+}: Props) => {
+  const [failedSrc, setFailedSrc] = useState<string | undefined>();
+  const formatSrc = formatUrlProtocol(src)?.replace(BILIBILI_IMAGE_HOST_PATTERN, matched =>
+    matched.replace(/^http:/i, "https:"),
+  );
   const finalSrc =
     params && formatSrc && formatSrc.includes("/bfs/") && !formatSrc.includes("@")
       ? `${formatSrc}@${params}`
       : formatSrc;
+  const isBilibiliImage = Boolean(finalSrc && /^(?:https?:)?\/\/(?:[^/]+\.)?hdslb\.com\//i.test(finalSrc));
+  const isError = Boolean(finalSrc && failedSrc === finalSrc);
 
   if (!src || isError) {
     return (
@@ -35,8 +51,10 @@ const Image = ({ params, width, height, src, className, emptyPlaceholder, ...res
       width={width}
       height={height}
       src={finalSrc}
-      onError={() => {
-        setIsError(true);
+      referrerPolicy={referrerPolicy ?? (isBilibiliImage ? "no-referrer" : undefined)}
+      onError={event => {
+        setFailedSrc(finalSrc);
+        onError?.(event);
       }}
       className={twMerge("object-cover", className)}
       {...rest}
