@@ -1,4 +1,6 @@
-import type { RouteObject } from "react-router";
+import { Navigate, type RouteObject } from "react-router";
+
+import { isWeb } from "@/platform";
 
 import Layout from "./layout";
 import DesktopLyrics from "./pages/desktop-lyrics";
@@ -19,7 +21,7 @@ import UserProfile from "./pages/user-profile";
 import Folder from "./pages/video-collection";
 import LocalFavorites from "./pages/video-collection/local-favorites";
 
-const routes: RouteObject[] = [
+export const createRoutes = (web = isWeb): RouteObject[] => [
   {
     path: "/",
     element: <Layout />,
@@ -70,7 +72,7 @@ const routes: RouteObject[] = [
       },
       {
         path: "local-music",
-        element: <LocalMusicPage />,
+        element: web ? <Navigate replace to="/" /> : <LocalMusicPage />,
       },
       {
         path: "search",
@@ -95,5 +97,7 @@ const routes: RouteObject[] = [
     element: <NotFound />,
   },
 ];
+
+const routes = createRoutes();
 
 export default routes;

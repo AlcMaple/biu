@@ -1,9 +1,9 @@
 import React from "react";
 import { type Control, Controller } from "react-hook-form";
 
-import { DefaultMenuList } from "@/common/constants/menus";
+import { getDefaultMenuList } from "@/common/constants/menus";
 import SelectAllCheckboxGroup from "@/components/select-all-checkbox-group";
-import { isAndroid } from "@/platform";
+import { isAndroid, isWeb } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useUser } from "@/store/user";
 
@@ -15,6 +15,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
   const user = useUser(state => state.user);
   const createdFavorites = useFavoritesStore(state => state.createdFavorites);
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
+  const defaultMenuList = getDefaultMenuList(isWeb);
 
   return (
     <div className="space-y-6">
@@ -27,7 +28,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
               control={control}
               name="hiddenMenuKeys"
               render={({ field }) => {
-                const groupKeys = DefaultMenuList.filter(i => i.href).map(i => i.href!);
+                const groupKeys = defaultMenuList.filter(i => i.href).map(i => i.href!);
                 const selectedKeys = groupKeys.filter(k => !field.value.includes(k));
 
                 const handleSelectionChange = (newSelectedKeys: string[]) => {
@@ -37,10 +38,12 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
                   field.onChange(nextHidden);
                 };
 
-                const items = DefaultMenuList.filter(i => (user?.isLogin ? true : !i.needLogin)).map(item => ({
-                  value: item.href!,
-                  label: item.title,
-                }));
+                const items = defaultMenuList
+                  .filter(i => (user?.isLogin ? true : !i.needLogin))
+                  .map(item => ({
+                    value: item.href!,
+                    label: item.title,
+                  }));
 
                 return (
                   <SelectAllCheckboxGroup
