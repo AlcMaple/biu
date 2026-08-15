@@ -5,7 +5,7 @@ import { RiPlayFill } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
-import platform, { isNativeMobile } from "@/platform";
+import platform, { isNativeMobile, isWeb } from "@/platform";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
 import { useModalStore } from "@/store/modal";
@@ -24,9 +24,44 @@ const REGION_WEB_LOCATION = "333.40138";
 
 type RecommendTabKey = "music" | "guichu" | "pop";
 
+type RecommendLoadError = {
+  scope: "initial" | "more";
+  message: string;
+};
+
 const REGION_MAP: Record<Exclude<RecommendTabKey, "pop">, number> = {
   music: 1003,
   guichu: 1007,
+};
+
+class RecommendApiError extends Error {}
+
+const getRecommendErrorMessage = (error: unknown) => {
+  if (error instanceof RecommendApiError) {
+    return `B 站推荐接口返回异常（${error.message}），请稍后手动重试。`;
+  }
+
+  const requestError = error as {
+    code?: string;
+    response?: { status?: number };
+  };
+  const status = requestError?.response?.status;
+
+  if (status === 429) {
+    return "请求过于频繁，请稍后再手动重试，避免继续触发限流。";
+  }
+  if (status === 401 || status === 403) {
+    return isWeb
+      ? "B 站拒绝了推荐请求，请确认登录状态或 Web 网络代理后手动重试。"
+      : "B 站拒绝了推荐请求，请确认登录状态后手动重试。";
+  }
+  if (requestError?.code === "ERR_NETWORK" || requestError?.code === "ECONNABORTED") {
+    return isWeb
+      ? "无法连接 B 站推荐服务，请检查网络或 Web 网络代理后手动重试。"
+      : "无法连接 B 站推荐服务，请检查网络后手动重试。";
+  }
+
+  return "推荐内容暂时无法加载，请稍后手动重试。";
 };
 
 const normalizeRankItem = (item: MusicItem): RecommendItem => {
@@ -65,6 +100,7 @@ const MusicRecommend = () => {
   const [hasMore, setHasMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<RecommendLoadError | null>(null);
   const pageRef = useRef(1);
   const [activeTab, setActiveTab] = useState<RecommendTabKey>("music");
   const scrollRestoreRef = useRef<{ tab: RecommendTabKey; top: number } | null>(null);
@@ -91,10 +127,7 @@ const MusicRecommend = () => {
           setList(prev => (pn === 1 ? normalized : [...prev, ...normalized]));
           setHasMore(items.length === PAGE_SIZE);
         } else {
-          if (pn === 1) {
-            setList([]);
-          }
-          setHasMore(false);
+          throw new RecommendApiError(res.message || `错误码 ${res.code}`);
         }
         return;
       }
@@ -113,41 +146,63 @@ const MusicRecommend = () => {
         setList(prev => (pn === 1 ? normalized : [...prev, ...normalized]));
         setHasMore(items.length === REGION_PAGE_SIZE);
       } else {
-        if (pn === 1) {
-          setList([]);
-        }
-        setHasMore(false);
+        throw new RecommendApiError(res.message || `错误码 ${res.code}`);
       }
     },
     [activeTab],
   );
 
-  const loadMore = async () => {
-    if (initialLoading || loadingMore || !hasMore) return;
-    try {
+  const loadMore = useCallback(
+    async (force = false) => {
+      if (initialLoading || loadingMore || (!hasMore && !force)) return;
+
+      const previousPage = pageRef.current;
+      const nextPage = previousPage + 1;
       setLoadingMore(true);
-      pageRef.current += 1;
-      await fetchPage(pageRef.current);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+      setLoadError(null);
+      pageRef.current = nextPage;
+
+      try {
+        await fetchPage(nextPage);
+      } catch (error) {
+        pageRef.current = previousPage;
+        setHasMore(false);
+        setLoadError({ scope: "more", message: getRecommendErrorMessage(error) });
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [fetchPage, hasMore, initialLoading, loadingMore],
+  );
 
   const init = useCallback(async () => {
+    setInitialLoading(true);
+    setLoadError(null);
+    setHasMore(false);
+    setLoadingMore(false);
+    pageRef.current = 1;
+
     try {
-      pageRef.current = 1;
-      setHasMore(true);
-      setLoadingMore(false);
       await fetchPage(1);
+    } catch (error) {
+      setList([]);
+      setHasMore(false);
+      setLoadError({ scope: "initial", message: getRecommendErrorMessage(error) });
     } finally {
       setInitialLoading(false);
     }
   }, [fetchPage]);
 
   useEffect(() => {
-    setInitialLoading(true);
-    init();
-  }, [activeTab, init]);
+    void init();
+  }, [init]);
+
+  const handleRetry = useCallback(() => {
+    if (loadError?.scope === "more") {
+      return loadMore(true);
+    }
+    return init();
+  }, [init, loadError?.scope, loadMore]);
 
   useEffect(() => {
     if (initialLoading) return;
@@ -310,30 +365,40 @@ const MusicRecommend = () => {
       </div>
       {activeTab === "pop" && <NewMusicTop onLayoutChange={handlePopLayoutChange} />}
       <div className="relative">
-        {displayMode === "card" ? (
-          <MusicRecommendGridList
-            key={listKey}
-            items={list}
-            hasMore={hasMore}
-            loading={loadingMore}
-            onLoadMore={loadMore}
-            getScrollElement={getScrollElement}
-            onMenuAction={handleMenuAction}
-          />
-        ) : (
-          <MusicRecommendList
-            key={listKey}
-            items={list}
-            hasMore={hasMore}
-            loading={loadingMore}
-            onLoadMore={loadMore}
-            getScrollElement={getScrollElement}
-            onMenuAction={handleMenuAction}
-          />
-        )}
+        {!(loadError?.scope === "initial" && list.length === 0) &&
+          (displayMode === "card" ? (
+            <MusicRecommendGridList
+              key={listKey}
+              items={list}
+              hasMore={hasMore}
+              loading={loadingMore}
+              onLoadMore={loadMore}
+              getScrollElement={getScrollElement}
+              onMenuAction={handleMenuAction}
+            />
+          ) : (
+            <MusicRecommendList
+              key={listKey}
+              items={list}
+              hasMore={hasMore}
+              loading={loadingMore}
+              onLoadMore={loadMore}
+              getScrollElement={getScrollElement}
+              onMenuAction={handleMenuAction}
+            />
+          ))}
         {initialLoading && list.length === 0 && (
           <div className="flex h-[40vh] items-center justify-center">
             <Spinner size="lg" />
+          </div>
+        )}
+        {loadError && !initialLoading && (
+          <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-4 text-center" role="alert">
+            <p className="font-medium">{loadError.scope === "more" ? "更多推荐加载失败" : "推荐内容加载失败"}</p>
+            <p className="text-foreground-500 text-sm">{loadError.message}</p>
+            <AsyncButton color="primary" variant="flat" onPress={handleRetry}>
+              {loadError.scope === "more" ? "重试加载更多" : "重新加载"}
+            </AsyncButton>
           </div>
         )}
       </div>
