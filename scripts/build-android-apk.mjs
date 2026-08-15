@@ -9,6 +9,7 @@ import pkg from "../package.json" with { type: "json" };
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ANDROID_DIR = resolve(ROOT, "android");
 const isWindows = process.platform === "win32";
+const corepack = isWindows ? "corepack.cmd" : "corepack";
 
 const run = (command, args, cwd = ROOT, env = process.env) => {
   const result = spawnSync(command, args, {
@@ -48,14 +49,18 @@ if (isRelease && !existsSync(resolve(ANDROID_DIR, "keystore.properties"))) {
   process.exit(1);
 }
 
-run(isWindows ? "corepack.cmd" : "corepack", ["pnpm", "build:android"]);
+const offlineAndroidEnv = { ...process.env, BIU_TARGET: "android" };
+delete offlineAndroidEnv.BIU_DEV_URL;
+
+run(corepack, ["pnpm", "exec", "rsbuild", "build"], ROOT, offlineAndroidEnv);
+run(corepack, ["pnpm", "exec", "cap", "sync", "android"], ROOT, offlineAndroidEnv);
 run(
   isWindows ? "gradlew.bat" : "./gradlew",
   [`assemble${variant[0].toUpperCase()}${variant.slice(1)}`],
   ANDROID_DIR,
   androidSdk
-    ? { ...process.env, ANDROID_HOME: androidSdk, ANDROID_SDK_ROOT: process.env.ANDROID_SDK_ROOT ?? androidSdk }
-    : process.env,
+    ? { ...offlineAndroidEnv, ANDROID_HOME: androidSdk, ANDROID_SDK_ROOT: process.env.ANDROID_SDK_ROOT ?? androidSdk }
+    : offlineAndroidEnv,
 );
 
 const source = resolve(ANDROID_DIR, "app", "build", "outputs", "apk", variant, `app-${variant}.apk`);
