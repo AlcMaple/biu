@@ -17,7 +17,12 @@ import {
 
 import { type MenuItemProps } from "@/components/menu/menu-item";
 
-export const DefaultMenuList: (MenuItemProps & { needLogin?: boolean })[] = [
+export type DefaultMenuItem = MenuItemProps & {
+  needLogin?: boolean;
+  hideOnWeb?: boolean;
+};
+
+export const DefaultMenuList: DefaultMenuItem[] = [
   {
     title: "推荐音乐",
     href: "/",
@@ -56,6 +61,7 @@ export const DefaultMenuList: (MenuItemProps & { needLogin?: boolean })[] = [
     href: "/local-music",
     icon: RiFolderMusicLine,
     activeIcon: RiFolderMusicFill,
+    hideOnWeb: true,
   },
   {
     title: "下载记录",
@@ -64,3 +70,5 @@ export const DefaultMenuList: (MenuItemProps & { needLogin?: boolean })[] = [
     activeIcon: RiFileDownloadFill,
   },
 ];
+
+export const getDefaultMenuList = (isWeb: boolean) => DefaultMenuList.filter(item => !(isWeb && item.hideOnWeb));
