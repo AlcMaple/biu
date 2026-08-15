@@ -24,7 +24,7 @@ import { useSettings } from "@/store/settings";
 import { useGlassmorphism } from "./glassmorphism";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
 
-const AndroidFullScreenPlayer = () => {
+const MobileFullScreenPlayer = () => {
   const isOpen = useModalStore(s => s.isFullScreenPlayerOpen);
   const close = useModalStore(s => s.closeFullScreenPlayer);
   const { playId, list } = usePlayList(
@@ -100,7 +100,7 @@ const AndroidFullScreenPlayer = () => {
           !isOpen ? (
             <Empty />
           ) : (
-            <DrawerBody className="relative flex flex-col gap-0 overflow-hidden bg-transparent p-0">
+            <DrawerBody className="relative flex flex-col gap-0 overflow-hidden bg-transparent p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
               {!showBlurredBackground && (
                 <div aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor }} />
               )}
@@ -207,4 +207,4 @@ const AndroidFullScreenPlayer = () => {
   );
 };
 
-export default AndroidFullScreenPlayer;
+export default MobileFullScreenPlayer;

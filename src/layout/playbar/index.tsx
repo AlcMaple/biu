@@ -3,14 +3,14 @@ import { useEffect } from "react";
 import { Card } from "@heroui/react";
 
 import { setVolumeBoost } from "@/common/utils/audio-graph";
-import { isAndroid } from "@/platform";
+import { isNativeMobile } from "@/platform";
 import { restoreSession } from "@/store/heartbeat";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 
-import AndroidPlayBar from "./android";
 import Center from "./center";
 import Left from "./left";
+import MobilePlayBar from "./mobile";
 import Right from "./right";
 
 /**
@@ -34,8 +34,8 @@ function PlayBar() {
     setVolumeBoost((volumeBoost ?? 100) / 100);
   }, [volumeBoost]);
 
-  if (isAndroid) {
-    return <AndroidPlayBar />;
+  if (isNativeMobile) {
+    return <MobilePlayBar />;
   }
 
   return (

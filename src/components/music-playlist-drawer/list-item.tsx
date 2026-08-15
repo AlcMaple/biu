@@ -6,7 +6,7 @@ import { RiMoreFill, RiMusic2Line, RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
 import Image from "@/components/image";
-import { isAndroid, isWeb } from "@/platform";
+import { isNativeMobile, isWeb } from "@/platform";
 import { type PlayData } from "@/store/play-list";
 
 import { getMenus } from "./menu";
@@ -82,7 +82,7 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
               variant="light"
               size="sm"
               className={
-                isAndroid || isWeb
+                isNativeMobile || isWeb
                   ? "flex-none"
                   : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
               }

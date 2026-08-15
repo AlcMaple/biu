@@ -6,7 +6,7 @@ import clx from "classnames";
 
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer from "@/components/scroll-container";
-import { isAndroid, isWeb } from "@/platform";
+import { isNativeMobile, isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import Collection from "./collection";
@@ -110,7 +110,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   }, [isDragging]);
 
   useEffect(() => {
-    if (isAndroid) return;
+    if (isNativeMobile) return;
 
     const onMouseMove = (event: MouseEvent) => {
       if (!isDraggingRef.current) return;
@@ -149,7 +149,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
     };
   }, [updateSettings]);
 
-  if (isAndroid) {
+  if (isNativeMobile) {
     return (
       <>
         <Drawer
@@ -160,7 +160,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
           classNames={{ base: "w-[260px] max-w-[72vw]" }}
         >
           <DrawerContent>
-            <DrawerBody className="flex flex-col gap-0 p-0">
+            <DrawerBody className="flex flex-col gap-0 p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
               <Logo isCollapsed={false} />
               <ScrollContainer className="min-h-0 flex-1 px-4 pb-2">
                 <DefaultMenus isCollapsed={false} onOpenAddFavorite={handleOpenAddFavorite} />

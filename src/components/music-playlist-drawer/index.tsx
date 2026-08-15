@@ -7,7 +7,7 @@ import { uniqBy } from "es-toolkit/array";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
-import platform, { isAndroid } from "@/platform";
+import platform, { isNativeMobile } from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { isSame, usePlayList, type PlayData } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -123,8 +123,8 @@ const PlayListDrawer = () => {
     <Drawer
       radius="md"
       shadow="md"
-      backdrop={isAndroid ? "opaque" : "transparent"}
-      size={isAndroid ? "xs" : "sm"}
+      backdrop={isNativeMobile ? "opaque" : "transparent"}
+      size={isNativeMobile ? "xs" : "sm"}
       hideCloseButton
       disableAnimation
       isOpen={isOpen}
@@ -132,7 +132,9 @@ const PlayListDrawer = () => {
       classNames={{
         backdrop: "z-200 window-no-drag",
         wrapper: "z-200 window-no-drag",
-        base: isAndroid ? "data-[placement=right]:mb-22 w-4/5 max-w-[360px]" : "data-[placement=right]:mb-22",
+        base: isNativeMobile
+          ? "data-[placement=right]:mr-[env(safe-area-inset-right)] data-[placement=right]:mb-[calc(88px+env(safe-area-inset-bottom))] w-4/5 max-w-[360px]"
+          : "data-[placement=right]:mb-22",
       }}
     >
       <DrawerContent>

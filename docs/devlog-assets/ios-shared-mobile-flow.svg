@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="500" viewBox="0 0 1040 500" role="img" aria-labelledby="title desc">
+  <title id="title">iOS 共享移动运行时</title>
+  <desc id="desc">Electron、Android、iOS 与 Web 共享 React 路由和状态层；运行时检测后，Android 与 iOS 共用原生移动平台适配和移动布局。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .title { font-size: 22px; font-weight: 700; }
+    .label { font-size: 15px; font-weight: 650; }
+    .small { font-size: 13px; fill: #5f6368; }
+    .box { fill: #fff; stroke: #c7c9d1; stroke-width: 1.5; rx: 12; }
+    .shared { fill: #f1edff; stroke: #7c5ce7; }
+    .electron { fill: #e8f4ff; stroke: #4f87c7; }
+    .mobile { fill: #eaf8ee; stroke: #4f9d69; }
+    .web { fill: #fff4dc; stroke: #c58b25; }
+    .ios { fill: #eef1f5; stroke: #6b7280; }
+    .arrow { fill: none; stroke: #747780; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#747780" />
+    </marker>
+  </defs>
+  <text x="40" y="42" class="title">iOS 加入共享渲染层，不增加第二套前端</text>
+  <rect x="350" y="68" width="340" height="76" class="box shared" />
+  <text x="520" y="98" text-anchor="middle" class="label">React + HashRouter + Zustand</text>
+  <text x="520" y="123" text-anchor="middle" class="small">页面、路由、播放队列与业务状态完全共用</text>
+  <path d="M 520 144 L 520 178" class="arrow" />
+  <rect x="360" y="180" width="320" height="64" class="box" />
+  <text x="520" y="207" text-anchor="middle" class="label">detect.ts 运行时检测</text>
+  <text x="520" y="230" text-anchor="middle" class="small">Electron / native Android / native iOS / Web</text>
+  <path d="M 420 244 C 340 274 210 278 150 308" class="arrow" />
+  <path d="M 500 244 C 470 274 420 278 390 308" class="arrow" />
+  <path d="M 540 244 C 570 274 620 278 650 308" class="arrow" />
+  <path d="M 620 244 C 700 274 830 278 890 308" class="arrow" />
+  <rect x="30" y="310" width="240" height="104" class="box electron" />
+  <text x="150" y="340" text-anchor="middle" class="label">Electron</text>
+  <text x="150" y="366" text-anchor="middle" class="small">electron.ts + desktop UI</text>
+  <text x="150" y="389" text-anchor="middle" class="small">IPC / electron-store</text>
+  <rect x="290" y="310" width="220" height="104" class="box mobile" />
+  <text x="400" y="340" text-anchor="middle" class="label">Android</text>
+  <text x="400" y="366" text-anchor="middle" class="small">mobile.ts + mobile UI</text>
+  <text x="400" y="389" text-anchor="middle" class="small">Preferences / Cookies / HTTP</text>
+  <rect x="530" y="310" width="220" height="104" class="box ios" />
+  <text x="640" y="340" text-anchor="middle" class="label">iOS</text>
+  <text x="640" y="366" text-anchor="middle" class="small">同一 mobile.ts + mobile UI</text>
+  <text x="640" y="389" text-anchor="middle" class="small">UserDefaults / Cookies / HTTP</text>
+  <rect x="770" y="310" width="240" height="104" class="box web" />
+  <text x="890" y="340" text-anchor="middle" class="label">Web</text>
+  <text x="890" y="366" text-anchor="middle" class="small">web.ts + desktop responsive UI</text>
+  <text x="890" y="389" text-anchor="middle" class="small">localStorage / browser axios</text>
+  <path d="M 400 414 C 430 450 490 452 520 452" class="arrow" />
+  <path d="M 640 414 C 610 450 550 452 520 452" class="arrow" />
+  <text x="520" y="482" text-anchor="middle" class="small">Android 与 iOS 只在真实系统差异上使用 isAndroid / isIOS；共享移动形态统一用 isNativeMobile</text>
+</svg>

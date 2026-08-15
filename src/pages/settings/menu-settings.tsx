@@ -3,7 +3,7 @@ import { type Control, Controller } from "react-hook-form";
 
 import { getDefaultMenuList } from "@/common/constants/menus";
 import SelectAllCheckboxGroup from "@/components/select-all-checkbox-group";
-import { isAndroid, isWeb } from "@/platform";
+import { isNativeMobile, isWeb } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useUser } from "@/store/user";
 
@@ -21,7 +21,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
     <div className="space-y-6">
       <h2>设置侧边菜单项显示和隐藏</h2>
       <div className="w-full space-y-8">
-        <div className={isAndroid ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
+        <div className={isNativeMobile ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
           <div className="text-medium font-medium">系统默认菜单</div>
           <div className="max-w-[480px]">
             <Controller
@@ -61,7 +61,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
 
         {user?.isLogin && (
           <>
-            <div className={isAndroid ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
+            <div className={isNativeMobile ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
               <div className="text-medium font-medium">个人创建菜单</div>
               <div className="max-w-[480px]">
                 <Controller
@@ -98,7 +98,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
                 />
               </div>
             </div>
-            <div className={isAndroid ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
+            <div className={isNativeMobile ? "flex w-full flex-col gap-3" : "flex w-full items-start space-x-[100px]"}>
               <div className="text-medium font-medium">个人收藏菜单</div>
               <div className="max-w-[480px]">
                 <Controller

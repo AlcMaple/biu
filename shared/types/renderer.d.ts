@@ -1,5 +1,5 @@
 declare global {
-  type AppPlatForm = "macos" | "windows" | "linux";
+  type AppPlatForm = "macos" | "windows" | "linux" | "android" | "ios";
 
   type StoreName = keyof StoreDataMap;
   interface LocalMusicItem {
@@ -48,7 +48,7 @@ declare global {
     getNeteaseLyrics: (params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>;
     /** 在 LrcLib 搜索歌曲/歌词 */
     searchLrclibLyrics: (params: SearchSongByLrclibParams) => Promise<SearchSongByLrclibResponse[]>;
-    /** 获取当前应用平台：macos | windows | linux */
+    /** 获取当前应用平台 */
     getPlatform: () => AppPlatForm;
     /** 更新网络代理设置 */
     setProxySettings: (proxySettings: ProxySettings) => Promise<void>;

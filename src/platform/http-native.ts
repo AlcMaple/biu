@@ -2,10 +2,14 @@ import { CapacitorHttp } from "@capacitor/core";
 
 import type { PlatformHttp, RequestConfig } from "./types";
 
+import { isIOS } from "./detect";
+
 const BASE_HEADERS: Record<string, string> = {
   Referer: "https://www.bilibili.com",
   Origin: "https://www.bilibili.com",
-  "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36",
+  "User-Agent": isIOS
+    ? "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15"
+    : "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36",
 };
 
 const http: PlatformHttp = {

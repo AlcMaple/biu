@@ -28,7 +28,7 @@ import {
 
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
-import platform, { isAndroid } from "@/platform";
+import platform, { isNativeMobile } from "@/platform";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
@@ -52,8 +52,10 @@ export const SystemSettingsTab = ({
   latestVersion,
   setValue,
 }: SystemSettingsTabProps) => {
-  const rowCls = isAndroid ? "flex w-full flex-col items-stretch gap-2" : "flex w-full items-center justify-between";
-  const labelCls = isAndroid ? "space-y-1" : "mr-6 space-y-1";
+  const rowCls = isNativeMobile
+    ? "flex w-full flex-col items-stretch gap-2"
+    : "flex w-full items-center justify-between";
+  const labelCls = isNativeMobile ? "space-y-1" : "mr-6 space-y-1";
 
   return (
     <Form className="w-full space-y-6">
@@ -73,8 +75,8 @@ export const SystemSettingsTab = ({
               classNames={{
                 cursor: "rounded-medium",
               }}
-              fullWidth={isAndroid}
-              size={isAndroid ? "sm" : "md"}
+              fullWidth={isNativeMobile}
+              size={isNativeMobile ? "sm" : "md"}
               selectedKey={field.value}
               onSelectionChange={key => field.onChange(key)}
             >
@@ -125,8 +127,8 @@ export const SystemSettingsTab = ({
               classNames={{
                 cursor: "rounded-medium",
               }}
-              fullWidth={isAndroid}
-              size={isAndroid ? "sm" : "md"}
+              fullWidth={isNativeMobile}
+              size={isNativeMobile ? "sm" : "md"}
               selectedKey={field.value}
               onSelectionChange={key => field.onChange(key)}
             >
@@ -171,7 +173,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">字体</div>
           <div className="text-sm text-zinc-500">选择界面显示的字体</div>
         </div>
-        <div className={isAndroid ? "w-full" : "w-[180px]"}>
+        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="fontFamily"
@@ -186,7 +188,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">页面切换动画</div>
           <div className="text-sm text-zinc-500">选择页面切换时的过渡效果</div>
         </div>
-        <div className={isAndroid ? "w-full" : "w-[180px]"}>
+        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="pageTransition"
@@ -215,7 +217,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">圆角</div>
           <div className="text-sm text-zinc-500">调整界面控件的圆角大小</div>
         </div>
-        <div className={isAndroid ? "w-full" : "w-[360px]"}>
+        <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
           <Controller
             control={control}
             name="borderRadius"
@@ -252,7 +254,7 @@ export const SystemSettingsTab = ({
             {audioQuality === "low" && "60-80 kbps"}
           </div>
         </div>
-        <div className={isAndroid ? "w-full" : "w-[180px]"}>
+        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="audioQuality"
@@ -284,7 +286,7 @@ export const SystemSettingsTab = ({
             在系统音量之外额外放大音频，适合声音很小的歌曲；100% 为不增强，内置限幅保护，拉高也不会破音
           </div>
         </div>
-        <div className={isAndroid ? "w-full" : "w-[360px]"}>
+        <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
           <Controller
             control={control}
             name="volumeBoost"
@@ -328,15 +330,15 @@ export const SystemSettingsTab = ({
         <FancyPlayerImageAlbum />
       </div>
 
-      {!isAndroid && <Divider />}
-      {!isAndroid && <h2>下载</h2>}
-      {!isAndroid && (
+      {!isNativeMobile && <Divider />}
+      {!isNativeMobile && <h2>下载</h2>}
+      {!isNativeMobile && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">下载目录</div>
             <div className="text-sm text-zinc-500">选择音视频保存的位置</div>
           </div>
-          <div className={isAndroid ? "w-full" : "w-[360px]"}>
+          <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
             <Controller
               control={control}
               name="downloadPath"
@@ -360,13 +362,13 @@ export const SystemSettingsTab = ({
       )}
 
       {/* FFmpeg 路径配置 */}
-      {!isAndroid && (
+      {!isNativeMobile && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">FFmpeg 路径</div>
             <div className="text-sm text-zinc-500">手动指定 FFmpeg 可执行文件路径</div>
           </div>
-          <div className={isAndroid ? "w-full" : "w-[360px]"}>
+          <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
             <Controller
               control={control}
               name="ffmpegPath"
@@ -403,10 +405,10 @@ export const SystemSettingsTab = ({
         />
       </div>
 
-      {!isAndroid && <Divider />}
-      {!isAndroid && <h2>系统</h2>}
+      {!isNativeMobile && <Divider />}
+      {!isNativeMobile && <h2>系统</h2>}
       {/* 窗口关闭选项 */}
-      {!isAndroid && (
+      {!isNativeMobile && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">窗口关闭</div>
@@ -426,7 +428,7 @@ export const SystemSettingsTab = ({
       )}
 
       {/* 开机自启动开关 */}
-      {!isAndroid && (
+      {!isNativeMobile && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">开机自启动</div>

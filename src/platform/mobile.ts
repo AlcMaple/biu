@@ -3,6 +3,8 @@ import { Preferences } from "@capacitor/preferences";
 
 import type { Logger, Platform } from "./types";
 
+import { isIOS } from "./detect";
+
 /**
  * B 站 cookie 域。所有读写都对准这个域，与 Electron 端
  * `electron/ipc/cookie.ts` 用 `.bilibili.com` 域保持一致。
@@ -14,47 +16,47 @@ const asyncNoop = async () => {};
 const unsubscribe = () => noop;
 
 /**
- * Android 端的 store 实现。每个 StoreName 对应一条 Capacitor Preferences 键值，
+ * 原生移动端的 store 实现。每个 StoreName 对应一条 Capacitor Preferences 键值，
  * value 用 JSON 序列化保存。这是 Electron 端 electron-store 的对等实现，
- * 区别只是底层从 .json 文件换成了 Android SharedPreferences。
+ * 区别只是底层从 .json 文件换成了 Android SharedPreferences 或 iOS UserDefaults。
  *
  * 解锁的功能：token 持久化、本地歌单 / 本地收藏 / tag 持久化、应用设置 / 快捷键设置、
  * 歌词缓存 —— 之前因为 noop 全部用不了。
  */
 const STORE_KEY_PREFIX = "biu:";
 
-async function androidGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
+async function mobileGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
   try {
     const { value } = await Preferences.get({ key: `${STORE_KEY_PREFIX}${name}` });
     if (!value) return undefined;
     return JSON.parse(value) as StoreDataMap[N];
   } catch (err) {
-    console.error(`[android.getStore] ${String(name)}:`, err);
+    console.error(`[mobile.getStore] ${String(name)}:`, err);
     return undefined;
   }
 }
 
-async function androidSetStore<N extends StoreName>(name: N, value: StoreDataMap[N]): Promise<void> {
+async function mobileSetStore<N extends StoreName>(name: N, value: StoreDataMap[N]): Promise<void> {
   try {
     if (value === undefined || value === null) return;
     await Preferences.set({ key: `${STORE_KEY_PREFIX}${name}`, value: JSON.stringify(value) });
   } catch (err) {
-    console.error(`[android.setStore] ${String(name)}:`, err);
+    console.error(`[mobile.setStore] ${String(name)}:`, err);
   }
 }
 
-async function androidClearStore(name: StoreName): Promise<void> {
+async function mobileClearStore(name: StoreName): Promise<void> {
   try {
     await Preferences.remove({ key: `${STORE_KEY_PREFIX}${name}` });
   } catch (err) {
-    console.error(`[android.clearStore] ${String(name)}:`, err);
+    console.error(`[mobile.clearStore] ${String(name)}:`, err);
   }
 }
 
 const platform: Platform = {
-  getStore: androidGetStore,
-  setStore: androidSetStore,
-  clearStore: androidClearStore,
+  getStore: mobileGetStore,
+  setStore: mobileSetStore,
+  clearStore: mobileClearStore,
   selectDirectory: async () => null,
   selectFile: async () => null,
   selectImages: async () => [],
@@ -79,7 +81,7 @@ const platform: Platform = {
       const cookies = await CapacitorCookies.getCookies({ url: BILIBILI_URL });
       return cookies?.[key];
     } catch (err) {
-      console.error("[android.getCookie]", err);
+      console.error("[mobile.getCookie]", err);
       return undefined;
     }
   },
@@ -97,14 +99,14 @@ const platform: Platform = {
         expires: expirationDate ? new Date(expirationDate * 1000).toUTCString() : undefined,
       });
     } catch (err) {
-      console.error("[android.setCookie]", err);
+      console.error("[mobile.setCookie]", err);
     }
   },
   searchNeteaseSongs: async () => ({}),
   getNeteaseSimilarSongs: async () => ({}),
   getNeteaseLyrics: async () => ({}),
   searchLrclibLyrics: async () => [],
-  getPlatform: () => "linux" as AppPlatForm,
+  getPlatform: () => (isIOS ? "ios" : "android"),
   setProxySettings: asyncNoop,
   updatePlaybackState: noop,
   onShortcutCommand: unsubscribe,
