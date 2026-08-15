@@ -1,6 +1,7 @@
 import moment from "moment";
 
 import { log } from "@/platform";
+import { isWeb } from "@/platform/detect";
 import { postClickInterfaceClickWebH5 } from "@/service/click-interface-click-web-h5";
 import { postClickInterfaceWebHeartbeat } from "@/service/click-interface-web-heartbeat";
 import { useSettings } from "@/store/settings";
@@ -57,7 +58,8 @@ const generateSessionId = () => {
 
 const checkReportingEnabled = () => {
   const { reportPlayHistory } = useSettings.getState();
-  if (!reportPlayHistory) {
+  const isAnonymousWeb = isWeb && !useUser.getState().user?.mid;
+  if (!reportPlayHistory || isAnonymousWeb) {
     currentSession = null;
     return false;
   }

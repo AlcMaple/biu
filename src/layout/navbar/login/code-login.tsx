@@ -19,7 +19,7 @@ const PHONE_REGEX_CN = /^(?:\+?86)?1\d{10}$/; // 简易中国大陆手机号校�
 
 interface Props {
   onClose: () => void;
-  updateUserData: (refreshToken?: string) => Promise<void>;
+  updateUserData: (refreshToken?: string) => Promise<boolean>;
 }
 
 const CodeLogin = ({ onClose, updateUserData }: Props) => {
@@ -146,9 +146,10 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
       });
 
       if (resp.code === 0) {
-        addToast({ title: "登录成功", color: "success" });
-        await updateUserData(resp.data?.refresh_token);
-        onClose();
+        if (await updateUserData(resp.data?.refresh_token)) {
+          addToast({ title: "登录成功", color: "success" });
+          onClose();
+        }
       } else {
         addToast({ title: resp.message || "登录失败", color: "danger" });
       }

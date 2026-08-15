@@ -24,6 +24,7 @@ export interface CollResourceDealResponse {
  */
 export const postCollResourceDeal = (data: CollResourceDealParams) => {
   return apiRequest.post<CollResourceDealResponse>("/medialist/gateway/coll/resource/deal", data, {
+    useCSRF: true,
     useFormData: true,
   });
 };

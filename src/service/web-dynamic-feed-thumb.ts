@@ -1,5 +1,3 @@
-import platform from "@/platform";
-
 import { apiRequest } from "./request";
 
 export interface PostDynamicFeedThumbParams {
@@ -15,12 +13,8 @@ export interface PostDynamicFeedThumbResposne {
   message: string;
 }
 
-export const postDynamicFeedThumb = async (data: PostDynamicFeedThumbParams) => {
-  const csrfToken = await platform.getCookie("bili_jct");
-
+export const postDynamicFeedThumb = (data: PostDynamicFeedThumbParams) => {
   return apiRequest.post<PostDynamicFeedThumbResposne>("/x/dynamic/feed/dyn/thumb", data, {
-    params: {
-      csrf: csrfToken,
-    },
+    useCSRF: true,
   });
 };

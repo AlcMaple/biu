@@ -1,9 +1,9 @@
 /* eslint-disable */
-import axios from 'axios'
+import axios from "axios";
 
-declare module 'axios' {
+declare module "axios" {
   export interface AxiosInstance {
-    request<T = any> (config: AxiosRequestConfig): Promise<T>;
+    request<T = any>(config: AxiosRequestConfig): Promise<T>;
     get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
     delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
     head<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
@@ -16,6 +16,7 @@ declare module 'axios' {
     useFormData?: boolean;
     useWbi?: boolean;
     useCSRF?: boolean;
+    useOptionalCSRF?: boolean;
     skipRefreshCheck?: boolean;
   }
 }

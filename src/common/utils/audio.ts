@@ -4,6 +4,7 @@ import { log } from "@/platform";
 import { getAudioWebStreamUrl } from "@/service/audio-web-url";
 import { getPlayerPlayurl, type DashAudio } from "@/service/player-playurl";
 import { useUser } from "@/store/user";
+import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
 import { audioQualitySort } from "../constants/audio";
 import { VideoFnval } from "../constants/video";
@@ -161,5 +162,6 @@ export const getAudioUrl = async (sid: number | string) => {
 
 /** URL是否有效 */
 export const isUrlValid = (url?: string): url is string => {
-  return Boolean(url) && moment().isBefore(moment.unix(Number(getUrlParams(url as string).deadline)));
+  if (!url) return false;
+  return isBilibiliMediaProxyUrl(url) || moment().isBefore(moment.unix(Number(getUrlParams(url).deadline)));
 };

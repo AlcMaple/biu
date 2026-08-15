@@ -21,8 +21,9 @@ import {
 } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
-import platform, { isNativeMobile } from "@/platform";
+import platform, { isNativeMobile, isWeb, log } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
+import { logoutWebAuthSession, refreshWebAuthSession } from "@/service/web-auth";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -49,19 +50,30 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
 
   const logout = async () => {
-    const csrfToken = await platform.getCookie("bili_jct");
-    if (!csrfToken) {
-      addToast({
-        title: "CSRF Token 不存在",
-        color: "danger",
-      });
-      return false;
-    }
+    try {
+      let loggedOut = false;
+      if (isWeb) {
+        const response = await logoutWebAuthSession();
+        loggedOut = response.code === 0;
+      } else {
+        const csrfToken = await platform.getCookie("bili_jct");
+        if (!csrfToken) {
+          addToast({
+            title: "CSRF Token 不存在",
+            color: "danger",
+          });
+          return false;
+        }
 
-    const res = await postPassportLoginExit({
-      biliCSRF: csrfToken,
-    });
-    if (res?.code === 0) {
+        const response = await postPassportLoginExit({ biliCSRF: csrfToken });
+        loggedOut = response?.code === 0;
+        if (!loggedOut) {
+          addToast({ title: response?.message || "退出登录失败", color: "danger" });
+          return false;
+        }
+      }
+
+      if (!loggedOut) return false;
       clearToken();
       clearUser();
       updateSettings({
@@ -77,11 +89,9 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
       });
       navigate("/");
       return true;
-    } else {
-      addToast({
-        title: res?.message || "退出登录失败",
-        color: "danger",
-      });
+    } catch (error) {
+      log.warn("[logout] 退出登录失败", error);
+      addToast({ title: "退出登录失败", color: "danger" });
       return false;
     }
   };
@@ -113,6 +123,10 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
       startContent: <RiRefreshLine size={18} />,
       onPress: async () => {
         try {
+          if (isWeb) {
+            const response = await refreshWebAuthSession();
+            if (response.code !== 0) throw new Error(response.message || "Web 会话刷新失败");
+          }
           await useUser.getState().updateUser();
           const mid = useUser.getState().user?.mid;
           if (mid) {
@@ -150,8 +164,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
           title: "确认退出登录？",
           type: "danger",
           onConfirm: async () => {
-            await logout();
-            return true;
+            return logout();
           },
         });
       },
