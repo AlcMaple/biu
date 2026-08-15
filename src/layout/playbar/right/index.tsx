@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Button, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { RiClosedCaptioningLine } from "@remixicon/react";
 
 import MusicDownloadButton from "@/components/music-download-button";
@@ -8,6 +8,7 @@ import MusicPlayMode from "@/components/music-play-mode";
 import MusicRate from "@/components/music-rate";
 import MusicVolume from "@/components/music-volume";
 import OpenPlaylistDrawerButton from "@/components/open-playlist-drawer-button";
+import PlatformTooltip from "@/components/platform-tooltip";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
@@ -34,7 +35,7 @@ const RightControl = () => {
       <OpenPlaylistDrawerButton />
       <MusicVolume />
       <MusicRate />
-      <Tooltip content="桌面歌词" closeDelay={0}>
+      <PlatformTooltip content="桌面歌词" closeDelay={0}>
         <Button
           isIconOnly
           size="sm"
@@ -45,7 +46,7 @@ const RightControl = () => {
         >
           <RiClosedCaptioningLine size={18} />
         </Button>
-      </Tooltip>
+      </PlatformTooltip>
     </div>
   );
 };

@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 
-import { addToast, Tooltip, Listbox, ListboxItem } from "@heroui/react";
+import { addToast, Listbox, ListboxItem, Popover, PopoverContent, PopoverTrigger, Tooltip } from "@heroui/react";
 import { RiDownload2Fill, RiFileImageLine, RiFileMusicLine, RiFileVideoLine } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
 import platform from "@/platform";
+import { isWeb } from "@/platform/detect";
 import { usePlayList } from "@/store/play-list";
 
 const MusicDownloadButton = () => {
@@ -87,9 +88,79 @@ const MusicDownloadButton = () => {
 
   if (playItem?.sid) {
     return (
-      <AsyncButton isIconOnly size="sm" variant="light" className="hover:text-primary" onPress={downloadAudio}>
+      <AsyncButton
+        isIconOnly
+        size="sm"
+        variant="light"
+        className="hover:text-primary"
+        aria-label="下载音频"
+        onPress={downloadAudio}
+      >
         <RiDownload2Fill size={18} />
       </AsyncButton>
+    );
+  }
+
+  const downloadOptions = (
+    <Listbox
+      aria-label="下载选项"
+      selectionMode="none"
+      onAction={key => {
+        if (key === "audio") {
+          void downloadAudio();
+        } else if (key === "video") {
+          void downloadVideo();
+        } else if (key === "cover") {
+          void downloadCover();
+        }
+        setIsTooltipOpen(false);
+      }}
+    >
+      <ListboxItem
+        className="rounded-medium"
+        key="audio"
+        textValue="下载音频"
+        startContent={<RiFileMusicLine size={16} />}
+      >
+        下载音频
+      </ListboxItem>
+      <ListboxItem
+        className="rounded-medium"
+        key="video"
+        textValue="下载视频"
+        startContent={<RiFileVideoLine size={16} />}
+      >
+        下载视频
+      </ListboxItem>
+      <ListboxItem
+        className="rounded-medium"
+        key="cover"
+        textValue="下载封面"
+        startContent={<RiFileImageLine size={16} />}
+      >
+        下载封面
+      </ListboxItem>
+    </Listbox>
+  );
+
+  if (isWeb) {
+    return (
+      <Popover
+        triggerScaleOnOpen={false}
+        isOpen={isTooltipOpen}
+        onOpenChange={setIsTooltipOpen}
+        disableAnimation
+        radius="md"
+        placement="top"
+        showArrow={false}
+      >
+        <PopoverTrigger>
+          <IconButton aria-label="打开下载选项">
+            <RiDownload2Fill size={18} />
+          </IconButton>
+        </PopoverTrigger>
+        <PopoverContent className="p-2">{downloadOptions}</PopoverContent>
+      </Popover>
     );
   }
 
@@ -106,49 +177,9 @@ const MusicDownloadButton = () => {
       classNames={{
         content: "p-2",
       }}
-      content={
-        <Listbox
-          aria-label="下载选项"
-          selectionMode="none"
-          onAction={key => {
-            if (key === "audio") {
-              void downloadAudio();
-            } else if (key === "video") {
-              void downloadVideo();
-            } else if (key === "cover") {
-              void downloadCover();
-            }
-            setIsTooltipOpen(false);
-          }}
-        >
-          <ListboxItem
-            className="rounded-medium"
-            key="audio"
-            textValue="下载音频"
-            startContent={<RiFileMusicLine size={16} />}
-          >
-            下载音频
-          </ListboxItem>
-          <ListboxItem
-            className="rounded-medium"
-            key="video"
-            textValue="下载视频"
-            startContent={<RiFileVideoLine size={16} />}
-          >
-            下载视频
-          </ListboxItem>
-          <ListboxItem
-            className="rounded-medium"
-            key="cover"
-            textValue="下载封面"
-            startContent={<RiFileImageLine size={16} />}
-          >
-            下载封面
-          </ListboxItem>
-        </Listbox>
-      }
+      content={downloadOptions}
     >
-      <IconButton>
+      <IconButton aria-label="打开下载选项">
         <RiDownload2Fill size={18} />
       </IconButton>
     </Tooltip>

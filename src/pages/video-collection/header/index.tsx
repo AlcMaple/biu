@@ -8,6 +8,7 @@ import clx from "classnames";
 import { CollectionType } from "@/common/constants/collection";
 import { isPrivateFav } from "@/common/utils/fav";
 import Image from "@/components/image";
+import { isWeb } from "@/platform";
 import { getWebInterfaceCard } from "@/service/user-account";
 
 interface Props {
@@ -67,7 +68,12 @@ const Header = memo(({ loading, type, attr, cover, title, desc, upMid, mediaCoun
           />
           {typeof onEdit === "function" && (
             <div
-              className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+              className={clx(
+                "absolute z-10 flex cursor-pointer items-center justify-center bg-black/60 text-white",
+                isWeb
+                  ? "top-2 right-2 size-10 rounded-full shadow-md"
+                  : "inset-0 rounded-md opacity-0 transition-opacity group-hover:opacity-100",
+              )}
               onClick={onEdit}
               onKeyDown={e => e.key === "Enter" && onEdit()}
               role="button"
@@ -75,8 +81,8 @@ const Header = memo(({ loading, type, attr, cover, title, desc, upMid, mediaCoun
               aria-label="修改封面"
             >
               <div className="flex flex-col items-center gap-2">
-                <RiEdit2Line size={28} />
-                <span className="text-sm">修改</span>
+                <RiEdit2Line size={isWeb ? 20 : 28} />
+                {!isWeb && <span className="text-sm">修改</span>}
               </div>
             </div>
           )}

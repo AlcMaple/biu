@@ -7,7 +7,7 @@ import { useRequest, useClickAway } from "ahooks";
 import classNames from "classnames";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 
-import { isAndroid } from "@/platform";
+import { isAndroid, isWeb } from "@/platform";
 import { getSearchSuggestMain } from "@/service/main-suggest";
 import { useSearchHistory } from "@/store/search-history";
 import { useSettings } from "@/store/settings";
@@ -108,7 +108,10 @@ const SearchInput: React.FC<SearchInputProps> = ({ onFocusChange }) => {
           },
         )}
       >
-        <OverlayScrollbarsComponent className="h-full flex-1 p-2" options={{ scrollbars: { autoHide: "leave" } }}>
+        <OverlayScrollbarsComponent
+          className="h-full flex-1 p-2"
+          options={{ scrollbars: { autoHide: isWeb ? "never" : "leave" } }}
+        >
           <Listbox
             aria-label="搜索建议"
             selectionMode="none"

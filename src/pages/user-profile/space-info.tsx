@@ -1,12 +1,13 @@
 import { Fragment } from "react";
 import { useParams } from "react-router";
 
-import { Avatar, Divider, Image, Tooltip } from "@heroui/react";
+import { Avatar, Divider, Image } from "@heroui/react";
 import { RiAddLine, RiCheckLine, RiFlashlightFill } from "@remixicon/react";
 
 import { UserRelation } from "@/common/constants/relation";
 import { formatNumber } from "@/common/utils/number";
 import AsyncButton from "@/components/async-button";
+import PlatformTooltip from "@/components/platform-tooltip";
 import { postRelationModify, UserRelationAction } from "@/service/relation-modify";
 import { type RelationStatData } from "@/service/relation-stat";
 import { type SpaceAccInfoData } from "@/service/space-wbi-acc-info";
@@ -91,11 +92,15 @@ const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2">
               {Boolean(spaceInfo?.official?.role) && (
-                <Tooltip closeDelay={0} content={spaceInfo?.official?.title}>
-                  <div className="bg-primary flex h-5 w-5 items-center justify-center rounded-full text-white ring-2 ring-white">
+                <PlatformTooltip closeDelay={0} content={spaceInfo?.official?.title}>
+                  <div
+                    className="bg-primary flex h-5 w-5 items-center justify-center rounded-full text-white ring-2 ring-white"
+                    role="img"
+                    aria-label={spaceInfo?.official?.title}
+                  >
                     <RiFlashlightFill size={12} />
                   </div>
-                </Tooltip>
+                </PlatformTooltip>
               )}
               <h1 className="text-xl font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{spaceInfo?.name}</h1>
             </div>

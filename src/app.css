@@ -1,11 +1,20 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@plugin './hero.ts';
+@plugin "./hero.ts";
 @plugin "@tailwindcss/typography";
 
-@source '../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
+@source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 
 @custom-variant dark (&:is(.dark *));
+
+@custom-variant hover {
+  @media (hover: hover) {
+    /* stylelint-disable-next-line nesting-selector-no-missing-scoping-root -- Tailwind expands this @custom-variant nesting root. */
+    &:where([data-hover-effects="enabled"] *):hover {
+      @slot;
+    }
+  }
+}
 
 @layer base {
   h1 {
@@ -33,7 +42,9 @@
   text-autospace: normal;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
 }
@@ -47,16 +58,17 @@ html, body, #root {
   display: none;
 }
 
-.suggest_high_light,.keyword {
+.suggest_high_light,
+.keyword {
   font-style: normal;
-  color: #F54180;
+  color: #f54180;
 }
 
 .os-scrollbar {
   --os-size: 10px;
   --os-handle-border-radius: 2px;
   --os-handle-bg: hsl(var(--heroui-default-300) / 90%);
-  --os-handle-bg-hover: hsl(var(--heroui-default-400) / 100%);
+  --os-handle-bg-hover: var(--os-handle-bg);
 
   padding: 0;
 }
@@ -65,4 +77,8 @@ html, body, #root {
 .os-thin .os-scrollbar {
   --os-size: 6px;
   --os-handle-border-radius: 3px;
+}
+
+:root[data-hover-effects="enabled"] .os-scrollbar {
+  --os-handle-bg-hover: hsl(var(--heroui-default-400) / 100%);
 }

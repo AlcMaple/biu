@@ -13,7 +13,7 @@ import Lyrics from "@/components/lyrics";
 import MusicPlayControl from "@/components/music-play-control";
 import MusicPlayProgress from "@/components/music-play-progress";
 import WindowAction from "@/components/window-action";
-import platform, { isElectron } from "@/platform";
+import platform, { isElectron, isWeb } from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -63,7 +63,7 @@ const FancyFullScreenPlayer = () => {
   imgBRef.current = imgB;
   activeBgRef.current = activeBg;
 
-  const [isUiVisible, setIsUiVisible] = useState(false);
+  const [isUiVisible, setIsUiVisible] = useState(isWeb);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isArtistEditOpen, setIsArtistEditOpen] = useState(false);
   const [artistInput, setArtistInput] = useState("");
@@ -256,12 +256,16 @@ const FancyFullScreenPlayer = () => {
             <DrawerBody
               className="relative flex flex-col gap-0 overflow-hidden bg-transparent p-0 text-white select-none"
               style={{ drop_shadow: "0 0 2px rgba(255,255,255,0.3)" } as React.CSSProperties}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={() => scheduleHideUi(3000)}
-              onMouseMove={() => {
-                if (!isUiVisible) setIsUiVisible(true);
-                scheduleHideUi(3000);
-              }}
+              onMouseEnter={isWeb ? undefined : handleMouseEnter}
+              onMouseLeave={isWeb ? undefined : () => scheduleHideUi(3000)}
+              onMouseMove={
+                isWeb
+                  ? undefined
+                  : () => {
+                      if (!isUiVisible) setIsUiVisible(true);
+                      scheduleHideUi(3000);
+                    }
+              }
             >
               {/* ══ CSS 动画定义 ══ */}
               <style>{`
@@ -468,7 +472,7 @@ const FancyFullScreenPlayer = () => {
                             type="button"
                             onClick={openArtistEditor}
                             className="group/artist flex items-center gap-2 border-b border-transparent pb-1 transition-colors hover:border-white/30"
-                            title={displayArtist ? "编辑歌手" : "添加歌手"}
+                            title={isWeb ? undefined : displayArtist ? "编辑歌手" : "添加歌手"}
                           >
                             <span
                               className={clsx("text-lg xl:text-xl", displayArtist ? "text-white/90" : "text-white/40")}
@@ -478,7 +482,10 @@ const FancyFullScreenPlayer = () => {
                             </span>
                             <RiPencilLine
                               size={13}
-                              className="text-white/50 opacity-0 transition-opacity group-hover/artist:opacity-100"
+                              className={clsx(
+                                "text-white/50",
+                                isWeb ? "opacity-100" : "opacity-0 transition-opacity group-hover/artist:opacity-100",
+                              )}
                             />
                           </button>
                         )}

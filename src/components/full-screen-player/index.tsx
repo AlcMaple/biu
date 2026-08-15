@@ -13,7 +13,7 @@ import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
-import platform, { isAndroid, isElectron } from "@/platform";
+import platform, { isAndroid, isElectron, isWeb } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -70,7 +70,7 @@ const FullScreenPlayer = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1000);
   const [windowHeight, setWindowHeight] = useState(typeof window !== "undefined" ? window.innerHeight : 800);
   const [isPageListOpen, setIsPageListOpen] = useState(false);
-  const [isUiVisible, setIsUiVisible] = useState(false);
+  const [isUiVisible, setIsUiVisible] = useState(isWeb);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
   const [controlsHeight, setControlsHeight] = useState(80);
@@ -231,14 +231,18 @@ const FullScreenPlayer = () => {
           ) : (
             <DrawerBody
               className="group/player relative flex flex-row gap-0 overflow-hidden bg-transparent p-0"
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onMouseMove={() => {
-                if (!isUiVisible) {
-                  setIsUiVisible(true);
-                }
-                scheduleHideUi(3000);
-              }}
+              onMouseEnter={isWeb ? undefined : handleMouseEnter}
+              onMouseLeave={isWeb ? undefined : handleMouseLeave}
+              onMouseMove={
+                isWeb
+                  ? undefined
+                  : () => {
+                      if (!isUiVisible) {
+                        setIsUiVisible(true);
+                      }
+                      scheduleHideUi(3000);
+                    }
+              }
             >
               {!showBlurredBackground && (
                 <div aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor: backgroundColor }} />

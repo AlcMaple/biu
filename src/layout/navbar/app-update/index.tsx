@@ -1,5 +1,6 @@
-import { Chip, Tooltip } from "@heroui/react";
+import { Chip } from "@heroui/react";
 
+import PlatformTooltip from "@/components/platform-tooltip";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useModalStore } from "@/store/modal";
 
@@ -10,11 +11,11 @@ const AppUpdateNotify = () => {
   if (!isUpdateAvailable) return null;
 
   return (
-    <Tooltip closeDelay={0} content="有新版本更新" placement="bottom">
+    <PlatformTooltip closeDelay={0} content="有新版本更新" placement="bottom">
       <Chip variant="dot" size="sm" color="success" className="cursor-pointer" onClick={onOpenReleaseNoteModal}>
         New
       </Chip>
-    </Tooltip>
+    </PlatformTooltip>
   );
 };
 

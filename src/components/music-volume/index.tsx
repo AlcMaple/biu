@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 
-import { Tooltip, Slider } from "@heroui/react";
+import { Button, Popover, PopoverContent, PopoverTrigger, Slider, Tooltip } from "@heroui/react";
 import { RiVolumeDownLine, RiVolumeMuteLine, RiVolumeUpLine } from "@remixicon/react";
 
+import { isWeb } from "@/platform/detect";
 import { usePlayList } from "@/store/play-list";
 
 import IconButton from "../icon-button";
@@ -18,16 +19,6 @@ const Volume = () => {
   const tooltipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const sliderRef = useRef<HTMLDivElement | null>(null);
-
-  const setSliderRef = useCallback((node: HTMLDivElement | null) => {
-    if (sliderRef.current) {
-      sliderRef.current.removeEventListener("wheel", onWheel);
-    }
-    sliderRef.current = node;
-    if (node) {
-      node.addEventListener("wheel", onWheel, { passive: false });
-    }
-  }, []);
 
   const onVolumeChange = (val: number) => {
     if (isMuted) {
@@ -92,6 +83,19 @@ const Volume = () => {
     }
   }, []);
 
+  const setSliderRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (sliderRef.current) {
+        sliderRef.current.removeEventListener("wheel", onWheel);
+      }
+      sliderRef.current = node;
+      if (node) {
+        node.addEventListener("wheel", onWheel, { passive: false });
+      }
+    },
+    [onWheel],
+  );
+
   // 清理定时器
   useEffect(() => {
     const button = buttonRef.current;
@@ -110,6 +114,64 @@ const Volume = () => {
   }, [onWheel]);
 
   const tooltipId = "volume-tooltip";
+  const volumeIcon = isMuted ? (
+    <RiVolumeMuteLine size={18} />
+  ) : volume > 0.5 ? (
+    <RiVolumeUpLine size={18} />
+  ) : (
+    <RiVolumeDownLine size={18} />
+  );
+  const volumeSlider = (
+    <div ref={setSliderRef} className="flex items-center justify-center p-3">
+      <Slider
+        disableAnimation
+        aria-label="音量"
+        color="primary"
+        radius="full"
+        size="sm"
+        orientation="vertical"
+        value={volume}
+        minValue={0}
+        maxValue={1}
+        step={0.01}
+        // @ts-expect-error volume is number
+        onChange={onVolumeChange}
+        classNames={{
+          trackWrapper: "h-40 w-[32px]",
+          thumb: "after:hidden",
+        }}
+        endContent={
+          <span className="text-foreground/60 w-8 text-center text-xs tabular-nums">{Math.round(volume * 100)}%</span>
+        }
+      />
+    </div>
+  );
+
+  if (isWeb) {
+    return (
+      <Popover
+        placement="top"
+        isOpen={isTooltipOpen}
+        onOpenChange={setIsTooltipOpen}
+        disableAnimation
+        showArrow={false}
+      >
+        <PopoverTrigger>
+          <IconButton ref={buttonRef} aria-label={`调节音量，当前 ${Math.round(volume * 100)}%`}>
+            {volumeIcon}
+          </IconButton>
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="flex flex-col items-center pb-3">
+            {volumeSlider}
+            <Button size="sm" variant="flat" onPress={onToggleMute}>
+              {isMuted ? "取消静音" : "静音"}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   return (
     <Tooltip
@@ -122,33 +184,7 @@ const Volume = () => {
       shouldCloseOnBlur={false}
       isOpen={isTooltipOpen}
       onOpenChange={setIsTooltipOpen}
-      content={
-        <div ref={setSliderRef} className="flex items-center justify-center p-3">
-          <Slider
-            disableAnimation
-            aria-label="音量"
-            color="primary"
-            radius="full"
-            size="sm"
-            orientation="vertical"
-            value={volume}
-            minValue={0}
-            maxValue={1}
-            step={0.01}
-            // @ts-expect-error volume is number
-            onChange={onVolumeChange}
-            classNames={{
-              trackWrapper: "h-40 w-[32px]",
-              thumb: "after:hidden",
-            }}
-            endContent={
-              <span className="text-foreground/60 w-8 text-center text-xs tabular-nums">
-                {Math.round(volume * 100)}%
-              </span>
-            }
-          />
-        </div>
-      }
+      content={volumeSlider}
     >
       <IconButton
         ref={buttonRef}
@@ -156,13 +192,7 @@ const Volume = () => {
         aria-label={isMuted ? "取消静音" : "静音"}
         aria-describedby={tooltipId}
       >
-        {isMuted ? (
-          <RiVolumeMuteLine size={18} />
-        ) : volume > 0.5 ? (
-          <RiVolumeUpLine size={18} />
-        ) : (
-          <RiVolumeDownLine size={18} />
-        )}
+        {volumeIcon}
       </IconButton>
     </Tooltip>
   );

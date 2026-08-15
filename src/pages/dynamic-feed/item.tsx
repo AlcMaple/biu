@@ -11,7 +11,7 @@ import type { WebDynamicItem } from "@/service/web-dynamic";
 import { formatNumber } from "@/common/utils/number";
 import { parseDuration } from "@/common/utils/time";
 import Image from "@/components/image";
-import platform from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { postDynamicFeedThumb } from "@/service/web-dynamic-feed-thumb";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
@@ -179,7 +179,7 @@ const DynamicItem: React.FC<DynamicItemProps> = ({ item, className }) => {
             </div>
             <div className="flex min-w-0 grow flex-col justify-between p-3">
               <div className="space-y-1">
-                <h3 className="line-clamp-2 text-sm font-medium" title={archive?.title || ""}>
+                <h3 className="line-clamp-2 text-sm font-medium" title={isWeb ? undefined : archive?.title || ""}>
                   {archive?.title || ""}
                 </h3>
                 <div className="text-default-500 line-clamp-1 text-xs">{archive?.desc || ""}</div>

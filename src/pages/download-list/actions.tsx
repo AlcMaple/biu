@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { addToast, Tooltip } from "@heroui/react";
+import { addToast } from "@heroui/react";
 import {
   RiDeleteBinLine,
   RiFileMusicLine,
@@ -11,6 +11,7 @@ import {
 } from "@remixicon/react";
 
 import AsyncButton from "@/components/async-button";
+import PlatformTooltip from "@/components/platform-tooltip";
 import platform from "@/platform";
 import { useModalStore } from "@/store/modal";
 
@@ -166,7 +167,13 @@ const DownloadActions = ({ data }: Props) => {
         {actions
           .filter(item => item.show)
           .map(item => (
-            <Tooltip closeDelay={0} disableAnimation key={item.key} content={item.label} color={item.tooltipColor}>
+            <PlatformTooltip
+              closeDelay={0}
+              disableAnimation
+              key={item.key}
+              content={item.label}
+              color={item.tooltipColor}
+            >
               <AsyncButton
                 key={item.key}
                 variant="light"
@@ -176,10 +183,11 @@ const DownloadActions = ({ data }: Props) => {
                 isDisabled={Boolean(pendingAction) && pendingAction !== item.key}
                 onPress={item.onPress}
                 className={item.className}
+                aria-label={item.label}
               >
                 {item.icon}
               </AsyncButton>
-            </Tooltip>
+            </PlatformTooltip>
           ))}
       </div>
     </>

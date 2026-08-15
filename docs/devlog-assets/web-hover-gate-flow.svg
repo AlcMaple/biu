@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="540" viewBox="0 0 1040 540" role="img" aria-labelledby="title desc">
+  <title id="title">Web 悬停效果门控与操作入口替代</title>
+  <desc id="desc">Electron 和 Android 设置根平台标记以保留悬停效果；Web 不设置标记，并将原悬停专属操作改成常显或点击入口。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .title { font-size: 22px; font-weight: 700; }
+    .label { font-size: 15px; font-weight: 650; }
+    .small { font-size: 13px; fill: #5f6368; }
+    .box { fill: #fff; stroke: #c7c9d1; stroke-width: 1.5; rx: 12; }
+    .source { fill: #f1edff; stroke: #7c5ce7; }
+    .gate { fill: #e8f4ff; stroke: #4f87c7; }
+    .web { fill: #fff4dc; stroke: #c58b25; }
+    .app { fill: #eaf8ee; stroke: #4f9d69; }
+    .arrow { fill: none; stroke: #747780; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#747780" />
+    </marker>
+  </defs>
+
+  <text x="40" y="42" class="title">无复制样式表：运行时根标记统一控制 hover</text>
+
+  <rect x="350" y="66" width="340" height="66" class="box source" />
+  <text x="520" y="94" text-anchor="middle" class="label">detect.ts：Electron / Android / Web</text>
+  <text x="520" y="117" text-anchor="middle" class="small">React createRoot 之前确定平台</text>
+
+  <path d="M 430 132 C 365 158 290 165 230 190" class="arrow" />
+  <path d="M 610 132 C 675 158 750 165 810 190" class="arrow" />
+
+  <rect x="55" y="192" width="350" height="78" class="box app" />
+  <text x="230" y="221" text-anchor="middle" class="label">Electron / Android</text>
+  <text x="230" y="246" text-anchor="middle" class="small">根节点写入 data-hover-effects="enabled"</text>
+  <text x="230" y="264" text-anchor="middle" class="small">原交互保持</text>
+
+  <rect x="635" y="192" width="350" height="78" class="box web" />
+  <text x="810" y="221" text-anchor="middle" class="label">普通 Web</text>
+  <text x="810" y="246" text-anchor="middle" class="small">根节点不写 hover 标记</text>
+  <text x="810" y="264" text-anchor="middle" class="small">视觉门控关闭</text>
+
+  <path d="M 230 270 C 260 300 330 306 380 325" class="arrow" />
+  <path d="M 810 270 C 780 300 710 306 660 325" class="arrow" />
+
+  <rect x="230" y="327" width="580" height="86" class="box gate" />
+  <text x="520" y="355" text-anchor="middle" class="label">共用 CSS 的两道选择器门控</text>
+  <text x="520" y="380" text-anchor="middle" class="small">Tailwind：hover / group-hover / dark:hover → 根标记条件</text>
+  <text x="520" y="401" text-anchor="middle" class="small">HeroUI：PostCSS 逐个门控真实 [data-hover…] 分支</text>
+
+  <path d="M 380 413 C 345 438 295 445 245 462" class="arrow" />
+  <path d="M 660 413 C 695 438 745 445 795 462" class="arrow" />
+
+  <rect x="55" y="464" width="380" height="58" class="box app" />
+  <text x="245" y="489" text-anchor="middle" class="label">应用端：hover / Tooltip / 自动隐藏照旧</text>
+  <text x="245" y="510" text-anchor="middle" class="small">保留桌面歌词、迷你播放器等专属鼠标逻辑</text>
+
+  <rect x="605" y="464" width="380" height="58" class="box web" />
+  <text x="795" y="489" text-anchor="middle" class="label">Web：常显操作 + 点击 Popover</text>
+  <text x="795" y="510" text-anchor="middle" class="small">菜单、删除、编辑、滑块仍可见且可键盘操作</text>
+</svg>

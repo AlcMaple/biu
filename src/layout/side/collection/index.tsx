@@ -10,7 +10,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Button, Tooltip, addToast } from "@heroui/react";
+import { Button, addToast } from "@heroui/react";
 import {
   RiAddLine,
   RiArrowDownSLine,
@@ -26,6 +26,7 @@ import { CollectionType } from "@/common/constants/collection";
 import { getAllFavMedia, getLocalFavMedia, getLocalFolderLatestCover } from "@/common/utils/fav";
 import { type ContextMenuItem } from "@/components/context-menu";
 import MenuGroup from "@/components/menu/menu-group";
+import PlatformTooltip from "@/components/platform-tooltip";
 import SortableMenuItem from "@/layout/side/collection/sortable-menu-item";
 import { postFavFolderDel } from "@/service/fav-folder-del";
 import { postFavFolderUnfav } from "@/service/fav-folder-unfav";
@@ -502,7 +503,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
     }));
 
     const titleExtra = onOpenAddFavorite ? (
-      <Tooltip closeDelay={0} content="新建收藏夹">
+      <PlatformTooltip closeDelay={0} content="新建收藏夹">
         <Button
           isIconOnly
           variant="light"
@@ -510,10 +511,11 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
           size="sm"
           className="h-auto w-auto min-w-auto p-1"
           onPress={onOpenAddFavorite}
+          aria-label="新建收藏夹"
         >
           <RiAddLine size={16} />
         </Button>
-      </Tooltip>
+      </PlatformTooltip>
     ) : null;
 
     return renderFavoriteGroup({

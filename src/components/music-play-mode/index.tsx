@@ -1,9 +1,11 @@
 import React from "react";
 
-import { Tooltip, Switch } from "@heroui/react";
+import { Popover, PopoverContent, PopoverTrigger, Switch, Tooltip } from "@heroui/react";
+import { RiSettings3Line } from "@remixicon/react";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import IconButton from "@/components/icon-button";
+import { isWeb } from "@/platform/detect";
 import { usePlayList } from "@/store/play-list";
 
 const PlayModeList = getPlayModeList(18);
@@ -35,6 +37,44 @@ const MusicPlayMode = () => {
   };
 
   const currentMode = PlayModeList.find(item => item.value === playMode);
+
+  if (isWeb) {
+    const modeButton = (
+      <IconButton className="flex-none" aria-label={currentMode?.desc ?? "播放模式"} onPress={togglePlayMode}>
+        {currentMode?.icon}
+      </IconButton>
+    );
+
+    if (playMode !== PlayMode.Random) {
+      return modeButton;
+    }
+
+    return (
+      <div className="flex items-center gap-1">
+        {modeButton}
+        <Popover placement="top" disableAnimation>
+          <PopoverTrigger>
+            <IconButton className="flex-none" aria-label="随机播放设置">
+              <RiSettings3Line size={16} />
+            </IconButton>
+          </PopoverTrigger>
+          <PopoverContent>
+            <div className="flex flex-col gap-2 px-2 py-1">
+              <span className="text-default-500 text-xs">{currentMode?.desc}</span>
+              <Switch
+                size="sm"
+                disableAnimation
+                isSelected={shouldKeepPagesOrderInRandomPlayMode}
+                onValueChange={setShouldKeepPagesOrderInRandomPlayMode}
+              >
+                保持分集顺序
+              </Switch>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
 
   if (playMode === PlayMode.Random) {
     return (

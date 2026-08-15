@@ -2,6 +2,7 @@ import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 import { pluginSvgr } from "@rsbuild/plugin-svgr";
 
+import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
 
 export default defineConfig({
@@ -38,6 +39,11 @@ export default defineConfig({
     }),
     pluginElectron(),
   ],
+  tools: {
+    postcss(_options, { addPlugins }) {
+      addPlugins(postcssScopeDataHover, { order: "post" });
+    },
+  },
   dev: {
     writeToDisk: true,
     lazyCompilation: false,

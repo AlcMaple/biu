@@ -2,9 +2,10 @@ import { useEffect, useRef } from "react";
 
 import { Button } from "@heroui/react";
 import { RiAddLine, RiCloseLine, RiImageLine } from "@remixicon/react";
+import clx from "classnames";
 import { useShallow } from "zustand/shallow";
 
-import platform from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 
 /** 将本地路径转为 img src */
@@ -83,9 +84,14 @@ const FancyPlayerImageAlbum = () => {
               />
               {/* 删除按钮 —— 右上角圆形 badge，hover 时显示 */}
               <button
-                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-red-500"
+                type="button"
+                className={clx(
+                  "absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white hover:bg-red-500",
+                  isWeb ? "opacity-100" : "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+                )}
                 onClick={() => removeImage(img)}
-                title="移除"
+                aria-label="移除背景图"
+                title={isWeb ? undefined : "移除"}
               >
                 <RiCloseLine size={12} />
               </button>
@@ -94,6 +100,7 @@ const FancyPlayerImageAlbum = () => {
 
           {/* 添加更多 */}
           <button
+            type="button"
             className="border-default flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-zinc-400 transition-colors hover:border-zinc-400 hover:text-zinc-600"
             onClick={handleSelectFiles}
           >

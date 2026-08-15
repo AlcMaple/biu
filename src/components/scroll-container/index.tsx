@@ -8,6 +8,8 @@ import {
   type OverlayScrollbarsComponentRef,
 } from "overlayscrollbars-react";
 
+import { isWeb } from "@/platform";
+
 const ScrollContainer = ({
   ref,
   options,
@@ -25,6 +27,7 @@ const ScrollContainer = ({
   const internalRef = useRef<ScrollRefObject | null>(null);
   const scrollRef = ref ?? internalRef;
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const customScrollbars = options && typeof options === "object" ? options.scrollbars : undefined;
 
   // 统一的滚动重置逻辑
   useEffect(() => {
@@ -52,9 +55,15 @@ const ScrollContainer = ({
     <OverlayScrollbarsComponent
       ref={scrollRef}
       options={{
-        scrollbars: { autoHide: "leave", autoHideDelay: 800, theme: "os-theme-light" },
         overflow: { x: "hidden" },
         ...options,
+        scrollbars: {
+          autoHide: "leave",
+          autoHideDelay: 800,
+          theme: "os-theme-light",
+          ...customScrollbars,
+          ...(isWeb ? { autoHide: "never" as const } : {}),
+        },
       }}
       events={{
         scroll: instance => {

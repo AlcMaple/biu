@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
-import { Button, Form, Input, Tooltip, addToast } from "@heroui/react";
+import { Button, Form, Input, addToast } from "@heroui/react";
 import { RiEyeLine, RiEyeOffLine, RiQuestionLine } from "@remixicon/react";
 import { JSEncrypt } from "jsencrypt";
 
 import { useGeetest } from "@/common/hooks/use-geetest";
+import PlatformTooltip from "@/components/platform-tooltip";
 import platform from "@/platform";
 import { getPassportLoginWebKey } from "@/service/passport-login-web-key";
 import { postPassportLoginWebLoginPassword } from "@/service/passport-login-web-login-passport";
@@ -145,6 +146,7 @@ const PasswordLogin = ({ onClose, updateUserData }: PasswordLoginProps) => {
                   variant="light"
                   className="min-w-0 px-2"
                   type="button"
+                  aria-label={isPwdVisible ? "隐藏密码" : "显示密码"}
                   onPress={() => {
                     setPwdVisible(v => !v);
                     setTimeout(() => {
@@ -159,16 +161,17 @@ const PasswordLogin = ({ onClose, updateUserData }: PasswordLoginProps) => {
                 >
                   {isPwdVisible ? <RiEyeLine size={18} /> : <RiEyeOffLine size={18} />}
                 </Button>
-                <Tooltip content="找回密码">
+                <PlatformTooltip content="找回密码">
                   <Button
                     isIconOnly
                     size="sm"
                     variant="light"
+                    aria-label="找回密码"
                     onPress={() => platform.openExternal("https://passport.bilibili.com/pc/passport/findPassword")}
                   >
                     <RiQuestionLine size={18} />
                   </Button>
-                </Tooltip>
+                </PlatformTooltip>
               </div>
             }
           />
