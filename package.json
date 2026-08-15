@@ -37,6 +37,8 @@
     "build:web": "BIU_TARGET=web rsbuild build",
     "test": "vitest",
     "build:android": "BIU_TARGET=android rsbuild build && cap sync android",
+    "build:android:apk": "node scripts/build-android-apk.mjs",
+    "build:android:apk:release": "node scripts/build-android-apk.mjs --release",
     "open:android": "cap open android",
     "knip": "knip --no-exit-code --max-show-issues 5 --reporter github-actions",
     "release": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail",

@@ -13,6 +13,7 @@
 
 ## 2026 专题日志
 
+- [移动端](docs/devlog/2026-移动端.md)
 - [Web 版](docs/devlog/2026-Web版.md)
 - [播放时长与本地收藏](docs/devlog/2026-播放时长与本地收藏.md)
 - [开发工具与性能](docs/devlog/2026-开发工具与性能.md)
