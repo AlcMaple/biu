@@ -3,14 +3,22 @@ import moment from "moment";
 
 import { refreshCookie } from "@/common/utils/cookie";
 import platform from "@/platform";
+import { isWeb } from "@/platform/detect";
 import { useToken } from "@/store/token";
 
 import { encodeParamsWbi } from "./wbi-sign";
 
 let refreshCookiePromise: Promise<any> | null = null;
 
+export function shouldCheckCookieRefresh(web: boolean, nextCheckRefreshTime: number | undefined, now: number) {
+  return !web && (nextCheckRefreshTime || 0) < now;
+}
+
 export const requestInterceptors = async (config: InternalAxiosRequestConfig) => {
-  if (!config.skipRefreshCheck && (useToken.getState().nextCheckRefreshTime || 0) < moment().unix()) {
+  if (
+    !config.skipRefreshCheck &&
+    shouldCheckCookieRefresh(isWeb, useToken.getState().nextCheckRefreshTime, moment().unix())
+  ) {
     if (!refreshCookiePromise) {
       useToken.setState({ nextCheckRefreshTime: moment().add(30, "seconds").unix() });
       refreshCookiePromise = refreshCookie().finally(() => {
