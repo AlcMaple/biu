@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { bv2av } from "@/common/utils/bv";
-import { detectInvalidLocalFavItems } from "@/common/utils/fav";
+import { detectInvalidLocalFavItems, isInvalidFavResource } from "@/common/utils/fav";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 
 vi.mock("@/service/fav-resource-infos", () => ({
@@ -39,6 +39,15 @@ describe("bv2av", () => {
     expect(bv2av("BV1xx411c7mD")).toBe(2);
     expect(bv2av("BV17x411w7KC")).toBe(170001);
     expect(bv2av("BV1Q541167Qg")).toBe(455017605);
+  });
+});
+
+describe("isInvalidFavResource", () => {
+  test("只把 attr 的最低位视为失效，避免把分P等其他标记误判为失效", () => {
+    expect(isInvalidFavResource(0)).toBe(false);
+    expect(isInvalidFavResource(1)).toBe(true);
+    expect(isInvalidFavResource(4)).toBe(false);
+    expect(isInvalidFavResource(9)).toBe(true);
   });
 });
 
@@ -121,6 +130,34 @@ describe("updateInvalidFlags", () => {
     expect(items.find(i => i.rid === 100)?.invalid).toBe(true);
     expect(items.find(i => i.rid === 200)?.invalid).toBeUndefined();
     expect(items.find(i => i.rid === 300)?.invalid).toBe(true);
+  });
+});
+
+describe("markInvalidByPlayback", () => {
+  beforeEach(() => {
+    useLocalFavItemsStore.setState({ folderItems: {} });
+  });
+
+  test("播放器确认下架后标记全部匹配的在线收藏项，不误伤本地文件", () => {
+    useLocalFavItemsStore.setState({
+      folderItems: {
+        1: [
+          makeItem({ rid: 100, type: 2, bvid: "BV1xx411c7mD" }),
+          makeItem({ rid: 200, type: 12, ownerMid: 1, ownerName: "up" }),
+          makeItem({ rid: "file-1", type: 12, source: "local", audioUrl: "file://a" }),
+        ],
+        2: [makeItem({ rid: 300, type: 2, bvid: "BV1xx411c7mD" })],
+      },
+    });
+
+    const store = useLocalFavItemsStore.getState();
+    expect(store.markInvalidByPlayback({ type: "mv", bvid: "BV1xx411c7mD" })).toBe(2);
+    expect(useLocalFavItemsStore.getState().folderItems[1][0].invalid).toBe(true);
+    expect(useLocalFavItemsStore.getState().folderItems[2][0].invalid).toBe(true);
+
+    expect(useLocalFavItemsStore.getState().markInvalidByPlayback({ type: "audio", sid: 200 })).toBe(1);
+    expect(useLocalFavItemsStore.getState().folderItems[1][1].invalid).toBe(true);
+    expect(useLocalFavItemsStore.getState().folderItems[1][2].invalid).toBeUndefined();
   });
 });
 

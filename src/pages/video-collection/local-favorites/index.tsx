@@ -19,6 +19,7 @@ import {
 import {
   RiDeleteBinLine,
   RiEraserLine,
+  RiErrorWarningLine,
   RiExternalLinkLine,
   RiFileMusicLine,
   RiMoreLine,
@@ -46,12 +47,14 @@ import MusicListHeader, { type MusicListSortKey } from "@/components/music-list-
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import SearchWithSort from "@/components/search-with-sort";
 import { TagFilterPopover } from "@/components/tag-popover";
+import VirtualPageList from "@/components/virtual-page-list";
 import platform from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useHeartbeat } from "@/store/heartbeat";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
+import { useSettings } from "@/store/settings";
 import { useTagStore } from "@/store/tags";
 
 import Header from "../header";
@@ -62,6 +65,7 @@ const durationToSeconds = (d: number | string | undefined): number => {
 
 // 本次启动内已后台检测过失效状态的收藏夹，避免来回切换页面时反复请求
 const invalidCheckedFolders = new Set<number>();
+const EMPTY_LOCAL_FAV_ITEMS: LocalFavItem[] = [];
 
 const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
@@ -84,14 +88,17 @@ const LocalFavorites = () => {
   const [sortKey, setSortKey] = useState<MusicListSortKey>("time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
+  const [showInvalidOnly, setShowInvalidOnly] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<LocalFavItem | null>(null);
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
 
   const itemTags = useTagStore(s => s.itemTags);
+  const displayMode = useSettings(s => s.displayMode);
+  const isCompact = displayMode === "compact";
 
   const folder = useFavoritesStore(s => s.createdFavorites.find(f => f.id === folderId));
-  const rawItems = useLocalFavItemsStore(s => s.folderItems[folderId]) ?? [];
+  const rawItems = useLocalFavItemsStore(s => s.folderItems[folderId]) ?? EMPTY_LOCAL_FAV_ITEMS;
   const removeItem = useLocalFavItemsStore(s => s.removeItem);
   const renameItem = useLocalFavItemsStore(s => s.renameItem);
   const updateInvalidFlags = useLocalFavItemsStore(s => s.updateInvalidFlags);
@@ -117,6 +124,9 @@ const LocalFavorites = () => {
         return activeTagIds.some(tid => tags.includes(tid));
       });
     }
+    if (showInvalidOnly) {
+      result = result.filter(i => i.invalid);
+    }
     const sign = sortDir === "asc" ? 1 : -1;
     return [...result].sort((a, b) => {
       let diff = 0;
@@ -137,7 +147,9 @@ const LocalFavorites = () => {
       }
       return sign * diff;
     });
-  }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags]);
+  }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags, showInvalidOnly]);
+
+  const invalidCount = useMemo(() => rawItems.filter(item => item.invalid).length, [rawItems]);
 
   // 当前歌单内实际用到的标签（标签筛选只针对歌单内部）
   const availableTagIds = useMemo(() => {
@@ -152,6 +164,7 @@ const LocalFavorites = () => {
     setSortKey("time");
     setSortDir("desc");
     setActiveTagIds([]);
+    setShowInvalidOnly(false);
   }, [folderIdStr]);
 
   // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量和时长
@@ -480,6 +493,14 @@ const LocalFavorites = () => {
           </Dropdown>
         </div>
         <div className="flex items-center space-x-2">
+          <Button
+            variant="flat"
+            color={showInvalidOnly ? "danger" : "default"}
+            startContent={<RiErrorWarningLine size={16} />}
+            onPress={() => setShowInvalidOnly(value => !value)}
+          >
+            {showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`}
+          </Button>
           <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
           <SearchWithSort onKeywordSearch={setKeyword} />
         </div>
@@ -494,36 +515,49 @@ const LocalFavorites = () => {
           sortDir={sortDir}
           onSort={handleSort}
         />
-        {items.map((item, index) => (
-          <MusicListItem
-            key={String(item.rid)}
-            index={index + 1}
-            title={item.title}
-            type={item.type === 2 ? "mv" : "audio"}
-            bvid={item.type === 2 ? item.bvid : undefined}
-            cid={item.type === 2 ? item.cid : undefined}
-            sid={isLocalSourceItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
-            itemId={isLocalSourceItem(item) ? String(item.rid) : undefined}
-            source={isLocalSourceItem(item) ? "local" : item.source}
-            cover={item.cover}
-            upName={isLocalSourceItem(item) ? undefined : item.ownerName}
-            upMid={isLocalSourceItem(item) ? undefined : item.ownerMid}
-            playCount={item.playCount}
-            duration={item.duration}
-            pubTime={formatMillisecond(item.fav_time)}
-            invalid={item.invalid}
-            menus={getLocalItemMenus(!isLocalSourceItem(item))}
-            onMenuAction={key => handleMenuAction(key, item)}
-            onPress={() => handleItemPress(item)}
+        {items.length > 0 && (
+          <VirtualPageList
+            items={items}
+            hasMore={false}
+            loading={false}
+            rowHeight={isCompact ? 36 : 64}
+            getScrollElement={() =>
+              (scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null
+            }
+            renderItem={(item, index) => (
+              <MusicListItem
+                key={String(item.rid)}
+                index={index + 1}
+                title={item.title}
+                type={item.type === 2 ? "mv" : "audio"}
+                bvid={item.type === 2 ? item.bvid : undefined}
+                cid={item.type === 2 ? item.cid : undefined}
+                sid={isLocalSourceItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined}
+                itemId={isLocalSourceItem(item) ? String(item.rid) : undefined}
+                source={isLocalSourceItem(item) ? "local" : item.source}
+                cover={item.cover}
+                upName={isLocalSourceItem(item) ? undefined : item.ownerName}
+                upMid={isLocalSourceItem(item) ? undefined : item.ownerMid}
+                playCount={item.playCount}
+                duration={item.duration}
+                pubTime={formatMillisecond(item.fav_time)}
+                invalid={item.invalid}
+                menus={getLocalItemMenus(!isLocalSourceItem(item))}
+                onMenuAction={key => handleMenuAction(key, item)}
+                onPress={() => handleItemPress(item)}
+              />
+            )}
           />
-        ))}
+        )}
         {items.length === 0 && rawItems.length === 0 && (
           <div className="py-16 text-center text-sm text-zinc-400">
             暂无内容，可通过音乐收藏按钮将内容添加到此收藏夹
           </div>
         )}
         {items.length === 0 && rawItems.length > 0 && (
-          <div className="py-16 text-center text-sm text-zinc-400">没有符合搜索条件的内容</div>
+          <div className="py-16 text-center text-sm text-zinc-400">
+            {showInvalidOnly ? "没有已标记为失效的内容" : "没有符合搜索条件的内容"}
+          </div>
         )}
       </div>
       <Modal isOpen={isRenameOpen} onClose={onRenameClose} size="sm">

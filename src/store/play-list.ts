@@ -17,6 +17,7 @@ import { log } from "@/platform";
 import { getAudioSongInfo } from "@/service/audio-song-info";
 import { getWebInterfaceView } from "@/service/web-interface-view";
 
+import { useLocalFavItemsStore } from "./local-fav-items";
 import { usePlayProgress } from "./play-progress";
 
 export type PlayDataType = "mv" | "audio";
@@ -1611,7 +1612,10 @@ async function dropCurrentIfInvalid(playId: string, playItem: PlayData): Promise
     sid: playItem.sid,
     title: playItem.title,
   });
-  toastInfo(`「${playItem.title || "该歌曲"}」已失效，已自动移除`);
+  const markedLocalFavorites = useLocalFavItemsStore.getState().markInvalidByPlayback(playItem);
+  toastInfo(
+    `「${playItem.title || "该歌曲"}」已失效，已自动移除${markedLocalFavorites ? "，已在本地收藏夹标记失效" : ""}`,
+  );
   await state.del(playId);
   return true;
 }
