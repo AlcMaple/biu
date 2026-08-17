@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useRef } from "react";
 
-import { addToast, Drawer, DrawerBody, DrawerContent, DrawerHeader } from "@heroui/react";
+import { addToast, Drawer, DrawerBody, DrawerContent, DrawerHeader, Switch } from "@heroui/react";
 import { RiDeleteBinLine, RiFocus3Line } from "@remixicon/react";
 import { uniqBy } from "es-toolkit/array";
 
+import { PlayMode } from "@/common/constants/audio";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
@@ -24,7 +25,10 @@ const PlayListDrawer = () => {
   const setOpen = useModalStore(s => s.setPlayListDrawerOpen);
   const list = usePlayList(s => s.list);
   const playId = usePlayList(s => s.playId);
+  const playMode = usePlayList(s => s.playMode);
   const clear = usePlayList(s => s.clear);
+  const shouldKeepPagesOrderInRandomPlayMode = usePlayList(s => s.shouldKeepPagesOrderInRandomPlayMode);
+  const setShouldKeepPagesOrderInRandomPlayMode = usePlayList(s => s.setShouldKeepPagesOrderInRandomPlayMode);
   const user = useUser(s => s.user);
   const playListItem = usePlayList(state => state.playListItem);
 
@@ -155,6 +159,22 @@ const PlayListDrawer = () => {
             )}
           </div>
         </DrawerHeader>
+        {playMode === PlayMode.Random && (
+          <div className="border-divider/40 flex items-center justify-between gap-4 border-b px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm">保持分集顺序</p>
+              <p className="text-default-500 text-xs">随机播放多分集视频时，优先连续播放下一集</p>
+            </div>
+            <Switch
+              aria-label="保持分集顺序"
+              className="flex-none"
+              disableAnimation
+              isSelected={shouldKeepPagesOrderInRandomPlayMode}
+              onValueChange={setShouldKeepPagesOrderInRandomPlayMode}
+              size="sm"
+            />
+          </div>
+        )}
         {list.length ? (
           <DrawerBody className="overflow-hidden px-0">
             <VirtualList

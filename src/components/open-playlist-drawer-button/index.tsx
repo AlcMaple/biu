@@ -7,7 +7,7 @@ const OpenPlaylistDrawerButton = () => {
   const setOpen = useModalStore(s => s.setPlayListDrawerOpen);
 
   return (
-    <IconButton onPress={() => setOpen(true)}>
+    <IconButton aria-label="播放列表" onPress={() => setOpen(true)}>
       <RiPlayListLine size={18} />
     </IconButton>
   );
