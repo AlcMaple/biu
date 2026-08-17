@@ -18,6 +18,12 @@ export const isDefaultFav = (attr?: number) => {
   return ((attr >> 1) & 1) === 0;
 };
 
+/**
+ * 收藏资源的 attr 是位掩码：只有最低位表示资源已失效。
+ * 例如 attr=4 仍然是正常资源，attr=1 / 9 才需要当作失效处理。
+ */
+export const isInvalidFavResource = (attr?: number) => ((attr ?? 0) & 1) === 1;
+
 /** 本地歌曲（含兼容旧数据：source 字段存入前的本地歌曲没有 source，但也没有 UP 主信息） */
 export const isLocalSourceItem = (item: LocalFavItem) =>
   item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName);
@@ -128,24 +134,32 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
   const playByRid = new Map<string, number>();
   const durationByRid = new Map<string, number>();
   const chunks = chunk([...resourceToRids.keys()], 50);
-  const results = await Promise.allSettled(
-    chunks.map(keys => getFavResourceInfos({ resources: keys.join(","), platform: "web" })),
-  );
+  const results: Array<Awaited<ReturnType<typeof getFavResourceInfos>> | null> = [];
+  // 本地歌单打开时的后台检测按分片顺序执行，避免大歌单一次并发打满 B 站接口。
+  for (const keys of chunks) {
+    try {
+      results.push(await getFavResourceInfos({ resources: keys.join(","), platform: "web" }));
+    } catch {
+      results.push(null);
+    }
+  }
 
   results.forEach((result, i) => {
-    if (result.status !== "fulfilled" || result.value.code !== 0) return;
-    const infos = result.value.data ?? [];
+    if (!result || result.code !== 0) return;
+    const infos = result.data ?? [];
     // attr 是位掩码而非单纯 0/1：仅第 0 位（attr & 1）表示「已失效」，其余位是分P/推广等无关标记，
     // 实测存在 attr=4 但视频本身完全正常可播的情况，不能按 attr !== 0 整体判定失效。
     // 接口对部分资源（尤其老视频）可能整条不返回，这未必代表已失效，也可能是接口本身的疏漏，
     // 因此缺席的条目本次不计入 checked，留待下次重试，避免把接口的偶发缺失误判成永久失效。
     const returnedKeys = new Set(infos.map(info => `${info.id}:${info.type}`));
-    const invalidKeys = new Set(infos.filter(info => (info.attr & 1) === 1).map(info => `${info.id}:${info.type}`));
+    const invalidKeys = new Set(
+      infos.filter(info => isInvalidFavResource(info.attr)).map(info => `${info.id}:${info.type}`),
+    );
     // 资源 -> 播放量（同一资源的所有分集 rid 共享此值）
     const playByKey = new Map<string, number>();
     const durationByKey = new Map<string, number>();
     for (const info of infos) {
-      if ((info.attr & 1) === 1) continue;
+      if (isInvalidFavResource(info.attr)) continue;
       const play = resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt);
       if (play > 0) playByKey.set(`${info.id}:${info.type}`, play);
       const duration = parseDuration(info.duration);
@@ -227,7 +241,7 @@ const fetchLocalFavRemoteInfo = async (item: {
   if (resourceId == null) return { playCount: 0 };
   try {
     const res = await getFavResourceInfos({ resources: `${resourceId}:${item.type}`, platform: "web" });
-    const info = (res.data ?? []).find(i => (i.attr & 1) === 0);
+    const info = (res.data ?? []).find(i => !isInvalidFavResource(i.attr));
     return info
       ? {
           playCount: resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt),
@@ -336,7 +350,7 @@ export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {
   }
 
   return allInfos
-    .filter(item => [2, 12].includes(item.type) && (item.attr & 1) === 0)
+    .filter(item => [2, 12].includes(item.type) && !isInvalidFavResource(item.attr))
     .map(item => {
       if (item.type === 2) {
         return {

@@ -62,6 +62,8 @@ interface Action {
    * 否则清除标记（资源恢复有效时摘掉旧标记）；未检测到的项保持原状。
    */
   updateInvalidFlags: (folderId: number, invalidRids: Set<string>, checkedRids: Set<string>) => void;
+  /** 播放器明确确认资源已删除/下架时，给所有匹配的本地收藏项打失效标记，但不删除它们。 */
+  markInvalidByPlayback: (target: { type: "mv" | "audio"; bvid?: string; sid?: number }) => number;
   /**
    * 补全缺失的播放量：仅对当前 playCount 为空/0 的项写入 playByRid 中的值，
    * 不覆盖已有快照。用于「点心动/播放栏收藏」入口存入时未带播放量的历史数据。
@@ -151,6 +153,33 @@ export const useLocalFavItemsStore = create<State & Action>()(
           if (!changed) return {};
           return { folderItems: { ...state.folderItems, [folderId]: updated } };
         }),
+      markInvalidByPlayback: target => {
+        let marked = 0;
+        set(state => {
+          let changed = false;
+          const folderItems = Object.fromEntries(
+            Object.entries(state.folderItems).map(([folderId, items]) => [
+              folderId,
+              items.map(item => {
+                const isLocal = item.source === "local" || (item.type === 12 && !item.ownerMid && !item.ownerName);
+                const matches =
+                  (target.type === "mv" && Boolean(target.bvid) && item.type === 2 && item.bvid === target.bvid) ||
+                  (target.type === "audio" &&
+                    target.sid !== undefined &&
+                    item.type === 12 &&
+                    !isLocal &&
+                    Number(item.rid) === target.sid);
+                if (!matches || item.invalid) return item;
+                changed = true;
+                marked += 1;
+                return { ...item, invalid: true };
+              }),
+            ]),
+          );
+          return changed ? { folderItems } : {};
+        });
+        return marked;
+      },
       updatePlayCounts: (folderId, playByRid) =>
         set(state => {
           const current = state.folderItems[folderId];

@@ -5,12 +5,13 @@ import { RiDeleteBinLine, RiFocus3Line } from "@remixicon/react";
 import { uniqBy } from "es-toolkit/array";
 
 import { PlayMode } from "@/common/constants/audio";
+import { getPlayListDisplayKey, isSamePlayListDisplayItem } from "@/common/utils/playlist-display";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
 import platform, { isNativeMobile } from "@/platform";
 import { useModalStore } from "@/store/modal";
-import { isSame, usePlayList, type PlayData } from "@/store/play-list";
+import { usePlayList, type PlayData } from "@/store/play-list";
 import { useUser } from "@/store/user";
 
 import Empty from "../empty";
@@ -34,9 +35,7 @@ const PlayListDrawer = () => {
 
   const playItem = useMemo(() => list.find(item => item.id === playId), [list, playId]);
   const pureList = useMemo(() => {
-    return uniqBy(list, item =>
-      item.source === "local" ? `local:${item.id}` : item.type === "mv" ? `mv:${item.bvid}` : `audio:${item.sid}`,
-    );
+    return uniqBy(list, getPlayListDisplayKey);
   }, [list]);
 
   const handleAction = useCallback(async (key: string, item: PlayData) => {
@@ -98,10 +97,7 @@ const PlayListDrawer = () => {
       return;
     }
 
-    const targetIndex =
-      playItem?.source === "local"
-        ? pureList.findIndex(item => item.id === playItem.id)
-        : pureList.findIndex(item => isSame(playItem, item));
+    const targetIndex = pureList.findIndex(item => isSamePlayListDisplayItem(playItem, item));
     if (targetIndex < 0) {
       addToast({ title: "未在列表中找到当前播放的歌曲", color: "warning" });
       return;
@@ -186,7 +182,7 @@ const PlayListDrawer = () => {
                 <ListItem
                   data={item}
                   isLogin={Boolean(user?.isLogin)}
-                  isPlaying={playItem?.source === "local" ? playItem?.id === item.id : isSame(playItem, item)}
+                  isPlaying={isSamePlayListDisplayItem(playItem, item)}
                   onClose={() => setOpen(false)}
                   onPress={() => playListItem(item.id)}
                   onAction={key => handleAction(key, item)}
