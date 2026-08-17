@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { useNavigate } from "react-router";
 
 import { Chip } from "@heroui/react";
-import { RiArrowUpSLine, RiMusic2Line } from "@remixicon/react";
+import { RiMusic2Line } from "@remixicon/react";
 import clsx from "classnames";
 
 import { openBiliVideoLink } from "@/common/utils/url";
@@ -28,7 +28,7 @@ const LeftControl = () => {
 
   return (
     <div className="flex h-full w-full items-center justify-start space-x-2">
-      <div data-id="full-screen-player-open" className="group relative flex-none cursor-pointer" onClick={open}>
+      <div data-id="full-screen-player-open" className="flex-none cursor-pointer" onClick={open}>
         <Image
           radius="md"
           src={playItem?.pageCover || playItem?.cover}
@@ -40,16 +40,6 @@ const LeftControl = () => {
           params="672w_378h_1c.avif"
           emptyPlaceholder={<RiMusic2Line />}
         />
-        <div
-          className={clsx(
-            "text-primary absolute z-10 flex items-center justify-center overflow-hidden bg-[rgba(0,0,0,0.5)]",
-            isWeb
-              ? "right-1 bottom-1 size-6 rounded-full"
-              : "top-0 left-0 h-full w-full rounded-md opacity-0 group-hover:opacity-100",
-          )}
-        >
-          <RiArrowUpSLine size={isWeb ? 18 : 32} />
-        </div>
       </div>
       <div className="flex min-w-0 flex-col items-start space-y-1">
         <span className="flex w-full items-center">

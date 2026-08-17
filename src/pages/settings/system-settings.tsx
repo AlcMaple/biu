@@ -28,7 +28,7 @@ import {
 
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
-import platform, { isNativeMobile } from "@/platform";
+import platform, { isNativeMobile, isWeb } from "@/platform";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
@@ -56,6 +56,7 @@ export const SystemSettingsTab = ({
     ? "flex w-full flex-col items-stretch gap-2"
     : "flex w-full items-center justify-between";
   const labelCls = isNativeMobile ? "space-y-1" : "mr-6 space-y-1";
+  const showDesktopSystemSettings = !isNativeMobile && !isWeb;
 
   return (
     <Form className="w-full space-y-6">
@@ -405,62 +406,63 @@ export const SystemSettingsTab = ({
         />
       </div>
 
-      {!isNativeMobile && <Divider />}
-      {!isNativeMobile && <h2>系统</h2>}
-      {/* 窗口关闭选项 */}
-      {!isNativeMobile && (
-        <div className={rowCls}>
-          <div className={labelCls}>
-            <div className="text-medium font-medium">窗口关闭</div>
-            <div className="text-sm text-zinc-500">选择窗口关闭时的行为</div>
-          </div>
-          <Controller
-            control={control}
-            name="closeWindowOption"
-            render={({ field }) => (
-              <RadioGroup orientation="horizontal" value={field.value} onValueChange={field.onChange}>
-                <Radio value="hide">隐藏到托盘</Radio>
-                <Radio value="exit">直接退出</Radio>
-              </RadioGroup>
-            )}
-          />
-        </div>
-      )}
-
-      {/* 开机自启动开关 */}
-      {!isNativeMobile && (
-        <div className={rowCls}>
-          <div className={labelCls}>
-            <div className="text-medium font-medium">开机自启动</div>
-            <div className="text-sm text-zinc-500">系统登录后自动启动应用</div>
-          </div>
-          <div className="flex w-[360px] justify-end">
+      {showDesktopSystemSettings && (
+        <>
+          <Divider />
+          <h2>系统</h2>
+          <div className={rowCls}>
+            <div className={labelCls}>
+              <div className="text-medium font-medium">窗口关闭</div>
+              <div className="text-sm text-zinc-500">选择窗口关闭时的行为</div>
+            </div>
             <Controller
               control={control}
-              name="autoStart"
+              name="closeWindowOption"
               render={({ field }) => (
-                <Switch disableAnimation isSelected={field.value} onValueChange={field.onChange} />
+                <RadioGroup orientation="horizontal" value={field.value} onValueChange={field.onChange}>
+                  <Radio value="hide">隐藏到托盘</Radio>
+                  <Radio value="exit">直接退出</Radio>
+                </RadioGroup>
               )}
             />
           </div>
-        </div>
+          <div className={rowCls}>
+            <div className={labelCls}>
+              <div className="text-medium font-medium">开机自启动</div>
+              <div className="text-sm text-zinc-500">系统登录后自动启动应用</div>
+            </div>
+            <div className="flex w-[360px] justify-end">
+              <Controller
+                control={control}
+                name="autoStart"
+                render={({ field }) => (
+                  <Switch disableAnimation isSelected={field.value} onValueChange={field.onChange} />
+                )}
+              />
+            </div>
+          </div>
+        </>
       )}
 
-      <Divider />
-      <h2>关于应用</h2>
-      <div className="flex w-full items-center justify-between">
-        <div className="mr-6 flex items-center space-x-1">
-          <span>当前版本 {appVersion}</span>
-          {isUpdateAvailable && Boolean(latestVersion) && (
-            <>
-              <RiArrowRightLongLine size={16} />
-              <span className="text-primary">{latestVersion}</span>
-            </>
-          )}
-        </div>
-        <UpdateCheckButton />
-      </div>
-      <ImportExport />
+      {!isWeb && (
+        <>
+          <Divider />
+          <h2>关于应用</h2>
+          <div className="flex w-full items-center justify-between">
+            <div className="mr-6 flex items-center space-x-1">
+              <span>当前版本 {appVersion}</span>
+              {isUpdateAvailable && Boolean(latestVersion) && (
+                <>
+                  <RiArrowRightLongLine size={16} />
+                  <span className="text-primary">{latestVersion}</span>
+                </>
+              )}
+            </div>
+            <UpdateCheckButton />
+          </div>
+          <ImportExport />
+        </>
+      )}
       <TagSettings />
     </Form>
   );
