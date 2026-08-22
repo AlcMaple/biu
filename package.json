@@ -156,8 +156,8 @@
     "vitest": "^4.0.16"
   },
   "lint-staged": {
-    "*.{js,cjs,mjs,ts,tsx}": "eslint --fix --concurrency auto",
-    "*.{css,less}": "stylelint --fix",
+    "!(docs)/**/*.{js,cjs,mjs,ts,tsx}": "eslint --fix --concurrency auto",
+    "!(docs)/**/*.{css,less}": "stylelint --fix",
     "*.json": "prettier --write"
   },
   "packageManager": "pnpm@10.24.0",
