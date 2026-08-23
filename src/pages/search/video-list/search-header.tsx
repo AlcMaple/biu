@@ -5,8 +5,8 @@ import { RiPlayFill } from "@remixicon/react";
 
 import type { WebSearchTypeVideoParams } from "@/service/web-interface-search-type";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import AsyncButton from "@/components/async-button";
-import { isNativeMobile } from "@/platform";
 
 export type SortOrder = WebSearchTypeVideoParams["order"];
 
@@ -35,7 +35,9 @@ export default function SearchHeader({
   onPlayAll,
   playAllDisabled,
 }: SearchHeaderProps) {
-  if (isNativeMobile) {
+  const isMobileLayout = useIsMobileLayout();
+
+  if (isMobileLayout) {
     return (
       <div className="flex flex-col gap-2 px-4 pb-4">
         <div className="-mx-4 overflow-x-auto px-4">

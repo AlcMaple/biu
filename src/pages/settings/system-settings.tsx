@@ -26,6 +26,7 @@ import {
   RiSunLine,
 } from "@remixicon/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
 import platform, { isNativeMobile, isWeb } from "@/platform";
@@ -52,11 +53,15 @@ export const SystemSettingsTab = ({
   latestVersion,
   setValue,
 }: SystemSettingsTabProps) => {
-  const rowCls = isNativeMobile
+  const isMobileLayout = useIsMobileLayout();
+  const rowCls = isMobileLayout
     ? "flex w-full flex-col items-stretch gap-2"
     : "flex w-full items-center justify-between";
-  const labelCls = isNativeMobile ? "space-y-1" : "mr-6 space-y-1";
+  const labelCls = isMobileLayout ? "space-y-1" : "mr-6 space-y-1";
+  // 这几项调用 platform.selectDirectory / selectFile，是平台能力而不是版式差异：
+  // 只能按平台判断，不能跟着视口宽度走（否则把 Electron 窗口拖窄就会让桌面设置消失）。
   const showDesktopSystemSettings = !isNativeMobile && !isWeb;
+  const showFileSystemSettings = !isNativeMobile;
 
   return (
     <Form className="w-full space-y-6">
@@ -76,8 +81,8 @@ export const SystemSettingsTab = ({
               classNames={{
                 cursor: "rounded-medium",
               }}
-              fullWidth={isNativeMobile}
-              size={isNativeMobile ? "sm" : "md"}
+              fullWidth={isMobileLayout}
+              size={isMobileLayout ? "sm" : "md"}
               selectedKey={field.value}
               onSelectionChange={key => field.onChange(key)}
             >
@@ -128,8 +133,8 @@ export const SystemSettingsTab = ({
               classNames={{
                 cursor: "rounded-medium",
               }}
-              fullWidth={isNativeMobile}
-              size={isNativeMobile ? "sm" : "md"}
+              fullWidth={isMobileLayout}
+              size={isMobileLayout ? "sm" : "md"}
               selectedKey={field.value}
               onSelectionChange={key => field.onChange(key)}
             >
@@ -174,7 +179,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">字体</div>
           <div className="text-sm text-zinc-500">选择界面显示的字体</div>
         </div>
-        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
+        <div className={isMobileLayout ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="fontFamily"
@@ -189,7 +194,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">页面切换动画</div>
           <div className="text-sm text-zinc-500">选择页面切换时的过渡效果</div>
         </div>
-        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
+        <div className={isMobileLayout ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="pageTransition"
@@ -218,7 +223,7 @@ export const SystemSettingsTab = ({
           <div className="text-medium font-medium">圆角</div>
           <div className="text-sm text-zinc-500">调整界面控件的圆角大小</div>
         </div>
-        <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
+        <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
           <Controller
             control={control}
             name="borderRadius"
@@ -255,7 +260,7 @@ export const SystemSettingsTab = ({
             {audioQuality === "low" && "60-80 kbps"}
           </div>
         </div>
-        <div className={isNativeMobile ? "w-full" : "w-[180px]"}>
+        <div className={isMobileLayout ? "w-full" : "w-[180px]"}>
           <Controller
             control={control}
             name="audioQuality"
@@ -287,7 +292,7 @@ export const SystemSettingsTab = ({
             在系统音量之外额外放大音频，适合声音很小的歌曲；100% 为不增强，内置限幅保护，拉高也不会破音
           </div>
         </div>
-        <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
+        <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
           <Controller
             control={control}
             name="volumeBoost"
@@ -331,15 +336,15 @@ export const SystemSettingsTab = ({
         <FancyPlayerImageAlbum />
       </div>
 
-      {!isNativeMobile && <Divider />}
-      {!isNativeMobile && <h2>下载</h2>}
-      {!isNativeMobile && (
+      {showFileSystemSettings && <Divider />}
+      {showFileSystemSettings && <h2>下载</h2>}
+      {showFileSystemSettings && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">下载目录</div>
             <div className="text-sm text-zinc-500">选择音视频保存的位置</div>
           </div>
-          <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
+          <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
             <Controller
               control={control}
               name="downloadPath"
@@ -363,13 +368,13 @@ export const SystemSettingsTab = ({
       )}
 
       {/* FFmpeg 路径配置 */}
-      {!isNativeMobile && (
+      {showFileSystemSettings && (
         <div className={rowCls}>
           <div className={labelCls}>
             <div className="text-medium font-medium">FFmpeg 路径</div>
             <div className="text-sm text-zinc-500">手动指定 FFmpeg 可执行文件路径</div>
           </div>
-          <div className={isNativeMobile ? "w-full" : "w-[360px]"}>
+          <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
             <Controller
               control={control}
               name="ffmpegPath"

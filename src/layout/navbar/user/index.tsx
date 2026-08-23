@@ -21,7 +21,8 @@ import {
 } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
-import platform, { isNativeMobile, isWeb, log } from "@/platform";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import platform, { isWeb, log } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
 import { logoutWebAuthSession, refreshWebAuthSession } from "@/service/web-auth";
 import { useFavoritesStore } from "@/store/favorite";
@@ -44,6 +45,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const clearToken = useToken(s => s.clear);
   const navigate = useNavigate();
   const updateSettings = useSettings(s => s.update);
+  const isMobileLayout = useIsMobileLayout();
 
   const { isOpen: isLoginModalOpen, onOpen: openLoginModal, onOpenChange: onLoginModalOpenChange } = useDisclosure();
 
@@ -190,7 +192,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
             as="button"
             type="button"
             className={
-              isNativeMobile
+              isMobileLayout
                 ? "cursor-pointer transition-transform hover:scale-105"
                 : "mr-4 cursor-pointer transition-transform hover:scale-105"
             }

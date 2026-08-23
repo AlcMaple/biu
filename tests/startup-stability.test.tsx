@@ -24,9 +24,12 @@ vi.mock("react", async importOriginal => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
+    // 这些用例是直接调用组件函数而不是渲染，所以把用到的 hook 换成不依赖 renderer 的实现。
+    useCallback: <T,>(callback: T) => callback,
     useEffect: (effect: EffectCallback) => {
       startupMocks.effects.push(effect);
     },
+    useState: <T,>(initial: T) => [typeof initial === "function" ? (initial as () => T)() : initial, vi.fn()],
   };
 });
 
@@ -44,7 +47,7 @@ vi.mock("react-router", async importOriginal => {
 vi.mock("@heroui/react", () => ({
   HeroUIProvider: "div",
   ToastProvider: "div",
-  useDisclosure: () => ({ isOpen: false, onOpen: vi.fn(), onOpenChange: vi.fn() }),
+  useDisclosure: () => ({ isOpen: false, onClose: vi.fn(), onOpen: vi.fn(), onOpenChange: vi.fn() }),
 }));
 
 vi.mock("@/platform", () => ({
@@ -54,6 +57,14 @@ vi.mock("@/platform", () => ({
   },
   isNativeMobile: false,
   log: startupMocks.log,
+}));
+
+// Layout 的响应式分支依赖 useSyncExternalStore；这些用例是直接调用组件函数而非渲染，
+// 所以把断点 hook 固定为桌面形态。
+vi.mock("@/common/hooks/use-responsive", () => ({
+  useIsMobileLayout: () => false,
+  useIsNarrowTabletLayout: () => false,
+  useIsTabletLayout: () => false,
 }));
 
 vi.mock("@/common/utils/cookie", () => ({ getCookitFromBSite: startupMocks.getCookitFromBSite }));

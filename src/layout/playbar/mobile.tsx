@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 
 import { Card, Slider } from "@heroui/react";
-import { RiMusic2Line, RiPauseCircleFill, RiPlayCircleFill, RiSkipForwardFill } from "@remixicon/react";
+import { RiMusic2Line, RiPauseCircleFill, RiPlayCircleFill, RiSkipBackFill, RiSkipForwardFill } from "@remixicon/react";
 
 import IconButton from "@/components/icon-button";
 import Image from "@/components/image";
+import MusicPlayMode from "@/components/music-play-mode";
 import OpenPlaylistDrawerButton from "@/components/open-playlist-drawer-button";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -15,6 +16,7 @@ const MobilePlayBar = () => {
   const playId = usePlayList(s => s.playId);
   const togglePlay = usePlayList(s => s.togglePlay);
   const next = usePlayList(s => s.next);
+  const prev = usePlayList(s => s.prev);
   const isPlaying = usePlayList(s => s.isPlaying);
   const duration = usePlayList(s => s.duration);
   const seek = usePlayList(s => s.seek);
@@ -63,13 +65,18 @@ const MobilePlayBar = () => {
             </span>
           </div>
         </div>
+        {/* 顺序：上一首 / 播放 / 下一首 / 播放顺序 / 播放列表 */}
         <div className="flex flex-none items-center">
+          <IconButton radius="md" onPress={prev} isDisabled={isEmptyPlayList || isSingle} aria-label="上一首">
+            <RiSkipBackFill size={22} />
+          </IconButton>
           <IconButton isDisabled={isEmptyPlayList} radius="full" onPress={togglePlay} className="size-11 min-w-11">
             {isPlaying ? <RiPauseCircleFill size={40} /> : <RiPlayCircleFill size={40} />}
           </IconButton>
-          <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle}>
+          <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle} aria-label="下一首">
             <RiSkipForwardFill size={22} />
           </IconButton>
+          <MusicPlayMode />
           <OpenPlaylistDrawerButton />
         </div>
       </div>

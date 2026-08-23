@@ -5,8 +5,9 @@ import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@
 import { RiMoreFill, RiMusic2Line, RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import Image from "@/components/image";
-import { isNativeMobile, isWeb } from "@/platform";
+import { isWeb } from "@/platform";
 import { type PlayData } from "@/store/play-list";
 
 import { getMenus } from "./menu";
@@ -23,6 +24,7 @@ interface Props {
 const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Props) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const isMobileLayout = useIsMobileLayout();
 
   return (
     <Button
@@ -82,7 +84,7 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
               variant="light"
               size="sm"
               className={
-                isNativeMobile || isWeb
+                isMobileLayout || isWeb
                   ? "flex-none"
                   : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
               }
