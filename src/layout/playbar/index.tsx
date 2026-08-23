@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 
 import { Card } from "@heroui/react";
+import clx from "classnames";
 
+import { useIsMobileLayout, useIsTabletLayout } from "@/common/hooks/use-responsive";
 import { setVolumeBoost } from "@/common/utils/audio-graph";
-import { isNativeMobile } from "@/platform";
 import { restoreSession } from "@/store/heartbeat";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -20,6 +21,8 @@ function PlayBar() {
   const playId = usePlayList(s => s.playId);
   const init = usePlayList(s => s.init);
   const volumeBoost = useSettings(s => s.volumeBoost);
+  const isMobileLayout = useIsMobileLayout();
+  const isTabletLayout = useIsTabletLayout();
 
   useEffect(() => {
     init();
@@ -34,7 +37,7 @@ function PlayBar() {
     setVolumeBoost((volumeBoost ?? 100) / 100);
   }, [volumeBoost]);
 
-  if (isNativeMobile) {
+  if (isMobileLayout) {
     return <MobilePlayBar />;
   }
 
@@ -42,7 +45,12 @@ function PlayBar() {
     <Card
       radius="none"
       shadow="sm"
-      className="bg-background grid h-full grid-cols-[minmax(0,1fr)_minmax(0,3fr)_minmax(0,1fr)] px-4"
+      className={clx(
+        "bg-background grid h-full",
+        isTabletLayout
+          ? "grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] gap-1 px-2"
+          : "grid-cols-[minmax(0,1fr)_minmax(0,3fr)_minmax(0,1fr)] px-4",
+      )}
     >
       <div className="h-full">{Boolean(playId) && <Left />}</div>
       <Center />

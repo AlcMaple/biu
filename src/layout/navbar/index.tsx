@@ -4,8 +4,9 @@ import { Button } from "@heroui/react";
 import { RiMenuLine } from "@remixicon/react";
 import clx from "classnames";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ShazamModal from "@/components/shazam-modal";
-import platform, { isElectron, isNativeMobile } from "@/platform";
+import platform, { isElectron } from "@/platform";
 import { useUser } from "@/store/user";
 
 import WindowAction from "../../components/window-action";
@@ -24,10 +25,11 @@ const LayoutNavbar = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const sideDrawer = useSideDrawer();
+  const isMobileLayout = useIsMobileLayout();
 
   const isNoDrag = isSearchFocused || isUserDropdownOpen;
 
-  if (isNativeMobile) {
+  if (isMobileLayout) {
     return (
       <div className="flex h-full items-center gap-2 px-2">
         <Button isIconOnly variant="light" size="sm" aria-label="打开菜单" onPress={() => sideDrawer?.openSideDrawer()}>

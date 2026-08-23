@@ -5,11 +5,12 @@ import { RiDeleteBinLine, RiFocus3Line } from "@remixicon/react";
 import { uniqBy } from "es-toolkit/array";
 
 import { PlayMode } from "@/common/constants/audio";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { getPlayListDisplayKey, isSamePlayListDisplayItem } from "@/common/utils/playlist-display";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
-import platform, { isNativeMobile } from "@/platform";
+import platform from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { usePlayList, type PlayData } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -32,6 +33,7 @@ const PlayListDrawer = () => {
   const setShouldKeepPagesOrderInRandomPlayMode = usePlayList(s => s.setShouldKeepPagesOrderInRandomPlayMode);
   const user = useUser(s => s.user);
   const playListItem = usePlayList(state => state.playListItem);
+  const isMobileLayout = useIsMobileLayout();
 
   const playItem = useMemo(() => list.find(item => item.id === playId), [list, playId]);
   const pureList = useMemo(() => {
@@ -123,8 +125,8 @@ const PlayListDrawer = () => {
     <Drawer
       radius="md"
       shadow="md"
-      backdrop={isNativeMobile ? "opaque" : "transparent"}
-      size={isNativeMobile ? "xs" : "sm"}
+      backdrop={isMobileLayout ? "opaque" : "transparent"}
+      size={isMobileLayout ? "xs" : "sm"}
       hideCloseButton
       disableAnimation
       isOpen={isOpen}
@@ -132,7 +134,7 @@ const PlayListDrawer = () => {
       classNames={{
         backdrop: "z-200 window-no-drag",
         wrapper: "z-200 window-no-drag",
-        base: isNativeMobile
+        base: isMobileLayout
           ? "data-[placement=right]:mr-[env(safe-area-inset-right)] data-[placement=right]:mb-[calc(88px+env(safe-area-inset-bottom))] w-4/5 max-w-[360px]"
           : "data-[placement=right]:mb-22",
       }}

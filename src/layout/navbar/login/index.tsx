@@ -3,7 +3,8 @@ import React, { useCallback } from "react";
 import { Divider, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 import moment from "moment";
 
-import { isNativeMobile, isWeb } from "@/platform";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { isWeb } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useToken } from "@/store/token";
 import { useUser } from "@/store/user";
@@ -22,6 +23,8 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
   const updateToken = useToken(state => state.updateToken);
   const updateCreatedFavorites = useFavoritesStore(state => state.updateCreatedFavorites);
   const updateCollectedFavorites = useFavoritesStore(state => state.updateCollectedFavorites);
+
+  const isMobileLayout = useIsMobileLayout();
 
   const onClose = () => onOpenChange(false);
 
@@ -50,7 +53,7 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
     [updateCollectedFavorites, updateCreatedFavorites, updateToken, updateUser],
   );
 
-  if (isNativeMobile) {
+  if (isMobileLayout) {
     return (
       <Modal
         size="sm"

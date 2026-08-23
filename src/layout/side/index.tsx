@@ -4,9 +4,10 @@ import { Button, Drawer, DrawerBody, DrawerContent, useDisclosure } from "@herou
 import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from "@remixicon/react";
 import clx from "classnames";
 
+import { useIsMobileLayout, useIsTabletLayout } from "@/common/hooks/use-responsive";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer from "@/components/scroll-container";
-import { isNativeMobile, isWeb } from "@/platform";
+import { isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
 import Collection from "./collection";
@@ -26,6 +27,8 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   const sideMenuCollapsed = useSettings(state => state.sideMenuCollapsed);
   const sideMenuWidth = useSettings(state => state.sideMenuWidth);
   const updateSettings = useSettings(state => state.update);
+  const isMobileLayout = useIsMobileLayout();
+  const isTabletLayout = useIsTabletLayout();
 
   const {
     isOpen: isFavoritesEditModalOpen,
@@ -52,7 +55,8 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
     onOpenChangeFavoritesEditModal();
   };
 
-  const effectiveSideMenuCollapsed = sideMenuCollapsed && !isWeb;
+  // 平板（768–1050px）强制 72px 图标轨，不受用户持久化宽度影响
+  const effectiveSideMenuCollapsed = isTabletLayout || (sideMenuCollapsed && !isWeb);
 
   const sidebarWidth = (() => {
     if (effectiveSideMenuCollapsed) return COLLAPSED_WIDTH;
@@ -65,6 +69,8 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   const [renderWidth, setRenderWidth] = useState(sidebarWidth);
   const [isDragging, setIsDragging] = useState(false);
   const isCollapsedVisual = isDragging ? !isWeb && renderWidth < MIN_WIDTH : effectiveSideMenuCollapsed;
+  // 平板与移动形态下不允许拖拽调宽
+  const canResize = !isMobileLayout && !isTabletLayout;
 
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -110,7 +116,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   }, [isDragging]);
 
   useEffect(() => {
-    if (isNativeMobile) return;
+    if (isMobileLayout) return;
 
     const onMouseMove = (event: MouseEvent) => {
       if (!isDraggingRef.current) return;
@@ -147,9 +153,9 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
         document.body.style.userSelect = prevUserSelectRef.current;
       }
     };
-  }, [updateSettings]);
+  }, [isMobileLayout, updateSettings]);
 
-  if (isNativeMobile) {
+  if (isMobileLayout) {
     return (
       <>
         <Drawer
@@ -206,7 +212,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
             onOpenEditFavorite={handleOpenEditFavorite}
           />
         </ScrollContainer>
-        {!isWeb && (
+        {!isWeb && !isTabletLayout && (
           <Button
             size="sm"
             isIconOnly
@@ -218,10 +224,12 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
             {isCollapsedVisual ? <RiArrowRightDoubleLine size={16} /> : <RiArrowLeftDoubleLine size={16} />}
           </Button>
         )}
-        <div
-          className="hover:bg-foreground/10 absolute top-0 right-0 h-full w-2 cursor-col-resize bg-transparent"
-          onMouseDown={onStartResize}
-        />
+        {canResize && (
+          <div
+            className="hover:bg-foreground/10 absolute top-0 right-0 h-full w-2 cursor-col-resize bg-transparent"
+            onMouseDown={onStartResize}
+          />
+        )}
       </div>
       <FavoritesEditModal
         mid={editingFavorite?.id}

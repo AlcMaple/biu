@@ -30,8 +30,10 @@ import "./app.css";
 moment.locale("zh-cn");
 
 /**
- * 顶层 App 全平台共用一棵路由树与一套 shell，形态差异下沉到组件内的
- * `isNativeMobile` 分支（见 `layout/index.tsx`、`layout/playbar`、`full-screen-player`）。
+ * 顶层 App 全平台共用一棵路由树与一套 shell，形态差异下沉到组件内的响应式分支
+ * （`common/hooks/use-responsive`：≤767px 移动形态、768–1050px 平板、≥1051px 桌面，
+ * 见 `layout/index.tsx`、`layout/playbar`、`full-screen-player`）。
+ * 窄 Web 与 Capacitor 原生端走同一套移动形态，不另建路由树。
  *
  * 不要在这里按平台早返到独立的路由树 —— 那样会让移动端整棵共享 UI 失效，
  * 等于把 Electron 端已实现的页面重做一遍。平台能力差异走 `platform/`，

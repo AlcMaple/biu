@@ -14,8 +14,6 @@ import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useUser } from "@/store/user";
 
-import PageListDrawer from "./page-list";
-
 const LeftControl = () => {
   const navigate = useNavigate();
   const user = useUser(s => s.user);
@@ -81,7 +79,6 @@ const LeftControl = () => {
         </span>
       </div>
       <div className="flex items-center">
-        {Boolean(playItem?.hasMultiPart) && <PageListDrawer />}
         {Boolean(playItem) && playItem?.source === "local" && <MusicFavButton />}
         {Boolean(user?.isLogin) && Boolean(playItem) && playItem?.source !== "local" && (
           <>

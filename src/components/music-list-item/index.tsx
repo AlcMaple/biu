@@ -8,7 +8,7 @@ import clx from "classnames";
 import { formatNumber } from "@/common/utils/number";
 import { formatDuration } from "@/common/utils/time";
 import Image from "@/components/image";
-import { isNativeMobile, isWeb } from "@/platform";
+import { isWeb } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 
@@ -16,7 +16,7 @@ import type { ContextMenuItem } from "../context-menu";
 
 import ContextMenu from "../context-menu";
 import OperationMenu from "./operation";
-import { getMusicListItemGrid } from "./styles";
+import { useMusicListColumns } from "./styles";
 
 interface Props {
   title: ReactNode;
@@ -75,7 +75,14 @@ const MusicListItem = ({
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
-  const gridCols = getMusicListItemGrid(isCompact, hidePubTime);
+  const {
+    gridCols,
+    isMobile: isMobileLayout,
+    showUp,
+    showPlayCount,
+    showPubTime,
+    showDuration,
+  } = useMusicListColumns(isCompact, hidePubTime);
 
   const invalidBadge = invalid && (
     <span className="border-danger/40 text-danger flex-none rounded-sm border px-1 text-[10px] leading-4">失效</span>
@@ -90,8 +97,8 @@ const MusicListItem = ({
         disableAnimation
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
-        onDoubleClick={!isNativeMobile && !isWeb ? onPress : undefined}
-        onPress={isNativeMobile || isWeb ? onPress : undefined}
+        onDoubleClick={!isMobileLayout && !isWeb ? onPress : undefined}
+        onPress={isMobileLayout || isWeb ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
           isCompact ? "h-9 min-h-9 min-w-0 px-0 text-sm" : "h-auto min-h-auto min-w-auto space-y-2 p-2",
@@ -161,7 +168,7 @@ const MusicListItem = ({
           )}
 
           {/* 3. UP名称 (Compact only) */}
-          {isCompact && !isNativeMobile && (
+          {isCompact && showUp && (
             <div className="min-w-0 truncate">
               <span
                 className={clx("text-foreground-500 w-fit truncate text-sm", {
@@ -179,19 +186,19 @@ const MusicListItem = ({
           )}
 
           {/* 4. 播放量 */}
-          {!isNativeMobile && (
+          {showPlayCount && (
             <div className="text-foreground-500 flex justify-end text-xs">
               {playCount !== undefined && playCount > 0 ? formatNumber(playCount) : "-"}
             </div>
           )}
 
           {/* 5. 投稿时间 */}
-          {!isNativeMobile && !hidePubTime && (
+          {showPubTime && (
             <div className="text-foreground-500 flex justify-end text-xs">{pubTime && <span>{pubTime}</span>}</div>
           )}
 
           {/* 6. 时长 */}
-          {!isNativeMobile && (
+          {showDuration && (
             <div className="text-foreground-500 flex justify-end text-xs tabular-nums">
               {Boolean(duration) && <span>{typeof duration === "number" ? formatDuration(duration) : duration}</span>}
             </div>

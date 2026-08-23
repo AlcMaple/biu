@@ -8,12 +8,13 @@ import { readableColor } from "color2k";
 import { useShallow } from "zustand/shallow";
 
 import { Themes } from "@/common/constants/theme";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { hexToHsl, resolveTheme, isHex } from "@/common/utils/color";
 import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
-import platform, { isElectron, isNativeMobile, isWeb } from "@/platform";
+import platform, { isElectron, isWeb } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -34,6 +35,7 @@ import FullScreenPlayerSettingsPanel from "./settings-panel";
 const appPlatform = platform.getPlatform();
 
 const FullScreenPlayer = () => {
+  const isMobileLayout = useIsMobileLayout();
   const isOpen = useModalStore(s => s.isFullScreenPlayerOpen);
   const close = useModalStore(s => s.closeFullScreenPlayer);
   const { playId, list } = usePlayList(
@@ -196,7 +198,7 @@ const FullScreenPlayer = () => {
 
   if (!playItem) return null;
 
-  if (isNativeMobile) return <MobileFullScreenPlayer />;
+  if (isMobileLayout) return <MobileFullScreenPlayer />;
 
   if (useFancyPlayer) return <FancyFullScreenPlayer />;
 

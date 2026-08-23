@@ -3,9 +3,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { addToast, Spinner, Tab, Tabs } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
-import platform, { isNativeMobile, isWeb } from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
 import { useModalStore } from "@/store/modal";
@@ -95,6 +96,7 @@ const normalizeRegionItem = (item: Archive, fallbackId: string | number): Recomm
 
 const MusicRecommend = () => {
   const scrollerRef = useRef<ScrollRefObject>(null);
+  const isMobileLayout = useIsMobileLayout();
 
   const [list, setList] = useState<RecommendItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -333,7 +335,7 @@ const MusicRecommend = () => {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <Tabs
           variant="solid"
-          size={isNativeMobile ? "md" : "lg"}
+          size={isMobileLayout ? "md" : "lg"}
           radius="md"
           classNames={{
             cursor: "rounded-medium",
@@ -354,7 +356,7 @@ const MusicRecommend = () => {
         </Tabs>
         <AsyncButton
           color="primary"
-          size={isNativeMobile ? "sm" : "md"}
+          size={isMobileLayout ? "sm" : "md"}
           startContent={<RiPlayFill size={18} />}
           isDisabled={initialLoading || list.length === 0}
           onPress={handlePlayAll}

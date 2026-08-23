@@ -1,10 +1,10 @@
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react";
 import clx from "classnames";
 
-import { isNativeMobile, isWeb } from "@/platform";
+import { isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
-import { getMusicListItemGrid } from "./styles";
+import { useMusicListColumns } from "./styles";
 
 export type MusicListSortKey = "title" | "playCount" | "time" | "duration";
 
@@ -23,7 +23,7 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
-  const gridCols = getMusicListItemGrid(isCompact, hidePubTime);
+  const { gridCols, showUp, showPlayCount, showPubTime, showDuration } = useMusicListColumns(isCompact, hidePubTime);
 
   const renderCell = (key: MusicListSortKey, label: string, align: "left" | "right") => {
     const canSort = sortable?.includes(key);
@@ -54,23 +54,6 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
     );
   };
 
-  if (isNativeMobile) {
-    return (
-      <div
-        className={clx(
-          "text-default-500 border-divider mb-2 grid w-full items-center gap-4 border-b text-sm",
-          isCompact ? "h-8" : "h-10 px-2",
-          gridCols,
-          className,
-        )}
-      >
-        <div className="min-w-8 text-center">#</div>
-        {renderCell("title", "标题", "left")}
-        <div className="w-8" />
-      </div>
-    );
-  }
-
   return (
     <div
       className={clx(
@@ -82,10 +65,10 @@ const MusicListHeader = ({ className, hidePubTime, timeTitle, sortable, sortBy, 
     >
       <div className="min-w-8 text-center">#</div>
       {renderCell("title", "标题", "left")}
-      {isCompact && <div className="text-left">UP</div>}
-      {renderCell("playCount", "播放量", "right")}
-      {!hidePubTime && renderCell("time", timeTitle || "投稿时间", "right")}
-      {renderCell("duration", "时长", "right")}
+      {showUp && <div className="text-left">UP</div>}
+      {showPlayCount && renderCell("playCount", "播放量", "right")}
+      {showPubTime && renderCell("time", timeTitle || "投稿时间", "right")}
+      {showDuration && renderCell("duration", "时长", "right")}
       <div className="w-8" />
     </div>
   );

@@ -25,7 +25,9 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
       .filter(item => item.href && !hiddenMenuKeys.includes(item.href))
       .filter(item => !(isNativeMobile && item.href && MOBILE_HIDDEN_HREFS.has(item.href)));
 
-    if (isCollapsed) {
+    // 展开态的「新建收藏夹」在收藏夹分组的标题栏里，而该分组未登录时整个不渲染；
+    // 折叠轨把这个入口提到菜单里，同样要跟着登录态走，否则未登录也会多出一个按钮。
+    if (isCollapsed && user?.isLogin) {
       return [
         ...filtered,
         {
