@@ -1,5 +1,7 @@
 # Web 部署
 
+> 生产发布、数据备份、自动续期、验证与回滚请先读 [Web 生产部署与维护指南](./Web%20生产部署与维护指南.md)
+
 ## 构建与启动
 
 Web 版不是纯静态站点。浏览器、B 站 API 和媒体 CDN 之间必须经过同源 BFF，因此 renderer、登录会话、API 代理和媒体 Range 代理由同一个 Node 进程提供。
@@ -22,13 +24,15 @@ pnpm start:web
 | `BIU_WEB_PORT` | `5678` | 监听端口，范围 1–65535 |
 | `BIU_WEB_PUBLIC_ORIGIN` | 本机开发时按连接推导 | 对外完整 origin，例如 `https://music.example.com`；生产或非 loopback 监听时必填 |
 | `BIU_WEB_CLIENT_IP_HEADER` | 未启用 | 可信反代覆盖写入的单值客户端 IP header，例如 `X-Biu-Client-IP` |
+| `BIU_SYNC_INTERNAL_ORIGIN` | `http://127.0.0.1:3002` | 本机 sync 服务的受信任内部 origin；HTTP 只允许 loopback |
+| `BIU_ACME_CHALLENGE_ORIGIN` | 未启用 | 可选的本机 HTTP-01 challenge 服务；只允许 loopback origin |
 
 生产示例：
 
 ```bash
 NODE_ENV=production \
 BIU_WEB_PUBLIC_ORIGIN=https://music.example.com \
-BIU_WEB_CLIENT_IP_HEADER=X-Biu-Client-IP \
+BIU_SYNC_INTERNAL_ORIGIN=http://127.0.0.1:3002 \
 pnpm start:web
 ```
 
@@ -69,8 +73,9 @@ location / {
 ## 运行边界
 
 - B 站 Cookie、refresh token、Gaia token 都只保存在服务端内存，浏览器只持有本站随机 HttpOnly 标识；上游 `Set-Cookie` 不会回传浏览器。
+- Web 同步走同源 `/__biu_sync/*`：BFF 在服务端换取短期同步凭据，浏览器不会取得 B 站 Cookie 或同步 JWT。
+- 若配置 `BIU_ACME_CHALLENGE_ORIGIN`，BFF 仅转发合法 HTTP-01 token 到固定 loopback origin，不能成为任意本地 URL 代理。
 - 登录会话、匿名媒体会话和不透明媒体 token 都是单进程内存状态。服务重启会退出 Web 登录并使旧媒体 token 失效；当前实现不能直接横向启动多个互不共享状态的 worker。
 - 媒体字节经过部署方服务器。播放和拖动会产生 Range 请求，`206`、`Content-Range` 和客户端取消会流式透传，因此带宽与出站流量由部署方承担。
 - 媒体端点只接受 BFF 签发的短期不透明 token，不接受 URL 参数；上游目标和每一次重定向都会重新经过固定 UPOS allowlist 校验。
-- `/__biu_auth/*`、`/__biu_proxy/*` 和 `/__biu_health` 均不得缓存。普通 HTML 也使用 `no-store`；带内容哈希的静态资源由 Node 返回长期缓存头。
-- 若配置 `BIU_WEB_CLIENT_IP_HEADER`，反代必须清洗并覆盖该 header 为一个合法 IPv4/IPv6，不能接受客户端自报、逗号链或追加式 `X-Forwarded-For`。
+- `/__biu_auth/*`、`/__biu_proxy/*`、`/__biu_sync/*` 和 `/__biu_health` 均不得缓存。普通 HTML 也使用 `no-store`；带内容哈希的静态资源由 Node 返回长期缓存头。
