@@ -1,4 +1,5 @@
 import platform, { log } from "@/platform";
+import { isWeb } from "@/platform/detect";
 
 import type { Envelope, SyncOp, SyncStoreName } from "./types";
 
@@ -10,11 +11,27 @@ interface CachedToken {
   mid: string;
 }
 
+interface WebSyncSessionResponse {
+  code: number;
+  data?: { mid?: string };
+}
+
 let cached: CachedToken | null = null;
 /** 避免同一时刻多个 store 并发触发同步时，重复发起多次换 token 请求 */
 let exchangeInFlight: Promise<CachedToken | null> | null = null;
 
 async function exchangeToken(): Promise<CachedToken | null> {
+  if (isWeb) {
+    try {
+      const res = await syncHttp.get<WebSyncSessionResponse>("/session");
+      const mid = res.data?.mid;
+      return res.code === 0 && typeof mid === "string" && /^\d+$/.test(mid) ? { token: "", mid } : null;
+    } catch (err) {
+      log.warn("[sync/client] Web sync session unavailable", err);
+      return null;
+    }
+  }
+
   const sessdata = await platform.getCookie("SESSDATA");
   if (!sessdata) {
     // 未登录：本地歌单同步依附于 B 站登录态，没登录就不同步，不算错误
@@ -43,7 +60,7 @@ async function getToken(): Promise<CachedToken | null> {
   return cached;
 }
 
-function invalidateToken() {
+export function invalidateSyncToken() {
   cached = null;
 }
 
@@ -58,7 +75,7 @@ async function withAuthRetry<T>(fn: (token: CachedToken) => Promise<T>): Promise
     const status = (err as { response?: { status?: number } })?.response?.status;
     if (status !== 401) throw err;
 
-    invalidateToken();
+    invalidateSyncToken();
     const retried = await getToken();
     if (!retried) return null;
     return fn(retried);
@@ -66,11 +83,10 @@ async function withAuthRetry<T>(fn: (token: CachedToken) => Promise<T>): Promise
 }
 
 export async function pullSnapshot(store: SyncStoreName): Promise<Envelope | null> {
-  return withAuthRetry(token =>
-    syncHttp.get<Envelope>(`/sync/${store}`, {
-      headers: { Authorization: `Bearer ${token.token}` },
-    }),
-  );
+  return withAuthRetry(token => {
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.get<Envelope>(`/sync/${store}`, { headers });
+  });
 }
 
 /**
@@ -84,13 +100,10 @@ export async function pushOps(
   ops: SyncOp[],
   allowFullDelete = false,
 ): Promise<Envelope | null> {
-  return withAuthRetry(token =>
-    syncHttp.post<Envelope>(
-      `/sync/${store}`,
-      { allowFullDelete, baseVersion, ops },
-      { headers: { Authorization: `Bearer ${token.token}` } },
-    ),
-  );
+  return withAuthRetry(token => {
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.post<Envelope>(`/sync/${store}`, { allowFullDelete, baseVersion, ops }, { headers });
+  });
 }
 
 export interface WatchResult {
@@ -106,12 +119,13 @@ export async function watchVersions(known: Record<string, number>): Promise<Watc
   const query = Object.entries(known)
     .map(([store, version]) => `${store}:${version}`)
     .join(",");
-  return withAuthRetry(token =>
-    syncHttp.get<WatchResult>(`/watch?versions=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token.token}` },
+  return withAuthRetry(token => {
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.get<WatchResult>(`/watch?versions=${encodeURIComponent(query)}`, {
+      headers,
       timeout: WATCH_REQUEST_TIMEOUT_MS,
-    }),
-  );
+    });
+  });
 }
 
 export async function getCurrentMid(): Promise<string | null> {

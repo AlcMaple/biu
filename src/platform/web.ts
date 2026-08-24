@@ -1,6 +1,22 @@
+import { StoreNameMap } from "@shared/store";
+
 import type { Logger, Platform } from "./types";
 
 const STORE_KEY_PREFIX = "biu:";
+const WEB_STORE_DATABASE = "biu-web-store";
+const WEB_STORE_OBJECT_STORE = "stores";
+
+// 歌单、同步基线与滚动备份会随用户数据增长；localStorage 的同步配额不适合承载它们。
+// 轻量设置保留 localStorage，以避免扩大迁移面。
+const highCapacityStores = new Set<StoreName>([
+  StoreNameMap.LocalFavorites,
+  StoreNameMap.LocalFavItems,
+  StoreNameMap.Tags,
+  StoreNameMap.PlaylistSyncMeta,
+  StoreNameMap.PlaylistSyncBackups,
+]);
+
+let databasePromise: Promise<IDBDatabase | undefined> | undefined;
 
 const noop = () => {};
 const asyncNoop = async () => {};
@@ -14,10 +30,79 @@ const getStorage = (): Storage | undefined => {
   }
 };
 
+const storageKey = (name: StoreName) => `${STORE_KEY_PREFIX}${String(name)}`;
+
+function openDatabase(): Promise<IDBDatabase | undefined> {
+  if (databasePromise) return databasePromise;
+  if (typeof indexedDB === "undefined") return Promise.resolve(undefined);
+
+  databasePromise = new Promise(resolve => {
+    let request: IDBOpenDBRequest;
+    try {
+      request = indexedDB.open(WEB_STORE_DATABASE, 1);
+    } catch (err) {
+      console.error("[web.store] IndexedDB unavailable:", err);
+      resolve(undefined);
+      return;
+    }
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(WEB_STORE_OBJECT_STORE)) {
+        request.result.createObjectStore(WEB_STORE_OBJECT_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => {
+      console.error("[web.store] IndexedDB open failed:", request.error);
+      resolve(undefined);
+    };
+    request.onblocked = () => {
+      console.warn("[web.store] IndexedDB upgrade is blocked by another tab");
+      resolve(undefined);
+    };
+  });
+  return databasePromise;
+}
+
+function readIndexedValue<T>(database: IDBDatabase, key: string): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(WEB_STORE_OBJECT_STORE, "readonly");
+    const request = transaction.objectStore(WEB_STORE_OBJECT_STORE).get(key);
+    request.onsuccess = () => resolve(request.result as T | undefined);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function writeIndexedValue(database: IDBDatabase, key: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(WEB_STORE_OBJECT_STORE, "readwrite");
+    transaction.objectStore(WEB_STORE_OBJECT_STORE).put(value, key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefined {
+  const value = getStorage()?.getItem(storageKey(name));
+  return value == null ? undefined : (JSON.parse(value) as StoreDataMap[N]);
+}
+
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
   try {
-    const value = getStorage()?.getItem(`${STORE_KEY_PREFIX}${String(name)}`);
-    return value == null ? undefined : (JSON.parse(value) as StoreDataMap[N]);
+    if (!highCapacityStores.has(name)) return readLegacyStore(name);
+
+    const database = await openDatabase();
+    if (!database) return readLegacyStore(name);
+
+    const value = await readIndexedValue<StoreDataMap[N] | null>(database, storageKey(name));
+    // null 是 clearStore 留下的 tombstone：不能回退到旧 localStorage，否则已删除歌单会复活。
+    if (value !== undefined) return value ?? undefined;
+
+    const legacy = readLegacyStore(name);
+    if (legacy === undefined) return undefined;
+    await writeIndexedValue(database, storageKey(name), legacy);
+    getStorage()?.removeItem(storageKey(name));
+    return legacy;
   } catch (err) {
     console.error(`[web.getStore] ${String(name)}:`, err);
     return undefined;
@@ -26,8 +111,17 @@ async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N
 
 async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N]): Promise<void> {
   try {
+    if (highCapacityStores.has(name)) {
+      const database = await openDatabase();
+      if (database) {
+        await writeIndexedValue(database, storageKey(name), value);
+        getStorage()?.removeItem(storageKey(name));
+        return;
+      }
+    }
+
     const serialized = JSON.stringify(value);
-    if (serialized !== undefined) getStorage()?.setItem(`${STORE_KEY_PREFIX}${String(name)}`, serialized);
+    if (serialized !== undefined) getStorage()?.setItem(storageKey(name), serialized);
   } catch (err) {
     console.error(`[web.setStore] ${String(name)}:`, err);
   }
@@ -35,7 +129,15 @@ async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N])
 
 async function webClearStore(name: StoreName): Promise<void> {
   try {
-    getStorage()?.removeItem(`${STORE_KEY_PREFIX}${String(name)}`);
+    if (highCapacityStores.has(name)) {
+      const database = await openDatabase();
+      if (database) {
+        await writeIndexedValue(database, storageKey(name), null);
+        getStorage()?.removeItem(storageKey(name));
+        return;
+      }
+    }
+    getStorage()?.removeItem(storageKey(name));
   } catch (err) {
     console.error(`[web.clearStore] ${String(name)}:`, err);
   }

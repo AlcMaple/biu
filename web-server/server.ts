@@ -145,6 +145,14 @@ export async function createProductionWebServer(options: ProductionWebServerOpti
   const staticHandler = await createStaticWebHandler(options.staticRoot);
 
   return createServer((request, response) => {
+    // These are safe for every response type, including static files. More restrictive CSP
+    // is intentionally introduced in report-only mode first because playback/login depend on
+    // external browser capabilities that must be measured rather than guessed.
+    response.setHeader("Referrer-Policy", "no-referrer");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Permissions-Policy", "geolocation=(), payment=(), usb=()");
+    response.setHeader("Content-Security-Policy", "base-uri 'self'; object-src 'none'; frame-ancestors 'none'");
     void application(request, response)
       .then(async handled => {
         if (!handled) await staticHandler(request, response);
