@@ -3,6 +3,7 @@ import { build as electronBuild } from "electron-builder";
 
 import pkg from "../package.json";
 import { ELECTRON_OUT_DIRNAME, ELECTRON_ICON_BASE_PATH } from "../shared/path";
+import { UPDATE_SIGNING_KEY_ID } from "../shared/update-signing-public-key.js";
 
 export async function buildElectron() {
   await electronBuild({
@@ -13,6 +14,10 @@ export async function buildElectron() {
       copyright: `Copyright © ${new Date().getFullYear()}`,
       nodeVersion: "current",
       buildVersion: pkg.version,
+      extraMetadata: {
+        // 运行时仅在内置 Ed25519 公钥与此标识匹配时启用自动更新。
+        biuUpdateTrust: { keyId: UPDATE_SIGNING_KEY_ID, mode: "ed25519" },
+      },
       asar: true,
       electronCompile: false,
       compression: "maximum",
@@ -83,7 +88,7 @@ export async function buildElectron() {
       },
       publish: {
         provider: "generic",
-        url: "http://8.163.0.99/biu/updates/",
+        url: "https://biu.alcmaple.cn/biu/updates/",
       },
     },
   })
@@ -92,5 +97,6 @@ export async function buildElectron() {
     })
     .catch(error => {
       logger.error(error);
+      throw error;
     });
 }

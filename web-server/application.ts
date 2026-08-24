@@ -1,16 +1,20 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { createAcmeChallengeProxyHandler, type AcmeChallengeProxyHandler } from "./acme-challenge-proxy.js";
 import { createWebAuthHandler, type WebAuthHandler } from "./auth/handler.js";
 import { sendProxyJson, type ProxyNext } from "./proxy-common.js";
 import { createBilibiliProxyHandler, type BilibiliProxyHandler } from "./proxy.js";
+import { createBiuSyncProxyHandler, type BiuSyncProxyHandler } from "./sync-proxy.js";
 
 export const WEB_HEALTH_PATH = "/__biu_health";
 
 export interface WebApplicationHandlerOptions {
+  acmeChallengeHandler?: AcmeChallengeProxyHandler;
   authHandler?: WebAuthHandler;
   clientIpHeader?: string;
   proxyHandler?: BilibiliProxyHandler;
   publicOrigin?: string;
+  syncProxyHandler?: BiuSyncProxyHandler;
 }
 
 export type WebApplicationHandler = (
@@ -21,9 +25,11 @@ export type WebApplicationHandler = (
 
 export function createWebApplicationHandler(options: WebApplicationHandlerOptions = {}): WebApplicationHandler {
   const publicOrigin = options.publicOrigin ?? process.env.BIU_WEB_PUBLIC_ORIGIN;
+  const acmeChallengeHandler = options.acmeChallengeHandler ?? createAcmeChallengeProxyHandler();
   const authHandler =
     options.authHandler ?? createWebAuthHandler({ clientIpHeader: options.clientIpHeader, publicOrigin });
   const proxyHandler = options.proxyHandler ?? createBilibiliProxyHandler({ publicOrigin });
+  const syncProxyHandler = options.syncProxyHandler ?? createBiuSyncProxyHandler({ publicOrigin });
 
   return async (request, response, next) => {
     response.setHeader("Referrer-Policy", "no-referrer");
@@ -39,7 +45,9 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
       return true;
     }
 
+    if (await acmeChallengeHandler(request, response)) return true;
     if (await authHandler(request, response)) return true;
+    if (await syncProxyHandler(request, response)) return true;
     if (await proxyHandler(request, response)) return true;
 
     next?.();

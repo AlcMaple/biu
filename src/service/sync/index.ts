@@ -4,7 +4,7 @@ import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
-import { watchVersions } from "./client";
+import { invalidateSyncToken, watchVersions } from "./client";
 import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavorites, encodeTags } from "./codec";
 import { WATCH_RETRY_DELAYS_MS } from "./config";
 import { StoreSyncController } from "./engine";
@@ -85,13 +85,17 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 有没有落下的通知"，有就拉。断线时按 2s→5s→15s→30s 退避重连：瞬断能立刻恢复
  * （否则每次断线都留一个几十秒的通知盲区），服务真挂了也不会空转打请求。
  */
-async function startWatchLoop(onChanged: (versions: Record<string, number>) => void): Promise<void> {
+async function startWatchLoop(
+  onChanged: (versions: Record<string, number>) => void,
+  isCurrent: () => boolean,
+): Promise<void> {
   let known: Record<string, number> = {};
   let failures = 0;
 
   log.info("[sync/watch] 通知通道启动");
 
   for (;;) {
+    if (!isCurrent()) return;
     const startedAt = Date.now();
     // 失败必须留痕：这条通道是跨设备实时的唯一来源，静默吞掉异常的话，
     // 它挂了在日志上完全看不出来，只能看到"同步很慢"这种没法排查的现象。
@@ -101,6 +105,7 @@ async function startWatchLoop(onChanged: (versions: Record<string, number>) => v
     });
 
     if (!result) {
+      if (!isCurrent()) return;
       const delay = WATCH_RETRY_DELAYS_MS[Math.min(failures, WATCH_RETRY_DELAYS_MS.length - 1)];
       log.warn(`[sync/watch] ${delay}ms 后重连`);
       await sleep(delay);
@@ -156,26 +161,48 @@ export function initLocalPlaylistSync(): void {
   // 用户的连续操作，这些场景没有后续变更要合并，多等一个窗口纯属增加跨设备延迟。
   const syncAllNow = () => allControllers.forEach(controller => controller.syncNow());
 
+  let watchedMid: number | undefined;
+  let watchGeneration = 0;
+  const ensureWatch = () => {
+    const mid = useUser.getState().user?.mid;
+    if (!mid) {
+      watchedMid = undefined;
+      watchGeneration += 1;
+      return;
+    }
+    if (watchedMid === mid) return;
+
+    watchedMid = mid;
+    const generation = ++watchGeneration;
+    void startWatchLoop(
+      versions => {
+        for (const controller of allControllers) {
+          const remoteVersion = versions[controller.storeName];
+          if (remoteVersion === undefined) continue;
+          // 已经同步到这个版本了 = 这条通知是本机自己推送造成的回声，不必再拉
+          if (controller.hasSynced(remoteVersion)) continue;
+          controller.syncNow(remoteVersion);
+        }
+      },
+      () => generation === watchGeneration && useUser.getState().user?.mid === mid,
+    );
+  };
+
   // 通知通道：另一台设备一改动，服务端立刻唤醒这里。这是唯一的常驻机制——
   // 没有定时轮询，断线由 startWatchLoop 自己退避重连补齐。
   //
   // 只叫醒**版本号真的变了**的那个 store：服务端返回的 versions 已经精确告诉我们是谁
   // 变了，无脑三个全跑等于每次通知多打两倍请求，两台设备叠加很容易撞满服务端限流。
-  void startWatchLoop(versions => {
-    for (const controller of allControllers) {
-      const remoteVersion = versions[controller.storeName];
-      if (remoteVersion === undefined) continue;
-      // 已经同步到这个版本了 = 这条通知是本机自己推送造成的回声，不必再拉
-      if (controller.hasSynced(remoteVersion)) continue;
-      controller.syncNow(remoteVersion);
-    }
-  });
   // 系统休眠唤醒后挂着的连接可能已经死了但还没超时，回到前台补一次，成本可忽略
   window.addEventListener("focus", syncAllNow);
 
   // 登录态从无到有时触发一次（涵盖"冷启动时本地已缓存登录态"和"刚登录"两种情况）
   useUser.subscribe((state, prev) => {
-    if (state.user?.mid && state.user.mid !== prev.user?.mid) syncAllNow();
+    if (state.user?.mid === prev.user?.mid) return;
+    invalidateSyncToken();
+    ensureWatch();
+    if (state.user?.mid) syncAllNow();
   });
+  ensureWatch();
   if (useUser.getState().user?.mid) syncAllNow();
 }

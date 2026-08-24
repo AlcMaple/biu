@@ -83,6 +83,12 @@ describe("production Web server", () => {
     expect(await index.text()).toContain("web-index");
     expect(index.headers.get("cache-control")).toBe("no-store");
     expect(index.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(index.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(index.headers.get("x-frame-options")).toBe("DENY");
+    expect(index.headers.get("permissions-policy")).toBe("geolocation=(), payment=(), usb=()");
+    expect(index.headers.get("content-security-policy")).toBe(
+      "base-uri 'self'; object-src 'none'; frame-ancestors 'none'",
+    );
     expect(missing.status).toBe(404);
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
   });

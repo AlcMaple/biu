@@ -121,7 +121,7 @@ describe("renderer startup stability", () => {
     expect(startupMocks.log.warn).toHaveBeenCalledWith("[startup] 获取 B 站初始 Cookie 失败", error);
   });
 
-  it("records a failed user refresh and skips the cookie-dependent sync loop on Web", async () => {
+  it("records a failed user refresh and starts BFF-backed playlist sync on Web", async () => {
     const error = new Error("user request failed");
     startupMocks.updateUser.mockRejectedValueOnce(error);
 
@@ -130,7 +130,7 @@ describe("renderer startup stability", () => {
     await Promise.resolve();
 
     expect(startupMocks.log.warn).toHaveBeenCalledWith("[startup] 更新用户信息失败", error);
-    expect(startupMocks.initLocalPlaylistSync).not.toHaveBeenCalled();
+    expect(startupMocks.initLocalPlaylistSync).toHaveBeenCalledOnce();
   });
 
   it("keeps local playlist sync enabled outside ordinary Web", () => {

@@ -1,60 +1,49 @@
 #!/usr/bin/env node
 /**
- * 更新文件上传脚本（每次发版后运行）
- * 用途：将打包产物上传到阿里云服务器的更新目录
+ * 将已构建的更新包发布到受限 SFTP 账户
  *
- * 前提：已运行过 pnpm build，产物在 dist/artifacts/ 目录下
- *
- * 运行方式：
- *   node dev_tools/upload-update.js
- *
- * 可选参数：
- *   --win     只上传 Windows 相关文件
- *   --mac     只上传 macOS 相关文件
- *   --linux   只上传 Linux 相关文件
- *   （不传参数则上传所有平台）
+ * 生产目标、账户和认证方式只能来自仓库外的私有环境配置：
+ * BIU_UPDATE_PUBLISH_HOST / BIU_UPDATE_PUBLISH_USER / BIU_UPDATE_REMOTE_DIR /
+ * BIU_UPDATE_PUBLIC_ORIGIN，以及 BIU_UPDATE_PUBLISH_KEY 或 SSH_AUTH_SOCK
  */
 
-import fs from "fs";
-import os from "os";
-import path from "path";
-import readline from "readline";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "ssh2";
-import { fileURLToPath } from "url";
+
+import { createWindowsUpdateMetadata, getWindowsUpdateManifestFilename } from "../shared/update-signing.js";
+import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
+import { loadUpdateSigningPrivateKey, signUpdateMetadata } from "./update-signature.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// ─── 读取更新说明 ─────────────────────────────────────────────────────────────
-
-const RELEASE_NOTES_FILE = path.join(__dirname, "release-notes.md");
-const releaseNotes = fs.existsSync(RELEASE_NOTES_FILE) ? fs.readFileSync(RELEASE_NOTES_FILE, "utf8").trim() : "";
-
-const HOST = "8.163.0.99";
-const USER = "root";
-const REMOTE_DIR = "/var/www/html/biu/updates/";
 const ROOT_DIR = path.join(__dirname, "..");
 const ARTIFACTS_DIR = path.join(ROOT_DIR, "dist", "artifacts");
+const RELEASE_NOTES_FILE = path.join(__dirname, "release-notes.md");
 
-// 部署 SSH 私钥路径：默认 ~/.ssh/biu_deploy，可用环境变量 BIU_DEPLOY_KEY 覆盖。
-// 存在则免密登录；首次用 `node dev_tools/upload-update.js --install-key` 把公钥写到服务器。
-const KEY_PATH = process.env.BIU_DEPLOY_KEY || path.join(os.homedir(), ".ssh", "biu_deploy");
-
-// ─── 读取版本号 ───────────────────────────────────────────────────────────────
-
+const releaseNotes = fs.existsSync(RELEASE_NOTES_FILE) ? fs.readFileSync(RELEASE_NOTES_FILE, "utf8").trim() : "";
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, "package.json"), "utf8"));
 const version = pkg.version;
 
-// ─── 解析参数，决定上传哪些平台 ──────────────────────────────────────────────
-
 const args = process.argv.slice(2);
-const installKey = args.includes("--install-key");
-const platformArgs = args.filter(a => a !== "--install-key");
-const noPlatformArg = platformArgs.length === 0;
-const uploadWin = noPlatformArg || platformArgs.includes("--win");
-const uploadMac = noPlatformArg || platformArgs.includes("--mac");
-const uploadLinux = noPlatformArg || platformArgs.includes("--linux");
+if (args.includes("--install-key")) {
+  throw new Error("请由管理员通过私有运行手册为受限发布账户登记公钥");
+}
 
-// ─── 待上传文件列表（按平台分组）─────────────────────────────────────────────
+const supportedFlags = new Set(["--win", "--mac", "--linux"]);
+const unsupportedFlags = args.filter(arg => !supportedFlags.has(arg));
+if (unsupportedFlags.length > 0) {
+  throw new Error(`不支持的发布参数：${unsupportedFlags.join(", ")}`);
+}
+
+const noPlatformArg = args.length === 0;
+const platforms = {
+  linux: noPlatformArg || args.includes("--linux"),
+  mac: noPlatformArg || args.includes("--mac"),
+  win: noPlatformArg || args.includes("--win"),
+};
 
 const fileGroups = {
   win: [
@@ -74,265 +63,190 @@ const fileGroups = {
   linux: [`Biu-${version}-linux-x64.AppImage`, `Biu-${version}-linux-arm64.AppImage`, "latest-linux.yml"],
 };
 
-// ─── 工具函数 ────────────────────────────────────────────────────────────────
-
-function log(msg) {
-  console.log(msg);
+function log(message) {
+  console.log(message);
 }
 
-/** 提示输入密码（不回显）*/
-function askPassword() {
-  return new Promise(resolve => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    let muted = false;
-    // 先允许输出（显示提示语），输入阶段再屏蔽回显
-    rl._writeToOutput = str => {
-      if (!muted) {
-        rl.output.write(str);
-      } else if (str.endsWith("\n") || str.endsWith("\r\n")) {
-        rl.output.write("\n");
-      }
-    };
-    rl.question("请输入服务器密码：", answer => {
-      muted = false;
-      rl.close();
-      resolve(answer.replace(/\r/g, ""));
-    });
-    // question() 写完提示语后才执行这行，之后的字符输入才被屏蔽
-    muted = true;
-  });
-}
-
-/** 建立 SSH 连接。auth 为 { privateKey } 或 { password } */
-function connect(auth) {
+function connect(config, auth) {
   return new Promise((resolve, reject) => {
     const client = new Client();
     client
-      .on("ready", () => resolve(client))
-      .on("error", reject)
-      .connect({ host: HOST, port: 22, username: USER, readyTimeout: 10000, ...auth });
+      .once("ready", () => resolve(client))
+      .once("error", reject)
+      .connect({ host: config.host, port: 22, readyTimeout: 10_000, username: config.user, ...auth });
   });
 }
 
-/** 解析认证方式：优先 SSH 私钥（免密），找不到再回退到交互输入密码 */
-async function resolveAuth() {
-  if (fs.existsSync(KEY_PATH)) {
-    log(`使用 SSH 私钥认证：${KEY_PATH}`);
-    return { privateKey: fs.readFileSync(KEY_PATH) };
-  }
-  log(`未找到部署私钥（${KEY_PATH}），回退到密码认证。`);
-  log("提示：运行 `node dev_tools/upload-update.js --install-key` 可配置一次性免密登录。");
-  const password = await askPassword();
-  return { password };
-}
-
-/** 在远端执行命令，输出打印到终端 */
-function exec(client, cmd) {
+function openSftp(client) {
   return new Promise((resolve, reject) => {
-    client.exec(cmd, (err, stream) => {
-      if (err) return reject(err);
-      let out = "";
-      stream.on("data", d => {
-        out += d;
-        process.stdout.write(d);
-      });
-      stream.stderr.on("data", d => process.stderr.write(d));
-      stream.on("close", code => {
-        if (code !== 0) reject(new Error(`命令退出码 ${code}`));
-        else resolve(out);
-      });
-    });
+    client.sftp((error, sftp) => (error ? reject(error) : resolve(sftp)));
   });
 }
 
-/** 通过 SFTP 上传单个文件，显示进度。remoteFilename 可覆盖远端文件名（用于临时文件） */
-function upload(client, localPath, remoteDir, remoteFilename) {
-  const filename = remoteFilename ?? path.basename(localPath);
-  const remotePath = remoteDir + filename;
+function putFile(sftp, localPath, remotePath) {
   const total = fs.statSync(localPath).size;
-
   return new Promise((resolve, reject) => {
-    client.sftp((err, sftp) => {
-      if (err) return reject(err);
-      sftp.fastPut(
-        localPath,
-        remotePath,
-        {
-          step: (transferred, _chunk, total) => {
-            const pct = Math.round((transferred / total) * 100);
-            process.stdout.write(
-              `\r  ${pct}%  (${(transferred / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB)`,
-            );
-          },
-          concurrency: 4,
-          chunkSize: 1024 * 512,
+    sftp.fastPut(
+      localPath,
+      remotePath,
+      {
+        chunkSize: 1024 * 512,
+        concurrency: 4,
+        step: transferred => {
+          const percent = Math.round((transferred / total) * 100);
+          process.stdout.write(`\r  ${percent}%  (${(transferred / 1024 / 1024).toFixed(1)} MB)`);
         },
-        err => {
-          if (err) return reject(err);
-          process.stdout.write(`\r  100%  (${(total / 1024 / 1024).toFixed(1)} MB)         \n`);
-          resolve();
-        },
-      );
-    });
+      },
+      error => {
+        if (error) return reject(error);
+        process.stdout.write(`\r  100%  (${(total / 1024 / 1024).toFixed(1)} MB)         \n`);
+        resolve();
+      },
+    );
   });
 }
 
-/** 删除旧版本安装包 */
-async function cleanOldVersions(client, platforms) {
-  const patterns = [];
-  if (platforms.win) patterns.push("Biu-*-win-*.exe", "Biu-*-win-*.exe.blockmap");
-  if (platforms.mac) patterns.push("Biu-*-mac-*.dmg", "Biu-*-mac-*.dmg.blockmap");
-  if (platforms.linux) patterns.push("Biu-*-linux-*.AppImage");
-  if (patterns.length === 0) return;
-  const cmd = patterns.map(p => `find ${REMOTE_DIR} -maxdepth 1 -name '${p}' -delete`).join(" && ");
-  await exec(client, cmd);
+function rename(sftp, source, target) {
+  return new Promise((resolve, reject) => sftp.rename(source, target, error => (error ? reject(error) : resolve())));
 }
 
-// ─── 主流程 ──────────────────────────────────────────────────────────────────
-
-log("╔══════════════════════════════════════════╗");
-log(`║       Biu v${version} 上传更新文件           ║`);
-log("╚══════════════════════════════════════════╝");
-
-// ─── 免密配置：把本机公钥写入服务器 authorized_keys（一次性，需输入一次密码）───
-if (installKey) {
-  const pubPath = KEY_PATH + ".pub";
-  if (!fs.existsSync(pubPath)) {
-    log(`\n❌ 未找到公钥 ${pubPath}`);
-    log(`   请先生成密钥：ssh-keygen -t ed25519 -f "${KEY_PATH}" -N ""`);
-    process.exit(1);
-  }
-  const pubKey = fs.readFileSync(pubPath, "utf8").trim();
-  log(`\n将把以下公钥写入 ${USER}@${HOST} 的 authorized_keys（需输入一次服务器密码）：`);
-  log(`  ${pubKey}`);
-  const password = await askPassword();
-  log("");
-
-  let keyClient;
-  try {
-    process.stdout.write("连接服务器...");
-    keyClient = await connect({ password });
-    log(" ✅");
-  } catch (e) {
-    log("\n❌ 连接失败：" + e.message);
-    process.exit(1);
-  }
-  try {
-    const safe = pubKey.replace(/'/g, "'\\''");
-    await exec(
-      keyClient,
-      `mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && { grep -qF '${safe}' ~/.ssh/authorized_keys || echo '${safe}' >> ~/.ssh/authorized_keys; }`,
-    );
-    log("✅ 公钥已写入，后续运行将自动免密登录。");
-  } catch (e) {
-    log("\n❌ 写入失败：" + e.message);
-    process.exit(1);
-  } finally {
-    keyClient.end();
-  }
-  process.exit(0);
+function publicFileUrl(publicOrigin, filename) {
+  const base = publicOrigin.endsWith("/") ? publicOrigin : `${publicOrigin}/`;
+  return new URL(filename, base).toString();
 }
 
-// 检查 dist/artifacts/ 目录是否存在
+function makeMetadataCopy(filename, sourcePath) {
+  if (!releaseNotes || !filename.endsWith(".yml")) return { cleanup: () => {}, path: sourcePath };
+
+  const original = fs.readFileSync(sourcePath, "utf8");
+  const stripped = original.replace(/^releaseNotes:[\s\S]*?(?=^\w|\Z)/m, "").trimEnd();
+  const indented = releaseNotes
+    .split("\n")
+    .map(line => `  ${line}`)
+    .join("\n");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "biu-update-meta-"));
+  const tempPath = path.join(directory, filename);
+  fs.writeFileSync(tempPath, `${stripped}\nreleaseNotes: |\n${indented}\n`, "utf8");
+  return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), path: tempPath };
+}
+
+function calculateSha512(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash("sha512");
+    const stream = fs.createReadStream(filePath);
+    stream.once("error", reject);
+    stream.on("data", chunk => hash.update(chunk));
+    stream.once("end", () => resolve(hash.digest("base64")));
+  });
+}
+
+async function createSignedWindowsManifests(files) {
+  const privateKey = loadUpdateSigningPrivateKey();
+  const releaseDate = new Date().toISOString();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "biu-signed-update-"));
+  const manifests = [];
+
+  try {
+    for (const arch of ["x64", "arm64"]) {
+      const filename = `Biu-${version}-win-setup-${arch}.exe`;
+      const installer = files.find(file => file.platform === "win" && file.filename === filename);
+      if (!installer) continue;
+
+      const metadata = createWindowsUpdateMetadata({
+        arch,
+        filename,
+        releaseDate,
+        releaseNotes,
+        sha512: await calculateSha512(installer.fullPath),
+        size: fs.statSync(installer.fullPath).size,
+        version,
+      });
+      const manifestName = getWindowsUpdateManifestFilename(arch);
+      const manifestPath = path.join(directory, manifestName);
+      fs.writeFileSync(manifestPath, signUpdateMetadata(metadata, privateKey), "utf8");
+      manifests.push({ filename: manifestName, fullPath: manifestPath });
+    }
+
+    if (manifests.length === 0) {
+      throw new Error("缺少 Windows NSIS 安装包；免费自动更新只能发布 win-setup-*.exe");
+    }
+    return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), manifests };
+  } catch (error) {
+    fs.rmSync(directory, { force: true, recursive: true });
+    throw error;
+  }
+}
+
+async function atomicPublish(sftp, localPath, filename, remoteDir) {
+  const temporaryName = `${filename}.${process.pid}.tmp`;
+  await putFile(sftp, localPath, remoteFile(remoteDir, temporaryName));
+  await rename(sftp, remoteFile(remoteDir, temporaryName), remoteFile(remoteDir, filename));
+}
+
 if (!fs.existsSync(ARTIFACTS_DIR)) {
-  log("\n❌ 未找到 dist/artifacts/ 目录，请先运行 pnpm build 完成打包。");
-  process.exit(1);
+  throw new Error("未找到 dist/artifacts/；请先完成构建");
 }
 
-// 收集实际存在的文件
 const filesToUpload = [];
-const platforms = { win: uploadWin, mac: uploadMac, linux: uploadLinux };
-
 for (const [platform, enabled] of Object.entries(platforms)) {
   if (!enabled) continue;
   for (const filename of fileGroups[platform]) {
     const fullPath = path.join(ARTIFACTS_DIR, filename);
-    if (fs.existsSync(fullPath)) {
-      filesToUpload.push({ platform, filename, fullPath });
-    }
+    if (fs.existsSync(fullPath)) filesToUpload.push({ filename, fullPath, platform });
   }
 }
 
 if (filesToUpload.length === 0) {
-  log("\n❌ dist/artifacts/ 中没有找到任何匹配的文件。");
-  log(`   当前版本：${version}，请确认打包是否成功。`);
-  process.exit(1);
+  throw new Error(`dist/artifacts/ 中没有当前版本 ${version} 的可上传文件`);
 }
 
-// 显示待上传列表
-log(`\n服务器：${USER}@${HOST}`);
-log(`目标路径：${REMOTE_DIR}`);
-log(`\n找到 ${filesToUpload.length} 个文件待上传：`);
-for (const { platform, filename } of filesToUpload) {
-  const tag = { win: "Win ", mac: "Mac ", linux: "Linux" }[platform];
-  log(`  [${tag}] ${filename}`);
-}
-log("");
+const config = loadUpdatePublishConfig();
+const auth = resolveSshAuth();
+const binaries = filesToUpload.filter(file => !file.filename.endsWith(".yml"));
+const metadata = filesToUpload.filter(file => file.filename.endsWith(".yml"));
+const signedWindowsManifests = platforms.win ? await createSignedWindowsManifests(filesToUpload) : null;
 
-// 解析认证（优先私钥免密，否则提示输入密码），后续所有操作复用同一连接
-const auth = await resolveAuth();
-log("");
+log(`Biu v${version} 更新发布`);
+log(
+  `待上传文件：${[...filesToUpload.map(file => file.filename), ...(signedWindowsManifests?.manifests ?? []).map(file => file.filename)].join(", ")}`,
+);
+log("认证：SSH 私钥或 agent（不允许密码认证）");
 
 let client;
 try {
-  process.stdout.write("连接服务器...");
-  client = await connect(auth);
-  log(" ✅");
-} catch (e) {
-  log("\n❌ 连接失败：" + e.message);
-  log("   请确认 IP、用户名和密码是否正确。");
-  process.exit(1);
-}
+  client = await connect(config, auth);
+  const sftp = await openSftp(client);
 
-try {
-  // 清理旧版本安装包
-  log("\n▶ 清理服务器旧版本安装包");
-  await cleanOldVersions(client, platforms);
+  // 先上传二进制与 blockmap，最后原子替换 metadata。这样客户端不会收到指向不存在文件的版本清单。
+  for (const file of binaries) {
+    log(`上传 ${file.filename}`);
+    await putFile(sftp, file.fullPath, remoteFile(config.remoteDir, file.filename));
+  }
 
-  // 逐个上传
-  let successCount = 0;
-  for (const { filename, fullPath } of filesToUpload) {
-    log(`\n▶ 上传 ${filename}`);
-
-    // 对 YAML 元数据文件注入 releaseNotes 后上传临时副本
-    const isYml = filename.endsWith(".yml");
-    let uploadPath = fullPath;
-    let tempYml = null;
-    if (isYml && releaseNotes) {
-      const original = fs.readFileSync(fullPath, "utf8");
-      // 移除旧的 releaseNotes 字段（如有），再追加新内容
-      const stripped = original.replace(/^releaseNotes:[\s\S]*?(?=^\w|\Z)/m, "").trimEnd();
-      const indented = releaseNotes
-        .split("\n")
-        .map(l => `  ${l}`)
-        .join("\n");
-      const patched = `${stripped}\nreleaseNotes: |\n${indented}\n`;
-      tempYml = fullPath + ".tmp";
-      fs.writeFileSync(tempYml, patched, "utf8");
-      uploadPath = tempYml;
-    }
-
+  for (const file of metadata) {
+    const copy = makeMetadataCopy(file.filename, file.fullPath);
     try {
-      await upload(client, uploadPath, REMOTE_DIR, filename);
-      successCount++;
-      log("  ✅ 完成");
-    } catch (e) {
-      log(`  ❌ 失败：${e.message}`);
-      client.end();
-      process.exit(1);
+      log(`原子发布 ${file.filename}`);
+      await atomicPublish(sftp, copy.path, file.filename, config.remoteDir);
     } finally {
-      if (tempYml) fs.rmSync(tempYml, { force: true });
+      copy.cleanup();
     }
   }
 
-  log(`\n╔══════════════════════════════════════╗`);
-  log(`║  ✅ 上传完成（${successCount}/${filesToUpload.length} 个文件）            ║`);
-  log(`╚══════════════════════════════════════╝`);
-  log("\n验证地址：");
-  if (uploadWin) log("  Windows: http://8.163.0.99/biu/updates/latest.yml");
-  if (uploadMac) log("  macOS:   http://8.163.0.99/biu/updates/latest-mac.yml");
-  if (uploadLinux) log("  Linux:   http://8.163.0.99/biu/updates/latest-linux.yml");
-  log("");
+  for (const manifest of signedWindowsManifests?.manifests ?? []) {
+    log(`原子发布受签名更新清单 ${manifest.filename}`);
+    await atomicPublish(sftp, manifest.fullPath, manifest.filename, config.remoteDir);
+  }
+
+  log("发布完成。验证地址：");
+  for (const file of metadata) log(`  ${publicFileUrl(config.publicOrigin, file.filename)}`);
+  for (const manifest of signedWindowsManifests?.manifests ?? []) {
+    log(`  ${publicFileUrl(config.publicOrigin, manifest.filename)}`);
+  }
+} catch (error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  throw new Error(`更新发布失败：${detail}`);
 } finally {
-  client.end();
+  client?.end();
+  signedWindowsManifests?.cleanup();
 }

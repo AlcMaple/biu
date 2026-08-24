@@ -14,7 +14,7 @@ import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
-import { isWeb, log } from "@/platform";
+import { log } from "@/platform";
 import { initLocalPlaylistSync } from "@/service/sync";
 import { useUser } from "@/store/user";
 
@@ -37,9 +37,8 @@ const Layout = () => {
       log.warn("[startup] 更新用户信息失败", error);
     });
 
-    // Web 平台没有可供同步服务换取令牌的 B 站 Cookie，启动通知通道只会形成空重连循环。
-    // Electron 与 Capacitor 原生端均具备 Cookie 能力，继续保留本地歌单跨设备同步。
-    if (!isWeb) initLocalPlaylistSync();
+    // Web 通过同源 BFF 在服务端换取同步权限；浏览器不接触 B 站 Cookie 或同步 JWT。
+    initLocalPlaylistSync();
   }, [updateUser]);
 
   // 抽屉只在移动形态下存在，离开该断点时要一并收掉状态。
