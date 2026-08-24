@@ -20,6 +20,34 @@ export interface WebQrPollData {
   user?: UserInfo;
 }
 
+export interface WebSmsCaptchaData {
+  captcha: {
+    geetest: {
+      challenge: string;
+      gt: string;
+    };
+    token: string;
+    type: string;
+  };
+  expiresAt: number;
+  loginId: string;
+}
+
+export interface WebSmsSendParams {
+  challenge: string;
+  cid: string;
+  loginId: string;
+  seccode: string;
+  tel: string;
+  token: string;
+  validate: string;
+}
+
+export interface WebSmsLoginParams {
+  code: string;
+  loginId: string;
+}
+
 export interface WebAuthSessionData {
   isLogin: boolean;
   user?: UserInfo;
@@ -48,6 +76,20 @@ export const pollWebQrCode = (loginId: string) => {
     { loginId },
     { timeout: 15_000 },
   );
+};
+
+export const createWebSmsCaptcha = () => {
+  return axiosInstance.post<WebAuthResponse<WebSmsCaptchaData>>(`${WEB_AUTH_ROOT}/sms/captcha`, undefined, {
+    timeout: 15_000,
+  });
+};
+
+export const sendWebSmsCode = (params: WebSmsSendParams) => {
+  return axiosInstance.post<WebAuthResponse<null>>(`${WEB_AUTH_ROOT}/sms/send`, params, { timeout: 15_000 });
+};
+
+export const loginWithWebSms = (params: WebSmsLoginParams) => {
+  return axiosInstance.post<WebAuthResponse<WebQrPollData>>(`${WEB_AUTH_ROOT}/sms/login`, params, { timeout: 15_000 });
 };
 
 export const getWebAuthSession = () => {

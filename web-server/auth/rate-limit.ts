@@ -1,8 +1,9 @@
-export type QrRateLimitAction = "create" | "poll";
+export type QrRateLimitAction = "create" | "poll" | "smsCaptcha" | "smsLogin" | "smsSend";
 
 export interface QrRateLimitRule {
   globalLimit: number;
   perIpLimit: number;
+  perSubjectLimit: number;
   windowMs: number;
 }
 
@@ -10,6 +11,9 @@ export interface QrRateLimiterOptions {
   create?: Partial<QrRateLimitRule>;
   now?: () => number;
   poll?: Partial<QrRateLimitRule>;
+  smsCaptcha?: Partial<QrRateLimitRule>;
+  smsLogin?: Partial<QrRateLimitRule>;
+  smsSend?: Partial<QrRateLimitRule>;
 }
 
 export interface QrRateLimitResult {
@@ -18,13 +22,17 @@ export interface QrRateLimitResult {
 }
 
 const DEFAULT_RULES: Record<QrRateLimitAction, QrRateLimitRule> = {
-  create: { globalLimit: 300, perIpLimit: 10, windowMs: 10 * 60 * 1000 },
-  poll: { globalLimit: 6_000, perIpLimit: 120, windowMs: 5 * 60 * 1000 },
+  create: { globalLimit: 300, perIpLimit: 10, perSubjectLimit: Number.MAX_SAFE_INTEGER, windowMs: 10 * 60 * 1000 },
+  poll: { globalLimit: 6_000, perIpLimit: 120, perSubjectLimit: Number.MAX_SAFE_INTEGER, windowMs: 5 * 60 * 1000 },
+  smsCaptcha: { globalLimit: 300, perIpLimit: 10, perSubjectLimit: Number.MAX_SAFE_INTEGER, windowMs: 10 * 60 * 1000 },
+  smsLogin: { globalLimit: 600, perIpLimit: 30, perSubjectLimit: 12, windowMs: 10 * 60 * 1000 },
+  smsSend: { globalLimit: 300, perIpLimit: 6, perSubjectLimit: 3, windowMs: 10 * 60 * 1000 },
 };
 
 interface RateLimitBuckets {
   global: number[];
   perIp: Map<string, number[]>;
+  perSubject: Map<string, number[]>;
 }
 
 const prune = (timestamps: number[], cutoff: number) => {
@@ -39,8 +47,11 @@ const prune = (timestamps: number[], cutoff: number) => {
  */
 export class QrRateLimiter {
   private readonly buckets: Record<QrRateLimitAction, RateLimitBuckets> = {
-    create: { global: [], perIp: new Map() },
-    poll: { global: [], perIp: new Map() },
+    create: { global: [], perIp: new Map(), perSubject: new Map() },
+    poll: { global: [], perIp: new Map(), perSubject: new Map() },
+    smsCaptcha: { global: [], perIp: new Map(), perSubject: new Map() },
+    smsLogin: { global: [], perIp: new Map(), perSubject: new Map() },
+    smsSend: { global: [], perIp: new Map(), perSubject: new Map() },
   };
   private readonly now: () => number;
   private readonly rules: Record<QrRateLimitAction, QrRateLimitRule>;
@@ -50,10 +61,13 @@ export class QrRateLimiter {
     this.rules = {
       create: { ...DEFAULT_RULES.create, ...options.create },
       poll: { ...DEFAULT_RULES.poll, ...options.poll },
+      smsCaptcha: { ...DEFAULT_RULES.smsCaptcha, ...options.smsCaptcha },
+      smsLogin: { ...DEFAULT_RULES.smsLogin, ...options.smsLogin },
+      smsSend: { ...DEFAULT_RULES.smsSend, ...options.smsSend },
     };
   }
 
-  consume(action: QrRateLimitAction, ip?: string): QrRateLimitResult {
+  consume(action: QrRateLimitAction, ip?: string, subject?: string): QrRateLimitResult {
     const now = this.now();
     const rule = this.rules[action];
     const bucket = this.buckets[action];
@@ -64,14 +78,21 @@ export class QrRateLimiter {
       prune(timestamps, cutoff);
       if (timestamps.length === 0) bucket.perIp.delete(key);
     }
+    for (const [key, timestamps] of bucket.perSubject) {
+      prune(timestamps, cutoff);
+      if (timestamps.length === 0) bucket.perSubject.delete(key);
+    }
 
     const ipTimestamps = ip ? (bucket.perIp.get(ip) ?? []) : undefined;
+    const subjectTimestamps = subject ? (bucket.perSubject.get(subject) ?? []) : undefined;
     const limitingTimestamps =
       bucket.global.length >= rule.globalLimit
         ? bucket.global
         : ipTimestamps && ipTimestamps.length >= rule.perIpLimit
           ? ipTimestamps
-          : undefined;
+          : subjectTimestamps && subjectTimestamps.length >= rule.perSubjectLimit
+            ? subjectTimestamps
+            : undefined;
 
     if (limitingTimestamps) {
       const retryAt = limitingTimestamps[0] + rule.windowMs;
@@ -82,6 +103,10 @@ export class QrRateLimiter {
     if (ip && ipTimestamps) {
       ipTimestamps.push(now);
       bucket.perIp.set(ip, ipTimestamps);
+    }
+    if (subject && subjectTimestamps) {
+      subjectTimestamps.push(now);
+      bucket.perSubject.set(subject, subjectTimestamps);
     }
     return { allowed: true };
   }

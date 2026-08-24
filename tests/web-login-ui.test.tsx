@@ -24,7 +24,14 @@ vi.mock("@heroui/react", () => ({
       {children}
     </div>
   ),
-  Tabs: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Tabs: ({ children, onSelectionChange }: { children: React.ReactNode; onSelectionChange?: (key: string) => void }) => (
+    <div>
+      <button type="button" onClick={() => onSelectionChange?.("sms")}>
+        切换到短信登录
+      </button>
+      {children}
+    </div>
+  ),
   addToast: vi.fn(),
 }));
 
@@ -67,15 +74,22 @@ describe("Web login UI", () => {
     Reflect.deleteProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT");
   });
 
-  it("offers only server-side QR login on ordinary Web", () => {
+  it("offers server-side QR and phone SMS login on ordinary Web", () => {
     const root = createRoot(container);
     act(() => {
       root.render(<Login isOpen onOpenChange={vi.fn()} />);
     });
 
     expect(container).toHaveTextContent("扫码登录内容");
-    expect(container).not.toHaveTextContent("短信登录");
-    expect(container).not.toHaveTextContent("密码登录");
+    expect(container).toHaveTextContent("扫码登录");
+    expect(container).toHaveTextContent("手机号验证码登录");
+    expect(container).not.toHaveTextContent("密码登录内容");
+
+    act(() => {
+      container.querySelector("button")?.click();
+    });
+    expect(container).toHaveTextContent("短信登录内容");
+    expect(container).not.toHaveTextContent("扫码登录内容");
 
     act(() => root.unmount());
   });

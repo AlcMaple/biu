@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 
 import { Divider, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 import moment from "moment";
@@ -25,6 +25,7 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
   const updateCollectedFavorites = useFavoritesStore(state => state.updateCollectedFavorites);
 
   const isMobileLayout = useIsMobileLayout();
+  const [webLoginMethod, setWebLoginMethod] = useState<"qrcode" | "sms">("qrcode");
 
   const onClose = () => onOpenChange(false);
 
@@ -91,8 +92,23 @@ const Login = ({ isOpen, onOpenChange }: Props) => {
       <Modal size="sm" radius="md" isOpen={isOpen} isDismissable={false} onOpenChange={onOpenChange}>
         <ModalContent>
           <ModalHeader className="justify-center pb-0 text-lg">登录</ModalHeader>
-          <ModalBody className="items-center justify-center pt-0 pb-6">
-            <QrcodeLogin onClose={onClose} updateUserData={updateUserData} />
+          <ModalBody className="pt-0 pb-6">
+            <Tabs
+              aria-label="登录方式"
+              classNames={{ cursor: "rounded-medium", tabContent: "text-medium font-medium" }}
+              fullWidth
+              selectedKey={webLoginMethod}
+              size="md"
+              variant="underlined"
+              onSelectionChange={key => setWebLoginMethod(key === "sms" ? "sms" : "qrcode")}
+            >
+              <Tab key="qrcode" title="扫码登录">
+                {webLoginMethod === "qrcode" && <QrcodeLogin onClose={onClose} updateUserData={updateUserData} />}
+              </Tab>
+              <Tab key="sms" title="手机号验证码登录">
+                {webLoginMethod === "sms" && <CodeLogin onClose={onClose} updateUserData={updateUserData} />}
+              </Tab>
+            </Tabs>
           </ModalBody>
         </ModalContent>
       </Modal>

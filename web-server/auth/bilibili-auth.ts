@@ -53,6 +53,23 @@ interface TvPollData {
   refresh_token?: string;
 }
 
+interface SmsCaptchaData {
+  geetest?: {
+    challenge?: string;
+    gt?: string;
+  };
+  token?: string;
+  type?: string;
+}
+
+interface SmsSendData {
+  captcha_key?: string;
+}
+
+interface SmsLoginData {
+  refresh_token?: string;
+}
+
 export interface BilibiliUser {
   isLogin: boolean;
   mid: number;
@@ -69,6 +86,50 @@ export interface TvPollResult {
   cookies: BilibiliCookie[];
   message: string;
   mid?: number;
+  refreshToken?: string;
+}
+
+export interface SmsCaptchaResult {
+  captcha: {
+    geetest: {
+      challenge: string;
+      gt: string;
+    };
+    token: string;
+    type: string;
+  };
+  cookies: BilibiliCookie[];
+}
+
+export interface SendSmsCodeInput {
+  challenge: string;
+  cid: string;
+  cookies: Iterable<BilibiliCookie>;
+  seccode: string;
+  tel: string;
+  token: string;
+  validate: string;
+}
+
+export interface SendSmsCodeResult {
+  captchaKey?: string;
+  code: number;
+  cookies: BilibiliCookie[];
+  message: string;
+}
+
+export interface LoginWithSmsInput {
+  captchaKey: string;
+  cid: string;
+  code: string;
+  cookies: Iterable<BilibiliCookie>;
+  tel: string;
+}
+
+export interface LoginWithSmsResult {
+  code: number;
+  cookies: BilibiliCookie[];
+  message: string;
   refreshToken?: string;
 }
 
@@ -273,6 +334,88 @@ export class BilibiliAuthClient {
       cookies: [...cookies.values()],
       message: envelope.message ?? "",
       mid: envelope.data?.mid,
+      refreshToken: envelope.data?.refresh_token,
+    };
+  }
+
+  async createSmsCaptcha(): Promise<SmsCaptchaResult> {
+    const target = new URL("/x/passport-login/captcha", PASSPORT_ORIGIN);
+    target.searchParams.set("source", "main_web");
+    const response = await this.fetchImpl(target, {
+      headers: requestHeaders(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const envelope = await readEnvelope<SmsCaptchaData>(response);
+    const captcha = envelope.data;
+    if (envelope.code !== 0 || !captcha?.token || !captcha.type || !captcha.geetest?.gt || !captcha.geetest.challenge) {
+      throw new BilibiliUpstreamError(envelope.message || `Bilibili SMS captcha request failed (${envelope.code})`);
+    }
+
+    return {
+      captcha: {
+        geetest: { challenge: captcha.geetest.challenge, gt: captcha.geetest.gt },
+        token: captcha.token,
+        type: captcha.type,
+      },
+      cookies: responseCookies(response, target, this.now()),
+    };
+  }
+
+  async sendSmsCode(input: SendSmsCodeInput): Promise<SendSmsCodeResult> {
+    const target = new URL("/x/passport-login/web/sms/send", PASSPORT_ORIGIN);
+    const currentCookies = [...input.cookies];
+    const response = await this.fetchImpl(target, {
+      method: "POST",
+      headers: requestHeaders(formatBilibiliCookieHeader(currentCookies, target, this.now()), {
+        "Content-Type": "application/x-www-form-urlencoded",
+      }),
+      body: new URLSearchParams({
+        challenge: input.challenge,
+        cid: input.cid,
+        seccode: input.seccode,
+        source: "main_web",
+        tel: input.tel,
+        token: input.token,
+        validate: input.validate,
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const envelope = await readEnvelope<SmsSendData>(response);
+    const cookies = mergeBilibiliCookies(currentCookies, responseCookies(response, target, this.now()), this.now());
+
+    return {
+      captchaKey: envelope.data?.captcha_key,
+      code: envelope.code,
+      cookies: [...cookies.values()],
+      message: envelope.message ?? "",
+    };
+  }
+
+  async loginWithSms(input: LoginWithSmsInput): Promise<LoginWithSmsResult> {
+    const target = new URL("/x/passport-login/web/login/sms", PASSPORT_ORIGIN);
+    const currentCookies = [...input.cookies];
+    const response = await this.fetchImpl(target, {
+      method: "POST",
+      headers: requestHeaders(formatBilibiliCookieHeader(currentCookies, target, this.now()), {
+        "Content-Type": "application/x-www-form-urlencoded",
+      }),
+      body: new URLSearchParams({
+        captcha_key: input.captchaKey,
+        cid: input.cid,
+        code: input.code,
+        keep: "true",
+        source: "main_web",
+        tel: input.tel,
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const envelope = await readEnvelope<SmsLoginData>(response);
+    const cookies = mergeBilibiliCookies(currentCookies, responseCookies(response, target, this.now()), this.now());
+
+    return {
+      code: envelope.code,
+      cookies: [...cookies.values()],
+      message: envelope.message ?? "",
       refreshToken: envelope.data?.refresh_token,
     };
   }

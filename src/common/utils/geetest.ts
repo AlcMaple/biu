@@ -23,7 +23,7 @@ export const loadGeetestScript = () => {
 interface GetCaptchaParamsResponse {
   code: number;
   message: string;
-  data: {
+  data?: {
     type: string;
     token: string;
     geetest: {
@@ -40,7 +40,7 @@ export const verifyGeetest = async (
     await loadGeetestScript();
 
     const res = await getCaptchaParams();
-    if (res.code !== 0 || !res.data.geetest) {
+    if (res.code !== 0 || !res.data?.geetest) {
       addToast({ title: res.message || "获取验证码失败", color: "danger" });
       return null;
     }
