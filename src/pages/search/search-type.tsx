@@ -13,3 +13,6 @@ export const SearchTypeOptions = [
     value: SearchType.User,
   },
 ];
+
+export const getSearchTypeOptions = (isLoggedIn: boolean) =>
+  SearchTypeOptions.filter(option => isLoggedIn || option.value !== SearchType.User);
