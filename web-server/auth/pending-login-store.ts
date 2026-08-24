@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import type { BilibiliCookie } from "./session-store.js";
+
 export const DEFAULT_PENDING_LOGIN_TTL_MS = 3 * 60 * 1000;
 export const DEFAULT_PENDING_LOGIN_LIMIT = 500;
 export const WEB_LOGIN_COOKIE_NAME = "__Host-biu_login";
@@ -8,16 +10,34 @@ const BROWSER_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 
 export class PendingLoginCapacityError extends Error {
   constructor() {
-    super("too many pending QR login transactions");
+    super("too many pending Web login transactions");
   }
 }
 
-export interface PendingLogin {
-  authCode: string;
+export interface SmsLoginTransaction {
+  captchaKey?: string;
+  cid?: string;
+  cookies: BilibiliCookie[];
+  tel?: string;
+}
+
+interface PendingLoginBase {
   browserBindingHash: string;
   expiresAt: number;
   polling: boolean;
 }
+
+export type PendingLogin =
+  | (PendingLoginBase & {
+      authCode: string;
+      kind: "qrcode";
+    })
+  | (PendingLoginBase & {
+      kind: "sms";
+      sms: SmsLoginTransaction;
+    });
+
+type PendingLoginKind = PendingLogin["kind"];
 
 export interface PendingLoginStoreOptions {
   maxEntries?: number;
@@ -54,22 +74,59 @@ export class PendingLoginStore {
   }
 
   create(authCode: string): { browserToken: string; expiresAt: number; loginId: string } {
+    const issued = this.issue();
+    this.pending.set(issued.key, {
+      authCode,
+      browserBindingHash: hashLoginId(issued.browserToken),
+      expiresAt: issued.expiresAt,
+      kind: "qrcode",
+      polling: false,
+    });
+    return { browserToken: issued.browserToken, expiresAt: issued.expiresAt, loginId: issued.loginId };
+  }
+
+  createSms(cookies: Iterable<BilibiliCookie>): { browserToken: string; expiresAt: number; loginId: string } {
+    const issued = this.issue();
+    this.pending.set(issued.key, {
+      browserBindingHash: hashLoginId(issued.browserToken),
+      expiresAt: issued.expiresAt,
+      kind: "sms",
+      polling: false,
+      sms: { cookies: [...cookies] },
+    });
+    return { browserToken: issued.browserToken, expiresAt: issued.expiresAt, loginId: issued.loginId };
+  }
+
+  updateSms(loginId: string, update: Partial<SmsLoginTransaction>): boolean {
+    if (!LOGIN_ID_PATTERN.test(loginId)) return false;
+
+    const pending = this.pending.get(hashLoginId(loginId));
+    if (!pending || pending.expiresAt <= this.now()) {
+      this.pending.delete(hashLoginId(loginId));
+      return false;
+    }
+    if (pending.kind !== "sms") return false;
+
+    pending.sms = {
+      ...pending.sms,
+      ...update,
+      ...(update.cookies ? { cookies: [...update.cookies] } : {}),
+    };
+    return true;
+  }
+
+  private issue(): { browserToken: string; expiresAt: number; key: string; loginId: string } {
     this.deleteExpired();
     if (this.pending.size >= this.maxEntries) throw new PendingLoginCapacityError();
 
     const loginId = this.randomId();
-    if (!LOGIN_ID_PATTERN.test(loginId)) throw new Error("generated QR login id has an invalid shape");
+    if (!LOGIN_ID_PATTERN.test(loginId)) throw new Error("generated Web login id has an invalid shape");
     const browserToken = this.randomBrowserToken();
-    if (!BROWSER_TOKEN_PATTERN.test(browserToken)) throw new Error("generated QR browser token has an invalid shape");
+    if (!BROWSER_TOKEN_PATTERN.test(browserToken))
+      throw new Error("generated Web login browser token has an invalid shape");
 
     const expiresAt = this.now() + this.ttlMs;
-    this.pending.set(hashLoginId(loginId), {
-      authCode,
-      browserBindingHash: hashLoginId(browserToken),
-      expiresAt,
-      polling: false,
-    });
-    return { browserToken, expiresAt, loginId };
+    return { browserToken, expiresAt, key: hashLoginId(loginId), loginId };
   }
 
   get size(): number {
@@ -80,6 +137,7 @@ export class PendingLoginStore {
   claim(
     loginId: string,
     browserToken: string | undefined,
+    expectedKind?: PendingLoginKind,
   ):
     | { pending: PendingLogin; status: "ok" }
     | { status: "binding-mismatch" }
@@ -95,6 +153,7 @@ export class PendingLoginStore {
       this.pending.delete(key);
       return { status: "expired" };
     }
+    if (expectedKind && pending.kind !== expectedKind) return { status: "missing" };
     if (!browserToken || !BROWSER_TOKEN_PATTERN.test(browserToken)) return { status: "binding-mismatch" };
     if (pending.browserBindingHash !== hashLoginId(browserToken)) return { status: "binding-mismatch" };
     if (pending.polling) return { status: "busy" };

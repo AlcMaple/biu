@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button, Input, Select, SelectItem, addToast } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { useGeetest } from "@/common/hooks/use-geetest";
+import { isWeb } from "@/platform";
 import { getGenericCountryList } from "@/service/generic-country-list";
 import { getPassportLoginDefaultCountry } from "@/service/passport-login-web-country";
 import { getPassportLoginWebLoginSms } from "@/service/passport-login-web-login-sms";
 import { passportLoginWebSmsSend } from "@/service/passport-login-web-sms-send";
+import { createWebSmsCaptcha, loginWithWebSms, sendWebSmsCode } from "@/service/web-auth";
 
 interface CodeLoginForm {
   phone: string;
@@ -24,8 +26,29 @@ interface Props {
 
 const CodeLogin = ({ onClose, updateUserData }: Props) => {
   const [countryId, setCountryId] = useState<string>("1");
+  const [captchaKey, setCaptchaKey] = useState<string>("");
+  const [webSmsReady, setWebSmsReady] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  const smsLoginIdRef = useRef<string>();
+
+  const clearPendingSmsLogin = useCallback(() => {
+    setCaptchaKey("");
+    setWebSmsReady(false);
+    smsLoginIdRef.current = undefined;
+  }, []);
+
+  const getWebSmsCaptcha = useCallback(async () => {
+    clearPendingSmsLogin();
+    const response = await createWebSmsCaptcha();
+    if (response.code === 0 && response.data) smsLoginIdRef.current = response.data.loginId;
+
+    return {
+      code: response.code,
+      data: response.data?.captcha,
+      message: response.message,
+    };
+  }, [clearPendingSmsLogin]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -36,6 +59,8 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
   }, []);
 
   useEffect(() => {
+    if (isWeb) return;
+
     const getDefaultCountry = async () => {
       const res = await getPassportLoginDefaultCountry();
 
@@ -53,7 +78,7 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
     return res?.data?.common || [];
   });
 
-  const { verify, loading: geetestLoading } = useGeetest();
+  const { verify, loading: geetestLoading } = useGeetest(isWeb ? getWebSmsCaptcha : undefined);
 
   const {
     control,
@@ -66,7 +91,6 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
     defaultValues: { phone: "", code: "" },
   });
 
-  const [captchaKey, setCaptchaKey] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
   const [sending, setSending] = useState(false);
 
@@ -96,27 +120,48 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
       if (!gtResult) return;
 
       // 2. Send SMS
-      const tel = Number(phone.replace(/\D/g, ""));
+      const tel = phone.replace(/\D/g, "");
       const countryCode = countryList?.find(item => item.id === Number(countryId))?.country_id || "86";
-      const res = await passportLoginWebSmsSend({
-        cid: Number(countryCode),
-        tel,
-        source: "main_web",
-        token: gtResult.token,
-        challenge: gtResult.challenge,
-        validate: gtResult.validate,
-        seccode: gtResult.seccode,
-      });
+      let responseCode: number;
+      let responseMessage: string;
+      let nextCaptchaKey: string | undefined;
+      if (isWeb) {
+        const response = await sendWebSmsCode({
+          challenge: gtResult.challenge,
+          cid: countryCode,
+          loginId: smsLoginIdRef.current || "",
+          seccode: gtResult.seccode,
+          tel,
+          token: gtResult.token,
+          validate: gtResult.validate,
+        });
+        responseCode = response.code;
+        responseMessage = response.message;
+      } else {
+        const response = await passportLoginWebSmsSend({
+          cid: Number(countryCode),
+          tel: Number(tel),
+          source: "main_web",
+          token: gtResult.token,
+          challenge: gtResult.challenge,
+          validate: gtResult.validate,
+          seccode: gtResult.seccode,
+        });
+        responseCode = response.code;
+        responseMessage = response.message;
+        nextCaptchaKey = response.data?.captcha_key;
+      }
 
-      if (res.code === 0) {
-        setCaptchaKey(res.data?.captcha_key || "");
+      if (responseCode === 0) {
+        if (isWeb) setWebSmsReady(true);
+        else setCaptchaKey(nextCaptchaKey || "");
         addToast({ title: "验证码已发送", color: "success" });
         setCountdown(60);
         setTimeout(() => {
           codeRef.current?.focus();
         });
       } else {
-        addToast({ title: res.message || "验证码发送失败", color: "danger" });
+        addToast({ title: responseMessage || "验证码发送失败", color: "danger" });
       }
     } catch (e: any) {
       addToast({ title: e?.message || "网络异常，稍后重试", color: "danger" });
@@ -127,31 +172,41 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
 
   const onSubmitCodeLogin = async (values: CodeLoginForm) => {
     try {
-      const tel = Number(values.phone.replace(/\D/g, ""));
-      const code = Number(values.code.replace(/\D/g, ""));
+      const code = values.code.replace(/\D/g, "");
 
-      if (!captchaKey) {
+      if ((isWeb && (!smsLoginIdRef.current || !webSmsReady)) || (!isWeb && !captchaKey)) {
         addToast({ title: "请先获取验证码", color: "warning" });
         return;
       }
 
-      const countryCode = countryList?.find(item => item.id === Number(countryId))?.country_id || "86";
-      const resp = await getPassportLoginWebLoginSms({
-        cid: Number(countryCode),
-        tel,
-        code,
-        source: "main_web",
-        captcha_key: captchaKey,
-        keep: true,
-      });
+      let responseCode: number;
+      let responseMessage: string;
+      let refreshToken: string | undefined;
+      if (isWeb) {
+        const response = await loginWithWebSms({ code, loginId: smsLoginIdRef.current! });
+        responseCode = response.code;
+        responseMessage = response.message;
+      } else {
+        const response = await getPassportLoginWebLoginSms({
+          cid: Number(countryList?.find(item => item.id === Number(countryId))?.country_id || "86"),
+          tel: Number(values.phone.replace(/\D/g, "")),
+          code: Number(code),
+          source: "main_web",
+          captcha_key: captchaKey,
+          keep: true,
+        });
+        responseCode = response.code;
+        responseMessage = response.message;
+        refreshToken = response.data?.refresh_token;
+      }
 
-      if (resp.code === 0) {
-        if (await updateUserData(resp.data?.refresh_token)) {
+      if (responseCode === 0) {
+        if (await updateUserData(refreshToken)) {
           addToast({ title: "登录成功", color: "success" });
           onClose();
         }
       } else {
-        addToast({ title: resp.message || "登录失败", color: "danger" });
+        addToast({ title: responseMessage || "登录失败", color: "danger" });
       }
     } catch (e: any) {
       addToast({ title: e?.message || "网络异常，稍后重试", color: "danger" });
@@ -175,6 +230,10 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
         render={({ field }) => (
           <Input
             {...field}
+            onChange={event => {
+              field.onChange(event);
+              clearPendingSmsLogin();
+            }}
             ref={e => {
               field.ref(e);
               phoneRef.current = e;
@@ -213,6 +272,7 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
                 selectedKeys={[countryId]}
                 onChange={e => {
                   setCountryId(e.target.value);
+                  clearPendingSmsLogin();
                 }}
                 aria-label="选择国家/地区"
               >

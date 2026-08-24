@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 
 import {
@@ -24,12 +25,17 @@ import {
   hasWebSessionCookie,
   parseCookieHeader,
   serializeClearedWebSessionCookie,
+  type BilibiliCookie,
   type WebSessionRecord,
 } from "./session-store.js";
 
 export const WEB_AUTH_ROOT = "/__biu_auth";
 
 const BODY_LIMIT_BYTES = 16 * 1024;
+const SMS_CODE_PATTERN = /^\d{6}$/;
+const SMS_COUNTRY_CODE_PATTERN = /^\d{1,4}$/;
+const SMS_PHONE_PATTERN = /^\d{5,15}$/;
+const SMS_RISK_FIELD_MAX_LENGTH = 4 * 1024;
 export const defaultWebSessionStore = new WebSessionStore();
 const defaultWebAuthClient = new BilibiliAuthClient();
 export const defaultWebSessionRefreshCoordinator = new WebSessionRefreshCoordinator({
@@ -220,6 +226,58 @@ async function readJsonBody(request: RequestWithOptionalBody): Promise<Record<st
   }
 }
 
+function readRequiredString(body: Record<string, unknown>, field: string, maxLength: number): string {
+  const value = body[field];
+  if (typeof value !== "string") throw new RequestBodyError(`${field} must be a string`, 400);
+
+  const normalized = value.trim();
+  const hasControlCharacter = Array.from(normalized).some(character => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+  if (!normalized || normalized.length > maxLength || hasControlCharacter) {
+    throw new RequestBodyError(`${field} has an invalid value`, 400);
+  }
+  return normalized;
+}
+
+function readSmsDigits(body: Record<string, unknown>, field: string, pattern: RegExp, maxLength: number): string {
+  const value = body[field];
+  const normalized =
+    typeof value === "string"
+      ? value.trim()
+      : typeof value === "number" && Number.isSafeInteger(value)
+        ? String(value)
+        : "";
+  if (!pattern.test(normalized) || normalized.length > maxLength) {
+    throw new RequestBodyError(`${field} has an invalid value`, 400);
+  }
+  return normalized;
+}
+
+function readSmsSendRequest(body: Record<string, unknown>) {
+  return {
+    challenge: readRequiredString(body, "challenge", SMS_RISK_FIELD_MAX_LENGTH),
+    cid: readSmsDigits(body, "cid", SMS_COUNTRY_CODE_PATTERN, 4),
+    loginId: readRequiredString(body, "loginId", 128),
+    seccode: readRequiredString(body, "seccode", SMS_RISK_FIELD_MAX_LENGTH),
+    tel: readSmsDigits(body, "tel", SMS_PHONE_PATTERN, 15),
+    token: readRequiredString(body, "token", SMS_RISK_FIELD_MAX_LENGTH),
+    validate: readRequiredString(body, "validate", SMS_RISK_FIELD_MAX_LENGTH),
+  };
+}
+
+function readSmsLoginRequest(body: Record<string, unknown>) {
+  return {
+    code: readSmsDigits(body, "code", SMS_CODE_PATTERN, 6),
+    loginId: readRequiredString(body, "loginId", 128),
+  };
+}
+
+function smsRateLimitSubject(cid: string, tel: string) {
+  return createHash("sha256").update(`${cid}:${tel}`).digest("hex");
+}
+
 function mapUpstreamStatus(error: BilibiliUpstreamError): number {
   if (error.status === 401 || error.status === 409) return error.status;
   return 502;
@@ -301,17 +359,48 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
           sessionStore: sessions,
         }));
 
-  const rejectRateLimitedQrRequest = (
+  const rejectRateLimitedLoginRequest = (
     action: QrRateLimitAction,
     request: IncomingMessage,
     response: ServerResponse,
+    message: string,
+    subject?: string,
   ): boolean => {
-    const result = qrRateLimiter.consume(action, configuredClientAddress(request, clientIpHeader));
+    const result = qrRateLimiter.consume(action, configuredClientAddress(request, clientIpHeader), subject);
     if (result.allowed) return false;
 
     if (result.retryAfterSeconds) response.setHeader("Retry-After", result.retryAfterSeconds);
-    sendJson(response, 429, { code: -429, message: "二维码登录请求过于频繁，请稍后重试" });
+    sendJson(response, 429, { code: -429, message });
     return true;
+  };
+
+  const completeLogin = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    credentials: {
+      cookies: BilibiliCookie[];
+      mid?: number;
+      refreshToken?: string;
+    },
+  ) => {
+    const requiredCookieNames = ["SESSDATA", "bili_jct"];
+    if (
+      requiredCookieNames.some(name => !credentials.cookies.some(cookie => cookie.name === name && cookie.value)) ||
+      !credentials.refreshToken
+    ) {
+      throw new BilibiliUpstreamError("Bilibili login succeeded without complete refreshable credentials");
+    }
+
+    const user = await authClient.getUser(credentials.cookies);
+    if (credentials.mid && user.mid !== credentials.mid) {
+      throw new BilibiliUpstreamError("Bilibili login identity validation failed");
+    }
+
+    // 仅在新身份已完成服务端校验后替换旧会话，失败时不会把用户登出。
+    sessions.destroySession(request);
+    const issued = sessions.createSession({ cookies: credentials.cookies, refreshToken: credentials.refreshToken });
+    response.setHeader("Set-Cookie", issued.cookieHeader);
+    return user;
   };
 
   const handleCreateQr = async (request: IncomingMessage, response: ServerResponse) => {
@@ -334,7 +423,7 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
   const handlePollQr = async (request: RequestWithOptionalBody, response: ServerResponse) => {
     const body = await readJsonBody(request);
     const loginId = typeof body.loginId === "string" ? body.loginId : "";
-    const claim = pendingLogins.claim(loginId, browserLoginToken(request));
+    const claim = pendingLogins.claim(loginId, browserLoginToken(request), "qrcode");
 
     if (claim.status === "missing" || claim.status === "expired") {
       response.setHeader("Set-Cookie", serializeClearedWebLoginCookie());
@@ -347,6 +436,11 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
     }
     if (claim.status === "busy") {
       sendJson(response, 200, { code: 86039, data: null, message: "二维码状态查询仍在进行" });
+      return;
+    }
+    if (claim.pending.kind !== "qrcode") {
+      pendingLogins.release(loginId);
+      sendJson(response, 200, { code: 86038, data: null, message: "二维码已失效" });
       return;
     }
 
@@ -369,28 +463,181 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
 
       // 上游已把二维码兑换为凭证，事务无论后续校验成功与否都不可再次使用。
       consume = true;
-
-      const requiredCookieNames = ["SESSDATA", "bili_jct"];
-      if (
-        requiredCookieNames.some(name => !poll.cookies.some(cookie => cookie.name === name && cookie.value)) ||
-        !poll.refreshToken
-      ) {
-        throw new BilibiliUpstreamError("Bilibili login succeeded without complete refreshable credentials");
-      }
-
-      const user = await authClient.getUser(poll.cookies);
-      if (poll.mid && user.mid !== poll.mid) {
-        throw new BilibiliUpstreamError("Bilibili login identity validation failed");
-      }
-
-      // Replace an existing browser session only after the new Bilibili identity is fully validated.
-      sessions.destroySession(request);
-      const issued = sessions.createSession({ cookies: poll.cookies, refreshToken: poll.refreshToken });
-      response.setHeader("Set-Cookie", issued.cookieHeader);
+      const user = await completeLogin(request, response, poll);
       clearLoginCookie();
       sendJson(response, 200, { code: 0, data: { user }, message: "0" });
     } finally {
       pendingLogins.release(loginId, consume);
+      if (consume && !loginCookieCleared) clearLoginCookie();
+    }
+  };
+
+  const handleCreateSmsCaptcha = async (request: IncomingMessage, response: ServerResponse) => {
+    pendingLogins.clearBrowser(browserLoginToken(request));
+    response.setHeader("Set-Cookie", serializeClearedWebLoginCookie());
+
+    const captcha = await authClient.createSmsCaptcha();
+    const pending = pendingLogins.createSms(captcha.cookies);
+    response.setHeader(
+      "Set-Cookie",
+      serializeWebLoginCookie(pending.browserToken, DEFAULT_PENDING_LOGIN_TTL_MS / 1000),
+    );
+    sendJson(response, 200, {
+      code: 0,
+      data: { captcha: captcha.captcha, expiresAt: pending.expiresAt, loginId: pending.loginId },
+      message: "0",
+    });
+  };
+
+  const handleSendSmsCode = async (request: RequestWithOptionalBody, response: ServerResponse) => {
+    const input = readSmsSendRequest(await readJsonBody(request));
+    if (
+      rejectRateLimitedLoginRequest(
+        "smsSend",
+        request,
+        response,
+        "手机号验证码发送过于频繁，请稍后重试",
+        smsRateLimitSubject(input.cid, input.tel),
+      )
+    ) {
+      return;
+    }
+
+    const claim = pendingLogins.claim(input.loginId, browserLoginToken(request), "sms");
+    if (claim.status === "missing" || claim.status === "expired") {
+      response.setHeader("Set-Cookie", serializeClearedWebLoginCookie());
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+      return;
+    }
+    if (claim.status === "binding-mismatch") {
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话不属于当前浏览器" });
+      return;
+    }
+    if (claim.status === "busy") {
+      sendJson(response, 200, { code: -409, data: null, message: "短信验证码请求正在处理中" });
+      return;
+    }
+    if (claim.pending.kind !== "sms") {
+      pendingLogins.release(input.loginId);
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+      return;
+    }
+
+    let consume = false;
+    let loginCookieCleared = false;
+    const clearLoginCookie = () => {
+      appendSetCookie(response, serializeClearedWebLoginCookie());
+      loginCookieCleared = true;
+    };
+    try {
+      const result = await authClient.sendSmsCode({ ...input, cookies: claim.pending.sms.cookies });
+      if (!pendingLogins.updateSms(input.loginId, { cookies: result.cookies })) {
+        consume = true;
+        clearLoginCookie();
+        sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+        return;
+      }
+      if (result.code !== 0) {
+        sendJson(response, 200, { code: result.code, data: null, message: result.message });
+        return;
+      }
+      if (!result.captchaKey) {
+        consume = true;
+        throw new BilibiliUpstreamError("Bilibili SMS request succeeded without a login ticket");
+      }
+      if (
+        !pendingLogins.updateSms(input.loginId, {
+          captchaKey: result.captchaKey,
+          cid: input.cid,
+          cookies: result.cookies,
+          tel: input.tel,
+        })
+      ) {
+        consume = true;
+        clearLoginCookie();
+        sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+        return;
+      }
+      sendJson(response, 200, { code: 0, data: null, message: "0" });
+    } finally {
+      pendingLogins.release(input.loginId, consume);
+      if (consume && !loginCookieCleared) clearLoginCookie();
+    }
+  };
+
+  const handleLoginWithSms = async (request: RequestWithOptionalBody, response: ServerResponse) => {
+    const input = readSmsLoginRequest(await readJsonBody(request));
+    const claim = pendingLogins.claim(input.loginId, browserLoginToken(request), "sms");
+    if (claim.status === "missing" || claim.status === "expired") {
+      response.setHeader("Set-Cookie", serializeClearedWebLoginCookie());
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+      return;
+    }
+    if (claim.status === "binding-mismatch") {
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话不属于当前浏览器" });
+      return;
+    }
+    if (claim.status === "busy") {
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录正在处理中" });
+      return;
+    }
+    if (claim.pending.kind !== "sms") {
+      pendingLogins.release(input.loginId);
+      sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+      return;
+    }
+
+    const sms = claim.pending.sms;
+    if (!sms.captchaKey || !sms.cid || !sms.tel) {
+      pendingLogins.release(input.loginId);
+      sendJson(response, 200, { code: -409, data: null, message: "请先获取验证码" });
+      return;
+    }
+    if (
+      rejectRateLimitedLoginRequest(
+        "smsLogin",
+        request,
+        response,
+        "手机号验证码登录尝试过于频繁，请稍后重试",
+        smsRateLimitSubject(sms.cid, sms.tel),
+      )
+    ) {
+      pendingLogins.release(input.loginId);
+      return;
+    }
+
+    let consume = false;
+    let loginCookieCleared = false;
+    const clearLoginCookie = () => {
+      appendSetCookie(response, serializeClearedWebLoginCookie());
+      loginCookieCleared = true;
+    };
+    try {
+      const result = await authClient.loginWithSms({
+        captchaKey: sms.captchaKey,
+        cid: sms.cid,
+        code: input.code,
+        cookies: sms.cookies,
+        tel: sms.tel,
+      });
+      if (!pendingLogins.updateSms(input.loginId, { cookies: result.cookies })) {
+        consume = true;
+        clearLoginCookie();
+        sendJson(response, 200, { code: -409, data: null, message: "短信登录会话已失效，请重新获取验证码" });
+        return;
+      }
+      if (result.code !== 0) {
+        sendJson(response, 200, { code: result.code, data: null, message: result.message });
+        return;
+      }
+
+      // 验证码一旦被 B 站兑换成功，事务不能再次提交，即使后续身份校验失败也一样。
+      consume = true;
+      const user = await completeLogin(request, response, result);
+      clearLoginCookie();
+      sendJson(response, 200, { code: 0, data: { user }, message: "0" });
+    } finally {
+      pendingLogins.release(input.loginId, consume);
       if (consume && !loginCookieCleared) clearLoginCookie();
     }
   };
@@ -474,10 +721,22 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
       const route = `${request.method ?? "GET"} ${url.pathname}`;
       if (request.method !== "GET" && rejectCrossSiteRequest(request, response, publicOrigin)) return true;
 
-      if (route === `POST ${WEB_AUTH_ROOT}/qrcode` && rejectRateLimitedQrRequest("create", request, response)) {
+      if (
+        route === `POST ${WEB_AUTH_ROOT}/qrcode` &&
+        rejectRateLimitedLoginRequest("create", request, response, "二维码登录请求过于频繁，请稍后重试")
+      ) {
         return true;
       }
-      if (route === `POST ${WEB_AUTH_ROOT}/qrcode/poll` && rejectRateLimitedQrRequest("poll", request, response)) {
+      if (
+        route === `POST ${WEB_AUTH_ROOT}/qrcode/poll` &&
+        rejectRateLimitedLoginRequest("poll", request, response, "二维码登录请求过于频繁，请稍后重试")
+      ) {
+        return true;
+      }
+      if (
+        route === `POST ${WEB_AUTH_ROOT}/sms/captcha` &&
+        rejectRateLimitedLoginRequest("smsCaptcha", request, response, "短信登录请求过于频繁，请稍后重试")
+      ) {
         return true;
       }
 
@@ -487,6 +746,15 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
           break;
         case `POST ${WEB_AUTH_ROOT}/qrcode/poll`:
           await handlePollQr(request, response);
+          break;
+        case `POST ${WEB_AUTH_ROOT}/sms/captcha`:
+          await handleCreateSmsCaptcha(request, response);
+          break;
+        case `POST ${WEB_AUTH_ROOT}/sms/send`:
+          await handleSendSmsCode(request, response);
+          break;
+        case `POST ${WEB_AUTH_ROOT}/sms/login`:
+          await handleLoginWithSms(request, response);
           break;
         case `GET ${WEB_AUTH_ROOT}/session`:
           await handleGetSession(request, response);
@@ -511,7 +779,7 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
 
       if (error instanceof PendingLoginCapacityError) {
         response.setHeader("Retry-After", Math.ceil(3 * 60));
-        sendJson(response, 429, { code: -429, message: "二维码登录队列已满，请稍后重试" });
+        sendJson(response, 429, { code: -429, message: "登录请求队列已满，请稍后重试" });
         return true;
       }
 

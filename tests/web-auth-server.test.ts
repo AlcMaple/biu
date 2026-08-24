@@ -311,7 +311,7 @@ describe("Web server session store", () => {
   });
 });
 
-describe("Web QR abuse controls", () => {
+describe("Web login abuse controls", () => {
   it("enforces global limits without treating an untrusted proxy peer as one client", () => {
     const limiter = new QrRateLimiter({
       create: { globalLimit: 2, perIpLimit: 1, windowMs: 60_000 },
@@ -330,20 +330,53 @@ describe("Web QR abuse controls", () => {
     expect(() => store.create("second-auth-code")).toThrow(PendingLoginCapacityError);
     expect(store.size).toBe(1);
   });
+
+  it("limits SMS sends for one phone even across different trusted client addresses", () => {
+    const limiter = new QrRateLimiter({
+      now: () => 1_000,
+      smsSend: { globalLimit: 10, perIpLimit: 10, perSubjectLimit: 1, windowMs: 60_000 },
+    });
+
+    expect(limiter.consume("smsSend", "198.51.100.7", "hashed-phone").allowed).toBe(true);
+    expect(limiter.consume("smsSend", "203.0.113.9", "hashed-phone").allowed).toBe(false);
+  });
 });
 
 describe("Web QR authentication handler", () => {
   const logger = { error: vi.fn(), warn: vi.fn() };
   const authClient = {
     createQrCode: vi.fn(),
+    createSmsCaptcha: vi.fn(),
     getUser: vi.fn(),
+    loginWithSms: vi.fn(),
     logout: vi.fn(),
     pollQrCode: vi.fn(),
     refreshSession: vi.fn(),
+    sendSmsCode: vi.fn(),
   };
 
   beforeEach(() => {
     authClient.createQrCode.mockResolvedValue({ authCode: "server-only-auth-code", url: "https://qr.example" });
+    authClient.createSmsCaptcha.mockResolvedValue({
+      captcha: {
+        geetest: { challenge: "server-only-challenge", gt: "server-only-gt" },
+        token: "server-only-risk-token",
+        type: "geetest",
+      },
+      cookies: [biliCookie("buvid3", "server-only-prelogin-cookie")],
+    });
+    authClient.sendSmsCode.mockResolvedValue({
+      captchaKey: "server-only-sms-ticket",
+      code: 0,
+      cookies: [biliCookie("buvid3", "server-only-prelogin-cookie")],
+      message: "0",
+    });
+    authClient.loginWithSms.mockResolvedValue({
+      code: 0,
+      cookies: [biliCookie("SESSDATA", "server-only-session"), biliCookie("bili_jct", "server-only-csrf")],
+      message: "0",
+      refreshToken: "server-only-refresh-token",
+    });
     authClient.pollQrCode.mockResolvedValue({
       code: 0,
       cookies: [biliCookie("SESSDATA", "server-only-session"), biliCookie("bili_jct", "server-only-csrf")],
@@ -416,6 +449,92 @@ describe("Web QR authentication handler", () => {
     expect(JSON.parse(replayResponse.body)).toMatchObject({ code: 86038 });
   });
 
+  it("keeps SMS credentials in the server transaction and issues the same opaque session after validation", async () => {
+    const sessions = new WebSessionStore({ randomToken: () => SESSION_TOKEN_A });
+    const pending = new PendingLoginStore({
+      randomBrowserToken: () => LOGIN_BROWSER_TOKEN_A,
+      randomId: () => LOGIN_ID,
+    });
+    const handler = createWebAuthHandler({
+      authClient: authClient as unknown as BilibiliAuthClient,
+      logger,
+      pendingLoginStore: pending,
+      sessionStore: sessions,
+    });
+
+    const captchaResponse = createResponse();
+    await handler(createRequest("POST", "/__biu_auth/sms/captcha"), captchaResponse.response);
+    const captcha = JSON.parse(captchaResponse.body) as {
+      data: { captcha: { geetest: { challenge: string; gt: string }; token: string }; loginId: string };
+    };
+    const browserToken = setCookieValue(captchaResponse.headers.get("set-cookie"), WEB_LOGIN_COOKIE_NAME);
+    expect(captcha.data).toMatchObject({
+      captcha: {
+        geetest: { challenge: "server-only-challenge", gt: "server-only-gt" },
+        token: "server-only-risk-token",
+      },
+      loginId: LOGIN_ID,
+    });
+    expect(captchaResponse.body).not.toContain("server-only-prelogin-cookie");
+
+    const sendResponse = createResponse();
+    await handler(
+      createRequest("POST", "/__biu_auth/sms/send", {
+        body: {
+          challenge: "server-only-challenge",
+          cid: "86",
+          loginId: captcha.data.loginId,
+          seccode: "server-only-seccode",
+          tel: "13800138000",
+          token: "server-only-risk-token",
+          validate: "server-only-validate",
+        },
+        cookie: loginCookie(browserToken!),
+      }),
+      sendResponse.response,
+    );
+    expect(JSON.parse(sendResponse.body)).toMatchObject({ code: 0 });
+    expect(sendResponse.body).not.toContain("server-only-sms-ticket");
+    expect(authClient.sendSmsCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cid: "86",
+        cookies: [biliCookie("buvid3", "server-only-prelogin-cookie")],
+        tel: "13800138000",
+      }),
+    );
+
+    const loginResponse = createResponse();
+    await handler(
+      createRequest("POST", "/__biu_auth/sms/login", {
+        body: { code: "123456", loginId: captcha.data.loginId },
+        cookie: loginCookie(browserToken!),
+      }),
+      loginResponse.response,
+    );
+
+    const ownCookie = String(loginResponse.headers.get("set-cookie"));
+    expect(JSON.parse(loginResponse.body)).toMatchObject({ code: 0, data: { user: { mid: 42 } } });
+    expect(loginResponse.body).not.toContain("server-only-session");
+    expect(loginResponse.body).not.toContain("server-only-csrf");
+    expect(loginResponse.body).not.toContain("server-only-refresh-token");
+    expect(ownCookie).toContain(`${WEB_SESSION_COOKIE_NAME}=${SESSION_TOKEN_A}`);
+    expect(ownCookie).toContain(`${WEB_LOGIN_COOKIE_NAME}=`);
+    expect(ownCookie).toContain("Max-Age=0");
+    expect(sessions.resolveCookieFor(cookieRequest(SESSION_TOKEN_A), API_TARGET)).toContain(
+      "SESSDATA=server-only-session",
+    );
+
+    const replayResponse = createResponse();
+    await handler(
+      createRequest("POST", "/__biu_auth/sms/login", {
+        body: { code: "123456", loginId: captcha.data.loginId },
+        cookie: loginCookie(browserToken!),
+      }),
+      replayResponse.response,
+    );
+    expect(JSON.parse(replayResponse.body)).toMatchObject({ code: -409 });
+  });
+
   it("binds a QR transaction to the browser that created it", async () => {
     const pending = new PendingLoginStore({
       randomBrowserToken: () => LOGIN_BROWSER_TOKEN_A,
@@ -449,6 +568,40 @@ describe("Web QR authentication handler", () => {
     );
     expect(JSON.parse(ownerResponse.body)).toMatchObject({ code: 0 });
     expect(authClient.pollQrCode).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds an SMS transaction to the browser that created it", async () => {
+    const pending = new PendingLoginStore({
+      randomBrowserToken: () => LOGIN_BROWSER_TOKEN_A,
+      randomId: () => LOGIN_ID,
+    });
+    const issued = pending.createSms([biliCookie("buvid3", "server-only-prelogin-cookie")]);
+    const handler = createWebAuthHandler({
+      authClient: authClient as unknown as BilibiliAuthClient,
+      logger,
+      pendingLoginStore: pending,
+    });
+
+    const responseTarget = createResponse();
+    await handler(
+      createRequest("POST", "/__biu_auth/sms/send", {
+        body: {
+          challenge: "challenge",
+          cid: "86",
+          loginId: LOGIN_ID,
+          seccode: "seccode",
+          tel: "13800138000",
+          token: "token",
+          validate: "validate",
+        },
+        cookie: loginCookie(LOGIN_BROWSER_TOKEN_B),
+      }),
+      responseTarget.response,
+    );
+
+    expect(issued.browserToken).toBe(LOGIN_BROWSER_TOKEN_A);
+    expect(JSON.parse(responseTarget.body)).toMatchObject({ code: -409 });
+    expect(authClient.sendSmsCode).not.toHaveBeenCalled();
   });
 
   it("rotates the browser binding and invalidates the prior QR when generating again", async () => {

@@ -36,18 +36,49 @@ describe("Web authentication client storage boundary", () => {
     expect(isWebAuthLocationSupported({ hostname: "192.168.1.23", protocol: "http:" })).toBe(false);
   });
 
-  it("uses bounded QR and manual refresh request timeouts", async () => {
+  it("uses bounded QR, SMS, and manual refresh request timeouts", async () => {
     const get = vi.fn().mockResolvedValue({ code: 0 });
     const post = vi.fn().mockResolvedValue({ code: 0 });
     vi.doMock("@/service/request", () => ({ axiosInstance: { get, post } }));
 
-    const { createWebQrCode, pollWebQrCode, refreshWebAuthSession } = await import("@/service/web-auth");
+    const {
+      createWebQrCode,
+      createWebSmsCaptcha,
+      loginWithWebSms,
+      pollWebQrCode,
+      refreshWebAuthSession,
+      sendWebSmsCode,
+    } = await import("@/service/web-auth");
     await createWebQrCode();
     await pollWebQrCode("login-id");
+    await createWebSmsCaptcha();
+    await sendWebSmsCode({
+      challenge: "challenge",
+      cid: "86",
+      loginId: "login-id",
+      seccode: "seccode",
+      tel: "13800138000",
+      token: "token",
+      validate: "validate",
+    });
+    await loginWithWebSms({ code: "123456", loginId: "login-id" });
     await refreshWebAuthSession();
 
     expect(post).toHaveBeenNthCalledWith(1, "/__biu_auth/qrcode", undefined, { timeout: 15_000 });
     expect(post).toHaveBeenNthCalledWith(2, "/__biu_auth/qrcode/poll", { loginId: "login-id" }, { timeout: 15_000 });
-    expect(post).toHaveBeenNthCalledWith(3, "/__biu_auth/session/refresh", undefined, { timeout: 45_000 });
+    expect(post).toHaveBeenNthCalledWith(3, "/__biu_auth/sms/captcha", undefined, { timeout: 15_000 });
+    expect(post).toHaveBeenNthCalledWith(
+      4,
+      "/__biu_auth/sms/send",
+      expect.objectContaining({ loginId: "login-id", tel: "13800138000" }),
+      { timeout: 15_000 },
+    );
+    expect(post).toHaveBeenNthCalledWith(
+      5,
+      "/__biu_auth/sms/login",
+      { code: "123456", loginId: "login-id" },
+      { timeout: 15_000 },
+    );
+    expect(post).toHaveBeenNthCalledWith(6, "/__biu_auth/session/refresh", undefined, { timeout: 45_000 });
   });
 });
