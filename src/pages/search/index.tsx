@@ -1,12 +1,13 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { Tabs, Tab } from "@heroui/react";
 
 import Empty from "@/components/empty";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { useSearchHistory } from "@/store/search-history";
+import { useUser } from "@/store/user";
 
-import { SearchType, SearchTypeOptions } from "./search-type";
+import { getSearchTypeOptions, SearchType } from "./search-type";
 import UserList from "./user-list";
 import VideoList from "./video-list";
 
@@ -14,6 +15,12 @@ const Search = () => {
   const scrollerRef = useRef<ScrollRefObject>(null);
   const [searchType, setSearchType] = useState(SearchType.Video);
   const keyword = useSearchHistory(s => s.keyword);
+  const isLoggedIn = useUser(s => Boolean(s.user?.isLogin && s.user.mid));
+  const searchTypeOptions = getSearchTypeOptions(isLoggedIn);
+
+  useEffect(() => {
+    if (!isLoggedIn && searchType === SearchType.User) setSearchType(SearchType.Video);
+  }, [isLoggedIn, searchType]);
 
   if (!keyword) {
     return <Empty />;
@@ -31,7 +38,7 @@ const Search = () => {
               cursor: "rounded-medium",
             }}
             className="-ml-1"
-            items={SearchTypeOptions}
+            items={searchTypeOptions}
             selectedKey={searchType}
             onSelectionChange={v => {
               setSearchType(v as SearchType);
@@ -48,7 +55,7 @@ const Search = () => {
             getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
           />
         )}
-        {searchType === SearchType.User && (
+        {isLoggedIn && searchType === SearchType.User && (
           <UserList
             keyword={keyword}
             getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
