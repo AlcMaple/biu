@@ -963,6 +963,8 @@ export const usePlayList = create<State & Action>()(
             state.randomPlayedIds = playMode === PlayMode.Random ? [initialId] : [];
             state.list = newList;
             state.playId = initialId;
+            // 地址解析是异步的，不能让进度条在这段时间继续显示上一首的时长。
+            state.duration = newList.find(item => item.id === initialId)?.duration;
           });
         },
         next: async () => {
@@ -1635,6 +1637,8 @@ usePlayList.subscribe(async (state, prevState) => {
     }
     if (audio) {
       audio.currentTime = 0;
+      // 新歌地址尚未解析完成时，不能保留旧 src；否则用户在这个间隙点播放会恢复上一首。
+      audio.src = "";
     }
     usePlayProgress.getState().setCurrentTime(0);
     // 切换歌曲
