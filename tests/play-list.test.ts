@@ -256,6 +256,40 @@ describe("play-list store", () => {
     expect(usePlayList.getState().playId).toBe(firstId);
   });
 
+  test("更换播放全部时立即清除旧源并采用新首曲目的时长", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    await s.playList([
+      {
+        type: "audio",
+        source: "local",
+        id: "old-local",
+        audioUrl: "https://audio.test/old.mp3",
+        title: "旧歌",
+        duration: 238,
+      },
+    ]);
+    await vi.waitFor(() => expect(s.getAudio().src).toContain("old.mp3"));
+
+    const { getDashUrl } = await import("@/common/utils/audio");
+    let resolveNewSource: (value: { audioUrl: string; isLossless: boolean }) => void = () => {};
+    vi.mocked(getDashUrl).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveNewSource = resolve;
+        }),
+    );
+
+    await s.playList([{ type: "mv", bvid: "BV-new", cid: "2", title: "新歌", duration: 293 }]);
+
+    expect(usePlayList.getState().getPlayItem()?.title).toBe("新歌");
+    expect(usePlayList.getState().duration).toBe(293);
+    expect(s.getAudio().src).toBe("");
+
+    resolveNewSource({ audioUrl: "https://audio.test/new.m4s", isLossless: false });
+    await vi.waitFor(() => expect(s.getAudio().src).toContain("new.m4s"));
+  });
+
   test("random mode keeps pages order", async () => {
     const s = usePlayList.getState();
     await s.init();
