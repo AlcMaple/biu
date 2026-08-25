@@ -87,11 +87,14 @@ Web-only 更新不应触碰 sync 数据；只备份 Web 服务定义和当前 re
 pnpm build:web
 release_stamp=$(date -u +%Y%m%dT%H%M%SZ)
 package_file="/tmp/biu-web-$release_stamp.tar.gz"
-tar -C "$PWD" -czf "$package_file" dist
+tar -C "$PWD" -czf "$package_file" dist/web dist/server
 shasum -a 256 "$package_file"
+tar -tzf "$package_file" | grep -Ec '\.env$|node_modules|\.pem$|\.key$'   # 必须为 0
 ```
 
-发布包只包含 `dist/`。严禁包含 `.env`、用户数据、`node_modules`、证书、私钥、浏览器 profile、运维配置或日志。
+发布包只包含 `dist/web` 与 `dist/server` 这两个 Web 产物目录。**不要整包 `dist/`**：同一工作区若跑过桌面端打包，`dist/artifacts/` 会留下几百 MB 的 Electron 产物（内含 `node_modules`），既违反下面的禁止项，也会把发布包从不到 1 MB 撑到几十 MB。
+
+发布包严禁包含 `.env`、用户数据、`node_modules`、证书、私钥、浏览器 profile、运维配置或日志。
 
 若 BFF 新增运行时 npm 依赖，不能在活跃 release 目录里盲目执行 `pnpm install`。先在隔离环境验证依赖解析、锁文件和启动方式，再把依赖切换方案写入私有运行手册。
 
