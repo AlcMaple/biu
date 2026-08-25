@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { Button } from "@heroui/react";
-import { RiPlayFill } from "@remixicon/react";
+import { RiPauseFill, RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
 import { formatNumber } from "@/common/utils/number";
@@ -67,11 +67,14 @@ const MusicListItem = ({
   const navigate = useNavigate();
   const playId = usePlayList(state => state.playId);
   const list = usePlayList(state => state.list);
+  const isPlaying = usePlayList(state => state.isPlaying);
   const playItem = list.find(item => item.id === playId);
   const isPlay =
     isSame(playItem, { type, bvid, sid, source, id: itemId }) &&
     // 有 cid 时精确匹配分集，防止同视频不同分集同时高亮
     (!cid || !playItem?.cid || cid === playItem.cid);
+  /** 当前就是这一行且正在播放：显示暂停图标 */
+  const isPlayingThis = isPlay && isPlaying;
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
@@ -205,7 +208,33 @@ const MusicListItem = ({
           )}
 
           {/* 7. 操作 */}
-          <div className="flex h-full items-center justify-end">
+          <div className="flex h-full items-center justify-end gap-0.5">
+            {/* 手机端整行点击的反馈不明显，给每行一个显式播放/暂停按钮：
+                当前行在播则点击暂停，否则点击播放；图标随播放状态变化，点了有即时反馈。
+                触屏没有 hover，封面上的 ▶ 蒙层用不上，这个按钮才是移动端的主要入口。 */}
+            {isMobileLayout && !invalid && typeof onPress === "function" && (
+              // 外层 span 只在冒泡阶段拦截，挡住事件继续冒到整行 Button（避免既播又暂停）；
+              // 不能用捕获阶段 stopPropagation，那样事件到不了里面的按钮，会导致按钮完全点不动。
+              // 按下(pointerdown)也要拦：heroui/react-aria 的 press 是基于 pointerdown 的，
+              // 不拦的话整行的 press 仍会被触发。
+              <span className="flex" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                <Button
+                  isIconOnly
+                  variant={isPlay ? "flat" : "light"}
+                  color={isPlay ? "primary" : "default"}
+                  size="sm"
+                  radius="full"
+                  aria-label={isPlayingThis ? "暂停" : "播放"}
+                  onPress={() => {
+                    // 已是当前曲：切换播放/暂停；否则开始播放这一行
+                    if (isPlay) usePlayList.getState().togglePlay();
+                    else onPress();
+                  }}
+                >
+                  {isPlayingThis ? <RiPauseFill size={18} /> : <RiPlayFill size={18} />}
+                </Button>
+              </span>
+            )}
             {Boolean(menus.length) && <OperationMenu items={menus} onAction={onMenuAction} />}
           </div>
         </div>
