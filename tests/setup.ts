@@ -22,8 +22,12 @@ class FakeAudio {
   playbackRate: number = 1;
   loop: boolean = false;
   src: string = "";
+  currentSrc: string = "";
   currentTime: number = 0;
   duration: number = 0;
+  readyState: number = 0;
+  networkState: number = 0;
+  buffered: { length: number; end: (i: number) => number } = { length: 0, end: () => 0 };
   paused: boolean = true;
   ondurationchange?: () => void;
   ontimeupdate?: () => void;

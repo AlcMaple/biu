@@ -128,7 +128,8 @@ describe("Web Bilibili BFF integration", () => {
         response.setHeader("Accept-Ranges", "bytes");
         response.setHeader("Content-Length", ranged.length);
         response.setHeader("Content-Range", `bytes ${start}-${end}/${FILE_BYTES.length}`);
-        response.setHeader("Content-Type", "audio/mp4");
+        // B 站 CDN 实际把音频 m4s 标成 octet-stream；代理应将其改写为 audio/mp4 供 iOS 播放
+        response.setHeader("Content-Type", "application/octet-stream");
         response.end(ranged);
         return;
       }
@@ -313,6 +314,8 @@ describe("Web Bilibili BFF integration", () => {
     expect(response.status).toBe(206);
     expect(response.headers.get("accept-ranges")).toBe("bytes");
     expect(response.headers.get("content-range")).toBe("bytes 4-7/10");
+    // 关键：iOS 的 <audio> 靠这个正确的音频类型才肯解码（上游是 octet-stream）
+    expect(response.headers.get("content-type")).toBe("audio/mp4");
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("4567");
   });
 
