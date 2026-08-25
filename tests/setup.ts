@@ -33,6 +33,26 @@ class FakeAudio {
   onpause?: () => void;
   onended?: () => void;
   onerror?: (err: any) => void;
+  onwaiting?: () => void;
+  onstalled?: () => void;
+  onplaying?: () => void;
+  error: { code: number; message?: string } | null = null;
+  private listeners = new Map<string, Set<(event: any) => void>>();
+  getAttribute(name: string) {
+    return name === "src" ? this.src || null : null;
+  }
+  addEventListener(type: string, listener: (event: any) => void) {
+    const bucket = this.listeners.get(type) ?? new Set();
+    bucket.add(listener);
+    this.listeners.set(type, bucket);
+  }
+  removeEventListener(type: string, listener: (event: any) => void) {
+    this.listeners.get(type)?.delete(listener);
+  }
+  dispatchEvent(event: { type: string }) {
+    for (const listener of this.listeners.get(event.type) ?? []) listener(event);
+    return true;
+  }
   load() {
     this.duration = 123;
     if (typeof this.ondurationchange === "function") this.ondurationchange();
@@ -66,6 +86,9 @@ if (typeof g.window.removeEventListener !== "function") {
 }
 g.window.electron = undefined;
 g.Audio = FakeAudio as any;
+if (typeof g.MediaError === "undefined") {
+  g.MediaError = { MEDIA_ERR_ABORTED: 1, MEDIA_ERR_NETWORK: 2, MEDIA_ERR_DECODE: 3, MEDIA_ERR_SRC_NOT_SUPPORTED: 4 };
+}
 
 vi.mock("electron-log/renderer", () => {
   const logger = {

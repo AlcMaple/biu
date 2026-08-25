@@ -26,6 +26,9 @@ pnpm start:web
 | `BIU_WEB_CLIENT_IP_HEADER` | 未启用 | 可信反代覆盖写入的单值客户端 IP header，例如 `X-Biu-Client-IP` |
 | `BIU_SYNC_INTERNAL_ORIGIN` | `http://127.0.0.1:3002` | 本机 sync 服务的受信任内部 origin；HTTP 只允许 loopback |
 | `BIU_ACME_CHALLENGE_ORIGIN` | 未启用 | 可选的本机 HTTP-01 challenge 服务；只允许 loopback origin |
+| `BIU_WEB_CLIENT_LOG_DIR` | 未启用 | 网页端日志落盘目录（相对路径按启动目录解析）。不配置就不接收回传日志 |
+| `BIU_WEB_CLIENT_LOG_RETENTION_DAYS` | `7` | 日志保留天数，超期文件自动删除 |
+| `BIU_WEB_CLIENT_LOG_MAX_MB` | `200` | 日志目录总体积上限（MB）；保留期内仍超限时从最旧的文件开始删 |
 
 生产示例：
 
@@ -33,8 +36,33 @@ pnpm start:web
 NODE_ENV=production \
 BIU_WEB_PUBLIC_ORIGIN=https://music.example.com \
 BIU_SYNC_INTERNAL_ORIGIN=http://127.0.0.1:3002 \
+BIU_WEB_CLIENT_LOG_DIR=/var/log/biu-web \
 pnpm start:web
 ```
+
+## 网页端日志回传
+
+手机浏览器打不开开发者工具，用户遇到播放失败只能靠截图描述。配置 `BIU_WEB_CLIENT_LOG_DIR` 后，网页会把 **warn / error** 批量回传到 `POST /__biu_log`，服务端按天写成 NDJSON：
+
+```
+/var/log/biu-web/web-client-2026-08-25.log
+```
+
+每行一条记录，字段：`receivedAt`（服务端时间，权威）、`clientAt`（客户端时间，仅供参考）、`level`、`message`、`context`、`sessionId`（每个标签页一个随机串，用来把同一次会话串起来，不含账号信息）、`userAgent`、`ip`（仅在配置了 `BIU_WEB_CLIENT_IP_HEADER` 时记录）。
+
+查最近的播放失败：
+
+```bash
+grep '"level":"error"' /var/log/biu-web/web-client-*.log | tail -50
+```
+
+边界与约束：
+
+- **只接受同源 POST**，单请求体 ≤ 32 KB、单批 ≤ 20 条、单条消息 ≤ 2000 字符；按 IP 60 次/分钟、全局 3000 次/分钟限流，超出返回 429。
+- 落盘前统一脱敏：`/__biu_proxy/bilibili/media/<token>` 里的媒体 token、以及 `SESSDATA` / `bili_jct` / `token` 等查询参数都会被替换成 `<redacted>`；控制字符一律剥离，客户端无法伪造额外日志行。
+- **磁盘保护是两道闸**：超过保留天数的文件直接删；保留期内总体积仍超 `BIU_WEB_CLIENT_LOG_MAX_MB` 时，从最旧的文件继续删。清理每小时最多跑一次，跟在写入之后，不需要额外的 cron。
+- 日志写入是异步的，失败只影响日志本身，不会影响请求与播放。
+- info / debug 不回传，只留在浏览器 console。
 
 ## HTTPS 反向代理
 
