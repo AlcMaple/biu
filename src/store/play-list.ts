@@ -16,6 +16,7 @@ import platform from "@/platform";
 import { log } from "@/platform";
 import { getAudioSongInfo } from "@/service/audio-song-info";
 import { getWebInterfaceView } from "@/service/web-interface-view";
+import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
 import { useLocalFavItemsStore } from "./local-fav-items";
 import { usePlayProgress } from "./play-progress";
@@ -204,26 +205,73 @@ const getAudioData = async (sid: number) => {
   ];
 };
 
-const toastError = (title: string) => {
+/**
+ * 同一条提示的最小间隔：换源自救 / 自动跳过在弱网下可能连续触发，
+ * 不去重会像刷屏一样连弹十几个 toast（移动端网页尤其明显）。
+ */
+const TOAST_THROTTLE_MS = 4000;
+const lastToastAt = new Map<string, number>();
+
+const toastThrottled = (title: string, color: "danger" | "warning") => {
+  const now = Date.now();
+  const last = lastToastAt.get(title);
+  if (last !== undefined && now - last < TOAST_THROTTLE_MS) return;
+  lastToastAt.set(title, now);
   addToast({
     title,
-    color: "danger",
+    color,
   });
+};
+
+const toastError = (title: string) => {
+  toastThrottled(title, "danger");
 };
 
 /** 换源等过程性提示：短暂自动消失，不打断使用 */
 const toastInfo = (title: string) => {
-  addToast({
-    title,
-    color: "warning",
-  });
+  toastThrottled(title, "warning");
 };
 
 const sanitizeTitle = (title: string) => stripHtml(title);
 
+/**
+ * iOS 的 WebKit（iOS 上所有浏览器都是 WKWebView，Chrome 同样受影响）只允许在用户手势
+ * 里启动媒体播放，而这个手势令牌**在 await 网络请求之后就失效了**。
+ * 点歌 → `await getDashUrl()` 取播放地址 → `audio.play()` 这条链路里，play() 已经不在
+ * 手势中，于是被拒（NotAllowedError）
+ *
+ * 解法：在点击的同步阶段先对媒体元素调一次 `load()`。WebKit 在用户手势中调用 load()
+ * 会解除该元素的手势限制，之后再异步换 src / play() 就不再被拦。
+ * 只在元素还没有 src 时做：已有源时 load() 会把播放进度清零。
+ */
+let audioGestureUnlocked = false;
+const primeAudioForGesture = () => {
+  if (audioGestureUnlocked) return;
+  audioGestureUnlocked = true;
+  if (audio.src) return;
+  try {
+    audio.load();
+  } catch {
+    // 元素还没准备好：忽略，后续 play() 失败会有明确提示
+  }
+};
+
 const handlePlayError = (error: any) => {
-  const errorMsg = error?.message || error?.name || "";
-  if (!errorMsg.includes("interrupted") && !errorMsg.includes("NotAllowed")) {
+  const errorName = error?.name || "";
+  const errorMsg = error?.message || errorName || "";
+  // AbortError（"The operation was aborted."）是换源/切歌时 load() 打断了上一次 play()，
+  // 属于我们自己造成的正常中断，不是播放失败，弹给用户只会变成噪音刷屏。
+  if (errorName === "AbortError" || errorMsg.includes("aborted")) return;
+  // NotAllowedError：浏览器（尤其手机）拒绝了非用户手势发起的播放。以前直接吞掉，
+  // 结果是「点了没反应也没提示」，必须告诉用户再点一次。
+  if (errorName === "NotAllowedError" || errorMsg.includes("NotAllowed")) {
+    // 这条会回传到服务端日志：手机上「点了没反应」的根因就靠它定位
+    log.warn("浏览器拒绝了本次播放（缺少用户手势）", { errorName, errorMsg, userAgent: navigator.userAgent });
+    toastError("浏览器阻止了自动播放，请再点一次播放");
+    return;
+  }
+  if (!errorMsg.includes("interrupted")) {
+    log.warn("播放出错", { errorName, errorMsg });
     toastError(error instanceof Error ? error.message : "获取播放链接失败");
   }
 };
@@ -461,8 +509,26 @@ export const usePlayList = create<State & Action>()(
               }, STALL_TIMEOUT_MS);
             };
 
+            // 同一首歌的失败处理正在进行时忽略新的失败事件：换源期间 onerror 与看门狗
+            // 可能同时开火，重入会让请求量翻倍
+            let failureHandlingId: string | undefined;
+
             // 播放失败统一处理（onerror 与卡死看门狗共用）：先换源自救，救不回来才跳下一首
             const handlePlaybackFailure = async (
+              playId: string,
+              failedSrc: string,
+              errInfo: { code?: number; message?: string },
+            ) => {
+              if (failureHandlingId === playId) return;
+              failureHandlingId = playId;
+              try {
+                await runPlaybackFailure(playId, failedSrc, errInfo);
+              } finally {
+                if (failureHandlingId === playId) failureHandlingId = undefined;
+              }
+            };
+
+            const runPlaybackFailure = async (
               playId: string,
               failedSrc: string,
               errInfo: { code?: number; message?: string },
@@ -482,16 +548,22 @@ export const usePlayList = create<State & Action>()(
 
               consecutiveErrorCount += 1;
               const listLength = get().list.length;
-              // 防 runaway：整个列表都跳过一遍仍失败时停止，避免无限循环
-              if (listLength === 0 || consecutiveErrorCount >= listLength) {
+              // 防 runaway：连续几首都失败通常意味着断网 / 整体不可用，继续往下跳只会
+              // 把整张歌单的取址接口全打一遍（原来的阈值是列表长度，几百首时形同虚设）
+              const skipLimit = Math.min(listLength, MAX_CONSECUTIVE_SKIPS);
+              if (listLength === 0 || consecutiveErrorCount >= skipLimit) {
                 consecutiveErrorCount = 0;
                 if (!audio.paused) audio.pause();
-                toastError("当前列表中没有可播放的歌曲");
+                set({ isPlaying: false });
+                toastError("当前歌曲无法播放，请检查网络后重试");
                 return;
               }
 
               log.error("音频播放失败，自动跳到下一首", { playId, src: failedSrc, ...errInfo });
               toastError("当前歌曲无法播放，已自动跳过");
+              // 退避后再跳：避免一秒内连锁跳过多首、瞬间打出大量请求
+              await delay(AUTO_SKIP_DELAY_MS);
+              if (get().playId !== playId) return;
               void get().next();
             };
 
@@ -676,6 +748,7 @@ export const usePlayList = create<State & Action>()(
           }
         },
         togglePlay: async () => {
+          primeAudioForGesture();
           if (!get().list?.length) {
             return;
           }
@@ -715,6 +788,8 @@ export const usePlayList = create<State & Action>()(
           duration,
           cid: targetCid,
         }: PlayItem) => {
+          // 必须在任何 await 之前：手机浏览器的播放许可只在同步的手势阶段有效
+          primeAudioForGesture();
           const { list, playId } = get();
           const currentItem = list?.find(item => item.id === playId);
           const sanitizedTitle = sanitizeTitle(title);
@@ -1441,6 +1516,60 @@ export const usePlayList = create<State & Action>()(
 let failoverPlayId: string | undefined;
 let failoverTriedUrls = new Set<string>();
 let failoverRefreshed = false;
+let failoverAttempts = 0;
+let lastFailoverAt = 0;
+
+/**
+ * 换源自救的节流参数。
+ *
+ * 背景：弱网 / 播放源整体不可用时（手机网页最容易复现），备用地址会一个接一个
+ * 秒失败，原实现不带任何间隔与次数上限，于是「换源 → 立刻再失败 → 再换源」在
+ * 一秒内跑完所有候选，再连锁跳过整张歌单，对 B 站接口形成短时高频请求，
+ * 既刷屏也有被风控的风险。这里给自救链路加上最小间隔 + 次数上限 + 跳歌退避。
+ */
+const FAILOVER_MIN_INTERVAL_MS = 2000;
+/** 单曲最多换几次源（含重新取地址），超过就交给跳过逻辑 */
+const FAILOVER_MAX_ATTEMPTS = 3;
+/** 自动跳下一首前的等待，避免整张列表在一秒内被烧完 */
+const AUTO_SKIP_DELAY_MS = 1500;
+/** 连续多少首失败后停手（原来是整张列表长度，几百首时等同于无限刷请求） */
+const MAX_CONSECUTIVE_SKIPS = 3;
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+/**
+ * 播放失败时探一次真实 HTTP 状态码。
+ *
+ * 手机上没法开开发者工具看 Network，媒体元素的 onerror 又只给 code=2/3/4 这种
+ * 笼统分类，排查时等于瞎子。这里对失败地址发一个 1 字节 Range 请求，把状态码
+ * 写进日志和提示里（404 = 代理 token 失效、403 = 上游拒绝、0 = 网络不通）。
+ * 每首歌只在重新取址那一步探一次，不会增加请求压力。
+ */
+async function probePlaybackStatus(url: string): Promise<number | undefined> {
+  if (typeof fetch !== "function") return undefined;
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Range: "bytes=0-0" },
+      method: "GET",
+    });
+    // 只关心状态码，正文立刻丢弃
+    void res.body?.cancel();
+    return res.status;
+  } catch {
+    return 0; // 请求根本没发出去 / 被网络层掐断
+  }
+}
+
+/** 距上次换源不足最小间隔时补齐等待，把失败风暴摊平成低频重试 */
+async function waitFailoverSlot() {
+  const elapsed = Date.now() - lastFailoverAt;
+  if (elapsed < FAILOVER_MIN_INTERVAL_MS) {
+    await delay(FAILOVER_MIN_INTERVAL_MS - elapsed);
+  }
+  lastFailoverAt = Date.now();
+}
 
 /**
  * 播放出错时的换源自救（对齐官方播放器行为）：先逐个换没试过的候选地址，
@@ -1452,7 +1581,10 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
     failoverPlayId = playId;
     failoverTriedUrls = new Set();
     failoverRefreshed = false;
+    failoverAttempts = 0;
   }
+  // 本曲自救次数用尽：不再继续换源，避免坏源上无休止地重试
+  if (failoverAttempts >= FAILOVER_MAX_ATTEMPTS) return false;
   if (failedSrc) {
     failoverTriedUrls.add(normalizePlaybackUrl(failedSrc));
   }
@@ -1466,18 +1598,37 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
 
   const resumeTime = usePlayProgress.getState().currentTime || 0;
 
-  const nextUrl = playItem.audioUrlCandidates?.find(url => !failoverTriedUrls.has(normalizePlaybackUrl(url)));
+  // 网页版所有候选地址都是同一个同源代理会话签出的 token，token 失效（服务重启 / 过期 /
+  // 会话轮换）时逐个试候选必然全军覆没，只是白白多打几次请求。直接重新取址即可。
+  const shouldRefreshFirst = isBilibiliMediaProxyUrl(failedSrc) && !failoverRefreshed;
+
+  const nextUrl = shouldRefreshFirst
+    ? undefined
+    : playItem.audioUrlCandidates?.find(url => !failoverTriedUrls.has(normalizePlaybackUrl(url)));
   if (nextUrl) {
     log.warn("音频播放失败，自动切换备用地址重试", { playId });
     failoverTriedUrls.add(normalizePlaybackUrl(nextUrl));
+    failoverAttempts += 1;
     toastInfo("播放卡顿，正在切换播放源…");
+    await waitFailoverSlot();
+    // 等待期间用户可能已切歌 / 暂停，这时不要抢占当前播放
+    if (usePlayList.getState().playId !== playId) return true;
     resumeAudioFrom(nextUrl, resumeTime);
     return true;
   }
 
   if (!failoverRefreshed) {
     failoverRefreshed = true;
-    log.warn("音频播放失败，候选地址已用尽，重新获取播放地址重试", { playId });
+    failoverAttempts += 1;
+    const status = await probePlaybackStatus(failedSrc);
+    log.warn("音频播放失败，重新获取播放地址重试", { playId, failedSrc, httpStatus: status });
+    if (status === 0) {
+      toastInfo("播放源连不上，请检查网络");
+    } else if (status !== undefined && status >= 400) {
+      toastInfo(`播放源失效（HTTP ${status}），正在重新获取…`);
+    }
+    await waitFailoverSlot();
+    if (usePlayList.getState().playId !== playId) return true;
     const refreshed = await refreshCurrentAudioSource();
     if (refreshed && !failoverTriedUrls.has(normalizePlaybackUrl(audio.src))) {
       failoverTriedUrls.add(normalizePlaybackUrl(audio.src));
@@ -1490,12 +1641,24 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
   return false;
 }
 
-/** 从指定地址续播：保留中断前的播放进度，换源重试时不从头播 */
+/**
+ * 从指定地址续播：保留中断前的播放进度，换源重试时不从头播。
+ *
+ * 注意 seek 必须等 loadedmetadata：刚 load() 完时 duration 还是 NaN，
+ * 此时写 currentTime 在 iOS 的 WebKit 上会被丢弃甚至打断这次加载
+ * （iOS 上所有浏览器都是 WKWebView，Chrome 同样受影响）。
+ */
 function resumeAudioFrom(url: string, resumeTime: number) {
   audio.src = url;
   audio.load();
   if (resumeTime > 0) {
-    audio.currentTime = resumeTime;
+    const seekOnce = () => {
+      audio.removeEventListener("loadedmetadata", seekOnce);
+      if (isSamePlaybackUrl(audio.src, url)) {
+        audio.currentTime = resumeTime;
+      }
+    };
+    audio.addEventListener("loadedmetadata", seekOnce);
   }
   void playAudioSafely();
 }

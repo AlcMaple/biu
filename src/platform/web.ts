@@ -2,6 +2,8 @@ import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
 
+import { installWebLogTransport, reportWebLog } from "./web-log-transport";
+
 const STORE_KEY_PREFIX = "biu:";
 const WEB_STORE_DATABASE = "biu-web-store";
 const WEB_STORE_OBJECT_STORE = "stores";
@@ -236,10 +238,18 @@ const platform: Platform = {
 };
 
 export const log: Logger = {
-  error: (...args) => console.error(...args),
-  warn: (...args) => console.warn(...args),
+  error: (...args) => {
+    console.error(...args);
+    reportWebLog("error", args);
+  },
+  warn: (...args) => {
+    console.warn(...args);
+    reportWebLog("warn", args);
+  },
   info: (...args) => console.info(...args),
   debug: (...args) => console.debug(...args),
 };
+
+installWebLogTransport();
 
 export default platform;

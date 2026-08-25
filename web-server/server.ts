@@ -31,6 +31,9 @@ const HASHED_ASSET_PATTERN = /(?:^|[.-])[a-f0-9]{8,}(?:[.-]|$)/i;
 
 export interface ProductionWebServerOptions {
   clientIpHeader?: string;
+  clientLogDir?: string;
+  clientLogMaxTotalBytes?: number;
+  clientLogRetentionDays?: number;
   publicOrigin?: string;
   staticRoot: string;
 }
@@ -140,6 +143,9 @@ export async function createStaticWebHandler(staticRoot: string) {
 export async function createProductionWebServer(options: ProductionWebServerOptions): Promise<Server> {
   const application = createWebApplicationHandler({
     clientIpHeader: options.clientIpHeader,
+    clientLogDir: options.clientLogDir,
+    clientLogMaxTotalBytes: options.clientLogMaxTotalBytes,
+    clientLogRetentionDays: options.clientLogRetentionDays,
     publicOrigin: options.publicOrigin,
   });
   const staticHandler = await createStaticWebHandler(options.staticRoot);

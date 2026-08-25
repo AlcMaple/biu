@@ -613,6 +613,52 @@ describe("play-list store", () => {
     expect(usePlayList.getState().getPlayItem()?.playCount).toBe(888);
   });
 
+  // —— 换源自救节流：坏源 / 弱网时不能把请求打成风暴 ——
+
+  test("单曲连续播放失败时，换源次数有上限且带最小间隔", async () => {
+    vi.useFakeTimers();
+    try {
+      const s = usePlayList.getState();
+      await s.init();
+      const audio = s.getAudio();
+
+      usePlayList.setState({
+        list: [
+          {
+            id: "bad",
+            type: "mv",
+            bvid: "BV_bad",
+            cid: "1",
+            title: "bad",
+            audioUrl: "https://cdn.test/0.mp3",
+            audioUrlCandidates: [
+              "https://cdn.test/1.mp3",
+              "https://cdn.test/2.mp3",
+              "https://cdn.test/3.mp3",
+              "https://cdn.test/4.mp3",
+              "https://cdn.test/5.mp3",
+            ],
+          },
+        ],
+        playId: "bad",
+      });
+      audio.src = "https://cdn.test/0.mp3";
+      const load = vi.spyOn(audio, "load");
+      (audio as any).error = { code: 2, message: "network" };
+
+      // 模拟坏源：每次换完源立刻再次失败
+      for (let i = 0; i < 10; i += 1) {
+        audio.onerror?.(new Event("error") as any);
+        await vi.advanceTimersByTimeAsync(3000);
+      }
+
+      // 换源最多 3 次（2 个备用地址 + 1 次重新取址），不会把 5 个候选一口气烧完
+      expect(load.mock.calls.length).toBeLessThanOrEqual(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("addList() 透传 playCount 到队列项", async () => {
     const s = usePlayList.getState();
     await s.init();
