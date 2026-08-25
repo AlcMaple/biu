@@ -45,7 +45,18 @@
 html,
 body,
 #root {
+  /*
+   * 移动端浏览器的动态工具栏会占掉底部一截，若用 height:100% 取的是「工具栏收起时」的
+   * 大视口，底部播放栏会被挡住、在手机上看不到。分三级回退，越靠后越准：
+   *   1) 100%    —— 最老环境兜底
+   *   2) 100dvh  —— 动态视口高度，Safari 等能正确扣掉工具栏
+   *   3) --app-h —— JS 用 visualViewport.height 实测的可见高度（见 use-app-height.ts）。
+   *      专治 iOS Chrome：它的底部工具栏是覆盖层，100dvh 也扣不掉，只有实测才准。
+   * 桌面 / Electron 无动态工具栏，三者相等，行为不变。
+   */
   height: 100%;
+  height: 100dvh;
+  height: var(--app-h, 100dvh);
   overflow: hidden;
 }
 

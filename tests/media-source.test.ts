@@ -10,19 +10,26 @@ vi.mock("@/platform", () => ({ log: { warn: vi.fn(), error: vi.fn(), info: vi.fn
 class FakeSourceBuffer extends EventTarget {
   updating = false;
   readonly appended: ArrayBuffer[] = [];
+  buffered = { length: 0, end: () => 10 };
   appendBuffer(chunk: ArrayBuffer) {
     this.appended.push(chunk);
     this.updating = true;
-    // 异步「处理完成」，触发 updateend
+    // 异步「处理完成」，模拟缓冲增长后触发 updateend
     setTimeout(() => {
       this.updating = false;
+      this.buffered = { length: 1, end: () => 10 };
       this.dispatchEvent(new Event("updateend"));
     }, 0);
   }
 }
 
 class FakeManagedMediaSource extends EventTarget {
-  static supported = new Set(['audio/mp4; codecs="mp4a.40.2"', 'audio/mp4; codecs="fLaC"']);
+  static supported = new Set([
+    'audio/mp4; codecs="mp4a.40.2"',
+    'audio/mp4; codecs="mp4a.40.5"',
+    'audio/mp4; codecs="fLaC"',
+    "audio/mp4",
+  ]);
   static isTypeSupported(type: string) {
     return FakeManagedMediaSource.supported.has(type);
   }
@@ -92,10 +99,18 @@ describe("pickAudioMime", () => {
   it("没有 MediaSource 时返回 undefined", () => {
     expect(pickAudioMime({})).toBeUndefined();
   });
+
+  it("优先使用流的真实编码（避免声明与实际不符导致解析失败）", () => {
+    (window as unknown as Record<string, unknown>).ManagedMediaSource = FakeManagedMediaSource;
+    // 即便 mp4a.40.2 也被支持，也应优先选真实的 mp4a.40.5
+    expect(pickAudioMime({ audioCodecs: "mp4a.40.5" })).toBe('audio/mp4; codecs="mp4a.40.5"');
+    // 小写 flac 纠正为大小写敏感的 fLaC
+    expect(pickAudioMime({ audioCodecs: "flac", isLossless: true })).toBe('audio/mp4; codecs="fLaC"');
+  });
 });
 
 describe("attachMediaSourceAudio", () => {
-  it("挂载后边下边 append，下载结束调用 endOfStream", async () => {
+  it("挂载后整段 append，完成后调用 endOfStream", async () => {
     const instances: FakeManagedMediaSource[] = [];
     const Ctor = function (this: unknown) {
       const inst = new FakeManagedMediaSource();
@@ -109,33 +124,29 @@ describe("attachMediaSourceAudio", () => {
 
     vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => undefined });
 
-    // 两块数据的流
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([1, 2, 3]));
-        controller.enqueue(new Uint8Array([4, 5]));
-        controller.close();
-      },
-    });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(stream, { status: 200 })),
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4, 5]), { status: 200 })),
     );
 
     const audio = new Audio();
     const onError = vi.fn();
-    const controller = attachMediaSourceAudio(audio, "https://x/media", { onError });
+    const onProgress = vi.fn();
+    const controller = attachMediaSourceAudio(audio, "https://x/media", { onError, onProgress });
     expect(controller).toBeDefined();
 
     // 模拟浏览器打开 MediaSource
     instances[0].open();
 
-    // 等待流读取 + append 完成
+    // 等待整段下载 + 一次性 append 完成
     await vi.waitFor(() => {
-      expect(instances[0].buffers[0]?.appended.length).toBe(2);
+      expect(instances[0].buffers[0]?.appended.length).toBe(1);
       expect(instances[0].endOfStreamCalls).toBe(1);
     });
     expect(onError).not.toHaveBeenCalled();
+    // 流式下载期间应上报进度，最终累计到全部字节
+    expect(onProgress).toHaveBeenCalled();
+    expect(onProgress.mock.calls.at(-1)?.[0]).toBe(5);
   });
 
   it("fetch 失败时回调 onError", async () => {
@@ -161,5 +172,81 @@ describe("attachMediaSourceAudio", () => {
     instances[0].open();
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+  });
+
+  it("append 触发 QuotaExceededError 时先驱逐再重试，不直接失败", async () => {
+    // 模拟大文件：第一次 append 抛配额超限，驱逐后第二次成功——正是「ありきたりなさよなら」的场景
+    class QuotaSourceBuffer extends EventTarget {
+      updating = false;
+      appendCount = 0;
+      removeCalls = 0;
+      buffered = { length: 1, start: () => 0, end: () => 8 };
+      appendBuffer() {
+        this.appendCount += 1;
+        if (this.appendCount === 1) {
+          const err = new Error("quota");
+          (err as { name?: string }).name = "QuotaExceededError";
+          throw err;
+        }
+        this.updating = true;
+        setTimeout(() => {
+          this.updating = false;
+          this.dispatchEvent(new Event("updateend"));
+        }, 0);
+      }
+      remove() {
+        this.removeCalls += 1;
+        this.updating = true;
+        setTimeout(() => {
+          this.updating = false;
+          this.dispatchEvent(new Event("updateend"));
+        }, 0);
+      }
+    }
+    const sb = new QuotaSourceBuffer();
+    class MS extends EventTarget {
+      static isTypeSupported = FakeManagedMediaSource.isTypeSupported;
+      readyState = "closed";
+      duration = NaN;
+      endOfStreamCalls = 0;
+      addSourceBuffer() {
+        return sb as unknown as SourceBuffer;
+      }
+      endOfStream() {
+        this.endOfStreamCalls += 1;
+      }
+      open() {
+        this.readyState = "open";
+        this.dispatchEvent(new Event("sourceopen"));
+      }
+    }
+    const ms = new MS();
+    (window as unknown as Record<string, unknown>).ManagedMediaSource = function () {
+      return ms;
+    };
+    (
+      (window as unknown as Record<string, unknown>).ManagedMediaSource as unknown as {
+        isTypeSupported: (t: string) => boolean;
+      }
+    ).isTypeSupported = FakeManagedMediaSource.isTypeSupported;
+    setUA(IPHONE_UA);
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => undefined });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4, 5]), { status: 200 })),
+    );
+
+    const audio = new Audio();
+    Object.defineProperty(audio, "currentTime", { configurable: true, value: 20 });
+    const onError = vi.fn();
+    attachMediaSourceAudio(audio, "https://x/media", { onError });
+    ms.open();
+
+    // 配额报错后应驱逐并重试成功，而非回调 onError
+    await vi.waitFor(() => {
+      expect(sb.removeCalls).toBeGreaterThanOrEqual(1);
+      expect(sb.appendCount).toBeGreaterThanOrEqual(2);
+    });
+    expect(onError).not.toHaveBeenCalled();
   });
 });

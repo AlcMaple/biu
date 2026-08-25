@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="864" viewBox="0 0 1160 864" role="img" aria-labelledby="title desc">
+  <title id="title">iOS 手机网页音频：从「播不动」到近乎秒播</title>
+  <desc id="desc">iOS 原生直连能播但前摇长、大文件超时；改为像 B 站网页一样只抓头段就起播、边播边下、驱逐已播，并把缓冲窗口卡在 iPhone 极小的配额之下，实现近乎秒播且不断音。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9a929a" />
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c07f8b" />
+    </marker>
+    <style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #282529; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #756f73; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #282529; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .line { fill: none; stroke: #9a929a; stroke-width: 2; marker-end: url(#arrow); }
+      .line-red { fill: none; stroke: #c07f8b; stroke-width: 2; marker-end: url(#arrow-red); }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1158" height="862" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+
+  <text x="34" y="42" class="title">iOS 手机网页音频：从「播不动」到近乎秒播</text>
+  <text x="34" y="64" class="subtitle">结果：手机网页点歌像 B 站网页一样近乎秒播（起播只需约 1–2 秒），不再前摇很久、不再播几秒断音；刷新页面保留上次歌曲与进度、保持暂停。</text>
+
+  <!-- 用户视角 -->
+  <rect x="24" y="84" width="1112" height="150" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="110" class="block">① 用户经历（手机网页 · 上层＝看得见的）</text>
+
+  <rect x="44" y="124" width="150" height="92" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="119" y="150" text-anchor="middle" class="card-t" fill="#4a4450">点「播放」</text>
+  <text x="119" y="172" text-anchor="middle" class="body" fill="#4a4450">列表里点一首歌</text>
+  <text x="119" y="190" text-anchor="middle" class="body" fill="#4a4450">或每行的播放按钮</text>
+
+  <rect x="238" y="124" width="176" height="92" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="326" y="150" text-anchor="middle" class="card-t" fill="#316247">约 1–2 秒就出声</text>
+  <text x="326" y="172" text-anchor="middle" class="body" fill="#316247">和 B 站网页一样</text>
+  <text x="326" y="190" text-anchor="middle" class="body" fill="#316247">不再前摇十几秒</text>
+
+  <rect x="458" y="124" width="176" height="92" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="546" y="150" text-anchor="middle" class="card-t" fill="#316247">整首顺畅播完</text>
+  <text x="546" y="172" text-anchor="middle" class="body" fill="#316247">中途不再突然没声</text>
+  <text x="546" y="190" text-anchor="middle" class="body" fill="#316247">大文件也一样</text>
+
+  <rect x="678" y="124" width="180" height="92" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="768" y="150" text-anchor="middle" class="card-t" fill="#4a4450">刷新页面</text>
+  <text x="768" y="172" text-anchor="middle" class="body" fill="#4a4450">底部播放栏还在</text>
+  <text x="768" y="190" text-anchor="middle" class="body" fill="#4a4450">上次进度还在</text>
+
+  <rect x="902" y="124" width="212" height="92" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="1008" y="150" text-anchor="middle" class="card-t" fill="#316247">保持暂停，不自动出声</text>
+  <text x="1008" y="172" text-anchor="middle" class="body" fill="#316247">等你再点播放才响</text>
+  <text x="1008" y="190" text-anchor="middle" class="body" fill="#316247">刷新不再突兀地开播</text>
+
+  <path class="line" d="M194 170 L236 170" />
+  <path class="line" d="M414 170 L456 170" />
+  <path class="line" d="M858 170 L900 170" />
+
+  <!-- 底层主链路 -->
+  <rect x="24" y="248" width="1112" height="150" rx="10" fill="#eef4f8" stroke="#91adc1" />
+  <text x="44" y="274" class="block">② 背后在做的（下层）：像 B 站一样「分段流式」，不是在后台放视频</text>
+
+  <rect x="44" y="288" width="238" height="92" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="163" y="314" text-anchor="middle" class="card-t" fill="#36566d">只抓「头段」就起播</text>
+  <text x="163" y="336" text-anchor="middle" class="body" fill="#36566d">攒够约 64KB（≈5 秒音频）</text>
+  <text x="163" y="354" text-anchor="middle" class="body" fill="#36566d">立刻喂进播放器 → 出声</text>
+
+  <rect x="322" y="288" width="238" height="92" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="441" y="314" text-anchor="middle" class="card-t" fill="#36566d">边播边下，小步喂</text>
+  <text x="441" y="336" text-anchor="middle" class="body" fill="#36566d">只往前多备约 12 秒</text>
+  <text x="441" y="354" text-anchor="middle" class="body" fill="#36566d">备够就暂缓下载等播放</text>
+
+  <rect x="600" y="288" width="238" height="92" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="719" y="314" text-anchor="middle" class="card-t" fill="#36566d">驱逐已播、控内存</text>
+  <text x="719" y="336" text-anchor="middle" class="body" fill="#36566d">身后只留约 5 秒</text>
+  <text x="719" y="354" text-anchor="middle" class="body" fill="#36566d">常驻缓冲 ≈ 17 秒</text>
+
+  <rect x="878" y="288" width="236" height="92" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="996" y="314" text-anchor="middle" class="card-t" fill="#4a4450">下载量／解码开销不变</text>
+  <text x="996" y="336" text-anchor="middle" class="body" fill="#4a4450">仍是那条纯音频流</text>
+  <text x="996" y="354" text-anchor="middle" class="body" fill="#4a4450">不碰视频轨</text>
+
+  <path class="line" d="M282 334 L320 334" />
+  <path class="line" d="M560 334 L598 334" />
+
+  <!-- 为什么非这么做（反直觉，最值钱） -->
+  <text x="34" y="432" class="block">③ 反直觉的两处——接手者最容易在这里改错</text>
+
+  <rect x="24" y="446" width="548" height="182" rx="10" fill="#eef4f8" stroke="#91adc1" />
+  <text x="44" y="472" class="card-t" fill="#36566d">为什么不直接把地址交给播放器自己放？</text>
+  <text x="44" y="496" class="body" fill="#36566d">iOS 原生直连其实能播这条纯音频流，但起播前会先</text>
+  <text x="44" y="514" class="body" fill="#36566d">缓冲一大段 → 前摇很长；8.4MB 的大文件经手机隧道</text>
+  <text x="44" y="532" class="body" fill="#36566d">甚至缓冲超时被判成坏源、直接跳过。所以要像 B 站一样</text>
+  <text x="44" y="550" class="body" fill="#36566d">只抓头段就起播。</text>
+  <rect x="44" y="562" width="508" height="52" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="582" class="body" fill="#96434f">纠错：「iOS 不支持纯音频轨、必须走它」曾是误判——真凶是</text>
+  <text x="58" y="600" class="body" fill="#96434f">代理早先把音频标成通用二进制类型，改成音频类型后原生就能播。</text>
+
+  <rect x="588" y="446" width="548" height="182" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="608" y="472" class="card-t" fill="#7a6234">为什么缓冲窗口要卡到这么小（约 17 秒）？</text>
+  <text x="608" y="496" class="body" fill="#7a6234">直觉：缓冲越多越稳。实际相反——iPhone 给网页音频的</text>
+  <text x="608" y="514" class="body" fill="#7a6234">缓冲配额极小：一段约 256KB 就能解码出约 20 秒音频，</text>
+  <text x="608" y="532" class="body" fill="#7a6234">两三段（约 40 秒）就超配额报错、当场断音。</text>
+  <rect x="608" y="548" width="508" height="66" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="622" y="570" class="body" fill="#7a6234">所以必须反过来：小段喂（约 5 秒）、只留很窄的窗口、</text>
+  <text x="622" y="588" class="body" fill="#7a6234">随播随扔已播段，把驻留量死死压在配额之下。这也是</text>
+  <text x="622" y="606" class="body" fill="#7a6234">走了几轮弯路（整段喂、40 秒大窗口）都失败后才定下的。</text>
+
+  <!-- 边界情况对照 -->
+  <rect x="24" y="644" width="1112" height="196" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="670" class="block">④ 边界与易混淆——只画顺利路径的话，遇到异常就会自己发明一套行为</text>
+
+  <rect x="44" y="684" width="350" height="140" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="60" y="708" class="card-t" fill="#96434f">「进度在走却没声音」≠ 卡死</text>
+  <text x="60" y="730" class="body" fill="#96434f">现象：播一会儿静音、但进度条还 1 秒 1 秒走，</text>
+  <text x="60" y="748" class="body" fill="#96434f">随后自动重来一次才放完。</text>
+  <text x="60" y="770" class="body" fill="#96434f">真因：撞了缓冲配额 → 播放失败 → 自动换源重播。</text>
+  <text x="60" y="792" class="body" fill="#96434f">现已被「卡窗口」根治，不该再出现。</text>
+
+  <rect x="406" y="684" width="350" height="140" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="422" y="708" class="card-t" fill="#36566d">弱网起播慢 ≠ 坏源</text>
+  <text x="422" y="730" class="body" fill="#36566d">起播前若长时间没进度，先探一次这个地址：</text>
+  <text x="422" y="748" class="body" fill="#36566d">只要还能正常取到字节、且仍在加载，就判成</text>
+  <text x="422" y="770" class="body" fill="#36566d">「慢」而非「卡死」，延长等待（最多约 72 秒），</text>
+  <text x="422" y="792" class="body" fill="#36566d">不误杀慢源；真取不到才换源／跳过。</text>
+
+  <rect x="768" y="684" width="346" height="140" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="784" y="708" class="card-t" fill="#316247">刷新／冷启动</text>
+  <text x="784" y="730" class="body" fill="#316247">只「恢复」上次的歌曲与进度并显示底部栏，</text>
+  <text x="784" y="748" class="body" fill="#316247">但保持暂停，绝不自动开播。</text>
+  <text x="784" y="770" class="body" fill="#316247">另：底部栏之前在手机上看不到，是因页面高度</text>
+  <text x="784" y="792" class="body" fill="#316247">按「工具栏收起时」算，被浏览器工具栏挡住，</text>
+  <text x="784" y="812" class="body" fill="#316247">改用「可见区域高度」后恢复可见。</text>
+</svg>

@@ -4,6 +4,7 @@ import { Outlet, useLocation } from "react-router";
 
 import clx from "classnames";
 
+import { useAppHeight } from "@/common/hooks/use-app-height";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ConfirmModal from "@/components/confirm-modal";
 import Fallback from "@/components/error-fallback";
@@ -26,6 +27,9 @@ const Layout = () => {
   const updateUser = useUser(state => state.updateUser);
   const location = useLocation();
   const isMobileLayout = useIsMobileLayout();
+
+  // 用可见视口高度钉住根容器高度，专治 iOS Chrome 底部工具栏遮住播放栏（详见 use-app-height）
+  useAppHeight();
 
   // 这里刻意不用 useDisclosure：它的 onOpenChange 是「切换」而不是按入参赋值，
   // 抽屉在断点切换时带着 open 状态卸载，会被那次回调反手切回 true —— 拉宽再拉窄就凭空弹出抽屉。

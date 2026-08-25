@@ -66,6 +66,8 @@ export interface PlayData {
   isLossless?: boolean;
   /** 是否为杜比音频 */
   isDolby?: boolean;
+  /** 音频编码串（如 mp4a.40.2 / mp4a.40.5 / fLaC）。MSE 必须按真实编码声明才能解析 */
+  audioCodecs?: string;
   /** 来源 */
   source?: "local" | "online";
   /** 播放量快照（收藏进本地歌单时直接沿用，省去回查 infos） */
@@ -314,6 +316,23 @@ const createAudio = (): HTMLAudioElement => {
 
 export const audio = createAudio();
 
+/** 已缓冲到的最靠后位置（秒）。用于区分「真卡死」和「还在慢慢下载」 */
+const bufferedEnd = () => (audio.buffered.length ? audio.buffered.end(audio.buffered.length - 1) : 0);
+
+/**
+ * 播放器当前状态快照，回传到服务端日志用于排查移动端卡顿。
+ * srcKind：mse=走 MediaSource（blob）、direct=直连 http、none=无源。
+ */
+const describeAudioState = () => ({
+  readyState: audio.readyState, // 0=无信息 … 4=可流畅播放
+  networkState: audio.networkState, // 2=NETWORK_LOADING 正在下载
+  bufferedEnd: Math.round(bufferedEnd() * 100) / 100,
+  currentTime: Math.round(audio.currentTime * 100) / 100,
+  duration: Number.isFinite(audio.duration) ? Math.round(audio.duration * 100) / 100 : null,
+  paused: audio.paused,
+  srcKind: !audio.currentSrc ? "none" : audio.currentSrc.startsWith("blob:") ? "mse" : "direct",
+});
+
 const updatePlaybackState = () => {
   if ("mediaSession" in navigator) {
     navigator.mediaSession.playbackState = audio.paused ? "paused" : "playing";
@@ -349,6 +368,12 @@ const playAudioSafely = async () => {
 let activeMediaSourceController: MediaSourceController | undefined;
 
 /**
+ * 当前 MSE 挂载累计已下载字节数。首段喂入前 buffered 一直是 0，但只要字节还在到，
+ * 就说明源是活的、不是卡死。看门狗用「字节数是否还在涨」作为存活信号，避免误杀正在拉流的源。
+ */
+let mseDownloadedBytes = 0;
+
+/**
  * 当前音频元素「逻辑上」加载的地址。
  * 走 MSE 时 `audio.src` 是 blob: 对象地址，跟真实媒体地址永远不相等，无法用它判重，
  * 因此单独记一份逻辑地址，供「是否已是当前源」的判断使用。
@@ -376,9 +401,13 @@ const seekOnMetadata = (resumeTime: number) => {
  * 因为 iOS WebKit 直连播不了 B 站的纯音频分片 MP4（见 media-source.ts）。
  * MSE 失败自动回退直连，让既有的换源/跳过逻辑照常兜底。
  */
-const setAudioSource = (url: string, opts: { isDolby?: boolean; isLossless?: boolean; resumeTime?: number } = {}) => {
+const setAudioSource = (
+  url: string,
+  opts: { audioCodecs?: string; isDolby?: boolean; isLossless?: boolean; resumeTime?: number } = {},
+) => {
   activeMediaSourceController?.abort();
   activeMediaSourceController = undefined;
+  mseDownloadedBytes = 0;
   currentSourceUrl = url;
 
   if (!url) {
@@ -386,11 +415,26 @@ const setAudioSource = (url: string, opts: { isDolby?: boolean; isLossless?: boo
     return;
   }
 
-  if (shouldUseMediaSource(url)) {
+  // iOS 走 MSE 分段流式播放（bilibili 式）：只喂前几百 KB 就起播，其余边播边下、
+  // 并驱逐已播缓冲控内存。原生 <audio> 直连虽然能播，但 iOS 会在起播前缓冲一大段，
+  // 造成长前摇、大文件还会超时；分段流式喂能做到近乎秒播（和 bilibili 网页一致）。
+  const useMse = shouldUseMediaSource(url);
+  log.warn("[src] setAudioSource 决策", {
+    useMse,
+    isAppleWebKit: shouldUseMediaSource(url),
+    isLossless: opts.isLossless,
+    isDolby: opts.isDolby,
+    audioCodecs: opts.audioCodecs,
+  });
+  if (useMse) {
     seekOnMetadata(opts.resumeTime ?? 0);
     const controller = attachMediaSourceAudio(audio, url, {
+      audioCodecs: opts.audioCodecs,
       isDolby: opts.isDolby,
       isLossless: opts.isLossless,
+      onProgress: received => {
+        mseDownloadedBytes = received;
+      },
       onError: () => {
         // MSE 失败：回退直连（iOS 上通常也会失败，但会走进既有的 onerror→换源/跳过链路）
         if (activeMediaSourceController?.url !== url) return;
@@ -453,6 +497,53 @@ export const isSame = (
 const shouldReportPlayRecord = (item?: { type: PlayDataType; source?: "local" | "online" }) =>
   item?.type === "mv" && item?.source !== "local";
 
+/** 一次性打印本设备的媒体能力，用于判断能否走 MSE 绕开元素加载器 */
+let mediaCapabilityLogged = false;
+const logMediaCapabilityOnce = () => {
+  if (mediaCapabilityLogged || typeof window === "undefined") return;
+  mediaCapabilityLogged = true;
+  const w = window as unknown as { ManagedMediaSource?: unknown; MediaSource?: unknown };
+  log.warn("媒体能力探测", {
+    buildId: typeof process !== "undefined" ? (process.env.BIU_BUILD_ID ?? "unknown") : "unknown",
+    hasManagedMediaSource: typeof w.ManagedMediaSource !== "undefined",
+    hasMediaSource: typeof w.MediaSource !== "undefined",
+    maxTouchPoints: typeof navigator !== "undefined" ? navigator.maxTouchPoints : undefined,
+    ua: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+  });
+};
+
+/**
+ * 用页面 fetch 探测媒体地址的真实响应，回传到服务端日志。
+ * 目的：iOS 的 <audio> 走独立媒体加载器，若页面 fetch 能拿到 206+字节而元素却失败，
+ * 就能定性为「元素加载器问题」而非网络/代理问题。
+ */
+async function probeMediaResponse(url: string): Promise<Record<string, unknown>> {
+  if (typeof fetch !== "function") return { probe: "no-fetch" };
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Range: "bytes=0-65535" },
+      method: "GET",
+    });
+    let bytes = 0;
+    try {
+      const buf = await res.arrayBuffer();
+      bytes = buf.byteLength;
+    } catch {
+      /* 读取正文失败也无妨，状态码更重要 */
+    }
+    return {
+      probeStatus: res.status,
+      probeContentType: res.headers.get("content-type"),
+      probeContentRange: res.headers.get("content-range"),
+      probeBytes: bytes,
+    };
+  } catch (error) {
+    return { probe: "fetch-threw", probeError: String(error) };
+  }
+}
+
 export const usePlayList = create<State & Action>()(
   persist(
     immer((set, get) => {
@@ -473,6 +564,7 @@ export const usePlayList = create<State & Action>()(
           const currentTime = usePlayProgress.getState().currentTime;
           if (!isSameCurrentSource(currentPlayItem?.audioUrl)) {
             setAudioSource(currentPlayItem!.audioUrl!, {
+              audioCodecs: currentPlayItem?.audioCodecs,
               isDolby: currentPlayItem?.isDolby,
               isLossless: currentPlayItem?.isLossless,
               resumeTime: currentTime > 0 ? currentTime : undefined,
@@ -490,6 +582,7 @@ export const usePlayList = create<State & Action>()(
             if (!isSameCurrentSource(mvPlayData.audioUrl)) {
               const currentTime = usePlayProgress.getState().currentTime;
               setAudioSource(mvPlayData.audioUrl, {
+                audioCodecs: mvPlayData.audioCodecs,
                 isDolby: mvPlayData.isDolby,
                 isLossless: mvPlayData.isLossless,
                 resumeTime: currentTime > 0 ? currentTime : undefined,
@@ -502,6 +595,7 @@ export const usePlayList = create<State & Action>()(
                 listItem.audioUrlCandidates = mvPlayData.audioUrlCandidates;
                 listItem.videoUrl = mvPlayData.videoUrl;
                 listItem.isLossless = mvPlayData.isLossless;
+                listItem.audioCodecs = mvPlayData.audioCodecs;
                 listItem.isDolby = mvPlayData.isDolby;
               }
             });
@@ -526,6 +620,7 @@ export const usePlayList = create<State & Action>()(
             if (!isSameCurrentSource(musicPlayData.audioUrl)) {
               const currentTime = usePlayProgress.getState().currentTime;
               setAudioSource(musicPlayData.audioUrl, {
+                audioCodecs: musicPlayData.audioCodecs,
                 isLossless: musicPlayData.isLossless,
                 resumeTime: currentTime > 0 ? currentTime : undefined,
               });
@@ -536,6 +631,8 @@ export const usePlayList = create<State & Action>()(
                 listItem.audioUrl = musicPlayData.audioUrl;
                 listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
                 listItem.isLossless = musicPlayData.isLossless;
+                listItem.audioCodecs = musicPlayData.audioCodecs;
+                listItem.audioCodecs = musicPlayData.audioCodecs;
               }
             });
           } else {
@@ -565,6 +662,7 @@ export const usePlayList = create<State & Action>()(
         randomPlayedIds: [],
         list: [],
         init: async () => {
+          logMediaCapabilityOnce();
           if (audio) {
             audio.volume = get().volume;
             audio.muted = get().isMuted;
@@ -575,8 +673,15 @@ export const usePlayList = create<State & Action>()(
             let consecutiveErrorCount = 0;
 
             // 卡死看门狗：进入缓冲后超时仍无任何进度（坏源常见表现是不报错只挂起），
-            // 视为播放失败触发换源自救；期间有进度推进则视为网络慢，重新计时观察
-            const STALL_TIMEOUT_MS = 8000;
+            // 视为播放失败触发换源自救；期间有进度推进则视为网络慢，重新计时观察。
+            // 12s（不是 8s）：移动端经隧道+无线网，初始缓冲比桌面慢得多，8s 太容易误杀。
+            const STALL_TIMEOUT_MS = 12000;
+            const NETWORK_LOADING = 2; // HTMLMediaElement.NETWORK_LOADING
+            // 弱网初始缓冲宽限：只要「源探测正常 + 元素仍在加载」，就一轮轮延长等待，
+            // 最多再宽限 6 轮 ≈ 72s。手机隧道网络下慢，12s 一刀切容易误杀正常但慢的源；
+            // 期间源一直正常就不误杀，真正的坏源探测会失败、照常换源/跳过。
+            const MAX_STALL_GRACE = 6;
+            let stallGraceUsed = 0;
             let stallWatchdog: ReturnType<typeof setTimeout> | undefined;
             const clearStallWatchdog = () => {
               if (stallWatchdog) {
@@ -589,15 +694,51 @@ export const usePlayList = create<State & Action>()(
               const playId = get().playId;
               if (!playId) return;
               const positionAtArm = audio.currentTime;
+              const bufferedAtArm = bufferedEnd();
+              const mseBytesAtArm = mseDownloadedBytes;
               stallWatchdog = setTimeout(() => {
                 stallWatchdog = undefined;
                 if (get().playId !== playId || audio.paused) return;
-                if (audio.currentTime !== positionAtArm) {
+                // 关键修复：不只看播放位置，也看缓冲是否在增长。
+                // 移动端初始缓冲期 currentTime 长时间停在 0，但 buffered 一直在涨——
+                // 这是「慢」不是「卡死」，只看 currentTime 会误判并触发无谓换源，
+                // 换源又重置缓冲，反复三次后错误跳过整首歌（桌面缓冲快所以从不触发）。
+                const advancedPlayback = audio.currentTime !== positionAtArm;
+                const advancedBuffer = bufferedEnd() > bufferedAtArm + 0.1;
+                // iOS MSE 起播前（首段还没喂入）buffered 恒为 0，但只要下载字节还在涨，
+                // 就是「下载慢」不是「卡死」，同样重新计时，避免误杀正在拉流的源。
+                const advancedDownload = mseDownloadedBytes > mseBytesAtArm;
+                if (advancedPlayback || advancedBuffer || advancedDownload) {
+                  stallGraceUsed = 0; // 有真实进度，宽限额度归零
                   armStallWatchdog();
                   return;
                 }
-                log.warn("播放长时间无进度，触发换源自救", { playId, src: audio.src, position: positionAtArm });
-                void handlePlaybackFailure(playId, audio.src, { message: "stall watchdog timeout" });
+                // 无可见进度：先探一次真实 HTTP 状态。iOS 原生加载器在缓冲大文件时
+                // currentTime/buffered 会长时间都是 0，但只要页面 fetch 拿得到字节、
+                // 且元素还在 LOADING，就是「还没缓冲够」而不是「卡死」——延长等待，别误杀。
+                const stalledSrc = audio.src;
+                void probeMediaResponse(stalledSrc)
+                  .then(probe => {
+                    if (get().playId !== playId || audio.paused) return;
+                    const stillLoading = audio.networkState === NETWORK_LOADING && !audio.error;
+                    const sourceHealthy = probe.probeStatus === 200 || probe.probeStatus === 206;
+                    if (stillLoading && sourceHealthy && stallGraceUsed < MAX_STALL_GRACE) {
+                      stallGraceUsed += 1;
+                      log.warn("播放暂无进度但源正常且仍在加载，延长等待", {
+                        playId,
+                        grace: stallGraceUsed,
+                        ...describeAudioState(),
+                        ...probe,
+                      });
+                      armStallWatchdog();
+                      return;
+                    }
+                    log.warn("播放长时间无进度，触发换源自救", { playId, ...describeAudioState(), ...probe });
+                    void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
+                  })
+                  .catch(() => {
+                    void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
+                  });
               }, STALL_TIMEOUT_MS);
             };
 
@@ -654,7 +795,12 @@ export const usePlayList = create<State & Action>()(
                 return;
               }
 
-              log.error("音频播放失败，自动跳到下一首", { playId, src: failedSrc, ...errInfo });
+              log.error("音频播放失败，自动跳到下一首", {
+                playId,
+                src: failedSrc,
+                ...errInfo,
+                ...describeAudioState(),
+              });
               toastError("当前歌曲无法播放，已自动跳过");
               // 退避后再跳：避免一秒内连锁跳过多首、瞬间打出大量请求
               await delay(AUTO_SKIP_DELAY_MS);
@@ -752,7 +898,17 @@ export const usePlayList = create<State & Action>()(
               // ABORTED(1) 是用户主动中止（切歌时旧请求被打断），不算播放失败
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
-              void handlePlaybackFailure(playId, audio.src, { code: err.code, message: err.message });
+              const erroredSrc = audio.src;
+              void probeMediaResponse(erroredSrc).then(probe => {
+                log.warn("音频元素报错", {
+                  playId,
+                  code: err.code,
+                  message: err.message,
+                  ...describeAudioState(),
+                  ...probe,
+                });
+              });
+              void handlePlaybackFailure(playId, erroredSrc, { code: err.code, message: err.message });
             };
 
             if ("mediaSession" in navigator) {
@@ -787,6 +943,11 @@ export const usePlayList = create<State & Action>()(
                 if (localCurrentTime) {
                   audio.currentTime = localCurrentTime;
                 }
+
+                // 刷新/冷启动只「恢复」上次的歌与进度，绝不自动开播：底部状态栏照常显示、
+                // 进度保留，但保持暂停，等用户主动点播放。（否则一刷新就自动出声，很突兀。）
+                if (!audio.paused) audio.pause();
+                set({ isPlaying: false });
 
                 updateMediaSession({
                   title: playItem.title,
@@ -1752,6 +1913,7 @@ function resumeAudioFrom(url: string, resumeTime: number) {
   // 换源续播：iOS 走 MSE、其余直连，seek 交给 setAudioSource 在 loadedmetadata 后执行
   const item = usePlayList.getState().getPlayItem?.();
   setAudioSource(url, {
+    audioCodecs: item?.audioCodecs,
     isDolby: item?.isDolby,
     isLossless: item?.isLossless,
     resumeTime: resumeTime > 0 ? resumeTime : undefined,
@@ -1786,6 +1948,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
       if (mvPlayData?.audioUrl) {
         const resumeTime = usePlayProgress.getState().currentTime || 0;
         setAudioSource(mvPlayData.audioUrl, {
+          audioCodecs: mvPlayData.audioCodecs,
           isDolby: mvPlayData.isDolby,
           isLossless: mvPlayData.isLossless,
           resumeTime: resumeTime > 0 ? resumeTime : undefined,
@@ -1799,6 +1962,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
             listItem.videoUrl = mvPlayData.videoUrl;
             listItem.isLossless = mvPlayData.isLossless;
             listItem.isDolby = mvPlayData.isDolby;
+            listItem.audioCodecs = mvPlayData.audioCodecs;
           }
         });
         return true;
@@ -1811,6 +1975,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
       if (musicPlayData?.audioUrl) {
         const resumeTime = usePlayProgress.getState().currentTime || 0;
         setAudioSource(musicPlayData.audioUrl, {
+          audioCodecs: musicPlayData.audioCodecs,
           isLossless: musicPlayData.isLossless,
           resumeTime: resumeTime > 0 ? resumeTime : undefined,
         });
@@ -1840,7 +2005,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
 function resetAudioAndPlay(url: string) {
   // 从头播：不带 resumeTime，iOS 走 MSE、其余直连
   const item = usePlayList.getState().getPlayItem?.();
-  setAudioSource(url, { isDolby: item?.isDolby, isLossless: item?.isLossless });
+  setAudioSource(url, { audioCodecs: item?.audioCodecs, isDolby: item?.isDolby, isLossless: item?.isLossless });
   void playAudioSafely();
 }
 
@@ -1948,6 +2113,7 @@ usePlayList.subscribe(async (state, prevState) => {
                 listItem.audioUrlCandidates = mvPlayData?.audioUrlCandidates;
                 listItem.videoUrl = mvPlayData?.videoUrl;
                 listItem.isLossless = mvPlayData?.isLossless;
+                listItem.audioCodecs = mvPlayData?.audioCodecs;
                 listItem.isDolby = mvPlayData?.isDolby;
               }
             });
@@ -1989,6 +2155,7 @@ usePlayList.subscribe(async (state, prevState) => {
                       videoUrl: mvPlayData?.videoUrl,
                       isLossless: mvPlayData?.isLossless,
                       isDolby: mvPlayData?.isDolby,
+                      audioCodecs: mvPlayData?.audioCodecs,
                     },
                   },
                   ...restMV,

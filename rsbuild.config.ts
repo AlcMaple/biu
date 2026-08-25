@@ -12,6 +12,13 @@ export default defineConfig(({ command }) => {
   const isWebDevelopment = isWebTarget && command === "dev";
 
   return {
+    source: {
+      define: {
+        // 构建版本号：部署时用 BIU_BUILD_ID=<release_stamp> 注入，写进每条回传日志，
+        // 这样看日志就能确认手机跑的是哪个版本，不用再靠「有没有硬刷新」猜。
+        "process.env.BIU_BUILD_ID": JSON.stringify(process.env.BIU_BUILD_ID || "dev"),
+      },
+    },
     output: {
       distPath: {
         root: "./dist/web",

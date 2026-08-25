@@ -217,6 +217,12 @@ export async function relayUpstreamStream(
   downstream.statusCode = upstream.statusCode ?? 502;
   copyUpstreamResponseHeaders(downstream, upstream.headers);
   if (input.kind === "api") downstream.setHeader("Cache-Control", "no-store");
+  if (input.kind === "media") {
+    // B 站 CDN 把音频 m4s 标成 application/octet-stream。桌面 <audio> 能容忍，但 iOS/移动端
+    // 在我们同时下发 nosniff 的情况下会拒绝解码（readyState 卡 0、一直 loading、buffered 0）。
+    // web 端这些媒体流只经 <audio> 播放（渲染层无 <video>），统一声明为 audio/mp4 才能在 iOS 播放。
+    downstream.setHeader("Content-Type", "audio/mp4");
+  }
   if (input.method === "HEAD") {
     upstream.resume();
     downstream.end();
