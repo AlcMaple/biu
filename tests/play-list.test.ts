@@ -2,7 +2,10 @@ import { describe, expect, test, beforeEach, vi } from "vitest";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { refreshCurrentAudioSource, usePlayList } from "@/store/play-list";
+import { usePlayProgress } from "@/store/play-progress";
 
+const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 26_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/151 Mobile/15E148";
 vi.mock("@/common/utils/audio", () => ({
   getAudioUrl: vi.fn(async () => ({ audioUrl: "https://audio.test/a.mp3", isLossless: false })),
   getDashUrl: vi.fn(async () => ({
@@ -63,6 +66,70 @@ beforeEach(() => {
   vi.clearAllMocks();
   usePlayList.getState().clear();
 });
+
+/**
+ * 在 store 测试里真正把 MSE 跑起来。
+ * 「跳到未缓冲位置要重新取流」「ended 后 paused/isPlaying 都为 false」这类问题
+ * 只在 MSE 活着时才会出现，非 MSE 环境下所有断言都会恒真（假绿）。
+ */
+const withFakeMse = () => {
+  const ua = navigator.userAgent;
+  const touch = navigator.maxTouchPoints;
+  const mediaSources: unknown[] = [];
+  class FakeSB extends EventTarget {
+    updating = false;
+    buffered = { length: 1, start: () => 0, end: () => 10 };
+    appendBuffer() {
+      this.updating = true;
+      setTimeout(() => {
+        this.updating = false;
+        this.dispatchEvent(new Event("updateend"));
+      }, 0);
+    }
+    remove() {
+      this.updating = true;
+      setTimeout(() => {
+        this.updating = false;
+        this.dispatchEvent(new Event("updateend"));
+      }, 0);
+    }
+  }
+  class FakeMS extends EventTarget {
+    static isTypeSupported = () => true;
+    readyState = "closed";
+    duration = NaN;
+    addSourceBuffer() {
+      return new FakeSB() as unknown as SourceBuffer;
+    }
+    endOfStream() {}
+    constructor() {
+      super();
+      mediaSources.push(this);
+      setTimeout(() => {
+        this.readyState = "open";
+        this.dispatchEvent(new Event("sourceopen"));
+      }, 0);
+    }
+  }
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: IPHONE_UA });
+  Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+  (window as any).ManagedMediaSource = FakeMS;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4]) as unknown as BodyInit, { status: 200 })),
+  );
+  vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => undefined });
+
+  return {
+    mediaSources,
+    restore: () => {
+      Object.defineProperty(navigator, "userAgent", { configurable: true, value: ua });
+      Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: touch });
+      delete (window as any).ManagedMediaSource;
+      vi.unstubAllGlobals();
+    },
+  };
+};
 
 describe("play-list store", () => {
   test("initial state", () => {
@@ -656,6 +723,145 @@ describe("play-list store", () => {
       expect(load.mock.calls.length).toBeLessThanOrEqual(3);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  test("播完前预取下一首地址，ended 时可同步切歌（手机锁屏续播）", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    await s.play({ type: "audio", sid: 401, title: "one" });
+    usePlayList.setState(state => {
+      state.list.push({ id: "second", type: "audio", sid: 402, title: "two" } as any);
+    });
+
+    const audio = s.getAudio();
+    vi.spyOn(audio, "load").mockImplementation(() => {});
+    vi.spyOn(audio, "play").mockResolvedValue(undefined as any);
+    Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+    Object.defineProperty(audio, "currentTime", { value: 95, writable: true, configurable: true });
+    Object.defineProperty(audio, "paused", { value: true, configurable: true });
+
+    // 还在播放中：提前把下一首的地址取好
+    audio.ontimeupdate?.(new Event("timeupdate"));
+    await vi.waitFor(() => {
+      expect(usePlayList.getState().list.find(item => item.id === "second")?.audioUrl).toBeTruthy();
+    });
+
+    const { getAudioUrl } = await import("@/common/utils/audio");
+    (getAudioUrl as any).mockClear();
+    audio.src = "";
+
+    // 播完：切歌必须是纯同步的（不再等任何网络请求），否则锁屏下会停住
+    audio.onended?.(new Event("ended"));
+    expect(usePlayList.getState().playId).toBe("second");
+    expect(audio.src).toContain("audio.test");
+    expect(getAudioUrl).not.toHaveBeenCalled();
+  });
+
+  test("拖动进度条到未缓冲位置：连续 seek 只重新取流一次，不是每动一下取一次", async () => {
+    const mse = withFakeMse();
+    try {
+      const s = usePlayList.getState();
+      await s.init();
+      const audio = s.getAudio();
+      vi.spyOn(audio, "play").mockResolvedValue(undefined as any);
+
+      await s.play({ type: "audio", sid: 701, title: "scrub" });
+      await vi.waitFor(() => expect(mse.mediaSources.length).toBe(1));
+      const mountsAfterPlay = mse.mediaSources.length;
+
+      // 假 SourceBuffer 的 buffered 恒为 [0,10]，下面这些目标都在缓冲区之外。
+      // 进度条 Slider 用的是连续触发的 onChange：模拟一次拖动。
+      for (const t of [30, 45, 60, 75, 90, 120]) s.seek(t);
+      expect(mse.mediaSources.length).toBe(mountsAfterPlay); // 停手前不重新取流
+
+      await new Promise(resolve => setTimeout(resolve, 400));
+      // 一次拖动 = 最多一次重新挂载，而不是 6 次
+      expect(mse.mediaSources.length).toBe(mountsAfterPlay + 1);
+      expect(usePlayProgress.getState().currentTime).toBe(120);
+    } finally {
+      mse.restore();
+    }
+  });
+
+  test("跳转加载期间进度条停在目标位置，不被旧位置的 timeupdate 拉回去", async () => {
+    const mse = withFakeMse();
+    try {
+      const s = usePlayList.getState();
+      await s.init();
+      const audio = s.getAudio();
+      vi.spyOn(audio, "play").mockResolvedValue(undefined as any);
+      await s.play({ type: "audio", sid: 901, title: "hold" });
+      await vi.waitFor(() => expect(mse.mediaSources.length).toBe(1));
+
+      // 跳到缓冲区之外（假 SourceBuffer 的 buffered 恒为 [0,10]）
+      s.seek(115);
+      expect(usePlayProgress.getState().currentTime).toBe(115);
+
+      // 元素还停在旧位置，timeupdate 会一路上报旧时间 —— 进度条不能被拉回去
+      audio.currentTime = 3;
+      audio.ontimeupdate?.(new Event("timeupdate"));
+      audio.currentTime = 4;
+      audio.ontimeupdate?.(new Event("timeupdate"));
+      expect(usePlayProgress.getState().currentTime).toBe(115);
+
+      // 数据到位、定位落实后交还控制权
+      audio.currentTime = 115;
+      audio.onseeked?.(new Event("seeked"));
+      audio.currentTime = 116;
+      audio.ontimeupdate?.(new Event("timeupdate"));
+      expect(usePlayProgress.getState().currentTime).toBe(116);
+    } finally {
+      mse.restore();
+    }
+  });
+
+  test("点击跳转不会为同一个目标重复取流（Slider 按下/抬起各发一次 onChange）", async () => {
+    const mse = withFakeMse();
+    try {
+      const s = usePlayList.getState();
+      await s.init();
+      const audio = s.getAudio();
+      vi.spyOn(audio, "play").mockResolvedValue(undefined as any);
+      await s.play({ type: "audio", sid: 902, title: "tap" });
+      await vi.waitFor(() => expect(mse.mediaSources.length).toBe(1));
+
+      // 按下时一次
+      s.seek(115);
+      await new Promise(resolve => setTimeout(resolve, 400));
+      expect(mse.mediaSources.length).toBe(2);
+
+      // 抬起时又一次（间隔超过防抖窗）：同一个目标，不该再取一遍流
+      s.seek(115);
+      await new Promise(resolve => setTimeout(resolve, 400));
+      expect(mse.mediaSources.length).toBe(2);
+    } finally {
+      mse.restore();
+    }
+  });
+
+  test("单首列表播完后会从头重播（MSE 下同样成立）", async () => {
+    const mse = withFakeMse();
+    try {
+      const s = usePlayList.getState();
+      await s.init();
+      const audio = s.getAudio();
+      const play = vi.spyOn(audio, "play").mockResolvedValue(undefined as any);
+
+      await s.play({ type: "audio", sid: 801, title: "only" });
+      await vi.waitFor(() => expect(mse.mediaSources.length).toBe(1));
+      expect(usePlayList.getState().list).toHaveLength(1);
+
+      // 播放自然结束：规范里 ended 之前会先 pause，所以 paused/isPlaying 都已是 false
+      audio.pause();
+      play.mockClear();
+      audio.onended?.(new Event("ended"));
+
+      // 重新挂载并起播（单首循环等价于「从头重播这一首」）
+      await vi.waitFor(() => expect(mse.mediaSources.length).toBe(2));
+      expect(play).toHaveBeenCalled();
+    } finally {
+      mse.restore();
     }
   });
 
