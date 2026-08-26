@@ -10,6 +10,20 @@ const isWebTarget = process.env.BIU_TARGET === "web";
 
 export default defineConfig(({ command }) => {
   const isWebDevelopment = isWebTarget && command === "dev";
+  const isWebProduction = isWebTarget && command === "build";
+
+  const umamiTrackingTag = isWebProduction
+    ? {
+        tag: "script",
+        attrs: {
+          defer: true,
+          src: "https://user.alcmaple.cn/script.js",
+          "data-website-id": "4a1ac5d8-22f8-481b-9084-c9282e0c3ce5",
+        },
+        head: true,
+        publicPath: false,
+      }
+    : undefined;
 
   return {
     source: {
@@ -33,6 +47,7 @@ export default defineConfig(({ command }) => {
     },
     html: {
       template: "./src/index.html",
+      ...(umamiTrackingTag ? { tags: [umamiTrackingTag] } : {}),
     },
     plugins: [
       pluginReact(),

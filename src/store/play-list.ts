@@ -56,6 +56,8 @@ export interface PlayData {
   totalPage?: number;
   /** 视频时长 单位为秒 */
   duration?: number;
+  /** 音频码率（bps）。MSE 用它把跳转目标换算成字节偏移，实现「跳转秒起」 */
+  audioBandwidth?: number;
   /** 视频音频url */
   audioUrl?: string;
   /** 候选音频地址（正规源优先、PCDN 兜底），播放失败时自动换源重试 */
@@ -140,7 +142,8 @@ interface Action {
   addToNext: (item: PlayItem) => void;
   addList: (items: PlayItem[]) => void;
   delPage: (id: string) => void;
-  del: (id: string) => void;
+  /** 实现是 async（删当前歌时要等续播链路走完），声明必须如实反映，否则调用方的 await 形同虚设 */
+  del: (id: string) => Promise<void>;
   clear: () => void;
   next: () => Promise<void>;
   prev: () => Promise<void>;
@@ -316,6 +319,58 @@ const createAudio = (): HTMLAudioElement => {
 
 export const audio = createAudio();
 
+/** 某个时间点是否已在缓冲区内（MSE 下用来判断跳转会不会踩空） */
+const isTimeBuffered = (time: number) => {
+  for (let i = 0; i < audio.buffered.length; i += 1) {
+    if (time >= audio.buffered.start(i) - 0.1 && time <= audio.buffered.end(i) + 0.1) return true;
+  }
+  return false;
+};
+
+/**
+ * 拖动进度条到「还没缓冲到」的位置时，重新挂载音频源的防抖等待（毫秒）。
+ * 进度条 Slider 用的是连续触发的 onChange，不合并就会边拖边重挂。
+ */
+const REMOUNT_SEEK_DEBOUNCE_MS = 250;
+let remountSeekTimer: ReturnType<typeof setTimeout> | undefined;
+const cancelPendingRemountSeek = () => {
+  if (remountSeekTimer) {
+    clearTimeout(remountSeekTimer);
+    remountSeekTimer = undefined;
+  }
+};
+
+/**
+ * 用户已经跳到、但数据还没到位的目标位置。
+ *
+ * 重新取流期间元素仍停在旧位置上，`ontimeupdate` 会一路把旧位置写回进度条，
+ * 表现就是「松手后进度条弹回原处，加载完才跳过去」。加载期间以这个值为准，
+ * 让进度条老老实实停在用户拖到的地方。
+ */
+let pendingSeekDisplayTime: number | undefined;
+/** 保险丝：万一定位始终没落实，也不能让进度条永远僵在那儿 */
+let pendingSeekDisplayTimer: ReturnType<typeof setTimeout> | undefined;
+const PENDING_SEEK_DISPLAY_MAX_MS = 15000;
+const clearPendingSeekDisplay = () => {
+  pendingSeekDisplayTime = undefined;
+  if (pendingSeekDisplayTimer) {
+    clearTimeout(pendingSeekDisplayTimer);
+    pendingSeekDisplayTimer = undefined;
+  }
+};
+const holdPendingSeekDisplay = (time: number) => {
+  pendingSeekDisplayTime = time;
+  if (pendingSeekDisplayTimer) clearTimeout(pendingSeekDisplayTimer);
+  pendingSeekDisplayTimer = setTimeout(clearPendingSeekDisplay, PENDING_SEEK_DISPLAY_MAX_MS);
+};
+
+/**
+ * 当前挂载用的起播位置。用来挡掉「同一个目标被重复挂载」——
+ * 进度条 Slider 在按下和抬起各发一次 onChange，间隔常常超过防抖窗，
+ * 不挡就会为同一次跳转白白重新取流两遍。
+ */
+let currentMountStartTime = 0;
+
 /** 已缓冲到的最靠后位置（秒）。用于区分「真卡死」和「还在慢慢下载」 */
 const bufferedEnd = () => (audio.buffered.length ? audio.buffered.end(audio.buffered.length - 1) : 0);
 
@@ -348,6 +403,9 @@ const playAudioSafely = async () => {
     await audio.play();
   } catch (error) {
     if ((error as DOMException)?.name === "NotSupportedError") {
+      // 这条路会静默地重新取址并重新挂载音频源。线上排查「播到一半无声」时，
+      // 缺了这行日志就只能看到一次没头没尾的 setAudioSource，无从判断起因。
+      log.warn("play() 被拒（NotSupportedError），重新获取播放地址并重挂", describeAudioState());
       const refreshed = await refreshCurrentAudioSource();
       if (refreshed) {
         try {
@@ -403,14 +461,27 @@ const seekOnMetadata = (resumeTime: number) => {
  */
 const setAudioSource = (
   url: string,
-  opts: { audioCodecs?: string; isDolby?: boolean; isLossless?: boolean; resumeTime?: number } = {},
+  opts: {
+    audioCodecs?: string;
+    isDolby?: boolean;
+    isLossless?: boolean;
+    resumeTime?: number;
+    /** 音频码率（bps）。MSE 用它把 resumeTime 换算成字节偏移，实现跳转秒起 */
+    audioBandwidth?: number;
+    /** 歌曲总时长（秒）。配合响应里的文件总大小换算字节偏移，比码率更准 */
+    duration?: number;
+  } = {},
 ) => {
+  // 换源/切歌作废掉还没执行的跳转重挂，避免它稍后把刚设好的源又顶掉
+  cancelPendingRemountSeek();
   activeMediaSourceController?.abort();
   activeMediaSourceController = undefined;
   mseDownloadedBytes = 0;
   currentSourceUrl = url;
+  currentMountStartTime = opts.resumeTime ?? 0;
 
   if (!url) {
+    clearPendingSeekDisplay();
     audio.src = "";
     return;
   }
@@ -421,17 +492,25 @@ const setAudioSource = (
   const useMse = shouldUseMediaSource(url);
   log.warn("[src] setAudioSource 决策", {
     useMse,
-    isAppleWebKit: shouldUseMediaSource(url),
+    isAppleWebKit: useMse,
+    resumeTime: opts.resumeTime ?? 0,
+    audioBandwidth: opts.audioBandwidth ?? 0,
     isLossless: opts.isLossless,
     isDolby: opts.isDolby,
     audioCodecs: opts.audioCodecs,
   });
   if (useMse) {
-    seekOnMetadata(opts.resumeTime ?? 0);
+    // 注意：**不要**在这里 seekOnMetadata。MSE 只能顺序喂，从外面写 currentTime 会把播放头
+    // 推到还没喂到的位置（缓冲区之外），节流/驱逐/配额三套逻辑的前提当场全塌 —— 这正是
+    // 「播到一半突然无声」的根因。定位交给喂流器自己：它用 Range 从目标片段取流，
+    // 并且只在数据真的覆盖到目标之后才落实 seek（见 media-source.ts 的 applyPendingSeek）。
     const controller = attachMediaSourceAudio(audio, url, {
       audioCodecs: opts.audioCodecs,
       isDolby: opts.isDolby,
       isLossless: opts.isLossless,
+      startTime: opts.resumeTime,
+      bandwidth: opts.audioBandwidth,
+      duration: opts.duration,
       onProgress: received => {
         mseDownloadedBytes = received;
       },
@@ -547,6 +626,61 @@ async function probeMediaResponse(url: string): Promise<Record<string, unknown>>
 export const usePlayList = create<State & Action>()(
   persist(
     immer((set, get) => {
+      /**
+       * 预判「下一首会是谁」，供播完前预取播放地址用（不改变当前播放）。
+       *
+       * 随机模式下这里会**当场把随机结果定下来并压进 randomFuture**，
+       * 因为 next() 会优先消费前向队列 —— 只有这样才能保证「预取的那首」就是
+       * 「真正会播的那首」，否则预取全白做。
+       */
+      const peekNextPlayId = (): string | undefined => {
+        const { playMode, list, playId, nextId, shouldKeepPagesOrderInRandomPlayMode } = get();
+        if (!list?.length || !playId) return undefined;
+        // 单曲循环不切歌；addToNext 指定了下一首就直接用它
+        if (playMode === PlayMode.Single) return undefined;
+        if (nextId) return nextId;
+
+        const currentIndex = list.findIndex(item => item.id === playId);
+        if (currentIndex < 0 || list.length === 1) return undefined;
+        if (playMode !== PlayMode.Random) return list[(currentIndex + 1) % list.length].id;
+
+        const currentPlayItem = list[currentIndex];
+        if (
+          shouldKeepPagesOrderInRandomPlayMode &&
+          currentPlayItem.pageIndex &&
+          currentPlayItem.pageIndex !== currentPlayItem.totalPage
+        ) {
+          const nextPage = list.find(
+            item => item.bvid === currentPlayItem.bvid && item.pageIndex === currentPlayItem.pageIndex! + 1,
+          );
+          if (nextPage) return nextPage.id;
+        }
+
+        // 前向队列里已有有效目标：next() 会消费它
+        const queued = get().randomFuture.find(id => list.some(item => item.id === id));
+        if (queued) return queued;
+
+        const playedThisCycle = new Set(get().randomPlayedIds);
+        playedThisCycle.add(playId);
+        let candidates = list.filter(item => !playedThisCycle.has(item.id));
+        const startNewCycle = candidates.length === 0;
+        if (startNewCycle) candidates = list.filter(item => item.id !== playId);
+        if (!candidates.length) return undefined;
+
+        const picked = candidates[Math.floor(Math.random() * candidates.length)].id;
+        set(state => {
+          // 与 next() 的随机选曲保持同一套「播完全部前不重复」账本
+          if (startNewCycle) {
+            state.randomPlayedIds = [picked];
+          } else {
+            pushUnique(state.randomPlayedIds, playId);
+            pushUnique(state.randomPlayedIds, picked);
+          }
+          state.randomFuture.unshift(picked);
+        });
+        return picked;
+      };
+
       const ensureAudioSrcValid = async () => {
         const { playId, list } = get();
         const currentPlayItem = list.find(item => item.id === playId);
@@ -554,9 +688,12 @@ export const usePlayList = create<State & Action>()(
           const currentTime = usePlayProgress.getState().currentTime;
           if (!isSameCurrentSource(currentPlayItem.audioUrl)) {
             // 本地文件是 blob/文件地址，setAudioSource 内部会判定为直连
-            setAudioSource(currentPlayItem.audioUrl, { resumeTime: currentTime > 0 ? currentTime : undefined });
+            setAudioSource(currentPlayItem.audioUrl, {
+              duration: currentPlayItem.duration,
+              resumeTime: currentTime > 0 ? currentTime : undefined,
+            });
           } else if (typeof currentTime === "number" && currentTime > 0) {
-            audio.currentTime = currentTime;
+            seekAudioTo(currentTime);
           }
           return;
         }
@@ -565,12 +702,14 @@ export const usePlayList = create<State & Action>()(
           if (!isSameCurrentSource(currentPlayItem?.audioUrl)) {
             setAudioSource(currentPlayItem!.audioUrl!, {
               audioCodecs: currentPlayItem?.audioCodecs,
+              audioBandwidth: currentPlayItem?.audioBandwidth,
+              duration: currentPlayItem?.duration,
               isDolby: currentPlayItem?.isDolby,
               isLossless: currentPlayItem?.isLossless,
               resumeTime: currentTime > 0 ? currentTime : undefined,
             });
           } else if (typeof currentTime === "number" && currentTime > 0) {
-            audio.currentTime = currentTime;
+            seekAudioTo(currentTime);
           }
           return;
         }
@@ -583,6 +722,8 @@ export const usePlayList = create<State & Action>()(
               const currentTime = usePlayProgress.getState().currentTime;
               setAudioSource(mvPlayData.audioUrl, {
                 audioCodecs: mvPlayData.audioCodecs,
+                audioBandwidth: mvPlayData.audioBandwidth,
+                duration: currentPlayItem?.duration,
                 isDolby: mvPlayData.isDolby,
                 isLossless: mvPlayData.isLossless,
                 resumeTime: currentTime > 0 ? currentTime : undefined,
@@ -596,6 +737,7 @@ export const usePlayList = create<State & Action>()(
                 listItem.videoUrl = mvPlayData.videoUrl;
                 listItem.isLossless = mvPlayData.isLossless;
                 listItem.audioCodecs = mvPlayData.audioCodecs;
+                listItem.audioBandwidth = mvPlayData.audioBandwidth;
                 listItem.isDolby = mvPlayData.isDolby;
               }
             });
@@ -621,6 +763,7 @@ export const usePlayList = create<State & Action>()(
               const currentTime = usePlayProgress.getState().currentTime;
               setAudioSource(musicPlayData.audioUrl, {
                 audioCodecs: musicPlayData.audioCodecs,
+                duration: currentPlayItem?.duration,
                 isLossless: musicPlayData.isLossless,
                 resumeTime: currentTime > 0 ? currentTime : undefined,
               });
@@ -631,7 +774,6 @@ export const usePlayList = create<State & Action>()(
                 listItem.audioUrl = musicPlayData.audioUrl;
                 listItem.audioUrlCandidates = musicPlayData.audioUrlCandidates;
                 listItem.isLossless = musicPlayData.isLossless;
-                listItem.audioCodecs = musicPlayData.audioCodecs;
                 listItem.audioCodecs = musicPlayData.audioCodecs;
               }
             });
@@ -826,14 +968,21 @@ export const usePlayList = create<State & Action>()(
 
             audio.ontimeupdate = () => {
               const currentTime = Math.round(audio.currentTime * 100) / 100;
-              usePlayProgress.getState().setCurrentTime(currentTime);
+              // 跳转还在重新取流：进度条停在用户跳到的位置，别被旧位置的 timeupdate 拉回去
+              if (pendingSeekDisplayTime === undefined) {
+                usePlayProgress.getState().setCurrentTime(currentTime);
+              }
               const playItem = get().getPlayItem?.();
               if (shouldReportPlayRecord(playItem)) {
                 void reportHeartbeat(playItem, currentTime, audio.duration, 0);
               }
+              maybePrefetchNextSource(currentTime, peekNextPlayId);
             };
 
             audio.onseeked = () => {
+              // 定位真正落实（含 MSE 数据到位后补的那一下）：交还进度条控制权
+              clearPendingSeekDisplay();
+              usePlayProgress.getState().setCurrentTime(Math.round(audio.currentTime * 100) / 100);
               updatePositionState();
             };
 
@@ -937,11 +1086,14 @@ export const usePlayList = create<State & Action>()(
             if (get().playId) {
               const playItem = get().list.find(item => item.id === get().playId);
               if (playItem) {
-                await ensureAudioSrcValid();
-
+                // 顺序很重要：进度必须**先**从 localStorage 恢复到 store，再挂载音频源。
+                // 否则 ensureAudioSrcValid 读到的 currentTime 还是初始值 0，会当成「从头播」
+                // 挂上 MSE，紧接着的定位又把播放头推到几十秒外 —— 播放头落在缓冲区之外，
+                // 无声且救不回来（见 seekAudioTo 的注释）。这条路每次带进度刷新都会走到。
                 const localCurrentTime = usePlayProgress.getState().initCurrentTime();
+                await ensureAudioSrcValid();
                 if (localCurrentTime) {
-                  audio.currentTime = localCurrentTime;
+                  seekAudioTo(localCurrentTime);
                 }
 
                 // 刷新/冷启动只「恢复」上次的歌与进度，绝不自动开播：底部状态栏照常显示、
@@ -999,9 +1151,7 @@ export const usePlayList = create<State & Action>()(
         },
         seek: s => {
           usePlayProgress.getState().setCurrentTime(s);
-          if (audio) {
-            audio.currentTime = s;
-          }
+          seekAudioTo(s);
         },
         togglePlay: async () => {
           primeAudioForGesture();
@@ -1330,8 +1480,15 @@ export const usePlayList = create<State & Action>()(
             case PlayMode.Single:
             case PlayMode.Loop: {
               if (list.length === 1) {
-                audio.currentTime = 0;
-                await playAudioSafely();
+                // 单首列表循环 = 从头重播，直接重挂从 0 起播。
+                // 不走 seekAudioTo：那是「跳转」入口，会被拖动防抖推迟 250ms，
+                // 还会先在已结束的旧源上 play() 一次再重挂，绕了一圈。
+                if (currentSourceUrl) {
+                  resetAudioAndPlay(currentSourceUrl);
+                } else {
+                  seekAudioTo(0);
+                  await playAudioSafely();
+                }
                 break;
               }
 
@@ -1344,8 +1501,15 @@ export const usePlayList = create<State & Action>()(
               const currentPlayItem = list[currentIndex];
 
               if (list.length === 1) {
-                audio.currentTime = 0;
-                await playAudioSafely();
+                // 单首列表循环 = 从头重播，直接重挂从 0 起播。
+                // 不走 seekAudioTo：那是「跳转」入口，会被拖动防抖推迟 250ms，
+                // 还会先在已结束的旧源上 play() 一次再重挂，绕了一圈。
+                if (currentSourceUrl) {
+                  resetAudioAndPlay(currentSourceUrl);
+                } else {
+                  seekAudioTo(0);
+                  await playAudioSafely();
+                }
                 break;
               }
 
@@ -1914,11 +2078,65 @@ function resumeAudioFrom(url: string, resumeTime: number) {
   const item = usePlayList.getState().getPlayItem?.();
   setAudioSource(url, {
     audioCodecs: item?.audioCodecs,
+    audioBandwidth: item?.audioBandwidth,
+    duration: item?.duration,
     isDolby: item?.isDolby,
     isLossless: item?.isLossless,
     resumeTime: resumeTime > 0 ? resumeTime : undefined,
   });
   void playAudioSafely();
+}
+
+/**
+ * 统一的定位入口。除了切歌前的清零，**任何地方都不要直接写 `audio.currentTime`**。
+ *
+ * MSE 只能从文件头顺序喂，播放头一旦被写到还没喂到的位置就落在缓冲区之外：元素永远
+ * 等不到数据（无声），喂流侧还会把正在喂的数据当成"已播过"驱逐掉、被 WebKit 当成
+ * 远离播放头的垃圾拒收（QuotaExceededError）。2026-08-26 线上那次「播到一半突然无声、
+ * 二十多秒后靠回退直连自己救回来」就是这么来的。
+ *
+ * 所以 MSE 下的定位必须带着目标时间重挂：喂流器用 HTTP Range 直接从目标片段取流，
+ * 并且只在数据真的覆盖到目标之后才落实 seek（见 media-source.ts 的 applyPendingSeek）。
+ * 目标已经在缓冲区里时则直接写，瞬时生效——这是最常见的小幅拖动。
+ */
+function seekAudioTo(time: number) {
+  if (!audio) return;
+  cancelPendingRemountSeek();
+  // 目标已在缓冲区内（或本来就是直连）：直接写，瞬时生效。拖动进度条时绝大多数落在这里。
+  if (!activeMediaSourceController || isTimeBuffered(time)) {
+    clearPendingSeekDisplay();
+    audio.currentTime = time;
+    return;
+  }
+  // 需要重新取流才够得着：等用户停手再动。进度条 Slider 的 onChange 在拖动过程中会连续
+  // 触发，每一下都重挂就是每一下 2~3 个 Range 请求的挂载风暴。
+  // 期间进度条停在目标位置，不要被旧位置的 timeupdate 拉回去。
+  holdPendingSeekDisplay(time);
+  remountSeekTimer = setTimeout(() => {
+    remountSeekTimer = undefined;
+    if (!activeMediaSourceController) {
+      clearPendingSeekDisplay();
+      return;
+    }
+    // 等待期间数据可能已经喂过来了，那就不用重挂
+    if (isTimeBuffered(time)) {
+      audio.currentTime = time;
+      return;
+    }
+    // 已经在为同一个目标取流了（Slider 按下/抬起各发一次 onChange，间隔常超过防抖窗）
+    if (Math.abs(currentMountStartTime - time) < 1) return;
+    const wasPlaying = !audio.paused;
+    const item = usePlayList.getState().getPlayItem?.();
+    setAudioSource(currentSourceUrl, {
+      audioCodecs: item?.audioCodecs,
+      audioBandwidth: item?.audioBandwidth,
+      duration: item?.duration,
+      isDolby: item?.isDolby,
+      isLossless: item?.isLossless,
+      resumeTime: time,
+    });
+    if (wasPlaying) void playAudioSafely();
+  }, REMOUNT_SEEK_DEBOUNCE_MS);
 }
 
 const audioSourceRefreshFlights = new Map<string, Promise<boolean>>();
@@ -1949,6 +2167,8 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
         const resumeTime = usePlayProgress.getState().currentTime || 0;
         setAudioSource(mvPlayData.audioUrl, {
           audioCodecs: mvPlayData.audioCodecs,
+          audioBandwidth: mvPlayData.audioBandwidth,
+          duration: playItem.duration,
           isDolby: mvPlayData.isDolby,
           isLossless: mvPlayData.isLossless,
           resumeTime: resumeTime > 0 ? resumeTime : undefined,
@@ -1963,6 +2183,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
             listItem.isLossless = mvPlayData.isLossless;
             listItem.isDolby = mvPlayData.isDolby;
             listItem.audioCodecs = mvPlayData.audioCodecs;
+            listItem.audioBandwidth = mvPlayData.audioBandwidth;
           }
         });
         return true;
@@ -1976,6 +2197,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
         const resumeTime = usePlayProgress.getState().currentTime || 0;
         setAudioSource(musicPlayData.audioUrl, {
           audioCodecs: musicPlayData.audioCodecs,
+          duration: playItem.duration,
           isLossless: musicPlayData.isLossless,
           resumeTime: resumeTime > 0 ? resumeTime : undefined,
         });
@@ -2005,7 +2227,12 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
 function resetAudioAndPlay(url: string) {
   // 从头播：不带 resumeTime，iOS 走 MSE、其余直连
   const item = usePlayList.getState().getPlayItem?.();
-  setAudioSource(url, { audioCodecs: item?.audioCodecs, isDolby: item?.isDolby, isLossless: item?.isLossless });
+  setAudioSource(url, {
+    audioCodecs: item?.audioCodecs,
+    audioBandwidth: item?.audioBandwidth,
+    isDolby: item?.isDolby,
+    isLossless: item?.isLossless,
+  });
   void playAudioSafely();
 }
 
@@ -2055,6 +2282,96 @@ async function dropCurrentIfInvalid(playId: string, playItem: PlayData): Promise
   return true;
 }
 
+/**
+ * 播完前多久开始预取下一首的播放地址（秒）。
+ *
+ * 手机锁屏/切后台时，页面 JS 会被系统冻结或大幅降频；一旦 `ended` 之后还要**先发网络请求**
+ * 去解析下一首的地址，这个异步过程在后台常常跑不完（或者跑完时音频会话已经失活，
+ * 非手势的 play() 被拒），表现就是「黑屏后当前这首播完就停了」。
+ *
+ * 解法是把网络请求提前到还在播放的时候做完：`ended` 触发时下一首的地址已经在列表项里，
+ * 切歌链路是**纯同步**的（setAudioSource + play() 在同一个任务里完成），
+ * 音频会话不中断，后台续播才稳。
+ */
+const PREFETCH_LEAD_SECONDS = 25;
+
+/** 已经预取过的「当前歌 → 下一首」组合，避免 timeupdate 每秒重复触发 */
+let prefetchedPairKey: string | undefined;
+
+/** 当前歌播到尾声时，提前把下一首的播放地址取好写回列表项 */
+function maybePrefetchNextSource(currentTime: number, peekNextPlayId: () => string | undefined) {
+  const duration = audio.duration;
+  if (!Number.isFinite(duration) || duration <= 0) return;
+  if (duration - currentTime > PREFETCH_LEAD_SECONDS) return;
+
+  const playId = usePlayList.getState().playId;
+  if (!playId) return;
+  const nextPlayId = peekNextPlayId();
+  if (!nextPlayId) return;
+
+  const pairKey = `${playId}->${nextPlayId}`;
+  if (prefetchedPairKey === pairKey) return;
+  prefetchedPairKey = pairKey;
+  void prefetchAudioSource(nextPlayId);
+}
+
+/**
+ * 静默解析某首歌的播放地址并写回列表项（不碰 audio 元素、不弹提示）。
+ * 失败只记日志：真正的失败处理仍由切到这首歌之后的既有链路负责。
+ */
+async function prefetchAudioSource(targetPlayId: string) {
+  const playItem = usePlayList.getState().list.find(item => item.id === targetPlayId);
+  if (!playItem) return;
+  // 本地文件无需解析；地址还没过期也不用重取
+  if (playItem.source === "local") return;
+  if (isUrlValid(playItem.audioUrl)) return;
+
+  const applyToItem = (patch: Partial<PlayData>) => {
+    usePlayList.setState(state => {
+      const listItem = state.list.find(item => item.id === targetPlayId);
+      if (listItem) Object.assign(listItem, patch);
+    });
+  };
+
+  try {
+    if (playItem.type === "audio" && playItem.sid) {
+      const musicPlayData = await getAudioUrl(playItem.sid);
+      if (!musicPlayData?.audioUrl) return;
+      applyToItem({
+        audioUrl: musicPlayData.audioUrl,
+        audioUrlCandidates: musicPlayData.audioUrlCandidates,
+        audioCodecs: musicPlayData.audioCodecs,
+        isLossless: musicPlayData.isLossless,
+      });
+      return;
+    }
+
+    if (playItem.type !== "mv" || !playItem.bvid) return;
+    // 多P占位项还没解析出 cid：先补 cid，再取地址（否则切过去仍要走两次网络请求）
+    let cid = playItem.cid;
+    if (!cid) {
+      const mvData = await getMVData(playItem.bvid);
+      cid = mvData[0]?.cid;
+      if (!cid) return;
+      applyToItem({ cid });
+    }
+    const mvPlayData = await getDashUrl(playItem.bvid, cid);
+    if (!mvPlayData?.audioUrl) return;
+    applyToItem({
+      audioUrl: mvPlayData.audioUrl,
+      audioUrlCandidates: mvPlayData.audioUrlCandidates,
+      videoUrl: mvPlayData.videoUrl,
+      audioCodecs: mvPlayData.audioCodecs,
+      audioBandwidth: mvPlayData.audioBandwidth,
+      isDolby: mvPlayData.isDolby,
+      isLossless: mvPlayData.isLossless,
+    });
+  } catch (error) {
+    // 预取失败不影响当前播放：切过去时会走原有的解析/换源/跳过链路
+    log.warn("预取下一首播放地址失败", { targetPlayId, error: String(error) });
+  }
+}
+
 // 切换歌曲时，更新当前播放的歌曲信息
 usePlayList.subscribe(async (state, prevState) => {
   if (state.playId !== prevState.playId) {
@@ -2065,12 +2382,25 @@ usePlayList.subscribe(async (state, prevState) => {
       }
     }
 
+    const nextPlayItem = state.playId ? state.list.find(item => item.id === state.playId) : undefined;
+    // 地址已就绪（本地文件 / 已预取且未过期）：这条路是**纯同步**的，
+    // 下面会立刻 setAudioSource + play()。手机锁屏后能否续播就取决于这里不出现异步空档。
+    const readyUrl =
+      nextPlayItem && audio.paused
+        ? nextPlayItem.source === "local"
+          ? nextPlayItem.audioUrl
+          : isUrlValid(nextPlayItem.audioUrl)
+            ? nextPlayItem.audioUrl
+            : undefined
+        : undefined;
+
     if (audio && !audio.paused) {
       audio.pause();
     }
-    if (audio) {
+    if (audio && !readyUrl) {
       audio.currentTime = 0;
       // 新歌地址尚未解析完成时，不能保留旧 src；否则用户在这个间隙点播放会恢复上一首。
+      // 反之地址已就绪时**不要**清空：清空 src 会中断音频会话，锁屏下再 play() 会被浏览器拒。
       setAudioSource(""); // 同时 abort 可能在跑的 MSE 挂载
     }
     usePlayProgress.getState().setCurrentTime(0);
@@ -2083,12 +2413,14 @@ usePlayList.subscribe(async (state, prevState) => {
           void beginPlayReport(playItem);
         }
       }
-      if (playItem?.source === "local" && playItem?.audioUrl && audio.paused) {
-        resetAudioAndPlay(playItem.audioUrl);
-        return;
-      }
-      if (isUrlValid(playItem?.audioUrl) && audio.paused) {
-        resetAudioAndPlay(playItem.audioUrl);
+      if (readyUrl && playItem) {
+        // 锁屏时也要把标题/封面更新到系统媒体控制中心，否则显示的还是上一首
+        updateMediaSession({
+          title: playItem.pageTitle || playItem.title,
+          artist: playItem.ownerName,
+          cover: playItem.pageCover || playItem.cover,
+        });
+        resetAudioAndPlay(readyUrl);
         return;
       }
 
@@ -2114,6 +2446,7 @@ usePlayList.subscribe(async (state, prevState) => {
                 listItem.videoUrl = mvPlayData?.videoUrl;
                 listItem.isLossless = mvPlayData?.isLossless;
                 listItem.audioCodecs = mvPlayData?.audioCodecs;
+                listItem.audioBandwidth = mvPlayData?.audioBandwidth;
                 listItem.isDolby = mvPlayData?.isDolby;
               }
             });
@@ -2156,6 +2489,7 @@ usePlayList.subscribe(async (state, prevState) => {
                       isLossless: mvPlayData?.isLossless,
                       isDolby: mvPlayData?.isDolby,
                       audioCodecs: mvPlayData?.audioCodecs,
+                      audioBandwidth: mvPlayData?.audioBandwidth,
                     },
                   },
                   ...restMV,

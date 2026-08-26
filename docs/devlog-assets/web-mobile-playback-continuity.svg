@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="1010" viewBox="0 0 1160 1010" role="img" aria-labelledby="title desc">
+  <title id="title">手机听歌：锁屏能连播、中途不断音、拖进度条能接着播</title>
+  <desc id="desc">手机上放歌是边下边放，数据从头往后送。以前把播放位置挪到还没送到的地方，那里永远等不到数据，就没了声音。现在改成先从你选的位置附近取数据，数据真的到了才把播放位置挪过去。</desc>
+  <defs>
+    <style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #282529; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #756f73; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #282529; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .tick { font: 10px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; fill: #948d92; }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1158" height="1008" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+
+  <text x="34" y="42" class="title">手机听歌：锁屏能连播、中途不断音、拖进度条能接着播</text>
+  <text x="34" y="64" class="subtitle">锁屏后一首接一首不用管；播放中途不再突然没声；拖进度条约 2 秒后从你选的位置接着播，之后全程不卡顿。</text>
+
+  <!-- ① 用户经历 -->
+  <rect x="24" y="84" width="1112" height="188" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="110" class="block">① 用户经历：三件事，以前都会让你停下来动手</text>
+
+  <rect x="44" y="124" width="348" height="60" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="218" y="147" text-anchor="middle" class="card-t" fill="#96434f">以前 · 锁屏听歌</text>
+  <text x="218" y="169" text-anchor="middle" class="body" fill="#96434f">一首放完就没声了，要解锁点一下才继续</text>
+  <rect x="44" y="192" width="348" height="60" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="218" y="215" text-anchor="middle" class="card-t" fill="#316247">现在</text>
+  <text x="218" y="237" text-anchor="middle" class="body" fill="#316247">锁屏后一首接一首播下去，全程不用管</text>
+
+  <rect x="406" y="124" width="348" height="60" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="580" y="147" text-anchor="middle" class="card-t" fill="#96434f">以前 · 播到一半</text>
+  <text x="580" y="169" text-anchor="middle" class="body" fill="#96434f">突然没声，二十多秒后自己又响了</text>
+  <rect x="406" y="192" width="348" height="60" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="580" y="215" text-anchor="middle" class="card-t" fill="#316247">现在</text>
+  <text x="580" y="237" text-anchor="middle" class="body" fill="#316247">整首连续播完，中间不再断</text>
+
+  <rect x="768" y="124" width="348" height="60" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="942" y="147" text-anchor="middle" class="card-t" fill="#96434f">以前 · 拖进度条</text>
+  <text x="942" y="169" text-anchor="middle" class="body" fill="#96434f">拖到没听过的地方，就再也没声了</text>
+  <rect x="768" y="192" width="348" height="60" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="942" y="215" text-anchor="middle" class="card-t" fill="#316247">现在</text>
+  <text x="942" y="237" text-anchor="middle" class="body" fill="#316247">约 2 秒后从你拖到的位置接着播</text>
+
+  <!-- ② 瓶颈 -->
+  <rect x="24" y="286" width="1112" height="252" rx="10" fill="#eef4f8" stroke="#91adc1" />
+  <text x="44" y="312" class="block">② 三件事其实是同一个毛病：手机上放歌是「边下边放」，数据从头往后送，不能跳着送</text>
+
+  <text x="44" y="342" class="card-t" fill="#96434f">上半：你看到的　　下半：背后在做的　（同一时刻，同一条时间轴）</text>
+
+  <rect x="44" y="352" width="1072" height="170" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+
+  <text x="80" y="378" class="body" fill="#96434f">进度条显示 54 秒，屏幕上一切正常 —— 但耳机里是安静的</text>
+  <rect x="80" y="388" width="1000" height="10" rx="5" fill="#e6dcdf" />
+  <rect x="80" y="388" width="270" height="10" rx="5" fill="#96434f" />
+  <circle cx="350" cy="393" r="7" fill="#96434f" />
+
+  <path d="M350 400 L350 452" stroke="#d99aa5" stroke-width="1.5" stroke-dasharray="4 4" />
+
+  <text x="80" y="446" class="body" fill="#36566d">数据只送到第 13 秒，54 秒那里还是空的 —— 它永远等不到自己那一段</text>
+  <rect x="80" y="456" width="1000" height="10" rx="5" fill="#dfe6ec" />
+  <rect x="80" y="456" width="65" height="10" rx="5" fill="#36566d" />
+
+  <text x="80" y="486" class="tick">0 秒</text>
+  <text x="1080" y="486" text-anchor="end" class="tick">200 秒（整首）</text>
+
+  <text x="80" y="510" class="body" fill="#96434f">更糟的是：系统会把「播放位置之前的」当成已经听过而丢掉，于是正在送的那段数据刚到就被自己扔了，越送越空。</text>
+
+  <!-- ③ 现在怎么做 -->
+  <rect x="24" y="552" width="1112" height="164" rx="10" fill="#edf7f1" stroke="#7fad91" />
+  <text x="44" y="578" class="block">③ 现在的做法：先把数据取到，再挪播放位置</text>
+
+  <rect x="44" y="592" width="348" height="108" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="218" y="616" text-anchor="middle" class="card-t" fill="#316247">从你选的位置附近开始取</text>
+  <text x="218" y="640" text-anchor="middle" class="body" fill="#316247">不再从头重放一遍整首歌，</text>
+  <text x="218" y="658" text-anchor="middle" class="body" fill="#316247">直接跳到那一段去下载。</text>
+  <text x="218" y="682" text-anchor="middle" class="body" fill="#316247">故意从早 8 秒处开始，宁可多听几秒也不跳过头</text>
+
+  <rect x="406" y="592" width="348" height="108" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="580" y="616" text-anchor="middle" class="card-t" fill="#316247">数据真到了，才挪播放位置</text>
+  <text x="580" y="640" text-anchor="middle" class="body" fill="#316247">播放位置永远落在有数据的地方，</text>
+  <text x="580" y="658" text-anchor="middle" class="body" fill="#316247">不会再出现「等一段永远不来的数据」。</text>
+  <text x="580" y="682" text-anchor="middle" class="body" fill="#316247">等待期间进度条停在你选的位置，不回弹</text>
+
+  <rect x="768" y="592" width="348" height="108" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="942" y="616" text-anchor="middle" class="card-t" fill="#316247">锁屏前就把下一首准备好</text>
+  <text x="942" y="640" text-anchor="middle" class="body" fill="#316247">当前歌还剩 25 秒时就去取下一首，</text>
+  <text x="942" y="658" text-anchor="middle" class="body" fill="#316247">这样换歌那一瞬间不用等网络。</text>
+  <text x="942" y="682" text-anchor="middle" class="body" fill="#316247">锁屏后系统会冻住没在出声的页面，等不起</text>
+
+  <!-- ④ 边界 -->
+  <rect x="24" y="730" width="1112" height="146" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="44" y="756" class="block">④ 取不到怎么办：每退一层只是变慢，不会变成没声音</text>
+
+  <rect x="44" y="770" width="1072" height="34" rx="8" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="64" y="792" class="body" fill="#7a6234"><tspan class="card-t">正常</tspan>　→　从你选的位置附近取到数据　→　约 2 秒后出声（实测值，同一首歌同一网络下测得）</text>
+
+  <rect x="44" y="810" width="1072" height="34" rx="8" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="64" y="832" class="body" fill="#7a6234"><tspan class="card-t">取不到那一段</tspan>　→　退回从头送　→　跳转要等久一点，但照样能播，不会没声</text>
+
+  <rect x="44" y="850" width="1072" height="34" rx="8" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="64" y="872" class="body" fill="#7a6234"><tspan class="card-t">边下边放整套都失灵</tspan>　→　交给手机自己下载　→　起播慢十几秒，但整首能播完</text>
+
+  <!-- ⑤ 容易改错 -->
+  <rect x="24" y="890" width="1112" height="74" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="914" class="block">⑤ 接手的人最容易在这里改错</text>
+  <text x="44" y="936" class="body" fill="#4a4450"><tspan class="card-t" fill="#96434f">「直接把播放位置挪过去不就行了？」</tspan>　不行。数据是顺序送的，挪到还没送到的地方就是挪进空档，会没声音而且自己恢复不了 —— 上面②画的就是这个。</text>
+  <text x="44" y="956" class="body" fill="#4a4450"><tspan class="card-t" fill="#96434f">「那干脆全交给手机自己下载？」</tspan>　也不行。那样起播要等十几秒，大文件还会超时被当成坏歌跳过 —— 这正是当初要自己送数据的原因。</text>
+
+  <text x="44" y="992" class="body" fill="#756f73">最常见的情况其实是「拖到已经听过的位置」，那种立刻就跳过去，没有任何等待；上面说的 2 秒只在拖到没听过的地方时才会遇到。</text>
+</svg>
