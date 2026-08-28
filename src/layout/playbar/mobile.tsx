@@ -70,7 +70,13 @@ const MobilePlayBar = () => {
           <IconButton radius="md" onPress={prev} isDisabled={isEmptyPlayList || isSingle} aria-label="上一首">
             <RiSkipBackFill size={22} />
           </IconButton>
-          <IconButton isDisabled={isEmptyPlayList} radius="full" onPress={togglePlay} className="size-11 min-w-11">
+          <IconButton
+            isDisabled={isEmptyPlayList}
+            radius="full"
+            onPress={togglePlay}
+            className="size-11 min-w-11"
+            aria-label={isPlaying ? "暂停" : "播放"}
+          >
             {isPlaying ? <RiPauseCircleFill size={40} /> : <RiPlayCircleFill size={40} />}
           </IconButton>
           <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle} aria-label="下一首">

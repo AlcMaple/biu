@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Spinner, Button } from "@heroui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getWebDynamicFeedAll, getWebDynamicFeedSpace, type WebDynamicItem } from "@/service/web-dynamic";
 
@@ -10,6 +11,7 @@ import AuthorList from "./author-list";
 import DynamicItem from "./item";
 
 const DynamicFeedPage = () => {
+  const isMobileLayout = useIsMobileLayout();
   const [items, setItems] = useState<WebDynamicItem[]>([]);
   const [offset, setOffset] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -135,13 +137,13 @@ const DynamicFeedPage = () => {
   }, [handleScroll]);
 
   return (
-    <div className="flex h-full w-full">
+    <div className={isMobileLayout ? "flex h-full w-full flex-col" : "flex h-full w-full"}>
       <AuthorList selectedAuthorMid={selectedAuthorMid} onSelect={handleSelectAuthor} />
 
-      <div className="flex min-w-0 flex-1">
-        <ScrollContainer ref={scrollRef} className="h-full w-full px-4">
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <ScrollContainer ref={scrollRef} className={isMobileLayout ? "h-full w-full px-3" : "h-full w-full px-4"}>
           <div
-            className="relative w-full px-4 py-4"
+            className={isMobileLayout ? "relative w-full px-0 py-3" : "relative w-full px-4 py-4"}
             style={{
               height: `${rowVirtualizer.getTotalSize()}px`,
             }}

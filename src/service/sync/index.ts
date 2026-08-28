@@ -1,3 +1,4 @@
+import { isOfflineDemo } from "@/common/offline-demo";
 import { log } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -136,6 +137,11 @@ let initialized = false;
  * 不会重复触发，不需要额外加窗口判断。
  */
 export function initLocalPlaylistSync(): void {
+  // The responsive prototype uses the real renderer with local fixtures. Keep the
+  // sync controller completely detached so opening the docs page cannot contact a
+  // sync server or start a long-lived watch request.
+  if (isOfflineDemo) return;
+
   if (initialized) return;
   initialized = true;
 

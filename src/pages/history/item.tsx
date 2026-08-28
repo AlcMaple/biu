@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { Button } from "@heroui/react";
 import clx from "classnames";
 
+import { useLayoutMode } from "@/common/hooks/use-responsive";
 import { formatDuration } from "@/common/utils/time";
 import ContextMenu, { type ContextMenuItem } from "@/components/context-menu";
 import Image from "@/components/image";
@@ -49,8 +50,17 @@ const HistoryListItem = ({
   const list = usePlayList(state => state.list);
   const playItem = list.find(item => item.id === playId);
   const isPlay = isSame(playItem, { type, bvid });
+  const mode = useLayoutMode();
+  const isMobile = mode === "mobile";
+  const isTablet = mode === "tablet" || mode === "narrow-tablet";
 
-  const gridCols = isCompact ? "grid-cols-[40px_1fr_150px_150px_150px_40px]" : "grid-cols-[40px_1fr_150px_150px_40px]";
+  const gridCols = isMobile
+    ? "grid-cols-[auto_1fr_auto]"
+    : isTablet
+      ? "grid-cols-[36px_minmax(0,1fr)_96px_auto]"
+      : isCompact
+        ? "grid-cols-[40px_1fr_150px_150px_150px_40px]"
+        : "grid-cols-[40px_1fr_150px_150px_40px]";
 
   const formatProgress = (prog: number, dur: number) => {
     const p = formatDuration(prog > 0 ? prog : 0);
@@ -66,10 +76,15 @@ const HistoryListItem = ({
         disableAnimation
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
-        onDoubleClick={onPress}
+        onDoubleClick={!isMobile ? onPress : undefined}
+        onPress={isMobile ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
-          isCompact ? "h-9 min-h-9 min-w-0 px-0 text-sm" : "h-auto min-h-auto min-w-auto space-y-2 p-2",
+          isMobile
+            ? "h-auto min-h-16 min-w-0 px-1 py-2 text-sm"
+            : isCompact
+              ? "h-9 min-h-9 min-w-0 px-0 text-sm"
+              : "h-auto min-h-auto min-w-auto space-y-2 p-2",
         )}
       >
         <div className={clx("grid w-full items-center gap-4", gridCols)}>
@@ -118,7 +133,7 @@ const HistoryListItem = ({
           </div>
 
           {/* 3. UP (Compact only) */}
-          {isCompact && (
+          {!isMobile && !isTablet && isCompact && (
             <div className="min-w-0 truncate text-left">
               <span
                 className={clx("text-foreground-500 w-fit truncate text-sm", {
@@ -136,12 +151,14 @@ const HistoryListItem = ({
           )}
 
           {/* 4. Progress/Duration */}
-          <div className="text-foreground-500 text-right text-xs tabular-nums">
-            {formatProgress(progress, duration)}
-          </div>
+          {!isMobile && (
+            <div className="text-foreground-500 text-right text-xs tabular-nums">
+              {formatProgress(progress, duration)}
+            </div>
+          )}
 
           {/* 5. View Time */}
-          <div className="text-foreground-500 text-right text-xs">{viewAt}</div>
+          {!isMobile && !isTablet && <div className="text-foreground-500 text-right text-xs">{viewAt}</div>}
 
           {/* 6. Actions */}
           <div className="flex h-full items-center justify-end">

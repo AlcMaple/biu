@@ -1,3 +1,4 @@
+import { isOfflineDemo } from "@/common/offline-demo";
 import {
   WEB_CLIENT_LOG_MAX_ENTRIES,
   WEB_CLIENT_LOG_MAX_MESSAGE,
@@ -117,7 +118,7 @@ function withinRateLimit() {
 }
 
 export function reportWebLog(level: WebClientLogLevel, args: unknown[]) {
-  if (typeof window === "undefined") return;
+  if (isOfflineDemo || typeof window === "undefined") return;
   if (!withinRateLimit()) return;
 
   const { context, message } = formatArgs(args);

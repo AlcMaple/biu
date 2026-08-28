@@ -89,6 +89,7 @@ ops/private/
 # Nuxt.js build / generate output
 .nuxt
 dist
+docs/responsive-prototype/runtime/
 
 # Gatsby files
 .cache/

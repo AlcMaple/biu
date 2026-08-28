@@ -12,6 +12,7 @@ import {
 import clsx from "classnames";
 import { filesize } from "filesize";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { formatDuration, formatMillisecond } from "@/common/utils/time";
 import ContextMenu from "@/components/context-menu";
 
@@ -48,6 +49,7 @@ const LocalMusicItemRow = ({
   onDelete,
   onFav,
 }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const [isOpOpen, setIsOpOpen] = React.useState(false);
   const items = isPlaying ? menus.filter(m => m.key !== "delete") : menus;
 
@@ -68,10 +70,21 @@ const LocalMusicItemRow = ({
         disableAnimation
         color={isPlaying ? "primary" : "default"}
         variant={isPlaying ? "flat" : "light"}
-        onDoubleClick={() => onPlay()}
-        className="group flex w-full items-center justify-between rounded-md p-2"
+        onDoubleClick={!isMobileLayout ? () => onPlay() : undefined}
+        onPress={isMobileLayout ? onPlay : undefined}
+        className={clsx(
+          "group flex w-full items-center justify-between rounded-md p-2",
+          isMobileLayout ? "min-h-14" : undefined,
+        )}
       >
-        <div className="grid w-full grid-cols-[40px_minmax(0,1fr)_100px_100px_100px_100px_40px] items-center gap-4">
+        <div
+          className={clsx(
+            "grid w-full items-center gap-4",
+            isMobileLayout
+              ? "grid-cols-[32px_minmax(0,1fr)_40px]"
+              : "grid-cols-[40px_minmax(0,1fr)_100px_100px_100px_100px_40px]",
+          )}
+        >
           <div className="text-foreground-500 min-w-8 text-center text-xs tabular-nums">
             <span
               className={clsx({
@@ -83,14 +96,22 @@ const LocalMusicItemRow = ({
             {!isPlaying && <RiPlayFill size={16} className="hidden align-middle group-hover:inline" />}
           </div>
           <div className="min-w-0 truncate">{data.title}</div>
-          <div className="text-foreground-500 flex justify-end text-xs tabular-nums">{filesize(data.size)}</div>
-          <div className="text-foreground-500 flex justify-end text-xs">{data.format?.toUpperCase() || "-"}</div>
-          <div className="text-foreground-500 flex justify-end text-xs tabular-nums">
-            {typeof data.duration === "number" ? formatDuration(Math.round(data.duration)) : "-"}
-          </div>
-          <div className="text-foreground-500 flex justify-end text-xs">
-            {data.createdTime ? formatMillisecond(data.createdTime) : "-"}
-          </div>
+          {!isMobileLayout && (
+            <div className="text-foreground-500 flex justify-end text-xs tabular-nums">{filesize(data.size)}</div>
+          )}
+          {!isMobileLayout && (
+            <div className="text-foreground-500 flex justify-end text-xs">{data.format?.toUpperCase() || "-"}</div>
+          )}
+          {!isMobileLayout && (
+            <div className="text-foreground-500 flex justify-end text-xs tabular-nums">
+              {typeof data.duration === "number" ? formatDuration(Math.round(data.duration)) : "-"}
+            </div>
+          )}
+          {!isMobileLayout && (
+            <div className="text-foreground-500 flex justify-end text-xs">
+              {data.createdTime ? formatMillisecond(data.createdTime) : "-"}
+            </div>
+          )}
           <div
             className="flex h-full items-center justify-end"
             onClick={e => {

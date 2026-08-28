@@ -4,12 +4,14 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { Switch } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { isHex } from "@/common/utils/color";
 import ColorPicker from "@/components/color-picker";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { usePlayList } from "@/store/play-list";
 
 const FullScreenPlayerSettingsPanel = ({ isUiVisible = true }: { isUiVisible?: boolean }) => {
+  const isMobileLayout = useIsMobileLayout();
   const { playId, list } = usePlayList(
     useShallow(state => ({
       playId: state.playId,
@@ -127,7 +129,7 @@ const FullScreenPlayerSettingsPanel = ({ isUiVisible = true }: { isUiVisible?: b
   }, [values?.spectrumColor, values?.lyricsColor, values?.backgroundColor, update]);
 
   return (
-    <div className="min-w-[320px] space-y-4">
+    <div className={isMobileLayout ? "w-[min(82vw,340px)] min-w-0 space-y-4" : "min-w-[320px] space-y-4"}>
       <div className="flex items-center justify-between">
         <div className="mr-6 space-y-0.5">
           <div className="text-medium">精美全屏播放器</div>

@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from "react-router";
 
+import { isOfflineDemo } from "@/common/offline-demo";
 import { isWeb } from "@/platform";
 
 import Layout from "./layout";
@@ -72,7 +73,7 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       },
       {
         path: "local-music",
-        element: web ? <Navigate replace to="/" /> : <LocalMusicPage />,
+        element: web && !isOfflineDemo ? <Navigate replace to="/" /> : <LocalMusicPage />,
       },
       {
         path: "search",
@@ -86,11 +87,11 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
   },
   {
     path: "mini-player",
-    element: web ? <Navigate replace to="/" /> : <MiniPlayer />,
+    element: web && !isOfflineDemo ? <Navigate replace to="/" /> : <MiniPlayer />,
   },
   {
     path: "desktop-lyrics",
-    element: web ? <Navigate replace to="/" /> : <DesktopLyrics />,
+    element: web && !isOfflineDemo ? <Navigate replace to="/" /> : <DesktopLyrics />,
   },
   {
     path: "*",

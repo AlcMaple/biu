@@ -32,6 +32,7 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import {
   detectInvalidLocalFavItems,
   getLocalFolderLatestCover,
@@ -96,6 +97,7 @@ const LocalFavorites = () => {
   const itemTags = useTagStore(s => s.itemTags);
   const displayMode = useSettings(s => s.displayMode);
   const isCompact = displayMode === "compact";
+  const isMobileLayout = useIsMobileLayout();
 
   const folder = useFavoritesStore(s => s.createdFavorites.find(f => f.id === folderId));
   const rawItems = useLocalFavItemsStore(s => s.folderItems[folderId]) ?? EMPTY_LOCAL_FAV_ITEMS;
@@ -354,6 +356,7 @@ const LocalFavorites = () => {
             addToast({ title: "本地文件路径丢失，请重新收藏该曲目", color: "warning" });
           } else {
             usePlayList.getState().addToNext(playItem);
+            addToast({ title: "已添加到下一首播放", color: "success" });
           }
           break;
         case "add-to-playlist":
@@ -414,7 +417,17 @@ const LocalFavorites = () => {
     onRenameClose();
   }, [renameValue, renameTarget, renameItem, folderId, itemToPlayItem, onRenameClose]);
 
+  const toggleInvalid = () => setShowInvalidOnly(value => !value);
   const dropdownMenuItems = [
+    {
+      key: "filter-invalid",
+      label: showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`,
+      hidden: !isMobileLayout,
+      startContent: <RiErrorWarningLine size={18} />,
+      className: undefined as string | undefined,
+      color: undefined as "danger" | undefined,
+      onPress: toggleInvalid,
+    },
     {
       key: "clear-invalid",
       label: "清除失效内容",
@@ -442,6 +455,21 @@ const LocalFavorites = () => {
     },
   ].filter(m => !(m.key === "delete" && folder?.isDefault));
 
+  const invalidButton = (
+    <Button
+      variant="flat"
+      color={showInvalidOnly ? "danger" : "default"}
+      startContent={<RiErrorWarningLine size={16} />}
+      onPress={toggleInvalid}
+      className="shrink-0"
+    >
+      {showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`}
+    </Button>
+  );
+  const tagFilter = (
+    <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
+  );
+
   return (
     <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={folderIdStr} className="h-full w-full px-4 pb-6">
       <Header
@@ -452,8 +480,8 @@ const LocalFavorites = () => {
         mediaCount={rawItems.length}
       />
 
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className={isMobileLayout ? "mb-3 flex flex-col gap-2" : "mb-4 flex items-center justify-between"}>
+        <div className={isMobileLayout ? "flex flex-wrap items-center gap-2" : "flex items-center space-x-2"}>
           <AsyncButton
             color="primary"
             startContent={<RiPlayFill size={22} />}
@@ -462,9 +490,11 @@ const LocalFavorites = () => {
           >
             播放全部
           </AsyncButton>
-          <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={handleAddToPlayList}>
-            <RiPlayListAddLine size={18} />
-          </IconButton>
+          {!isMobileLayout && (
+            <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={handleAddToPlayList}>
+              <RiPlayListAddLine size={18} />
+            </IconButton>
+          )}
           <Dropdown
             disableAnimation
             placement="bottom-start"
@@ -473,11 +503,11 @@ const LocalFavorites = () => {
             classNames={{ content: "min-w-[120px]" }}
           >
             <DropdownTrigger>
-              <Button isIconOnly variant="flat" className="hover:text-primary">
+              <Button isIconOnly variant="flat" className="hover:text-primary" aria-label="收藏夹操作">
                 <RiMoreLine />
               </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="收藏夹操作" items={dropdownMenuItems}>
+            <DropdownMenu aria-label="收藏夹操作" items={dropdownMenuItems.filter(item => !item.hidden)}>
               {item => (
                 <DropdownItem
                   key={item.key}
@@ -492,16 +522,10 @@ const LocalFavorites = () => {
             </DropdownMenu>
           </Dropdown>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="flat"
-            color={showInvalidOnly ? "danger" : "default"}
-            startContent={<RiErrorWarningLine size={16} />}
-            onPress={() => setShowInvalidOnly(value => !value)}
-          >
-            {showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`}
-          </Button>
-          <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
+        <div className={isMobileLayout ? "flex min-w-0 items-center gap-2" : "flex items-center space-x-2"}>
+          {isMobileLayout && tagFilter}
+          {!isMobileLayout && invalidButton}
+          {!isMobileLayout && tagFilter}
           <SearchWithSort onKeywordSearch={setKeyword} />
         </div>
       </div>

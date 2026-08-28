@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { addToast, Listbox, ListboxItem, Popover, PopoverContent, PopoverTrigger, Tooltip } from "@heroui/react";
 import { RiDownload2Fill, RiFileImageLine, RiFileMusicLine, RiFileVideoLine } from "@remixicon/react";
 
+import { isOfflineDemo } from "@/common/offline-demo";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
 import platform from "@/platform";
@@ -52,6 +53,14 @@ const MusicDownloadButton = () => {
     if (!coverUrl) {
       addToast({
         title: "没有可下载的封面",
+        color: "warning",
+      });
+      return;
+    }
+
+    if (isOfflineDemo) {
+      addToast({
+        title: "离线 Demo 不下载文件",
         color: "warning",
       });
       return;

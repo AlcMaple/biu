@@ -453,8 +453,12 @@ export const SystemSettingsTab = ({
         <>
           <Divider />
           <h2>关于应用</h2>
-          <div className="flex w-full items-center justify-between">
-            <div className="mr-6 flex items-center space-x-1">
+          <div
+            className={
+              isMobileLayout ? "flex w-full flex-col items-start gap-3" : "flex w-full items-center justify-between"
+            }
+          >
+            <div className="mr-6 flex min-w-0 items-center space-x-1">
               <span>当前版本 {appVersion}</span>
               {isUpdateAvailable && Boolean(latestVersion) && (
                 <>

@@ -11,6 +11,7 @@ import {
   TOPUP_BATCH,
   TOPUP_THRESHOLD,
 } from "@/common/constants/heartbeat";
+import { isOfflineDemo } from "@/common/offline-demo";
 import { addOnlineItemToLocalFav, getLocalFavMedia } from "@/common/utils/fav";
 import { songKey, type SongCandidate } from "@/common/utils/pure-song";
 import platform from "@/platform";
@@ -271,6 +272,8 @@ function persistSession(active: boolean, sessionIds: Set<string>) {
  * 每个窗口都恢复的话会各挂一个续供订阅 → 队列见底时重复抓取、重复入队。
  */
 export async function restoreSession() {
+  if (isOfflineDemo) return;
+
   if (useHeartbeat.getState().active) return; // 已在会话中：不重复恢复
   const { active, sessionIds } = await loadSession();
   if (!active || !sessionIds.length) return;
@@ -310,6 +313,15 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
       if (!likes.length) {
         set({ loading: false });
         return "empty";
+      }
+
+      // The docs build keeps the FM state machine and playlist UI real, but uses
+      // the local liked-folder snapshot instead of asking for online candidates.
+      if (isOfflineDemo) {
+        await usePlayList.getState().playList(likes);
+        const sessionIds = new Set(usePlayList.getState().list.map(item => item.id));
+        set({ active: true, loading: false, sessionIds });
+        return "likes-only";
       }
 
       clearHeartbeatCache(); // 新会话：清掉上一会话的同 UP/看了又看缓存

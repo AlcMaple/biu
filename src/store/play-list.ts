@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
 import { getPlayModeList, PlayMode } from "@/common/constants/audio";
+import { isOfflineDemo } from "@/common/offline-demo";
 import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/common/utils/audio";
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
 import { attachMediaSourceAudio, shouldUseMediaSource, type MediaSourceController } from "@/common/utils/media-source";
@@ -399,6 +400,13 @@ const updatePlaybackState = () => {
 };
 
 const playAudioSafely = async () => {
+  if (isOfflineDemo) {
+    // The demo has no media endpoint. Keep the real playlist/playbar state machine
+    // responsive while avoiding an artificial browser media error from a fixture URL.
+    usePlayList.setState({ isPlaying: true });
+    return;
+  }
+
   try {
     await audio.play();
   } catch (error) {
@@ -684,6 +692,12 @@ export const usePlayList = create<State & Action>()(
       const ensureAudioSrcValid = async () => {
         const { playId, list } = get();
         const currentPlayItem = list.find(item => item.id === playId);
+        if (isOfflineDemo) {
+          // The demo represents playback state without mounting a media URL. This
+          // keeps the real playlist controls usable while guaranteeing that no
+          // browser media loader or source-refresh path can issue a request.
+          return;
+        }
         if (currentPlayItem?.source === "local" && currentPlayItem?.audioUrl) {
           const currentTime = usePlayProgress.getState().currentTime;
           if (!isSameCurrentSource(currentPlayItem.audioUrl)) {
@@ -1163,6 +1177,13 @@ export const usePlayList = create<State & Action>()(
             return;
           }
 
+          if (isOfflineDemo) {
+            set(state => {
+              state.isPlaying = !state.isPlaying;
+            });
+            return;
+          }
+
           if (audio.paused) {
             set(state => {
               state.isPlaying = true;
@@ -1362,6 +1383,7 @@ export const usePlayList = create<State & Action>()(
             const insertAt = currentIndex === -1 ? state.list.length : currentIndex + 1;
             state.list.splice(insertAt, 0, ...itemsToAdd);
             state.playId = nextPlayItem.id;
+            if (isOfflineDemo) state.isPlaying = true;
           });
         },
         playListItem: async (id: string) => {
@@ -1382,6 +1404,7 @@ export const usePlayList = create<State & Action>()(
               pushUnique(state.randomPlayedIds, id);
             }
             state.playId = id;
+            if (isOfflineDemo) state.isPlaying = true;
             if (state.nextId === id) {
               state.nextId = undefined;
             }
@@ -1444,6 +1467,7 @@ export const usePlayList = create<State & Action>()(
             state.randomPlayedIds = playMode === PlayMode.Random ? [initialId] : [];
             state.list = newList;
             state.playId = initialId;
+            if (isOfflineDemo) state.isPlaying = true;
             // 地址解析是异步的，不能让进度条在这段时间继续显示上一首的时长。
             state.duration = newList.find(item => item.id === initialId)?.duration;
           });
@@ -1728,6 +1752,7 @@ export const usePlayList = create<State & Action>()(
             set({
               playId: nextId,
               list: nextPlayItem,
+              isPlaying: isOfflineDemo,
             });
             return;
           }
@@ -2375,6 +2400,8 @@ async function prefetchAudioSource(targetPlayId: string) {
 // 切换歌曲时，更新当前播放的歌曲信息
 usePlayList.subscribe(async (state, prevState) => {
   if (state.playId !== prevState.playId) {
+    if (isOfflineDemo) return;
+
     if (!state.playId) {
       const prevPlayItem = prevState.list.find(item => item.id === prevState.playId);
       if (shouldReportPlayRecord(prevPlayItem)) {

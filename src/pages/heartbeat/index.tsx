@@ -5,8 +5,10 @@ import { RiHeartPulseFill, RiHeart3Line } from "@remixicon/react";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import { restoreSession, useHeartbeat } from "@/store/heartbeat";
-import { useLocalFavItemsStore } from "@/store/local-fav-items";
+import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList } from "@/store/play-list";
+
+const EMPTY_LIKED_ITEMS: LocalFavItem[] = [];
 
 const Heartbeat = () => {
   const loading = useHeartbeat(s => s.loading);
@@ -17,7 +19,10 @@ const Heartbeat = () => {
   const list = usePlayList(s => s.list);
 
   const current = list.find(i => i.id === playId);
-  const likedItems = useLocalFavItemsStore(s => s.folderItems[LIKED_FOLDER_ID] ?? []);
+  // Keep the selector result referentially stable when the folder has not been
+  // hydrated yet. Returning a fresh [] on every render makes Zustand's
+  // useSyncExternalStore loop forever on the FM route.
+  const likedItems = useLocalFavItemsStore(s => s.folderItems[LIKED_FOLDER_ID] ?? EMPTY_LIKED_ITEMS);
   const isLiked = Boolean(current?.bvid) && likedItems.some(i => i.bvid === current?.bvid);
 
   const handleStart = async () => {

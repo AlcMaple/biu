@@ -6,24 +6,26 @@ import { createBilibiliWebMiddleware } from "./plugins/bilibili-web-proxy";
 import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
 
-const isWebTarget = process.env.BIU_TARGET === "web";
+const isDemoTarget = process.env.BIU_TARGET === "demo";
+const isWebTarget = process.env.BIU_TARGET === "web" || isDemoTarget;
 
 export default defineConfig(({ command }) => {
   const isWebDevelopment = isWebTarget && command === "dev";
   const isWebProduction = isWebTarget && command === "build";
 
-  const umamiTrackingTag = isWebProduction
-    ? {
-        tag: "script",
-        attrs: {
-          defer: true,
-          src: "https://user.alcmaple.cn/script.js",
-          "data-website-id": "4a1ac5d8-22f8-481b-9084-c9282e0c3ce5",
-        },
-        head: true,
-        publicPath: false,
-      }
-    : undefined;
+  const umamiTrackingTag =
+    isWebProduction && !isDemoTarget
+      ? {
+          tag: "script",
+          attrs: {
+            defer: true,
+            src: "https://user.alcmaple.cn/script.js",
+            "data-website-id": "4a1ac5d8-22f8-481b-9084-c9282e0c3ce5",
+          },
+          head: true,
+          publicPath: false,
+        }
+      : undefined;
 
   return {
     source: {
@@ -31,11 +33,14 @@ export default defineConfig(({ command }) => {
         // 构建版本号：部署时用 BIU_BUILD_ID=<release_stamp> 注入，写进每条回传日志，
         // 这样看日志就能确认手机跑的是哪个版本，不用再靠「有没有硬刷新」猜。
         "process.env.BIU_BUILD_ID": JSON.stringify(process.env.BIU_BUILD_ID || "dev"),
+        // Keep this as a string because the browser bundle does not provide a runtime
+        // `process` object. Rsbuild replaces the complete expression at build time.
+        "process.env.BIU_OFFLINE_DEMO": JSON.stringify(isDemoTarget ? "true" : "false"),
       },
     },
     output: {
       distPath: {
-        root: "./dist/web",
+        root: isDemoTarget ? "./docs/responsive-prototype/runtime" : "./dist/web",
       },
       // 生产环境相对路径，保证通过 file:// 加载时静态资源能正确引用
       assetPrefix: "./",
@@ -81,7 +86,7 @@ export default defineConfig(({ command }) => {
       cliShortcuts: false,
       // 开发环境相对路径，保证通过 file:// 加载时静态资源能正确引用
       assetPrefix: "./",
-      ...(isWebTarget
+      ...(isWebTarget && !isDemoTarget
         ? {
             setupMiddlewares: ({ unshift }) => {
               unshift(createBilibiliWebMiddleware());

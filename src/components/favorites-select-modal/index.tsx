@@ -17,6 +17,7 @@ import { useRequest } from "ahooks";
 
 import type { Page } from "@/service/web-interface-view";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { addOnlineItemToLocalFav, resolveLocalFavoriteSelection } from "@/common/utils/fav";
 import { formatDuration } from "@/common/utils/time";
 import { TagPanel } from "@/components/tag-popover";
@@ -48,6 +49,7 @@ const hasSameIds = (arr1: number[], arr2: number[]) => {
 
 /** 将视频添加到收藏夹或从收藏夹中移除 */
 const FavoritesSelectModal = () => {
+  const isMobileLayout = useIsMobileLayout();
   const user = useUser(s => s.user);
   const isFavSelectModalOpen = useModalStore(s => s.isFavSelectModalOpen);
   const onFavSelectModalOpenChange = useModalStore(s => s.onFavSelectModalOpenChange);
@@ -366,7 +368,7 @@ const FavoritesSelectModal = () => {
       isOpen={isFavSelectModalOpen}
       onOpenChange={onFavSelectModalOpenChange}
       isDismissable={false}
-      size={allTags.length > 0 ? "xl" : "md"}
+      size={isMobileLayout ? "md" : allTags.length > 0 ? "xl" : "md"}
       radius="md"
       classNames={{
         backdrop: "z-200",
@@ -416,7 +418,11 @@ const FavoritesSelectModal = () => {
             </ScrollContainer>
           ) : (
             /* 选收藏夹步骤：有标签时右侧多一栏标签面板（左右独立滚动），无标签时保持单栏 */
-            <div className={allTags.length > 0 ? "flex h-[340px]" : "h-full"}>
+            <div
+              className={
+                allTags.length > 0 ? (isMobileLayout ? "flex h-[420px] flex-col" : "flex h-[340px]") : "h-full"
+              }
+            >
               <ScrollContainer
                 style={{ height: "100%" }}
                 options={{ scrollbars: { visibility: "hidden" } }}
@@ -461,7 +467,13 @@ const FavoritesSelectModal = () => {
                 </div>
               </ScrollContainer>
               {allTags.length > 0 && (
-                <div className="border-divider flex w-60 flex-none flex-col border-l pt-2">
+                <div
+                  className={
+                    isMobileLayout
+                      ? "border-divider flex min-h-0 flex-1 flex-col border-t pt-2"
+                      : "border-divider flex w-60 flex-none flex-col border-l pt-2"
+                  }
+                >
                   <div className="text-foreground-500 px-4 pb-1.5 text-sm font-medium">标签</div>
                   <TagPanel
                     selectedIds={selectedTagIds}

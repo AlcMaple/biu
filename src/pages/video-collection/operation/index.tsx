@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { RiPlayFill, RiPlayListAddLine } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
 import SearchWithSort, { type SearchProps } from "@/components/search-with-sort";
@@ -35,9 +36,11 @@ const Operations = ({
   onClearInvalid,
   tagFilter,
 }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
+
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center space-x-2">
+    <div className={isMobileLayout ? "mb-3 flex flex-col gap-2" : "mb-4 flex items-center justify-between"}>
+      <div className={isMobileLayout ? "flex flex-wrap items-center gap-2" : "flex items-center space-x-2"}>
         <AsyncButton
           color="primary"
           startContent={<RiPlayFill size={22} />}
@@ -46,9 +49,11 @@ const Operations = ({
         >
           播放全部
         </AsyncButton>
-        <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={onAddToPlayList}>
-          <RiPlayListAddLine size={18} />
-        </IconButton>
+        {!isMobileLayout && (
+          <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={onAddToPlayList}>
+            <RiPlayListAddLine size={18} />
+          </IconButton>
+        )}
         {!loading && type !== CollectionType.VideoSeries && isCreatedBySelf !== true && (
           <FavToggle isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />
         )}
@@ -60,14 +65,16 @@ const Operations = ({
           onClearInvalid={onClearInvalid}
         />
       </div>
-      <div className="flex items-center space-x-2">
-        {tagFilter}
-        <SearchWithSort
-          onKeywordSearch={onKeywordSearch}
-          orderOptions={orderOptions}
-          order={order}
-          onOrderChange={onOrderChange}
-        />
+      <div className={isMobileLayout ? "flex min-w-0 items-center gap-2" : "flex items-center space-x-2"}>
+        <div className={isMobileLayout ? "flex min-w-0 flex-1 items-center gap-2" : undefined}>
+          {tagFilter}
+          <SearchWithSort
+            onKeywordSearch={onKeywordSearch}
+            orderOptions={orderOptions}
+            order={order}
+            onOrderChange={onOrderChange}
+          />
+        </div>
       </div>
     </div>
   );

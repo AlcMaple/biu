@@ -34,6 +34,7 @@
     "dev:android": "node scripts/run-rsbuild-with-target.mjs android dev",
     "dev:ios": "node scripts/sync-ios-version.mjs && node scripts/run-rsbuild-with-target.mjs ios dev",
     "dev:web": "node scripts/run-rsbuild-with-target.mjs web dev",
+    "build:responsive-demo": "node scripts/build-responsive-demo.mjs",
     "build": "rsbuild build",
     "build:web": "node scripts/run-rsbuild-with-target.mjs web build && rimraf dist/server && tsc -p web-server/tsconfig.json",
     "start:web": "node dist/server/web-server/index.js",

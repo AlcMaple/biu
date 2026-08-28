@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import { addToast, Spinner } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { parseDuration } from "@/common/utils/time";
 import AsyncButton from "@/components/async-button";
 import SearchWithSort from "@/components/search-with-sort";
@@ -21,6 +22,7 @@ interface VideoPostProps {
 }
 
 const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
+  const isMobileLayout = useIsMobileLayout();
   const { id } = useParams();
   const displayMode = useSettings(state => state.displayMode);
 
@@ -109,6 +111,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
           ownerMid: item.mid,
           duration: parseDuration(item.length),
         });
+        addToast({ title: "已添加到下一首播放", color: "success" });
         break;
       case "add-to-playlist":
         usePlayList.getState().addList([
@@ -122,6 +125,7 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
             duration: parseDuration(item.length),
           },
         ]);
+        addToast({ title: "已添加到播放列表", color: "success" });
         break;
       case "download-audio":
         platform.addMediaDownloadTask({
@@ -247,7 +251,13 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
 
   return (
     <div className="h-full w-full">
-      <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div
+        className={
+          isMobileLayout
+            ? "mb-3 flex flex-col items-stretch gap-2"
+            : "mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center"
+        }
+      >
         <div className="flex items-center">
           <AsyncButton
             color="primary"
@@ -260,7 +270,11 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
           </AsyncButton>
           <div className="text-default-500 pl-2 text-sm">共 {total} 条</div>
         </div>
-        <div className="flex items-center gap-3">
+        <div
+          className={
+            isMobileLayout ? "flex w-full min-w-0 flex-col items-stretch gap-2" : "flex min-w-0 items-center gap-3"
+          }
+        >
           <SearchWithSort
             onKeywordSearch={setKeyword}
             order={order}

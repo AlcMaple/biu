@@ -4,6 +4,7 @@ import { addToast, Button, Divider, Input } from "@heroui/react";
 import { RiArrowDownSLine, RiDeleteBinLine, RiPriceTag3Line } from "@remixicon/react";
 import clx from "classnames";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { isWeb } from "@/platform";
 import { useTagStore } from "@/store/tags";
 
@@ -11,6 +12,7 @@ import { useTagStore } from "@/store/tags";
 const COLLAPSED_MAX_HEIGHT = 96;
 
 const TagSettings = () => {
+  const isMobileLayout = useIsMobileLayout();
   const tags = useTagStore(s => s.tags);
   const addTag = useTagStore(s => s.addTag);
   const removeTag = useTagStore(s => s.removeTag);
@@ -46,7 +48,7 @@ const TagSettings = () => {
       <h2>标签</h2>
       <div className="text-sm text-zinc-500">创建标签后可在收藏时打标签，并在收藏夹页面按标签筛选，颜色自动分配</div>
 
-      <div className="flex items-center gap-2">
+      <div className={isMobileLayout ? "flex flex-col items-stretch gap-2" : "flex items-center gap-2"}>
         <Input
           size="sm"
           placeholder="输入标签名称，按 Enter 添加"
@@ -55,10 +57,17 @@ const TagSettings = () => {
           onKeyDown={e => {
             if (e.key === "Enter") handleAdd();
           }}
-          className="max-w-xs"
+          className={isMobileLayout ? "w-full" : "max-w-xs"}
           startContent={<RiPriceTag3Line size={16} className="text-zinc-400" />}
         />
-        <Button size="sm" variant="flat" color="primary" onPress={handleAdd} isDisabled={!name.trim()}>
+        <Button
+          size="sm"
+          variant="flat"
+          color="primary"
+          onPress={handleAdd}
+          isDisabled={!name.trim()}
+          className={isMobileLayout ? "self-start" : undefined}
+        >
           添加
         </Button>
       </div>

@@ -14,7 +14,11 @@ const Menus = ({ data }: Props) => {
   const { isOpen, onOpenChange } = useDisclosure();
 
   return (
-    <>
+    <span
+      className="flex flex-none"
+      onPointerDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
+    >
       <Dropdown
         disableAnimation
         isOpen={isOpen}
@@ -58,7 +62,7 @@ const Menus = ({ data }: Props) => {
           </DropdownItem>
         </DropdownMenu>
       </Dropdown>
-    </>
+    </span>
   );
 };
 

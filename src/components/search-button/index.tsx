@@ -3,13 +3,18 @@ import React, { useState } from "react";
 import { Input } from "@heroui/react";
 import { RiSearchLine } from "@remixicon/react";
 import { useDebounceFn } from "ahooks";
+import { twMerge } from "tailwind-merge";
+
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 
 interface Props {
   onSearch?: (value: string) => void;
+  className?: string;
 }
 
 /** 列表搜索框（常驻显示，输入防抖触发搜索） */
-const SearchButton = ({ onSearch }: Props) => {
+const SearchButton = ({ onSearch, className }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const [value, setValue] = useState("");
 
   const { run: handleSearch } = useDebounceFn(
@@ -38,7 +43,7 @@ const SearchButton = ({ onSearch }: Props) => {
       }}
       placeholder="搜索"
       startContent={<RiSearchLine size={18} className="text-default-400" />}
-      className="w-60"
+      className={twMerge(isMobileLayout ? "min-w-0 flex-1" : "w-60", className)}
       classNames={{
         inputWrapper: "h-10 pr-1",
       }}

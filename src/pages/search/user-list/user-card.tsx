@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { Avatar, Card, CardBody, addToast } from "@heroui/react";
 import { RiAddLine, RiFlashlightFill, RiUserFollowLine } from "@remixicon/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { formatNumber } from "@/common/utils/number";
 import { formatUrlProtocol } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -17,6 +18,7 @@ interface UserCardProps {
 }
 
 const UserCard: React.FC<UserCardProps> = ({ u }) => {
+  const isMobileLayout = useIsMobileLayout();
   const navigate = useNavigate();
   const [isFollowed, setIsFollowed] = useState(u.is_followed);
 
@@ -50,10 +52,16 @@ const UserCard: React.FC<UserCardProps> = ({ u }) => {
 
   return (
     <Card isHoverable={!isWeb} isPressable as="div" onPress={() => navigate(`/user/${u.mid}`)}>
-      <CardBody className="flex flex-col items-center gap-y-2">
+      <CardBody
+        className={isMobileLayout ? "flex flex-col items-center gap-y-1 p-2" : "flex flex-col items-center gap-y-2"}
+      >
         {/* Avatar Section */}
         <div className="relative flex-none">
-          <Avatar className="h-16 w-16" src={formatUrlProtocol(u.upic as string)} isBordered />
+          <Avatar
+            className={isMobileLayout ? "h-14 w-14" : "h-16 w-16"}
+            src={formatUrlProtocol(u.upic as string)}
+            isBordered
+          />
           {u.official_verify?.type === 0 && (
             <div className="bg-warning ring-background absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full text-white ring-2">
               <RiFlashlightFill size={12} />
@@ -71,7 +79,15 @@ const UserCard: React.FC<UserCardProps> = ({ u }) => {
           {/* Name & Level */}
           <div className="flex flex-col items-center space-y-1">
             <div className="flex w-full items-center justify-center gap-2">
-              <span className="text-foreground truncate text-lg font-bold">{u.uname}</span>
+              <span
+                className={
+                  isMobileLayout
+                    ? "text-foreground max-w-full truncate text-sm font-bold"
+                    : "text-foreground truncate text-lg font-bold"
+                }
+              >
+                {u.uname}
+              </span>
               {u.level && (
                 <span className="flex h-4 min-w-[24px] flex-none items-center justify-center rounded-[2px] bg-[#FB7299] px-1 text-[10px] font-bold text-white italic">
                   LV{u.level}
@@ -86,7 +102,11 @@ const UserCard: React.FC<UserCardProps> = ({ u }) => {
             {u.usign && <span className="line-clamp-2 max-w-full min-w-0 flex-1 break-all">{u.usign}</span>}
           </div>
           {/* Button */}
-          <div className="mt-2">
+          <div
+            className="mt-2"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+          >
             <AsyncButton
               size="sm"
               color={isFollowed ? "success" : "default"}

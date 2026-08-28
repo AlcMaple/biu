@@ -23,38 +23,29 @@ const OperationMenu = ({ items, onAction, onOpenChange }: OperationMenuProps) =>
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Popover
-      radius="md"
-      isOpen={isOpen}
-      onOpenChange={open => {
-        setIsOpen(open);
-        onOpenChange?.(open);
-      }}
-      placement="bottom-end"
-      offset={4}
-      disableAnimation
+    <span
+      className="flex flex-none"
+      onPointerDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
     >
-      <PopoverTrigger>
-        <Button isIconOnly variant="light" size="sm" aria-label="操作菜单">
-          <RiMore2Line size={16} />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[160px] p-0"
-        data-no-contextmenu="true"
-        onContextMenuCapture={e => {
-          e.preventDefault();
-          e.stopPropagation();
+      <Popover
+        radius="md"
+        isOpen={isOpen}
+        onOpenChange={open => {
+          setIsOpen(open);
+          onOpenChange?.(open);
         }}
-        onContextMenu={e => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        placement="bottom-end"
+        offset={4}
+        disableAnimation
       >
-        <Listbox
-          aria-label="操作菜单"
-          selectionMode="none"
-          items={items.filter(item => !item.hidden)}
+        <PopoverTrigger>
+          <Button isIconOnly variant="light" size="sm" aria-label="操作菜单">
+            <RiMore2Line size={16} />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-[160px] p-0"
           data-no-contextmenu="true"
           onContextMenuCapture={e => {
             e.preventDefault();
@@ -64,25 +55,40 @@ const OperationMenu = ({ items, onAction, onOpenChange }: OperationMenuProps) =>
             e.preventDefault();
             e.stopPropagation();
           }}
-          onAction={key => {
-            onAction?.(String(key));
-            setIsOpen(false);
-          }}
-          className="p-2"
         >
-          {item => (
-            <ListboxItem
-              key={item.key}
-              startContent={item.icon}
-              className={twMerge("rounded-medium", item.className)}
-              color={item.color}
-            >
-              {item.label}
-            </ListboxItem>
-          )}
-        </Listbox>
-      </PopoverContent>
-    </Popover>
+          <Listbox
+            aria-label="操作菜单"
+            selectionMode="none"
+            items={items.filter(item => !item.hidden)}
+            data-no-contextmenu="true"
+            onContextMenuCapture={e => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onContextMenu={e => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onAction={key => {
+              onAction?.(String(key));
+              setIsOpen(false);
+            }}
+            className="p-2"
+          >
+            {item => (
+              <ListboxItem
+                key={item.key}
+                startContent={item.icon}
+                className={twMerge("rounded-medium", item.className)}
+                color={item.color}
+              >
+                {item.label}
+              </ListboxItem>
+            )}
+          </Listbox>
+        </PopoverContent>
+      </Popover>
+    </span>
   );
 };
 

@@ -4,6 +4,7 @@ import { Input } from "@heroui/react";
 import { RiSearchLine } from "@remixicon/react";
 import { useDebounceFn } from "ahooks";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import DateRangePicker from "@/components/date-range-picker";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const Search = ({ onSearch, onDateRangeChange }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const [keyword, setKeyword] = useState("");
 
   const { run: handleSearch } = useDebounceFn(
@@ -22,7 +24,13 @@ const Search = ({ onSearch, onDateRangeChange }: Props) => {
   );
 
   return (
-    <div className="flex w-full items-center justify-between py-2">
+    <div
+      className={
+        isMobileLayout
+          ? "flex w-full flex-col items-stretch gap-2 py-2"
+          : "flex w-full items-center justify-between py-2"
+      }
+    >
       <DateRangePicker onDateRangeChange={onDateRangeChange} />
 
       <Input
@@ -36,7 +44,7 @@ const Search = ({ onSearch, onDateRangeChange }: Props) => {
           handleSearch("");
         }}
         radius="md"
-        className="w-64"
+        className={isMobileLayout ? "w-full" : "w-64"}
       />
     </div>
   );

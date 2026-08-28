@@ -21,7 +21,11 @@ export function useAppHeight() {
     if (!vv) return;
 
     const apply = () => {
-      document.documentElement.style.setProperty("--app-h", `${Math.round(vv.height)}px`);
+      // visualViewport can briefly report 0 while a browser rotates; keep the
+      // last usable CSS value instead of collapsing the whole app shell.
+      if (vv.height > 0) {
+        document.documentElement.style.setProperty("--app-h", `${Math.round(vv.height)}px`);
+      }
     };
     apply();
 
@@ -40,9 +44,15 @@ export function useAppHeight() {
 
     // resize：工具栏收放 / 旋转 / 键盘弹出都会触发，高度变化都在这里
     vv.addEventListener("resize", apply);
+    // 某些 iOS Chrome 版本把工具栏移动表现为 visualViewport 的 offset
+    // 变化而不是单独的 resize；scroll 事件能覆盖这条路径。
+    vv.addEventListener("scroll", apply);
+    window.addEventListener("resize", apply);
     window.addEventListener("orientationchange", apply);
     return () => {
       vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
       window.removeEventListener("orientationchange", apply);
     };
   }, []);

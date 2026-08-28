@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { addToast, Button, Input, Spinner, useDisclosure } from "@heroui/react";
 import { RiAddLine, RiDeleteBinLine, RiEditLine, RiSearchLine } from "@remixicon/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import PlatformTooltip from "@/components/platform-tooltip";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
@@ -25,6 +26,7 @@ import UserCard from "./user-card";
 const PAGE_SIZE = 20;
 
 const FollowList = () => {
+  const isMobileLayout = useIsMobileLayout();
   const user = useUser(s => s.user);
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
   const scrollRef = useRef<ScrollRefObject>(null);
@@ -200,9 +202,9 @@ const FollowList = () => {
 
   return (
     <>
-      <div className="flex h-full w-full">
-        <div className="h-full w-50 pb-4">
-          <div className="border-divider/40 flex h-full flex-col border-r">
+      <div className={isMobileLayout ? "flex h-full w-full flex-col" : "flex h-full w-full"}>
+        <div className={isMobileLayout ? "h-auto w-full" : "h-full w-50 pb-4"}>
+          <div className={`border-divider/40 flex flex-col border-r ${isMobileLayout ? "border-b" : "h-full"}`}>
             <div className="mb-2 flex items-center justify-between space-x-1 px-4">
               <h1 className="min-w-0 truncate">{activeTab === "all" ? "全部关注" : activeTag?.name || "我的关注"}</h1>
               <div className="flex items-center">
@@ -220,13 +222,12 @@ const FollowList = () => {
                 </PlatformTooltip>
               </div>
             </div>
-            <ScrollContainer className="h-full min-h-0 w-full flex-1 px-2">
-              <div className="flex min-h-0 flex-1 flex-col">
+            {isMobileLayout ? (
+              <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto px-3 pb-2">
                 <Button
-                  fullWidth
+                  className="flex-none justify-between px-3"
                   radius="md"
                   variant={activeTab === "all" ? "flat" : "light"}
-                  className="justify-between px-3"
                   onPress={() => setActiveTab("all")}
                 >
                   <span className="truncate">{`全部关注${allCount ? `(${allCount})` : ""}`}</span>
@@ -237,10 +238,9 @@ const FollowList = () => {
                   return (
                     <Button
                       key={key}
-                      fullWidth
+                      className="flex-none justify-between px-3"
                       radius="md"
                       variant={isActive ? "flat" : "light"}
-                      className="justify-between px-3"
                       onPress={() => setActiveTab(key)}
                     >
                       <span className="truncate">{`${tag.name}${tag.count ? `(${tag.count})` : ""}`}</span>
@@ -248,14 +248,52 @@ const FollowList = () => {
                   );
                 })}
               </div>
-            </ScrollContainer>
+            ) : (
+              <ScrollContainer className="h-full min-h-0 w-full flex-1 px-2">
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <Button
+                    fullWidth
+                    radius="md"
+                    variant={activeTab === "all" ? "flat" : "light"}
+                    className="justify-between px-3"
+                    onPress={() => setActiveTab("all")}
+                  >
+                    <span className="truncate">{`全部关注${allCount ? `(${allCount})` : ""}`}</span>
+                  </Button>
+                  {tags.map(tag => {
+                    const key = String(tag.tagid);
+                    const isActive = activeTab === key;
+                    return (
+                      <Button
+                        key={key}
+                        fullWidth
+                        radius="md"
+                        variant={isActive ? "flat" : "light"}
+                        className="justify-between px-3"
+                        onPress={() => setActiveTab(key)}
+                      >
+                        <span className="truncate">{`${tag.name}${tag.count ? `(${tag.count})` : ""}`}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </ScrollContainer>
+            )}
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-1">
-          <ScrollContainer ref={scrollRef} enableBackToTop className="h-full w-full px-4">
+        <div className="flex min-h-0 min-w-0 flex-1">
+          <ScrollContainer
+            ref={scrollRef}
+            enableBackToTop
+            className={isMobileLayout ? "h-full w-full px-3" : "h-full w-full px-4"}
+          >
             <div className="flex h-full flex-col">
-              <div className="mb-4 flex items-center justify-between">
+              <div
+                className={
+                  isMobileLayout ? "mb-3 flex flex-col items-stretch gap-2" : "mb-4 flex items-center justify-between"
+                }
+              >
                 <div className="flex items-center space-x-1">
                   {isCustomTag && activeTag && (
                     <>
@@ -291,7 +329,7 @@ const FollowList = () => {
                   <div className="flex items-center">
                     <Input
                       classNames={{
-                        base: "w-64",
+                        base: isMobileLayout ? "w-full" : "w-64",
                         inputWrapper: "h-10",
                       }}
                       placeholder="搜索关注"
@@ -323,7 +361,7 @@ const FollowList = () => {
                   renderItem={item => <UserCard u={item} refresh={reload} onSetGroup={handleOpenSetGroup} />}
                   getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null}
                   onLoadMore={loadMore}
-                  rowHeight={240}
+                  rowHeight={isMobileLayout ? 190 : 240}
                   hasMore={hasMore}
                   loading={loading}
                 />
