@@ -5,7 +5,9 @@ export const getUrlParams = (url: string) => {
 };
 
 export const formatUrlProtocol = (url?: string) => {
-  if (url && !url.startsWith("http")) {
+  // Offline responsive-demo fixtures use inline SVG data URLs. They are already
+  // complete URLs and must not be treated as protocol-relative Bilibili URLs.
+  if (url && !url.startsWith("http") && !url.startsWith("data:")) {
     return `https:${url}`;
   }
 

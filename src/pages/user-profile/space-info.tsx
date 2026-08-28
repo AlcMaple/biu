@@ -5,6 +5,7 @@ import { Avatar, Divider, Image } from "@heroui/react";
 import { RiAddLine, RiCheckLine, RiFlashlightFill } from "@remixicon/react";
 
 import { UserRelation } from "@/common/constants/relation";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { formatNumber } from "@/common/utils/number";
 import AsyncButton from "@/components/async-button";
 import PlatformTooltip from "@/components/platform-tooltip";
@@ -22,6 +23,7 @@ interface Props {
 }
 
 const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const user = useUser(s => s.user);
   const themeMode = useSettings(s => s.themeMode);
   const { id } = useParams();
@@ -72,8 +74,18 @@ const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }
 
   if (relationWithMe === UserRelation.Blocked) {
     return (
-      <div className="flex h-[480px] w-full flex-col items-center justify-center space-y-6">
-        <Avatar src={spaceInfo?.face} alt={spaceInfo?.name} className="h-[120px] w-[120px] shadow-lg" />
+      <div
+        className={
+          isMobileLayout
+            ? "flex h-[360px] w-full flex-col items-center justify-center gap-5"
+            : "flex h-[480px] w-full flex-col items-center justify-center space-y-6"
+        }
+      >
+        <Avatar
+          src={spaceInfo?.face}
+          alt={spaceInfo?.name}
+          className={isMobileLayout ? "h-24 w-24 shadow-lg" : "h-[120px] w-[120px] shadow-lg"}
+        />
         <p className="text-lg">已拉黑</p>
       </div>
     );
@@ -81,13 +93,21 @@ const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }
 
   return (
     <div
-      className="flex h-[200px] items-end justify-between space-x-8 bg-cover bg-center px-8 py-4 text-white bg-blend-multiply"
+      className={
+        isMobileLayout
+          ? "flex min-h-[248px] w-full flex-col items-start justify-end gap-3 bg-cover bg-center px-4 py-4 text-white bg-blend-multiply"
+          : "flex h-[200px] items-end justify-between space-x-8 bg-cover bg-center px-8 py-4 text-white bg-blend-multiply"
+      }
       style={{
         background: `linear-gradient(rgba(0,0,0,${overlayOpacity}), rgba(0,0,0,${overlayOpacity})), url(${spaceInfo?.top_photo_v2?.l_200h_img}) center/cover no-repeat`,
       }}
     >
-      <div className="flex min-w-0 grow items-end space-x-4">
-        <Avatar src={spaceInfo?.face} alt={spaceInfo?.name} className="h-[140px] w-[140px] flex-none shadow-lg" />
+      <div className={isMobileLayout ? "flex w-full min-w-0 items-end gap-3" : "flex min-w-0 grow items-end space-x-4"}>
+        <Avatar
+          src={spaceInfo?.face}
+          alt={spaceInfo?.name}
+          className={isMobileLayout ? "h-20 w-20 flex-none shadow-lg" : "h-[140px] w-[140px] flex-none shadow-lg"}
+        />
         <div className="flex min-w-0 flex-1 flex-col space-y-2">
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2">
@@ -102,7 +122,9 @@ const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }
                   </div>
                 </PlatformTooltip>
               )}
-              <h1 className="text-xl font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{spaceInfo?.name}</h1>
+              <h1 className="min-w-0 truncate text-xl font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {spaceInfo?.name}
+              </h1>
             </div>
             {Boolean(spaceInfo?.vip?.status) && (
               <Image
@@ -117,7 +139,11 @@ const SpaceInfo = ({ spaceInfo, relationStats, relationWithMe, refreshRelation }
           </p>
         </div>
       </div>
-      <div className="flex flex-none items-center space-x-4">
+      <div
+        className={
+          isMobileLayout ? "flex w-full flex-wrap items-center gap-3 pl-1" : "flex flex-none items-center space-x-4"
+        }
+      >
         {Boolean(user?.isLogin) && !isSelf && (
           <AsyncButton
             variant="shadow"

@@ -1,5 +1,6 @@
 import { Select, SelectItem } from "@heroui/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import SearchButton from "@/components/search-button";
 
 export interface SearchProps {
@@ -10,10 +11,21 @@ export interface SearchProps {
 }
 
 const SearchWithSort = ({ onKeywordSearch, orderOptions, order, onOrderChange }: SearchProps) => {
+  const isMobileLayout = useIsMobileLayout();
+  const hasOrderOptions = Boolean(orderOptions?.length);
+
   return (
-    <div className="flex items-center space-x-2">
-      <SearchButton onSearch={onKeywordSearch} />
-      {Boolean(orderOptions?.length) && (
+    <div
+      className={
+        isMobileLayout
+          ? hasOrderOptions
+            ? "flex min-w-0 flex-1 flex-col items-stretch gap-2"
+            : "flex min-w-0 flex-1 items-center"
+          : "flex items-center space-x-2"
+      }
+    >
+      <SearchButton onSearch={onKeywordSearch} className={isMobileLayout ? "w-full min-w-0" : undefined} />
+      {hasOrderOptions && (
         <Select
           radius="md"
           selectionMode="single"
@@ -30,7 +42,7 @@ const SearchWithSort = ({ onKeywordSearch, orderOptions, order, onOrderChange }:
             color: "primary",
             hideSelectedIcon: true,
           }}
-          className="max-w-xs"
+          className={isMobileLayout ? "w-full max-w-none min-w-0" : "max-w-xs"}
           classNames={{
             innerWrapper: "w-20",
           }}

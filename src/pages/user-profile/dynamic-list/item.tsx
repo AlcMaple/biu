@@ -16,6 +16,7 @@ import moment from "moment";
 
 import type { WebDynamicItem } from "@/service/web-dynamic";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { formatNumber } from "@/common/utils/number";
 import { parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
@@ -31,6 +32,7 @@ interface DynamicItemProps {
 }
 
 const DynamicItem = ({ item }: DynamicItemProps) => {
+  const isMobileLayout = useIsMobileLayout();
   const author = item.modules.module_author;
   const dynamic = item.modules.module_dynamic;
   const stat = item.modules.module_stat;
@@ -160,7 +162,7 @@ const DynamicItem = ({ item }: DynamicItemProps) => {
             onClick={handlePlay}
           >
             <div className="flex flex-row">
-              <div className="relative h-32 w-48 shrink-0">
+              <div className={isMobileLayout ? "relative h-24 w-36 shrink-0" : "relative h-32 w-48 shrink-0"}>
                 <Image
                   params="472w_264h_1c_!web-dynamic.webp"
                   removeWrapper
@@ -180,7 +182,13 @@ const DynamicItem = ({ item }: DynamicItemProps) => {
                   {archive.duration_text || ""}
                 </div>
               </div>
-              <div className="flex min-w-0 grow flex-col justify-between p-3">
+              <div
+                className={
+                  isMobileLayout
+                    ? "flex min-w-0 grow flex-col justify-between p-2"
+                    : "flex min-w-0 grow flex-col justify-between p-3"
+                }
+              >
                 <div className="space-y-1">
                   <h3 className="line-clamp-2 text-sm font-medium" title={isWeb ? undefined : archive.title || ""}>
                     {archive.title || ""}

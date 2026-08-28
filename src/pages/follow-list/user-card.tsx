@@ -7,6 +7,7 @@ import { RiFlashlightFill, RiGroupLine, RiUserUnfollowLine } from "@remixicon/re
 import type { RelationListItem } from "@/service/relation-followings";
 import type { RelationTagUser } from "@/service/relation-tag";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { isWeb } from "@/platform";
 import { UserRelationAction, postRelationModify } from "@/service/relation-modify";
 import { useModalStore } from "@/store/modal";
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const UserCard = ({ u, refresh, onSetGroup }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const navigate = useNavigate();
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
 
@@ -67,9 +69,19 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
       onPress={() => navigate(`/user/${u.mid}`)}
       className="group relative h-full w-full overflow-hidden"
     >
-      <CardBody className="flex items-center space-y-2 overflow-hidden p-4">
-        <div className="relative h-32 w-32 flex-none">
-          <Avatar className="text-large h-32 w-32" src={`${u.face}@160w_160h_1c_1s.webp`} name={u.uname} />
+      <CardBody
+        className={
+          isMobileLayout
+            ? "flex items-center space-y-2 overflow-hidden p-2"
+            : "flex items-center space-y-2 overflow-hidden p-4"
+        }
+      >
+        <div className={isMobileLayout ? "relative h-20 w-20 flex-none" : "relative h-32 w-32 flex-none"}>
+          <Avatar
+            className={isMobileLayout ? "text-large h-20 w-20" : "text-large h-32 w-32"}
+            src={`${u.face}@160w_160h_1c_1s.webp`}
+            name={u.uname}
+          />
           {u.official_verify?.type === 0 && (
             <div className="bg-warning ring-background absolute right-1 bottom-1 flex h-6 w-6 items-center justify-center rounded-full text-white ring-2">
               <RiFlashlightFill size={14} />
@@ -81,15 +93,23 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
             </div>
           )}
         </div>
-        <div className="flex w-full flex-col items-center space-y-1">
-          <span className="max-w-full min-w-0 truncate text-lg">{u.uname}</span>
+        <div className="flex w-full min-w-0 flex-col items-center space-y-1">
+          <span
+            className={isMobileLayout ? "max-w-full min-w-0 truncate text-sm" : "max-w-full min-w-0 truncate text-lg"}
+          >
+            {u.uname}
+          </span>
           <span className="text-foreground-500 line-clamp-2 w-full text-center text-sm">{u.sign}</span>
         </div>
       </CardBody>
 
       <div
-        className={`bg-background/70 absolute bottom-4 left-1/2 flex w-max -translate-x-1/2 items-center justify-center rounded-full border border-white/10 px-1 py-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 ${
-          isWeb ? "translate-y-0" : "translate-y-20 transition-all duration-300 ease-in-out group-hover:translate-y-0"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+        className={`bg-background/70 absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full border border-white/10 px-1 py-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 ${
+          isMobileLayout
+            ? "w-[calc(100%-16px)]"
+            : `w-max ${isWeb ? "translate-y-0" : "translate-y-20 transition-all duration-300 ease-in-out group-hover:translate-y-0"}`
         }`}
       >
         <Button
@@ -101,7 +121,7 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
           title={isWeb ? undefined : "设置分组"}
           startContent={<RiGroupLine size={18} />}
         >
-          设置分组
+          {isMobileLayout ? null : "设置分组"}
         </Button>
         <Button
           size="sm"
@@ -113,7 +133,7 @@ const UserCard = ({ u, refresh, onSetGroup }: Props) => {
           title={isWeb ? undefined : "取消关注"}
           startContent={<RiUserUnfollowLine size={18} />}
         >
-          取消关注
+          {isMobileLayout ? null : "取消关注"}
         </Button>
       </div>
     </Card>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17181a" />
+    <title>Biu · React 响应式离线 Demo</title>
+    <style>
+      html,
+      body,
+      iframe {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        border: 0;
+      }
+
+      body {
+        overflow: hidden;
+        background: #17181a;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      #missing {
+        display: none;
+        box-sizing: border-box;
+        height: 100%;
+        padding: 32px;
+        line-height: 1.8;
+      }
+
+      #missing code {
+        color: #1ed760;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe id="demo" title="Biu React 响应式离线 Demo"></iframe>
+    <main id="missing">
+      <h1>需要先构建 Demo</h1>
+      <p>这是项目真实 React 路由树的离线构建入口，不是手写静态截图。</p>
+      <p>在仓库根目录运行 <code>pnpm build:responsive-demo</code> 后重新打开本页。</p>
+    </main>
+    <script>
+      (function () {
+        var frame = document.getElementById("demo");
+        var missing = document.getElementById("missing");
+        var route = location.hash ? location.hash.slice(1) : "/";
+        var source = "./runtime/index.html#" + (route.startsWith("/") ? route : "/" + route);
+        frame.src = source;
+        frame.onerror = function () {
+          frame.style.display = "none";
+          missing.style.display = "block";
+        };
+      })();
+    </script>
+  </body>
+</html>

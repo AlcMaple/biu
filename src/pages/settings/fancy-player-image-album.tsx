@@ -5,6 +5,7 @@ import { RiAddLine, RiCloseLine, RiImageLine } from "@remixicon/react";
 import clx from "classnames";
 import { useShallow } from "zustand/shallow";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import platform, { isWeb } from "@/platform";
 import { useFancyPlayerImages } from "@/store/fancy-player-images";
 
@@ -18,6 +19,7 @@ const toImgSrc = (path: string) => {
 };
 
 const FancyPlayerImageAlbum = () => {
+  const isMobileLayout = useIsMobileLayout();
   const { images, thumbs, addImages, removeImage, backfillThumbs } = useFancyPlayerImages(
     useShallow(s => ({
       images: s.images,
@@ -52,13 +54,19 @@ const FancyPlayerImageAlbum = () => {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-zinc-500">
+      <div className={isMobileLayout ? "flex flex-col items-stretch gap-2" : "flex items-center justify-between"}>
+        <div className="min-w-0 text-sm text-zinc-500">
           {images.length === 0
             ? "尚未添加图片，切换歌曲时将使用歌曲封面作为背景"
             : `已添加 ${images.length} 张图片，切换歌曲时随机选取`}
         </div>
-        <Button size="sm" variant="flat" startContent={<RiAddLine size={16} />} onPress={handleSelectFiles}>
+        <Button
+          size="sm"
+          variant="flat"
+          startContent={<RiAddLine size={16} />}
+          onPress={handleSelectFiles}
+          className={isMobileLayout ? "self-start" : undefined}
+        >
           添加图片
         </Button>
       </div>

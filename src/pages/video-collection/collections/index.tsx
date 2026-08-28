@@ -122,6 +122,7 @@ const VideoCollections = () => {
           duration: item.duration,
         })),
       );
+      addToast({ title: `已添加 ${filteredMedias.length} 首到播放列表`, color: "success" });
     }
   };
 
@@ -168,6 +169,7 @@ const VideoCollections = () => {
           ownerMid: item.upper?.mid,
           duration: item.duration,
         });
+        addToast({ title: "已添加到下一首播放", color: "success" });
         break;
       case "add-to-playlist":
         usePlayList.getState().addList([
@@ -182,6 +184,7 @@ const VideoCollections = () => {
             duration: item.duration,
           },
         ]);
+        addToast({ title: "已添加到播放列表", color: "success" });
         break;
       case "favorite":
         useModalStore.getState().onOpenFavSelectModal({

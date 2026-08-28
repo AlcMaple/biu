@@ -150,6 +150,7 @@ const Later = () => {
           ownerMid: item.owner?.mid,
           duration: item.duration,
         });
+        addToast({ title: "已添加到下一首播放", color: "success" });
         break;
       case "add-to-playlist":
         usePlayList.getState().addList([
@@ -163,6 +164,7 @@ const Later = () => {
             duration: item.duration,
           },
         ]);
+        addToast({ title: "已添加到播放列表", color: "success" });
         break;
       case "download-audio":
         await platform.addMediaDownloadTask({

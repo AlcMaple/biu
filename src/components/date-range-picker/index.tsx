@@ -4,11 +4,14 @@ import { DateRangePicker as HeroDateRangePicker, Tab, Tabs, type DateValue, type
 import { getLocalTimeZone } from "@internationalized/date";
 import moment from "moment";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+
 interface Props {
   onDateRangeChange?: (range: { start?: number; end?: number } | null) => void;
 }
 
 const DateRangePicker = ({ onDateRangeChange }: Props) => {
+  const isMobileLayout = useIsMobileLayout();
   const [selectedKey, setSelectedKey] = useState<string>("all");
   const [dateRange, setDateRange] = useState<RangeValue<DateValue> | null>(null);
 
@@ -55,29 +58,37 @@ const DateRangePicker = ({ onDateRangeChange }: Props) => {
   };
 
   return (
-    <div className="-ml-1 flex items-center space-x-4">
-      <Tabs
-        aria-label="时间范围"
-        variant="light"
-        selectedKey={selectedKey}
-        onSelectionChange={key => handlePresetChange(key as string)}
-        classNames={{
-          cursor: "rounded-medium",
-        }}
-      >
-        <Tab key="all" title="全部时间" />
-        <Tab key="today" title="今天" />
-        <Tab key="yesterday" title="昨天" />
-        <Tab key="week" title="近一周" />
-      </Tabs>
+    <div
+      className={
+        isMobileLayout ? "flex w-full min-w-0 flex-col items-stretch gap-2" : "-ml-1 flex items-center space-x-4"
+      }
+    >
+      <div className={isMobileLayout ? "-mx-1 min-w-0 overflow-x-auto" : undefined}>
+        <Tabs
+          aria-label="时间范围"
+          variant="light"
+          selectedKey={selectedKey}
+          onSelectionChange={key => handlePresetChange(key as string)}
+          classNames={{
+            cursor: "rounded-medium",
+            tabList: isMobileLayout ? "w-max min-w-full" : undefined,
+          }}
+          size={isMobileLayout ? "sm" : "md"}
+        >
+          <Tab key="all" title="全部时间" />
+          <Tab key="today" title="今天" />
+          <Tab key="yesterday" title="昨天" />
+          <Tab key="week" title="近一周" />
+        </Tabs>
+      </div>
 
-      <div className="w-64">
+      <div className={isMobileLayout ? "w-full min-w-0" : "w-64"}>
         <HeroDateRangePicker
           aria-label="选择日期范围"
           // @ts-ignore 忽略类型检查，因为 HeroDateRangePicker 的类型定义有问题
           value={dateRange}
           onChange={handleDateRangeChange}
-          visibleMonths={2}
+          visibleMonths={isMobileLayout ? 1 : 2}
         />
       </div>
     </div>

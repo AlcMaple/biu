@@ -1,5 +1,6 @@
-import axios, { type CreateAxiosDefaults } from "axios";
+import axios, { type AxiosAdapter, type CreateAxiosDefaults } from "axios";
 
+import { isOfflineDemo } from "@/common/offline-demo";
 import { isNativeMobile, isWeb } from "@/platform/detect";
 import { resolveBilibiliBaseURL } from "@shared/bilibili-web-proxy";
 
@@ -7,9 +8,22 @@ import { nativeAdapter } from "./native-adapter";
 import { requestInterceptors } from "./request-interceptors";
 import { geetestInterceptors } from "./response-interceptors";
 
+const offlineDemoAdapter: AxiosAdapter = async config => {
+  const { offlineDemoResponse } = await import("@/common/offline-demo-fixtures");
+  const data = offlineDemoResponse(config);
+  return {
+    data,
+    status: 200,
+    statusText: "OK",
+    headers: {},
+    config,
+  };
+};
+
 const axiosConfig: CreateAxiosDefaults = {
   timeout: 10000,
   withCredentials: true,
+  ...(isOfflineDemo ? { adapter: offlineDemoAdapter } : {}),
   ...(isNativeMobile ? { adapter: nativeAdapter } : {}),
 };
 

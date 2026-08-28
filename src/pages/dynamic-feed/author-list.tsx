@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Spinner } from "@heroui/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getRelationFollowings } from "@/service/relation-followings";
 import { useUser } from "@/store/user";
@@ -14,6 +15,7 @@ interface AuthorListProps {
 }
 
 const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) => {
+  const isMobileLayout = useIsMobileLayout();
   const user = useUser(s => s.user);
   const scrollRef = useRef<ScrollRefObject>(null);
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
@@ -69,6 +71,11 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
   }, [scrollElement, loading, hasMore, error, fetchFollowings, page]);
 
   useEffect(() => {
+    if (isMobileLayout) {
+      setScrollElement(null);
+      return;
+    }
+
     const initScrollElement = () => {
       if (scrollRef.current) {
         const instance = scrollRef.current.osInstance();
@@ -80,7 +87,7 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
     initScrollElement();
     const timer = setTimeout(initScrollElement, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isMobileLayout]);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -103,13 +110,13 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
   }, [fetchFollowings, user?.mid]);
 
   return (
-    <div className="h-full w-64">
-      <div className="border-divider/40 flex h-full flex-col border-r">
+    <div className={isMobileLayout ? "h-auto w-full" : "h-full w-64"}>
+      <div className={`border-divider/40 flex flex-col ${isMobileLayout ? "border-b" : "h-full border-r"}`}>
         <div className="mb-2 px-4">
           <h1 className="min-w-0 truncate">用户动态</h1>
         </div>
-        <ScrollContainer ref={scrollRef} className="h-full min-h-0 w-full flex-1 px-2">
-          <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {isMobileLayout ? (
+          <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto px-3 pb-2">
             <UserItem author={null} isSelected={selectedAuthorMid === null} onSelect={onSelect} />
             {list.map(author => (
               <UserItem
@@ -119,25 +126,39 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
                 onSelect={onSelect}
               />
             ))}
-            {loading && (
-              <div className="text-default-500 flex items-center gap-2 px-2 py-2">
-                <Spinner size="sm" />
-                <span>加载中...</span>
-              </div>
-            )}
-            {!loading && error && (
-              <div className="flex flex-col items-start gap-2 px-2 py-2">
-                <p className="text-danger text-sm">{error}</p>
-                <Button size="sm" onPress={() => fetchFollowings(page)}>
-                  重试
-                </Button>
-              </div>
-            )}
-            {!loading && !hasMore && list.length === 0 && !error && (
-              <p className="text-default-400 px-2 text-sm">暂无关注</p>
-            )}
           </div>
-        </ScrollContainer>
+        ) : (
+          <ScrollContainer ref={scrollRef} className="h-full min-h-0 w-full flex-1 px-2">
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <UserItem author={null} isSelected={selectedAuthorMid === null} onSelect={onSelect} />
+              {list.map(author => (
+                <UserItem
+                  key={author.mid}
+                  author={author}
+                  isSelected={selectedAuthorMid === author.mid}
+                  onSelect={onSelect}
+                />
+              ))}
+              {loading && (
+                <div className="text-default-500 flex items-center gap-2 px-2 py-2">
+                  <Spinner size="sm" />
+                  <span>加载中...</span>
+                </div>
+              )}
+              {!loading && error && (
+                <div className="flex flex-col items-start gap-2 px-2 py-2">
+                  <p className="text-danger text-sm">{error}</p>
+                  <Button size="sm" onPress={() => fetchFollowings(page)}>
+                    重试
+                  </Button>
+                </div>
+              )}
+              {!loading && !hasMore && list.length === 0 && !error && (
+                <p className="text-default-400 px-2 text-sm">暂无关注</p>
+              )}
+            </div>
+          </ScrollContainer>
+        )}
       </div>
     </div>
   );

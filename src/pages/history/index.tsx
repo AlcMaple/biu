@@ -179,6 +179,7 @@ const History = () => {
             ownerMid: item.author_mid,
             duration: item.duration,
           });
+          addToast({ title: "已添加到下一首播放", color: "success" });
           break;
         case "add-to-playlist":
           usePlayList.getState().addList([
@@ -192,6 +193,7 @@ const History = () => {
               duration: item.duration,
             },
           ]);
+          addToast({ title: "已添加到播放列表", color: "success" });
           break;
         case "favorite":
           useModalStore.getState().onOpenFavSelectModal({
@@ -347,9 +349,9 @@ const History = () => {
   return (
     <ScrollContainer enableBackToTop ref={scrollerRef} className="h-full w-full px-4">
       <div className="mb-2">
-        <div className="flex items-center justify-between">
-          <h1>历史记录</h1>
-          <div className="flex items-center justify-end space-x-2">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <h1 className="min-w-0 truncate">历史记录</h1>
+          <div className="flex flex-none items-center justify-end gap-1">
             <Switch
               size="sm"
               isSelected={reportPlayHistory}
@@ -359,7 +361,7 @@ const History = () => {
             >
               记录播放历史
             </Switch>
-            <IconButton variant="flat" size="sm" onPress={handleClear}>
+            <IconButton variant="flat" size="sm" onPress={handleClear} aria-label="清空历史记录">
               <RiDeleteBinLine size={18} />
             </IconButton>
           </div>

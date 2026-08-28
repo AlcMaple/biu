@@ -111,7 +111,7 @@ const Menu = ({ type, isCreatedBySelf, mediaCount, attr, onClearInvalid }: MenuP
         }}
       >
         <DropdownTrigger>
-          <Button isIconOnly variant="flat" className="hover:text-primary">
+          <Button isIconOnly variant="flat" className="hover:text-primary" aria-label="收藏夹操作">
             <RiMoreLine />
           </Button>
         </DropdownTrigger>

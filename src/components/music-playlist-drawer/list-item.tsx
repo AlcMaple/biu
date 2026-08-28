@@ -70,43 +70,49 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
             {data?.source === "local" ? "本地音乐" : data?.ownerName || "未知"}
           </span>
         </div>
-        <Dropdown
-          disableAnimation
-          isOpen={isOpen}
-          onOpenChange={setIsOpen}
-          classNames={{
-            content: "min-w-fit",
-          }}
+        <span
+          className="flex flex-none"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => event.stopPropagation()}
         >
-          <DropdownTrigger>
-            <Button
-              isIconOnly
-              variant="light"
-              size="sm"
-              className={
-                isMobileLayout || isWeb
-                  ? "flex-none"
-                  : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
-              }
-              aria-label="播放列表操作菜单"
-            >
-              <RiMoreFill size={16} />
-            </Button>
-          </DropdownTrigger>
-
-          <DropdownMenu
-            aria-label="播放列表操作菜单"
-            items={getMenus({ isLogin, isLocal: data.source === "local" })}
-            // @ts-ignore 忽略onAction类型问题
-            onAction={onAction}
+          <Dropdown
+            disableAnimation
+            isOpen={isOpen}
+            onOpenChange={setIsOpen}
+            classNames={{
+              content: "min-w-fit",
+            }}
           >
-            {item => (
-              <DropdownItem key={item.key} color={item.color} startContent={item.icon}>
-                {item.label}
-              </DropdownItem>
-            )}
-          </DropdownMenu>
-        </Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                variant="light"
+                size="sm"
+                className={
+                  isMobileLayout || isWeb
+                    ? "flex-none"
+                    : `flex-none transition-opacity duration-200 ${isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"} group-hover:pointer-events-auto group-hover:opacity-100`
+                }
+                aria-label="播放列表操作菜单"
+              >
+                <RiMoreFill size={16} />
+              </Button>
+            </DropdownTrigger>
+
+            <DropdownMenu
+              aria-label="播放列表操作菜单"
+              items={getMenus({ isLogin, isLocal: data.source === "local" })}
+              // @ts-ignore 忽略onAction类型问题
+              onAction={onAction}
+            >
+              {item => (
+                <DropdownItem key={item.key} color={item.color} startContent={item.icon}>
+                  {item.label}
+                </DropdownItem>
+              )}
+            </DropdownMenu>
+          </Dropdown>
+        </span>
       </div>
     </Button>
   );

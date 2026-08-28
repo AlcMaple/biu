@@ -1,11 +1,12 @@
+import { isOfflineDemo } from "@/common/offline-demo";
 import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
 
 import { installWebLogTransport, reportWebLog } from "./web-log-transport";
 
-const STORE_KEY_PREFIX = "biu:";
-const WEB_STORE_DATABASE = "biu-web-store";
+const STORE_KEY_PREFIX = isOfflineDemo ? "biu-demo:" : "biu:";
+const WEB_STORE_DATABASE = isOfflineDemo ? "biu-demo-web-store" : "biu-web-store";
 const WEB_STORE_OBJECT_STORE = "stores";
 
 // 歌单、同步基线与滚动备份会随用户数据增长；localStorage 的同步配额不适合承载它们。
@@ -90,6 +91,19 @@ function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefi
 }
 
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
+  if (isOfflineDemo) {
+    const { DEMO_STORE_DATA } = await import("@/common/offline-demo-fixtures");
+    const demoStores: Partial<Record<StoreName, unknown>> = {
+      [StoreNameMap.AppSettings]: { appSettings: DEMO_STORE_DATA.appSettings },
+      [StoreNameMap.UserLoginInfo]: DEMO_STORE_DATA.user,
+      [StoreNameMap.LocalFavorites]: DEMO_STORE_DATA.favorites,
+      [StoreNameMap.LocalFavItems]: DEMO_STORE_DATA.localFavItems,
+      [StoreNameMap.Tags]: DEMO_STORE_DATA.tags,
+    };
+    const seeded = demoStores[name];
+    if (seeded !== undefined) return seeded as StoreDataMap[N];
+  }
+
   try {
     if (!highCapacityStores.has(name)) return readLegacyStore(name);
 
@@ -162,6 +176,7 @@ const platform: Platform = {
   showFileInFolder: async () => false,
   openDirectory: async () => false,
   openExternal: async url => {
+    if (isOfflineDemo) return false;
     try {
       const target = new URL(url, window.location.href);
       if (target.protocol !== "http:" && target.protocol !== "https:") return false;
@@ -211,7 +226,11 @@ const platform: Platform = {
   isFullScreen: async () => false,
   onWindowFullScreenChange: unsubscribe,
   toggleDevTools: noop,
-  getMediaDownloadTaskList: async () => [],
+  getMediaDownloadTaskList: async () => {
+    if (!isOfflineDemo) return [];
+    const { DEMO_DOWNLOAD_TASKS } = await import("@/common/offline-demo-fixtures");
+    return DEMO_DOWNLOAD_TASKS as unknown as MediaDownloadTask[];
+  },
   syncMediaDownloadTaskList: unsubscribe,
   addMediaDownloadTask: asyncNoop,
   addMediaDownloadTaskList: asyncNoop,
@@ -220,7 +239,11 @@ const platform: Platform = {
   cancelMediaDownloadTask: asyncNoop,
   retryMediaDownloadTask: asyncNoop,
   clearMediaDownloadTaskList: asyncNoop,
-  scanLocalMusic: async () => [],
+  scanLocalMusic: async () => {
+    if (!isOfflineDemo) return [];
+    const { DEMO_LOCAL_MUSIC } = await import("@/common/offline-demo-fixtures");
+    return DEMO_LOCAL_MUSIC;
+  },
   deleteLocalMusicFile: async () => false,
   peekFancyPlayerThumb: async () => null,
   readFancyPlayerSourceFile: async () => null,

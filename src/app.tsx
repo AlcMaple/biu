@@ -6,6 +6,7 @@ import moment from "moment";
 
 import platform, { isWeb, log } from "@/platform";
 
+import { useIsMobileLayout } from "./common/hooks/use-responsive";
 import { getCookitFromBSite } from "./common/utils/cookie";
 import {
   blurActiveNonEditableElement,
@@ -44,6 +45,7 @@ export function App() {
   const routeElement = useRoutes(routes);
   const navigate = useNavigate();
   const setUpdate = useAppUpdateStore(s => s.setUpdate);
+  const isMobileLayout = useIsMobileLayout();
 
   useEffect(() => {
     // Web 代理采用匿名会话，不转发 Cookie；请求首页无法种下可用登录态，只会多一次网络请求。
@@ -225,8 +227,8 @@ export function App() {
   return (
     <HeroUIProvider navigate={navigate} useHref={useHref} locale="zh-CN">
       <ToastProvider
-        placement="bottom-right"
-        toastOffset={90}
+        placement={isMobileLayout ? "bottom-center" : "bottom-right"}
+        toastOffset={isMobileLayout ? 96 : 90}
         maxVisibleToasts={3}
         toastProps={{ timeout: 2000, color: "primary" }}
         regionProps={{

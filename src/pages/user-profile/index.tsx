@@ -5,6 +5,7 @@ import { Spinner, Tab, Tabs } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { UserRelation } from "@/common/constants/relation";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getRelationStat } from "@/service/relation-stat";
 import { getXSpaceSettings } from "@/service/space-setting";
@@ -22,6 +23,7 @@ import SpaceInfo from "./space-info";
  * 用户个人中心
  */
 const UserProfile = () => {
+  const isMobileLayout = useIsMobileLayout();
   const { id } = useParams();
   const user = useUser(s => s.user);
   const isSelf = String(user?.mid) === id;
@@ -132,12 +134,17 @@ const UserProfile = () => {
         refreshRelation={refreshRelation}
       />
       {relationWithMe !== UserRelation.Blocked && (
-        <div className="p-4">
+        <div className={isMobileLayout ? "p-3" : "p-4"}>
           <Tabs
             radius="md"
-            classNames={{ cursor: "rounded-medium", panel: "px-0 py-4" }}
             aria-label="个人资料栏目"
             variant="solid"
+            fullWidth={isMobileLayout}
+            classNames={{
+              cursor: "rounded-medium",
+              panel: "px-0 py-4",
+              tabList: isMobileLayout ? "overflow-x-auto" : undefined,
+            }}
           >
             {tabs.map(item => (
               <Tab key={item.key} title={item.label}>

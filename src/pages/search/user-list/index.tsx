@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { Spinner, addToast } from "@heroui/react";
 
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import VirtualGridPageList from "@/components/virtual-grid-page-list";
 import { getRelationRelations } from "@/service/relation-relations";
 import { getWebInterfaceWbiSearchType, type SearchUserItem } from "@/service/web-interface-search-type";
@@ -16,6 +17,7 @@ interface UserListProps {
 }
 
 export default function UserList({ keyword, getScrollElement }: UserListProps) {
+  const isMobileLayout = useIsMobileLayout();
   const [list, setList] = useState<SearchUserItemWithRelation[]>([]);
   const [sortKey, setSortKey] = useState<UserSortKey>("default");
   const [page, setPage] = useState(1);
@@ -123,7 +125,7 @@ export default function UserList({ keyword, getScrollElement }: UserListProps) {
         onLoadMore={loadMore}
         hasMore={hasMore}
         loading={loadingMore}
-        rowHeight={240}
+        rowHeight={isMobileLayout ? 190 : 240}
         className="px-4"
       />
     </>
