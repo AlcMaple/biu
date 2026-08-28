@@ -88,7 +88,12 @@ const Theme = ({ children }: Props) => {
   const contextValue = useMemo(() => ({ theme: resolveTheme(themeMode, systemTheme) }), [themeMode, systemTheme]);
 
   return (
-    <main className="h-screen w-screen overflow-hidden">
+    // The overlay provider inserts an intermediate div without a height. A
+    // percentage height therefore resolves against its content instead of the
+    // measured root, which lets long pages push the playbar below the viewport.
+    // Bind the shell directly to the measured visible height; unlike h-screen,
+    // this does not reintroduce iOS Safari's large 100vh layout viewport.
+    <main className="h-[var(--app-h,100dvh)] w-full overflow-hidden">
       <ThemeNameContext value={contextValue}>{children}</ThemeNameContext>
     </main>
   );

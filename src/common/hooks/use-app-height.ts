@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 
-import { log } from "@/platform";
-
 /**
  * 把「可见视口高度」写进 CSS 变量 `--app-h`，供根容器（html/body/#root）当高度用。
  *
@@ -28,19 +26,6 @@ export function useAppHeight() {
       }
     };
     apply();
-
-    // 诊断：把各种高度指标打到服务器日志，用来判断 iOS Chrome 的底部工具栏到底被哪个指标扣掉。
-    // 手机没法开 DevTools，只能这样实测。定位到正确指标后即删。
-    log.warn("[viewport] 高度指标", {
-      innerHeight: window.innerHeight,
-      vvHeight: Math.round(vv.height),
-      vvOffsetTop: Math.round(vv.offsetTop),
-      clientHeight: document.documentElement.clientHeight,
-      screenHeight: window.screen.height,
-      screenAvailHeight: window.screen.availHeight,
-      dpr: window.devicePixelRatio,
-      orientation: window.innerWidth > window.innerHeight ? "landscape" : "portrait",
-    });
 
     // resize：工具栏收放 / 旋转 / 键盘弹出都会触发，高度变化都在这里
     vv.addEventListener("resize", apply);
