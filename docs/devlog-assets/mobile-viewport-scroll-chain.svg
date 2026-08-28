@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" role="img">
+  <title>手机浏览器工具栏变化时的可见区域、列表滚动与播放栏布局</title>
+  <desc>真实 iPhone 日志显示可见高度 684px、设备屏幕高度 874px。应用壳固定在可见区域，文档根保留下拉刷新手势，长列表在自己的滚动区域内滚动，播放栏始终占据可见底部空间，旋转和工具栏变化时重新测量。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#756f73"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7fad91"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="1199" height="719" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+  <text x="34" y="39" font-size="19" font-weight="700" fill="#282529">手机浏览器工具栏变化时，页面仍能刷新、滚动并显示播放控制</text>
+  <text x="34" y="66" font-size="12.5" fill="#756f73">实测 iPhone：可见高度 684px，设备屏幕高度 874px；把“可见区域”和“内容滚动”分开，三种状态互不遮挡。</text>
+
+  <!-- 用户时间轴 -->
+  <text x="34" y="103" font-size="14" font-weight="700" fill="#282529">用户看到的</text>
+  <line x1="118" y1="190" x2="1136" y2="190" stroke="#c3bcc6" stroke-width="2"/>
+  <g font-size="11" text-anchor="middle">
+    <rect x="38" y="126" width="180" height="76" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+    <text x="128" y="156" fill="#4a4450" font-size="13" font-weight="700">打开页面</text>
+    <text x="128" y="176" fill="#756f73">顶部搜索与内容正常出现</text>
+
+    <line x1="222" y1="164" x2="252" y2="164" stroke="#756f73" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="258" y="126" width="190" height="76" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="353" y="156" fill="#36566d" font-size="13" font-weight="700">工具栏展开 / 收起</text>
+    <text x="353" y="176" fill="#55758a">播放栏跟随可见区域调整</text>
+
+    <line x1="452" y1="164" x2="482" y2="164" stroke="#756f73" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="488" y="126" width="180" height="76" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="578" y="156" fill="#316247" font-size="13" font-weight="700">下拉可刷新</text>
+    <text x="578" y="176" fill="#557862">回到顶部仍保留原生手势</text>
+
+    <line x1="672" y1="164" x2="702" y2="164" stroke="#756f73" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="708" y="126" width="180" height="76" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="798" y="156" fill="#316247" font-size="13" font-weight="700">长列表上下滚动</text>
+    <text x="798" y="176" fill="#557862">歌曲不会被壳整体截断</text>
+
+    <line x1="892" y1="164" x2="922" y2="164" stroke="#756f73" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="928" y="126" width="224" height="76" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="1040" y="156" fill="#316247" font-size="13" font-weight="700">播放后仍看得到控制</text>
+    <text x="1040" y="176" fill="#557862">播放栏在浏览器工具栏上方</text>
+  </g>
+
+  <!-- 技术时间轴 -->
+  <text x="34" y="248" font-size="14" font-weight="700" fill="#282529">背后在做的</text>
+  <line x1="118" y1="333" x2="1136" y2="333" stroke="#c3bcc6" stroke-width="2"/>
+  <g font-size="11" text-anchor="middle">
+    <rect x="38" y="270" width="180" height="76" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="128" y="298" fill="#36566d" font-size="13" font-weight="700">读取可见区域</text>
+    <text x="128" y="318" fill="#55758a">684px（屏幕高度 874px）</text>
+
+    <line x1="222" y1="308" x2="252" y2="308" stroke="#91adc1" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="258" y="270" width="190" height="76" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="353" y="298" fill="#36566d" font-size="13" font-weight="700">应用壳固定可见高度</text>
+    <text x="353" y="318" fill="#55758a">不再被内容增长撑高</text>
+
+    <line x1="452" y1="308" x2="482" y2="308" stroke="#91adc1" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="488" y="270" width="180" height="76" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+    <text x="578" y="298" fill="#7a6234" font-size="13" font-weight="700">文档根保留纵向手势</text>
+    <text x="578" y="318" fill="#8c764b">下拉刷新不被根节点截断</text>
+
+    <line x1="672" y1="308" x2="702" y2="308" stroke="#91adc1" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <rect x="708" y="270" width="180" height="76" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="798" y="298" fill="#316247" font-size="13" font-weight="700">列表容器独立滚动</text>
+    <text x="798" y="318" fill="#557862">只滚歌曲内容</text>
+
+    <line x1="892" y1="308" x2="922" y2="308" stroke="#7fad91" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
+    <rect x="928" y="270" width="224" height="76" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="1040" y="298" fill="#316247" font-size="13" font-weight="700">播放栏占据底部空间</text>
+    <text x="1040" y="318" fill="#557862">不与列表争夺同一块高度</text>
+  </g>
+
+  <!-- 边界与易错点 -->
+  <text x="34" y="393" font-size="14" font-weight="700" fill="#282529">边界与最容易改错的地方</text>
+  <g font-size="11">
+    <rect x="38" y="416" width="350" height="112" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="58" y="444" font-size="13" font-weight="700" fill="#36566d">工具栏 / 旋转</text>
+    <text x="58" y="466" fill="#55758a">每次可见高度变化都重新测量。</text>
+    <text x="58" y="486" fill="#55758a">横屏不沿用竖屏高度，列表和播放栏</text>
+    <text x="58" y="504" fill="#55758a">仍从同一个可见区域重新布局。</text>
+
+    <rect x="408" y="416" width="350" height="112" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="428" y="444" font-size="13" font-weight="700" fill="#316247">职责分开</text>
+    <text x="428" y="466" fill="#557862">应用壳负责固定边界和播放栏位置；</text>
+    <text x="428" y="486" fill="#557862">歌曲列表负责自己的滚动，不让长内容</text>
+    <text x="428" y="504" fill="#557862">把整个页面一起推到浏览器工具栏后面。</text>
+
+    <rect x="778" y="416" width="374" height="112" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+    <text x="798" y="444" font-size="13" font-weight="700" fill="#96434f">不要这样修</text>
+    <text x="798" y="466" fill="#96434f">不要用无明确高度的中间层撑起主壳，</text>
+    <text x="798" y="486" fill="#96434f">也不要为了挡住工具栏而锁死文档根</text>
+    <text x="798" y="504" fill="#96434f">的纵向滚动；两者都会同时破坏刷新、</text>
+    <text x="798" y="522" fill="#96434f">列表滚动、横屏和播放栏。</text>
+  </g>
+
+  <rect x="38" y="568" width="1114" height="112" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+  <text x="58" y="597" font-size="13" font-weight="700" fill="#4a4450">验收口径</text>
+  <text x="58" y="620" font-size="11" fill="#4a4450">竖屏：下拉刷新、歌曲列表滚动、播放后底部控制可见；横屏：旋转后内容仍在可见区域内，列表可滚动，播放栏不落到工具栏后方。</text>
+  <text x="58" y="643" font-size="11" fill="#756f73">当前修复先以临时服务版本供真机验证；确认通过后再进入正式提交和发布。</text>
+</svg>
