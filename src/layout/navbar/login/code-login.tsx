@@ -18,6 +18,9 @@ interface CodeLoginForm {
 }
 
 const PHONE_REGEX_CN = /^(?:\+?86)?1\d{10}$/; // 简易中国大陆手机号校验
+const SMS_CODE_LENGTH = 6;
+
+const normalizeSmsCode = (value: string) => value.replace(/\D/g, "").slice(0, SMS_CODE_LENGTH);
 
 interface Props {
   onClose: () => void;
@@ -298,12 +301,20 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
           render={({ field }) => (
             <Input
               {...field}
+              onChange={event => field.onChange(normalizeSmsCode(event.target.value))}
+              onPaste={event => {
+                event.preventDefault();
+                field.onChange(normalizeSmsCode(event.clipboardData.getData("text")));
+              }}
               ref={e => {
                 field.ref(e);
                 codeRef.current = e;
               }}
               className="flex-1"
               type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={SMS_CODE_LENGTH}
               placeholder="验证码"
               variant="bordered"
               isInvalid={!!errors.code}
