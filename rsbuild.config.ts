@@ -5,6 +5,7 @@ import { pluginSvgr } from "@rsbuild/plugin-svgr";
 import { createBilibiliWebMiddleware } from "./plugins/bilibili-web-proxy";
 import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
+import { UMAMI_HOST, UMAMI_WEBSITE_ID } from "./shared/umami";
 
 const isDemoTarget = process.env.BIU_TARGET === "demo";
 const isWebTarget = process.env.BIU_TARGET === "web" || isDemoTarget;
@@ -19,8 +20,8 @@ export default defineConfig(({ command }) => {
           tag: "script",
           attrs: {
             defer: true,
-            src: "https://user.alcmaple.cn/script.js",
-            "data-website-id": "4a1ac5d8-22f8-481b-9084-c9282e0c3ce5",
+            src: `${UMAMI_HOST}/script.js`,
+            "data-website-id": UMAMI_WEBSITE_ID,
           },
           head: true,
           publicPath: false,

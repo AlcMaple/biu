@@ -4,6 +4,7 @@ import log from "electron-log";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { reportDesktopActivity } from "./analytics";
 import { destroyDesktopLyricsWindow } from "./desktop-lyrics";
 import { applyProxySettings } from "./ipc/app";
 import { channel } from "./ipc/channel";
@@ -158,6 +159,7 @@ if (!gotTheLock) {
     installWebRequestInterceptors();
 
     createWindow();
+    void reportDesktopActivity("startup");
     void injectAuthCookie().catch(error => {
       log.error("[main] Failed to initialize auth cookies:", error);
     });
@@ -183,7 +185,14 @@ if (!gotTheLock) {
     }
   });
 
-  app.on("activate", () => mainWindow?.show());
+  app.on("activate", () => {
+    mainWindow?.show();
+    void reportDesktopActivity("activate");
+  });
+
+  app.on("browser-window-focus", () => {
+    void reportDesktopActivity("focus");
+  });
 
   app.on("before-quit", () => {
     (app as any).quitting = true;
@@ -222,6 +231,8 @@ if (!gotTheLock) {
   });
 
   app.on("second-instance", () => {
+    void reportDesktopActivity("second-instance");
+
     if (mainWindow) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
