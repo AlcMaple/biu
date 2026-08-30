@@ -17,10 +17,19 @@ interface CodeLoginForm {
   code: string;
 }
 
-const PHONE_REGEX_CN = /^(?:\+?86)?1\d{10}$/; // 简易中国大陆手机号校验
+const PHONE_REGEX_CN = /^(?:\+?86)?1\d{10}$/;
 const SMS_CODE_LENGTH = 6;
 
 const normalizeSmsCode = (value: string) => value.replace(/\D/g, "").slice(0, SMS_CODE_LENGTH);
+
+const normalizePhoneNumber = (value: string, countryCode?: string) => {
+  const code = countryCode?.replace(/\D/g, "");
+  if (!code) return value.replace(/\D/g, "");
+
+  const internationalPrefix = new RegExp(`^(?:\\+\\s*|00\\s*)${code}\\s*`);
+  const withoutCountryCode = value.trim().replace(internationalPrefix, "");
+  return withoutCountryCode.replace(/\D/g, "");
+};
 
 interface Props {
   onClose: () => void;
@@ -81,6 +90,9 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
     return res?.data?.common || [];
   });
 
+  const selectedCountryCode =
+    countryList?.find(item => item.id === Number(countryId))?.country_id || (countryId === "1" ? "86" : undefined);
+
   const { verify, loading: geetestLoading } = useGeetest(isWeb ? getWebSmsCaptcha : undefined);
 
   const {
@@ -97,7 +109,6 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
   const [countdown, setCountdown] = useState<number>(0);
   const [sending, setSending] = useState(false);
 
-  // 倒计时逻辑保持不变
   useEffect(() => {
     let timer: number | null = null;
     if (countdown > 0) {
@@ -109,7 +120,7 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
   }, [countdown]);
 
   const onSendCode = async () => {
-    const phone = getValues("phone");
+    const phone = normalizePhoneNumber(getValues("phone"), selectedCountryCode);
     const isPhoneValid = await trigger("phone");
 
     if (!isPhoneValid || !phone) {
@@ -118,12 +129,10 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
 
     setSending(true);
     try {
-      // 1. Geetest Verification
       const gtResult = await verify();
       if (!gtResult) return;
 
-      // 2. Send SMS
-      const tel = phone.replace(/\D/g, "");
+      const tel = phone;
       const countryCode = countryList?.find(item => item.id === Number(countryId))?.country_id || "86";
       let responseCode: number;
       let responseMessage: string;
@@ -192,7 +201,7 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
       } else {
         const response = await getPassportLoginWebLoginSms({
           cid: Number(countryList?.find(item => item.id === Number(countryId))?.country_id || "86"),
-          tel: Number(values.phone.replace(/\D/g, "")),
+          tel: Number(normalizePhoneNumber(values.phone, selectedCountryCode)),
           code: Number(code),
           source: "main_web",
           captcha_key: captchaKey,
@@ -234,7 +243,12 @@ const CodeLogin = ({ onClose, updateUserData }: Props) => {
           <Input
             {...field}
             onChange={event => {
-              field.onChange(event);
+              field.onChange(normalizePhoneNumber(event.target.value, selectedCountryCode));
+              clearPendingSmsLogin();
+            }}
+            onPaste={event => {
+              event.preventDefault();
+              field.onChange(normalizePhoneNumber(event.clipboardData.getData("text"), selectedCountryCode));
               clearPendingSmsLogin();
             }}
             ref={e => {
