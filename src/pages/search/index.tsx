@@ -15,6 +15,7 @@ const Search = () => {
   const scrollerRef = useRef<ScrollRefObject>(null);
   const [searchType, setSearchType] = useState(SearchType.Video);
   const keyword = useSearchHistory(s => s.keyword);
+  const searchRevision = useSearchHistory(s => s.searchRevision);
   const isLoggedIn = useUser(s => Boolean(s.user?.isLogin && s.user.mid));
   const searchTypeOptions = getSearchTypeOptions(isLoggedIn);
 
@@ -49,14 +50,17 @@ const Search = () => {
         </div>
       </div>
       <>
+        {/* 关键词不变时也要重新挂载结果组件，才能再次请求。 */}
         {searchType === SearchType.Video && (
           <VideoList
+            key={`video-${searchRevision}`}
             keyword={keyword}
             getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
           />
         )}
         {isLoggedIn && searchType === SearchType.User && (
           <UserList
+            key={`user-${searchRevision}`}
             keyword={keyword}
             getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
           />

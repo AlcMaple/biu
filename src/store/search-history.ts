@@ -9,6 +9,8 @@ export interface SearchItem {
 export interface SearchHistoryState {
   keyword: string;
   items: SearchItem[];
+  // 相同关键词也要重新发起搜索；只在当前页面内递增，不参与持久化
+  searchRevision: number;
 }
 
 export interface SearchHistoryAction {
@@ -22,14 +24,19 @@ export const useSearchHistory = create<SearchHistoryState & SearchHistoryAction>
     (set, get) => ({
       keyword: "",
       items: [],
+      searchRevision: 0,
       add: value => {
-        const { items } = get();
+        const { items, searchRevision } = get();
         const newItem = { value, time: Date.now() };
 
         if (items.some(i => i.value === value)) {
-          set({ keyword: value, items: [newItem, ...items.filter(i => i.value !== value)] });
+          set({
+            keyword: value,
+            items: [newItem, ...items.filter(i => i.value !== value)],
+            searchRevision: searchRevision + 1,
+          });
         } else {
-          set({ keyword: value, items: [newItem, ...items] });
+          set({ keyword: value, items: [newItem, ...items], searchRevision: searchRevision + 1 });
         }
       },
       delete: item => set(state => ({ items: state.items.filter(i => i.value !== item.value) })),
