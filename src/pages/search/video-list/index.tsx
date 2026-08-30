@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 
-import { addToast, Spinner } from "@heroui/react";
+import { addToast, Button, Spinner } from "@heroui/react";
 
 import { stripHtml } from "@/common/utils/str";
 import { parseDuration } from "@/common/utils/time";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Empty from "@/components/empty";
-import platform from "@/platform";
+import platform, { log } from "@/platform";
 import { getWebInterfaceWbiSearchType, type SearchVideoItem } from "@/service/web-interface-search-type";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -31,6 +31,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
   const [hasMore, setHasMore] = useState(true);
   const [initialLoading, setInitialLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [initialError, setInitialError] = useState(false);
 
   const fetchPage = useCallback(
     async (pn: number) => {
@@ -40,8 +41,17 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
         page: pn,
         page_size: 24,
         order,
-        ...(musicOnly && { tids: 3 }), // 音乐分区ID为3
+        ...(musicOnly && { tids: 3 }), // B 站音乐分区的 tid 固定为 3。
       });
+
+      // BFF 会透传 B 站的业务错误并保持 HTTP 200；只看 HTTP 状态会把 -400/-412
+      // 当成「正常空列表」，用户看到的就是暂无内容而不是可重试的失败态。
+      if (res?.code !== 0 || !res?.data || !Array.isArray(res.data.result)) {
+        const error = new Error("Bilibili search request failed");
+        Object.assign(error, { biliCode: res?.code, biliMessage: res?.message });
+        throw error;
+      }
+
       const items = res?.data?.result ?? [];
       const total = res?.data?.numResults ?? 0;
       return { items, total };
@@ -61,7 +71,13 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
         return newList;
       });
       setPage(nextPage);
-    } catch {
+    } catch (error) {
+      const details = error && typeof error === "object" ? (error as Record<string, unknown>) : undefined;
+      log.warn("[search] 视频列表加载更多失败", {
+        biliCode: details?.biliCode,
+        httpStatus: (details?.response as { status?: number } | undefined)?.status,
+        errorCode: details?.code,
+      });
       addToast({ title: "加载更多失败", color: "danger" });
     } finally {
       setLoadingMore(false);
@@ -71,6 +87,7 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
   const retryInitial = useCallback(async () => {
     if (!keyword) return;
     setInitialLoading(true);
+    setInitialError(false);
     setList([]);
     setPage(1);
     setHasMore(true);
@@ -78,15 +95,22 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
       const { items, total } = await fetchPage(1);
       setList(items);
       setHasMore(items.length < total);
-    } catch {
-      addToast({ title: "加载失败", color: "danger" });
+    } catch (error) {
+      const details = error && typeof error === "object" ? (error as Record<string, unknown>) : undefined;
+      log.warn("[search] 视频列表初次加载失败", {
+        biliCode: details?.biliCode,
+        httpStatus: (details?.response as { status?: number } | undefined)?.status,
+        errorCode: details?.code,
+      });
+      setInitialError(true);
+      addToast({ title: "加载失败", description: "搜索请求失败，请检查网络后重试", color: "danger" });
     } finally {
       setInitialLoading(false);
     }
   }, [fetchPage, keyword]);
 
   useEffect(() => {
-    retryInitial();
+    void retryInitial();
   }, [retryInitial]);
 
   const handlePlayAll = useCallback(async () => {
@@ -194,8 +218,16 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
           <Spinner label="加载中" />
         </div>
       )}
-      {!initialLoading && !list?.length && <Empty className="min-h-[280px]" />}
-      {!initialLoading && list?.length > 0 && (
+      {!initialLoading && initialError && (
+        <div role="alert" className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
+          <p className="text-default-500">搜索加载失败，请检查网络后重试</p>
+          <Button size="sm" color="primary" onPress={() => void retryInitial()}>
+            重新加载
+          </Button>
+        </div>
+      )}
+      {!initialLoading && !initialError && !list?.length && <Empty className="min-h-[280px]" />}
+      {!initialLoading && !initialError && list?.length > 0 && (
         <>
           {displayMode === "card" ? (
             <GridList
