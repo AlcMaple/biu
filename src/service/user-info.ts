@@ -1,4 +1,5 @@
 import { apiRequest } from "./request";
+import { cacheWbiKeys } from "./request/wbi-key-cache";
 
 /**
  * 导航栏用户信息 - 响应类型
@@ -123,10 +124,21 @@ export interface WbiImg {
   sub_url: string; // Wbi 签名参数 subKey的伪装 url 详见文档 Wbi 签名
 }
 
-/**
- * 获取导航栏用户信息
- * @returns 导航栏用户信息
- */
-export const getUserInfo = () => {
-  return apiRequest.get<GetUserInfoResponse>("/x/web-interface/nav");
+let userInfoRequest: Promise<GetUserInfoResponse> | undefined;
+
+// /nav 同时提供 WBI 密钥；合并同一时刻的读取，并缓存匿名响应，避免搜索/播放各自等待一次。
+export const getUserInfo = (): Promise<GetUserInfoResponse> => {
+  if (!userInfoRequest) {
+    userInfoRequest = apiRequest
+      .get<GetUserInfoResponse>("/x/web-interface/nav")
+      .then(response => {
+        cacheWbiKeys(response?.data?.wbi_img);
+        return response;
+      })
+      .finally(() => {
+        userInfoRequest = undefined;
+      });
+  }
+
+  return userInfoRequest;
 };
