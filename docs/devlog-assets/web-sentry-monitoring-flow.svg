@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="520" viewBox="0 0 1120 520" role="img" aria-labelledby="title desc">
+  <title id="title">Biu Web Sentry 监控数据流</title>
+  <desc id="desc">浏览器和 Web BFF 分别将脱敏后的异常与低采样性能数据发送到独立的 Sentry 项目，登录用户仅用 B 站 mid 和昵称关联，构建期 source map 上传后立即删除。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="m 0 0 10 5 -10 5 z" fill="#756f73" />
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #282529; }
+      .subtitle { font-size: 15px; fill: #756f73; }
+      .section { font-size: 16px; font-weight: 700; }
+      .card-title { font-size: 17px; font-weight: 700; }
+      .body { font-size: 14px; fill: #4a4450; }
+      .small { font-size: 13px; fill: #756f73; }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1118" height="518" rx="14" fill="#fbfafb" stroke="#e2dcdf" stroke-width="2" />
+  <text x="40" y="48" font-size="22" font-weight="700">Biu Web Sentry 监控数据流</text>
+  <text x="40" y="76" class="subtitle">异常可追踪，登录用户用 B 站 mid / 昵称关联，业务参数不出监控事件</text>
+
+  <text x="40" y="122" class="section">运行时</text>
+  <rect x="40" y="142" width="300" height="190" rx="10" fill="#eef4f8" stroke="#91adc1" stroke-width="2" />
+  <text x="64" y="178" class="card-title">浏览器端</text>
+  <text x="64" y="208" class="body">异常、React 可恢复错误</text>
+  <text x="64" y="234" class="body">登录后仅关联 B 站 mid / 昵称</text>
+  <text x="64" y="260" class="body">仅给同源 BFF 请求传播 trace</text>
+  <text x="64" y="286" class="body">URL 去掉 query，headers 只留 UA</text>
+  <text x="64" y="312" class="small">无 DSN 时不加载监控代码</text>
+
+  <rect x="410" y="142" width="300" height="190" rx="10" fill="#edf7f1" stroke="#7fad91" stroke-width="2" />
+  <text x="434" y="178" class="card-title">Web BFF</text>
+  <text x="434" y="208" class="body">每个响应带 X-Request-ID</text>
+  <text x="434" y="234" class="body">业务路由 5% 性能采样</text>
+  <text x="434" y="260" class="body">500 捕获异常并保留请求关联</text>
+  <text x="434" y="286" class="small">健康检查、静态资源不采 span</text>
+
+  <rect x="780" y="142" width="300" height="190" rx="10" fill="#fff8e8" stroke="#d9bd85" stroke-width="2" />
+  <text x="804" y="178" class="card-title">Sentry</text>
+  <text x="804" y="208" class="body">biu-web：浏览器异常与性能</text>
+  <text x="804" y="234" class="body">biu-server：BFF 异常与请求</text>
+  <text x="804" y="260" class="body">两端 release 使用同一提交号</text>
+  <text x="804" y="286" class="small">不启用 Session Replay</text>
+
+  <path d="M340 227 H410" fill="none" stroke="#756f73" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M710 227 H780" fill="none" stroke="#756f73" stroke-width="2" marker-end="url(#arrow)" />
+
+  <text x="40" y="360" class="section">构建期</text>
+  <rect x="40" y="380" width="1040" height="92" rx="10" fill="#f4f2f5" stroke="#c3bcc6" stroke-width="2" />
+  <text x="64" y="416" class="body">提交号 → Web bundle 注入 release → source map 上传到 biu-web</text>
+  <text x="64" y="444" class="body">上传完成后立即删除对外构建目录中的 .map；无 Auth Token 时不生成 Web source map</text>
+  <path d="M560 312 V380" fill="none" stroke="#756f73" stroke-width="2" marker-end="url(#arrow)" />
+</svg>

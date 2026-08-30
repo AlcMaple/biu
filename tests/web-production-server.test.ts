@@ -82,6 +82,7 @@ describe("production Web server", () => {
     expect(index.status).toBe(200);
     expect(await index.text()).toContain("web-index");
     expect(index.headers.get("cache-control")).toBe("no-store");
+    expect(index.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
     expect(index.headers.get("referrer-policy")).toBe("no-referrer");
     expect(index.headers.get("x-content-type-options")).toBe("nosniff");
     expect(index.headers.get("x-frame-options")).toBe("DENY");

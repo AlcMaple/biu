@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 
 import { DEFAULT_CLIENT_LOG_MAX_TOTAL_BYTES, DEFAULT_CLIENT_LOG_RETENTION_DAYS } from "./client-log-store.js";
+import { captureWebStartupError, isWebMonitoringEnabled } from "./monitoring.js";
 import { normalizePublicOrigin } from "./proxy-common.js";
 import { closeProductionWebServer, createProductionWebServer } from "./server.js";
 
@@ -92,6 +93,7 @@ async function main() {
   console.info(`[web] Biu is listening at ${config.publicOrigin ?? localOrigin}`);
   console.info(`[web] Health check: ${config.publicOrigin ?? localOrigin}/__biu_health`);
   console.info("[web] Sessions are stored in this process only; restarting it signs Web users out.");
+  console.info(`[web] Sentry monitoring: ${isWebMonitoringEnabled ? "enabled" : "disabled"}`);
   console.info(
     config.clientLogDir
       ? `[web] Client logs: ${config.clientLogDir} (kept ${config.clientLogRetentionDays} days, max ${Math.round(config.clientLogMaxTotalBytes / (1024 * 1024))} MB)`
@@ -113,5 +115,6 @@ async function main() {
 
 void main().catch(error => {
   console.error("[web] Failed to start", error);
+  void captureWebStartupError(error);
   process.exitCode = 1;
 });

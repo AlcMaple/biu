@@ -3,6 +3,9 @@ import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  define: {
+    __BIU_SENTRY_ENABLED__: "false",
+  },
   plugins: [react()],
   test: {
     globals: true,

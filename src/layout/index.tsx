@@ -15,7 +15,7 @@ import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
-import { log } from "@/platform";
+import { isWeb, log } from "@/platform";
 import { initLocalPlaylistSync } from "@/service/sync";
 import { useUser } from "@/store/user";
 
@@ -57,6 +57,7 @@ const Layout = () => {
       resetKeys={[location.pathname]}
       onError={(error, info) => {
         log.error("[ErrorBoundary]", error, info);
+        if (isWeb) window.__biuMonitoring?.captureException(error, info.componentStack ?? undefined);
       }}
     >
       <SideDrawerContext.Provider value={{ openSideDrawer }}>

@@ -2,6 +2,8 @@ import type { IncomingMessage } from "node:http";
 
 import { createHash, randomBytes } from "node:crypto";
 
+import type { BiuMonitoringUser } from "../../shared/monitoring-user.js";
+
 export const WEB_SESSION_COOKIE_NAME = "__Host-biu_session";
 export const DEFAULT_WEB_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -21,6 +23,7 @@ export interface WebSessionRecord {
   lastAccessAt: number;
   lastRefreshCheckAt: number;
   refreshToken?: string;
+  user?: BiuMonitoringUser;
 }
 
 export interface ResolvedWebSessionRecord {
@@ -206,7 +209,7 @@ export class WebSessionStore {
     this.sessionTtlMs = options.sessionTtlMs ?? DEFAULT_WEB_SESSION_TTL_MS;
   }
 
-  createSession(input: { cookies: Iterable<BilibiliCookie>; refreshToken?: string }): {
+  createSession(input: { cookies: Iterable<BilibiliCookie>; refreshToken?: string; user?: BiuMonitoringUser }): {
     cookieHeader: string;
     sessionId: string;
   } {
@@ -225,6 +228,7 @@ export class WebSessionStore {
       // QR 登录刚经过一次服务端身份校验，可从这里开始计算下一次 Cookie 状态检查。
       lastRefreshCheckAt: now,
       refreshToken: input.refreshToken,
+      ...(input.user ? { user: input.user } : {}),
     });
 
     return {
@@ -265,17 +269,21 @@ export class WebSessionStore {
 
   updateSession(
     request: RequestWithHeaders,
-    update: { cookies?: Iterable<BilibiliCookie>; refreshToken?: string },
+    update: { cookies?: Iterable<BilibiliCookie>; refreshToken?: string; user?: BiuMonitoringUser | null },
   ): boolean {
     const session = this.getSession(request);
     if (!session) return false;
 
     if (update.cookies) session.cookies = mergeBilibiliCookies(session.cookies.values(), update.cookies, this.now());
     if (update.refreshToken !== undefined) session.refreshToken = update.refreshToken;
+    if (update.user !== undefined) session.user = update.user ?? undefined;
     return true;
   }
 
-  updateSessionById(sessionId: string, update: { cookies?: Iterable<BilibiliCookie>; refreshToken?: string }): boolean {
+  updateSessionById(
+    sessionId: string,
+    update: { cookies?: Iterable<BilibiliCookie>; refreshToken?: string; user?: BiuMonitoringUser | null },
+  ): boolean {
     const session = this.sessions.get(sessionId);
     if (!session || session.expiresAt <= this.now()) {
       this.sessions.delete(sessionId);
@@ -284,6 +292,7 @@ export class WebSessionStore {
 
     if (update.cookies) session.cookies = mergeBilibiliCookies(session.cookies.values(), update.cookies, this.now());
     if (update.refreshToken !== undefined) session.refreshToken = update.refreshToken;
+    if (update.user !== undefined) session.user = update.user ?? undefined;
     return true;
   }
 
