@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 
+import { toBiuMonitoringUser, type BiuMonitoringUser } from "../../shared/monitoring-user.js";
+import { setWebRequestUser } from "../monitoring.js";
 import {
   BilibiliAuthClient,
   BilibiliUpstreamError,
@@ -77,6 +79,7 @@ export interface ResolvedWebSession {
   cookieHeaderFor: (target: string | URL) => string;
   sessionId: string;
   updateFromSetCookie: (setCookies: string[], responseUrl: string | URL) => void;
+  user?: BiuMonitoringUser;
 }
 
 export type WebSessionResolver = (
@@ -306,9 +309,12 @@ export function createWebSessionResolver(
   return async (request, response) => {
     const resolved = sessionStore.resolveSessionRecord(request);
     if (!resolved) {
+      setWebRequestUser(request, null);
       if (response && hasWebSessionCookie(request)) appendSetCookie(response, serializeClearedWebSessionCookie());
       return undefined;
     }
+
+    setWebRequestUser(request, resolved.session.user);
 
     if (refreshCoordinator) {
       const refresh = refreshCoordinator.refreshIfDue(resolved);
@@ -327,6 +333,7 @@ export function createWebSessionResolver(
     return {
       cookieHeaderFor: target => formatBilibiliCookieHeader(resolved.session.cookies.values(), target),
       sessionId: resolved.sessionId,
+      user: resolved.session.user,
       updateFromSetCookie: (setCookies, responseUrl) => {
         const updates = setCookies
           .map(header => parseBilibiliSetCookie(header, responseUrl))
@@ -398,7 +405,13 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
 
     // 仅在新身份已完成服务端校验后替换旧会话，失败时不会把用户登出。
     sessions.destroySession(request);
-    const issued = sessions.createSession({ cookies: credentials.cookies, refreshToken: credentials.refreshToken });
+    const monitoringUser = toBiuMonitoringUser(user);
+    const issued = sessions.createSession({
+      cookies: credentials.cookies,
+      refreshToken: credentials.refreshToken,
+      user: monitoringUser ?? undefined,
+    });
+    setWebRequestUser(request, monitoringUser);
     response.setHeader("Set-Cookie", issued.cookieHeader);
     return user;
   };
@@ -648,8 +661,11 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
   ): { session: WebSessionRecord; sessionId: string } | undefined => {
     const resolved = sessions.resolveSessionRecord(request);
     if (!resolved) {
+      setWebRequestUser(request, null);
       if (hasWebSessionCookie(request)) appendSetCookie(response, serializeClearedWebSessionCookie());
       sendJson(response, 401, unauthenticatedPayload());
+    } else {
+      setWebRequestUser(request, resolved.session.user);
     }
     return resolved;
   };
@@ -657,16 +673,22 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
   const handleGetSession = async (request: IncomingMessage, response: ServerResponse) => {
     const session = sessions.getSession(request);
     if (!session) {
+      setWebRequestUser(request, null);
       if (hasWebSessionCookie(request)) appendSetCookie(response, serializeClearedWebSessionCookie());
       sendJson(response, 200, unauthenticatedPayload());
       return;
     }
+    setWebRequestUser(request, session.user);
 
     try {
       const user = await authClient.getUser(session.cookies.values());
+      const monitoringUser = toBiuMonitoringUser(user);
+      sessions.updateSession(request, { user: monitoringUser });
+      setWebRequestUser(request, monitoringUser);
       sendJson(response, 200, sessionPayload(user));
     } catch (error) {
       if (error instanceof BilibiliUpstreamError && error.status === 401) {
+        setWebRequestUser(request, null);
         sessions.destroySession(request);
         response.setHeader("Set-Cookie", serializeClearedWebSessionCookie());
         sendJson(response, 200, unauthenticatedPayload());
@@ -683,6 +705,9 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
     try {
       const result = await refreshCoordinator.refreshNow(resolved);
       const user = await authClient.getUser(resolved.session.cookies.values());
+      const monitoringUser = toBiuMonitoringUser(user);
+      sessions.updateSession(request, { user: monitoringUser });
+      setWebRequestUser(request, monitoringUser);
       sendJson(response, 200, { code: 0, data: { refreshed: result.refreshed, user }, message: "0" });
     } catch (error) {
       if (error instanceof BilibiliUpstreamError && error.status === 401) {
@@ -695,6 +720,7 @@ export function createWebAuthHandler(options: WebAuthHandlerOptions = {}): WebAu
 
   const handleLogout = async (request: IncomingMessage, response: ServerResponse) => {
     const session = sessions.getSession(request);
+    setWebRequestUser(request, session?.user);
     let upstreamLoggedOut = false;
 
     if (session) {

@@ -437,6 +437,10 @@ describe("Web QR authentication handler", () => {
     expect(sessions.resolveCookieFor(cookieRequest(SESSION_TOKEN_A), API_TARGET)).toBe(
       "bili_jct=server-only-csrf; SESSDATA=server-only-session",
     );
+    expect(sessions.resolveSessionRecord(cookieRequest(SESSION_TOKEN_A))?.session.user).toEqual({
+      id: "42",
+      username: "Biu",
+    });
 
     const replayResponse = createResponse();
     await handler(

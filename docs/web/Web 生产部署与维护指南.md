@@ -280,6 +280,38 @@ launchctl kickstart -k "gui/$(id -u)/$BIU_WEB_SERVICE_LABEL"
 
 Web BFF 登录会话位于进程内存，重启后用户需要重新登录；这是预期行为，不是歌单数据丢失。
 
+### 3.5 Sentry 监控接入
+
+Web 监控由两个相互独立的 Sentry 项目组成：浏览器 `biu-web` 和 Node BFF `biu-server`。Electron、Android、iOS 不读取 Web 的 DSN。两端均关闭自动 PII；登录态仅主动设置 B 站 `mid` 与昵称，浏览器请求只向同源 `__biu_*` BFF 传播 trace；健康检查、静态资源和网页日志不上报性能 span。
+
+Sentry 配置必须放在仓库外的 `600` 权限文件中。浏览器 DSN 是构建期变量，服务端 DSN 是 LaunchAgent 运行时变量；`SENTRY_RELEASE` 与 `VITE_SENTRY_RELEASE` 必须逐字符相同：
+
+```bash
+release=$(git rev-parse --short HEAD)
+sentry_env=/仓库外的/biu-sentry.env
+test -f "$sentry_env"
+chmod 600 "$sentry_env"
+set -a
+. "$sentry_env"
+set +a
+SENTRY_RELEASE="$release" VITE_SENTRY_RELEASE="$release" pnpm build:web
+```
+
+`SENTRY_AUTH_TOKEN`、`SENTRY_ORG`、`SENTRY_WEB_PROJECT` 同时存在时，Rsbuild 的 Webpack 兼容插件才会上传 `dist/web` 的 source map，并在上传后删除 map；未配置 token 时不生成 Web source map。`web-server` 的 `@sentry/node` 会在 `build:web` 的最后一步打进 `dist/server/web-server/index.js`，因此发布包仍只需要 `dist/web` 和 `dist/server`，不在活跃 release 里执行 `pnpm install`。
+
+LaunchAgent 需要保留以下运行时变量（真实值仍在私有文件或受控 plist 中）：
+
+```text
+SENTRY_DSN=<biu-server 项目 DSN>
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=<本次 git 短提交>
+SENTRY_TRACES_SAMPLE_RATE=0.05
+```
+
+前端构建变量对应 `VITE_SENTRY_DSN`、`VITE_SENTRY_ENVIRONMENT`、`VITE_SENTRY_RELEASE` 和 `VITE_SENTRY_TRACES_SAMPLE_RATE`。没有 DSN 时浏览器监控模块不会加载；监控初始化失败也不能阻断页面启动。
+
+首次验收使用**现有已登录的 Chrome 标签**打开站点，不要新建会话导致重新登录。确认 `window.__biuMonitoring` 已初始化并完成用户信息刷新后，再从真实业务代码触发一次受控错误，检查 `biu-web` 项目的 issue 是否带当前 release、用户 `id` / `username`、browser/os/device 上下文且 URL 无 query；匿名事件的用户字段为空是预期行为。服务端真实 500 应进入 `biu-server`，带已校验账号的 `id` / `username` 和同一个 `X-Request-ID`。公网静态资源的 `.map` 后缀不得返回 source map。
+
 ## 4. 发布后的逐层验收
 
 按从内到外顺序执行；每层失败先修复该层，不要盲目改 DNS、TLS 或数据。

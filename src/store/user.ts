@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import platform from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { getUserInfo, type UserInfo } from "@/service/user-info";
 import { StoreNameMap } from "@shared/store";
 
@@ -13,23 +13,35 @@ interface Action {
   updateUser: () => Promise<void>;
   clear: () => void;
 }
+
+const updateBrowserMonitoringUser = (user: UserInfo | null) => {
+  if (!isWeb) return;
+  window.__biuMonitoring?.setUser(
+    user
+      ? {
+          id: String(user.mid),
+          ...(user.uname ? { username: user.uname } : {}),
+        }
+      : null,
+  );
+};
+
 export const useUser = create<UserState & Action>()(
   persist(
     set => ({
       user: null,
       updateUser: async () => {
         const res = await getUserInfo();
+        const user = res.code === 0 && res.data?.isLogin ? res.data : null;
 
-        if (res.code === 0 && res.data?.isLogin) {
-          set(() => ({ user: res.data }));
-        } else {
-          set(() => ({ user: null }));
-        }
+        set(() => ({ user }));
+        updateBrowserMonitoringUser(user);
       },
       clear: () => {
         set(() => ({
           user: null,
         }));
+        updateBrowserMonitoringUser(null);
       },
     }),
     {

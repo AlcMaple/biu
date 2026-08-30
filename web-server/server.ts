@@ -7,6 +7,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
 import { createWebApplicationHandler } from "./application.js";
+import { captureWebRequestError, ensureWebRequestId, withWebRequestMonitoring } from "./monitoring.js";
 import { sendProxyJson } from "./proxy-common.js";
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -151,25 +152,23 @@ export async function createProductionWebServer(options: ProductionWebServerOpti
   const staticHandler = await createStaticWebHandler(options.staticRoot);
 
   return createServer((request, response) => {
-    // These are safe for every response type, including static files. More restrictive CSP
-    // is intentionally introduced in report-only mode first because playback/login depend on
-    // external browser capabilities that must be measured rather than guessed.
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("X-Frame-Options", "DENY");
     response.setHeader("Permissions-Policy", "geolocation=(), payment=(), usb=()");
     response.setHeader("Content-Security-Policy", "base-uri 'self'; object-src 'none'; frame-ancestors 'none'");
-    void application(request, response)
-      .then(async handled => {
-        if (!handled) await staticHandler(request, response);
-      })
-      .catch(error => {
-        if (response.headersSent) {
-          response.destroy(error instanceof Error ? error : undefined);
-          return;
-        }
-        sendProxyJson(response, 500, { code: -500, message: "Web server request failed" });
-      });
+    const requestId = ensureWebRequestId(request, response);
+    void withWebRequestMonitoring(request, response, requestId, async () => {
+      const handled = await application(request, response);
+      if (!handled) await staticHandler(request, response);
+    }).catch(async error => {
+      await captureWebRequestError(error, request, requestId);
+      if (response.headersSent) {
+        response.destroy(error instanceof Error ? error : undefined);
+        return;
+      }
+      sendProxyJson(response, 500, { code: -500, message: "Web server request failed", requestId });
+    });
   });
 }
 
