@@ -95,4 +95,29 @@ describe("Web SMS code input", () => {
 
     act(() => root.unmount());
   });
+
+  it("removes the selected country prefix from a pasted phone number", () => {
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(<CodeLogin onClose={vi.fn()} updateUserData={vi.fn()} />);
+    });
+
+    const input = container.querySelector<HTMLInputElement>('input[placeholder="请输入手机号"]');
+    expect(input).not.toBeNull();
+
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: { getData: () => "+86 138 2590 0730" },
+    });
+
+    act(() => {
+      input?.dispatchEvent(paste);
+    });
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(input).toHaveValue("13825900730");
+
+    act(() => root.unmount());
+  });
 });
