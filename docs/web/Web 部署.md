@@ -4,7 +4,7 @@
 
 ## 构建与启动
 
-Web 版不是纯静态站点。浏览器、B 站 API 和媒体 CDN 之间必须经过同源 BFF，因此 renderer、登录会话、API 代理和媒体 Range 代理由同一个 Node 进程提供。
+Web 版不是纯静态站点。浏览器、B 站 API、媒体 CDN 和歌词上游之间必须经过同源 BFF，因此 renderer、登录会话、API 代理、媒体 Range 代理和歌词代理由同一个 Node 进程提供。
 
 ```bash
 pnpm build:web
@@ -101,6 +101,7 @@ location / {
 ## 运行边界
 
 - B 站 Cookie、refresh token、Gaia token 都只保存在服务端内存，浏览器只持有本站随机 HttpOnly 标识；上游 `Set-Cookie` 不会回传浏览器。
+- Web 歌词搜索只经同源 `/__biu_lyrics/*` 访问固定的网易云与 LrcLib 上游；服务端需要能出站访问 `interface.music.163.com` 和 `lrclib.net`，浏览器不会直连或携带 B 站 Cookie。
 - Web 同步走同源 `/__biu_sync/*`：BFF 在服务端换取短期同步凭据，浏览器不会取得 B 站 Cookie 或同步 JWT。
 - 若配置 `BIU_ACME_CHALLENGE_ORIGIN`，BFF 仅转发合法 HTTP-01 token 到固定 loopback origin，不能成为任意本地 URL 代理。
 - 登录会话、匿名媒体会话和不透明媒体 token 都是单进程内存状态。服务重启会退出 Web 登录并使旧媒体 token 失效；当前实现不能直接横向启动多个互不共享状态的 worker。

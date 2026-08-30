@@ -1,4 +1,5 @@
 import { isOfflineDemo } from "@/common/offline-demo";
+import { getWebNeteaseLyrics, searchWebLrclibLyrics, searchWebNeteaseSongs } from "@/service/web-lyrics";
 import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
@@ -190,10 +191,10 @@ const platform: Platform = {
   navigate: unsubscribe,
   getCookie: async () => undefined,
   setCookie: asyncNoop,
-  searchNeteaseSongs: async () => ({}),
+  searchNeteaseSongs: async params => (isOfflineDemo ? {} : searchWebNeteaseSongs(params)),
   getNeteaseSimilarSongs: async () => ({}),
-  getNeteaseLyrics: async () => ({}),
-  searchLrclibLyrics: async () => [],
+  getNeteaseLyrics: async params => (isOfflineDemo ? {} : getWebNeteaseLyrics(params)),
+  searchLrclibLyrics: async params => (isOfflineDemo ? [] : searchWebLrclibLyrics(params)),
   getPlatform: getWebPlatform,
   setProxySettings: asyncNoop,
   updatePlaybackState: noop,

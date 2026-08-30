@@ -165,7 +165,7 @@ set +a
 
 | 组件 | 职责 | 不能做的事 |
 | --- | --- | --- |
-| Web BFF | 登录、B 站 API/媒体 Range 代理、Web 同步桥接 | 不能改为静态站；不能把 Cookie、JWT 或上游签名 URL 交给浏览器 |
+| Web BFF | 登录、B 站 API/媒体 Range 代理、固定歌词上游代理、Web 同步桥接 | 不能改为静态站；不能把 Cookie、JWT 或上游签名 URL 交给浏览器 |
 | sync 服务 | `favorites`、`fav-items`、`tags` 的条目级合并、历史与通知 | 必须单实例；不能用多进程/cluster 并发写同一数据目录 |
 | 浏览器 IndexedDB | 缓存、同步基线、离线辅助 | 不是跨端权威数据源 |
 | 公网反代 | TLS、Host 原样传递、Range 透传、到私有隧道的转发 | 不能暴露终端、SSH、数据目录或备份目录 |

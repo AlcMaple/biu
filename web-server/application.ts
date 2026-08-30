@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createAcmeChallengeProxyHandler, type AcmeChallengeProxyHandler } from "./acme-challenge-proxy.js";
 import { createWebAuthHandler, type WebAuthHandler } from "./auth/handler.js";
 import { createClientLogHandler, type ClientLogHandler } from "./client-log.js";
+import { createWebLyricsProxyHandler, type WebLyricsProxyHandler } from "./lyrics-proxy.js";
 import { sendProxyJson, type ProxyNext } from "./proxy-common.js";
 import { createBilibiliProxyHandler, type BilibiliProxyHandler } from "./proxy.js";
 import { createBiuSyncProxyHandler, type BiuSyncProxyHandler } from "./sync-proxy.js";
@@ -18,6 +19,7 @@ export interface WebApplicationHandlerOptions {
   clientLogDir?: string;
   clientLogMaxTotalBytes?: number;
   clientLogRetentionDays?: number;
+  lyricsProxyHandler?: WebLyricsProxyHandler;
   proxyHandler?: BilibiliProxyHandler;
   publicOrigin?: string;
   syncProxyHandler?: BiuSyncProxyHandler;
@@ -46,6 +48,7 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
           retentionDays: options.clientLogRetentionDays,
         })
       : undefined);
+  const lyricsProxyHandler = options.lyricsProxyHandler ?? createWebLyricsProxyHandler();
   const syncProxyHandler = options.syncProxyHandler ?? createBiuSyncProxyHandler({ publicOrigin });
 
   return async (request, response, next) => {
@@ -64,6 +67,7 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
 
     if (await acmeChallengeHandler(request, response)) return true;
     if (clientLogHandler && (await clientLogHandler(request, response))) return true;
+    if (await lyricsProxyHandler(request, response)) return true;
     if (await authHandler(request, response)) return true;
     if (await syncProxyHandler(request, response)) return true;
     if (await proxyHandler(request, response)) return true;
