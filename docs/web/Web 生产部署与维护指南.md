@@ -17,6 +17,19 @@
 
 没有私有配置或对应服务器访问权时，AI/开发者应当**停止**，而不是猜 IP、用户、路径或密钥。
 
+本项目在受控 macOS 终端的默认配置文件约定为 `~/.config/biu/production.env`。它位于仓库之外，权限必须为 `600`；如果换了机器或用户目录，应重新创建同等字段的私有文件，再通过 `BIU_OPS_CONFIG` 指向它。这个文件是部署服务器时使用的运维参数，不是前端或 Web 功能配置。
+
+本项目另有一份不入 Git 的私有满血版运行手册，默认位置为 `~/.config/biu/Biu Web 生产部署与维护指南.md`。公开版只保留可迁移的流程和变量名；实际主机、路径、端口、服务标签和当前线上状态以私有版及 `production.env` 为准。
+
+首次准备本项目环境时可以这样加载（不要把文件内容粘贴到聊天或公开日志）：
+
+```bash
+export BIU_OPS_CONFIG="$HOME/.config/biu/production.env"
+chmod 600 "$BIU_OPS_CONFIG"
+```
+
+普通 Web 更新主要需要公网入口、云主机制品中转和 Mac mini Web 服务的 `BIU_WEB_*` 字段；`BIU_SYNC_DATA_DIR`、备份目录和 `BIU_TEST_ACCOUNT_ID` 只在修改/验收 sync 数据时使用；`BIU_UPDATE_*` 只在发布桌面自动更新时使用；`BIU_ACME_*` / `BIU_CERTBOT_*` 只在证书续期或 HTTP-01 挑战维护时使用。字段的逐项说明和填写来源见 [ops/production.example.env](../../ops/production.example.env)。
+
 ### 授权会话的启动方式
 
 在获授权的开发机或 Mac mini 私有终端中，由操作人预先设置 `BIU_OPS_CONFIG` 指向仓库外、权限为 `600` 的私有配置文件。不要在聊天框、终端截图或 GitHub 中粘贴该文件内容。
@@ -30,11 +43,19 @@ set +a
 
 : "${BIU_PUBLIC_ORIGIN:?}"
 : "${BIU_CLOUD_SSH_ALIAS:?}"
+: "${BIU_CLOUD_ARTIFACT_DIR:?}"
 : "${BIU_WEB_RELEASE_ROOT:?}"
 : "${BIU_WEB_AGENT_FILE:?}"
 : "${BIU_WEB_SERVICE_LABEL:?}"
+: "${BIU_WEB_NODE:?}"
 : "${BIU_WEB_PORT:?}"
-: "${BIU_SYNC_DATA_DIR:?}"
+: "${BIU_WEB_TEST_PORT:?}"
+: "${BIU_HEALTH_PATH:?}"
+: "${BIU_SYNC_INTERNAL_ORIGIN:?}"
+
+# 只有进入第 6 节执行 sync 数据迁移/恢复时才需要：
+# : "${BIU_SYNC_DATA_DIR:?}"
+# : "${BIU_SYNC_BACKUP_ROOT:?}"
 ```
 
 只检查变量是否存在，**不要**运行 `env`、`set`、`cat "$BIU_OPS_CONFIG"`、`plutil -p` 或把完整 LaunchAgent 输出写入日志。
