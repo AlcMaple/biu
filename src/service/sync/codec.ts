@@ -59,7 +59,7 @@ export function decodeFavItems(flat: FlatSnapshot): Record<number, LocalFavItem[
   return folderItems;
 }
 
-// ── tags：标签定义（`tag:{id}`）+ 条目打标（`item:{rid}`）两个 id 空间前缀区分 ──
+// ── tags：标签定义（`tag:{id}`）+ 条目打标（`item:{canonical-key}`）两个 id 空间前缀区分 ──
 
 const TAG_PREFIX = "tag:";
 const ITEM_PREFIX = "item:";

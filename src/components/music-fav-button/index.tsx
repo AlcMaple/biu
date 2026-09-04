@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { RiStarFill, RiStarLine } from "@remixicon/react";
 
+import { getFavoriteResourceRid } from "@/common/utils/bv";
 import IconButton from "@/components/icon-button";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
@@ -27,8 +28,10 @@ const MusicFavButton = () => {
   const handleOpen = () => {
     if (!playItem) return;
     const isLocal = playItem.source === "local";
+    const rid = getFavoriteResourceRid(playItem);
+    if (rid === undefined) return;
     onOpenFavSelectModal({
-      rid: isLocal ? String(playItem.id) : playItem.type === "mv" ? String(playItem.aid) : String(playItem.sid),
+      rid,
       type: playItem.type === "mv" ? 2 : 12,
       isLocal,
       title: "收藏",

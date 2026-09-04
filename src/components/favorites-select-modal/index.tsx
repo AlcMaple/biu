@@ -33,11 +33,28 @@ import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
-import { useTagStore } from "@/store/tags";
+import { type TagItemTarget, useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
 import AsyncButton from "../async-button";
 import ScrollContainer from "../scroll-container";
+
+const createTagTarget = ({
+  rid,
+  type,
+  source,
+  bvid,
+  cid,
+}: {
+  rid?: string | number;
+  type: number;
+  source?: TagItemTarget["source"];
+  bvid?: string;
+  cid?: string | number;
+}): TagItemTarget | undefined => {
+  if (rid === undefined || rid === null || rid === "") return undefined;
+  return { rid, type, source, bvid, cid };
+};
 
 const hasSameIds = (arr1: number[], arr2: number[]) => {
   if (arr1.length !== arr2.length) {
@@ -101,12 +118,28 @@ const FavoritesSelectModal = () => {
     }
   }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, needsFetchPages, rid]);
 
-  // 标签初始状态：分集收藏时标签挂在分集 cid 上，整个视频挂在 rid 上
+  // 标签初始状态：分集使用 bvid + cid，整稿使用 bvid/aid。
   useEffect(() => {
     if (!isFavSelectModalOpen || !rid || showPagePicker) return;
-    const tagRid = pickedCid !== "whole" ? pickedCid : rid;
-    setSelectedTagIds(getItemTagIds(tagRid));
-  }, [isFavSelectModalOpen, rid, showPagePicker, pickedCid, getItemTagIds]);
+    const tagTarget = createTagTarget({
+      rid: pickedCid !== "whole" ? pickedCid : rid,
+      type,
+      source: itemInfo?.source ?? (isLocal ? "local" : "online"),
+      bvid: itemInfo?.bvid,
+      cid: pickedCid !== "whole" ? pickedCid : undefined,
+    });
+    if (tagTarget) setSelectedTagIds(getItemTagIds(tagTarget));
+  }, [
+    getItemTagIds,
+    isFavSelectModalOpen,
+    isLocal,
+    itemInfo?.bvid,
+    itemInfo?.source,
+    pickedCid,
+    rid,
+    showPagePicker,
+    type,
+  ]);
 
   // 获取多P视频分集列表，决定是否显示选集步骤
   useRequest(
@@ -307,9 +340,15 @@ const FavoritesSelectModal = () => {
         });
       }
 
-      // 保存标签：分集收藏挂在 cid 上，整个视频挂在 rid 上（与本地条目的 rid 一致）
-      if (rid) {
-        setItemTagsInStore(localRid, selectedTagIds);
+      const tagTarget = createTagTarget({
+        rid: localRid,
+        type,
+        source: itemInfo?.source ?? (isLocal ? "local" : "online"),
+        bvid: itemInfo?.bvid,
+        cid: selection.cid,
+      });
+      if (tagTarget) {
+        setItemTagsInStore(tagTarget, selectedTagIds);
       }
 
       onFavSelectModalOpenChange(false);
@@ -340,8 +379,13 @@ const FavoritesSelectModal = () => {
     }
   };
 
-  // 标签的归属对象：分集收藏时是分集（cid），整个视频时是视频本身（rid）
-  const tagRid = pickedCid !== "whole" ? pickedCid : rid;
+  const tagTarget = createTagTarget({
+    rid: pickedCid !== "whole" ? pickedCid : rid,
+    type,
+    source: itemInfo?.source ?? (isLocal ? "local" : "online"),
+    bvid: itemInfo?.bvid,
+    cid: pickedCid !== "whole" ? pickedCid : undefined,
+  });
 
   const allItems = [
     // 收藏具体分集时不显示 B站收藏夹（分集仅允许存入本地收藏夹）
@@ -504,7 +548,7 @@ const FavoritesSelectModal = () => {
               onPress={handleConfirm}
               isDisabled={
                 hasSameIds(selectedIds, prevSelectedRef.current) &&
-                hasSameIds(selectedTagIds, tagRid ? getItemTagIds(tagRid) : [])
+                hasSameIds(selectedTagIds, tagTarget ? getItemTagIds(tagTarget) : [])
               }
             >
               确认
