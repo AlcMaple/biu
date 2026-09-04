@@ -25,7 +25,7 @@ import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { isSame, usePlayList, type PlayItem } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
-import { useTagStore } from "@/store/tags";
+import { getItemTagIdsFromMap, useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
 import Header from "../header";
@@ -61,7 +61,12 @@ const Favorites = () => {
   const filteredItems = useMemo(() => {
     if (!activeTagIds.length) return items;
     return items.filter(item => {
-      const tags = itemTags[String(item.id)] ?? [];
+      const tags = getItemTagIdsFromMap(itemTags, {
+        rid: item.id,
+        type: item.type,
+        source: "online",
+        bvid: item.type === 2 ? item.bvid : undefined,
+      });
       return activeTagIds.some(tid => tags.includes(tid));
     });
   }, [items, activeTagIds, itemTags]);
@@ -70,7 +75,13 @@ const Favorites = () => {
   const availableTagIds = useMemo(() => {
     const set = new Set<number>();
     for (const item of items) {
-      for (const tid of itemTags[String(item.id)] ?? []) set.add(tid);
+      const tags = getItemTagIdsFromMap(itemTags, {
+        rid: item.id,
+        type: item.type,
+        source: "online",
+        bvid: item.type === 2 ? item.bvid : undefined,
+      });
+      for (const tid of tags) set.add(tid);
     }
     return [...set];
   }, [items, itemTags]);

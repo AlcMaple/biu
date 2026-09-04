@@ -56,7 +56,7 @@ import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-item
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
-import { useTagStore } from "@/store/tags";
+import { getItemTagIdsFromMap, useTagStore } from "@/store/tags";
 
 import Header from "../header";
 
@@ -67,6 +67,14 @@ const durationToSeconds = (d: number | string | undefined): number => {
 // 本次启动内已后台检测过失效状态的收藏夹，避免来回切换页面时反复请求
 const invalidCheckedFolders = new Set<number>();
 const EMPTY_LOCAL_FAV_ITEMS: LocalFavItem[] = [];
+
+const getLocalItemTagTarget = (item: LocalFavItem) => ({
+  rid: item.rid,
+  type: item.type,
+  source: isLocalSourceItem(item) ? ("local" as const) : ("online" as const),
+  bvid: item.bvid,
+  cid: item.cid,
+});
 
 const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
@@ -122,7 +130,7 @@ const LocalFavorites = () => {
     }
     if (activeTagIds.length > 0) {
       result = result.filter(i => {
-        const tags = itemTags[String(i.rid)] ?? [];
+        const tags = getItemTagIdsFromMap(itemTags, getLocalItemTagTarget(i));
         return activeTagIds.some(tid => tags.includes(tid));
       });
     }
@@ -157,7 +165,7 @@ const LocalFavorites = () => {
   const availableTagIds = useMemo(() => {
     const set = new Set<number>();
     for (const item of rawItems) {
-      for (const tid of itemTags[String(item.rid)] ?? []) set.add(tid);
+      for (const tid of getItemTagIdsFromMap(itemTags, getLocalItemTagTarget(item))) set.add(tid);
     }
     return [...set];
   }, [rawItems, itemTags]);
