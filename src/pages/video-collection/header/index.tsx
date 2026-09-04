@@ -114,18 +114,20 @@ const Header = memo(({ loading, type, attr, cover, title, desc, upMid, mediaCoun
             <span>•</span>
             <span>{mediaCount} 条视频</span>
           </div>
-          <User
-            avatarProps={{
-              size: "sm",
-              src: upInfo?.card?.face,
-            }}
-            name={
-              <Link color="foreground" href={`/user/${upMid}`} className="hover:underline">
-                {upInfo?.card?.name}
-              </Link>
-            }
-            className="max-w-full justify-start"
-          />
+          {Boolean(upMid) && (
+            <User
+              avatarProps={{
+                size: "sm",
+                src: upInfo?.card?.face,
+              }}
+              name={
+                <Link color="foreground" href={`/user/${upMid}`} className="hover:underline">
+                  {upInfo?.card?.name}
+                </Link>
+              }
+              className="max-w-full justify-start"
+            />
+          )}
         </div>
       </div>
     </>
