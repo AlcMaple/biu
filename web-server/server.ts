@@ -30,6 +30,15 @@ const CONTENT_TYPES: Record<string, string> = {
 
 const HASHED_ASSET_PATTERN = /(?:^|[.-])[a-f0-9]{8,}(?:[.-]|$)/i;
 
+// 只接管已下线的入口；其他 chunk / 拼错的 URL 仍返回 404，避免任意资源失败都刷新页面。
+const STALE_ENTRY_PATTERN = /^\/static\/js\/index\.[a-f0-9]{8}\.js$/;
+const STALE_ENTRY_RECOVERY = Buffer.from(`(function () {
+  var url = new URL(location.href);
+  if (url.searchParams.has('__biu_stale_entry')) return;
+  url.searchParams.set('__biu_stale_entry', '1');
+  location.replace(url.pathname + url.search + url.hash);
+})();`);
+
 export interface ProductionWebServerOptions {
   clientIpHeader?: string;
   clientLogDir?: string;
@@ -109,7 +118,17 @@ export async function createStaticWebHandler(staticRoot: string) {
       if (!isInsideRoot(root, filePath)) throw new Error("static symlink escaped its root");
       fileStat = await stat(filePath);
       if (!fileStat.isFile()) throw new Error("not a file");
-    } catch {
+    } catch (error) {
+      // 真实文件优先；权限错误、越界软链和目录不伪装成陈旧入口。
+      if ((error as NodeJS.ErrnoException).code === "ENOENT" && STALE_ENTRY_PATTERN.test(pathname)) {
+        response.statusCode = 200;
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+        response.setHeader("Content-Length", STALE_ENTRY_RECOVERY.length);
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.end(method === "HEAD" ? undefined : STALE_ENTRY_RECOVERY);
+        return;
+      }
       sendStaticError(response, 404, "Not Found");
       return;
     }

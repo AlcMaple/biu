@@ -41,7 +41,7 @@ export default defineConfig(({ command }) => {
       ? {
           tag: "script",
           attrs: {
-            defer: true,
+            async: true,
             src: `${UMAMI_HOST}/script.js`,
             "data-website-id": UMAMI_WEBSITE_ID,
           },
