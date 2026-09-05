@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import http, { type Server } from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { closeProductionWebServer, createProductionWebServer } from "../web-server/server";
@@ -54,6 +55,8 @@ describe("production Web server", () => {
     staticRoot = await mkdtemp(path.join(os.tmpdir(), "biu-web-static-"));
     outsideRoot = await mkdtemp(path.join(os.tmpdir(), "biu-web-outside-"));
     await mkdir(path.join(staticRoot, "assets"));
+    await mkdir(path.join(staticRoot, "static/js"), { recursive: true });
+    await writeFile(path.join(staticRoot, "static/js/index.01234567.js"), "current-entry");
     await writeFile(path.join(staticRoot, "index.html"), "<html>web-index</html>");
     await writeFile(path.join(staticRoot, "assets", "app.0123456789.js"), "console.log('asset')");
     await writeFile(path.join(outsideRoot, "secret.txt"), "server-secret");
@@ -92,6 +95,41 @@ describe("production Web server", () => {
     );
     expect(missing.status).toBe(404);
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+  });
+
+  it("recovers only missing hashed entries once while preserving the route and query", async () => {
+    const response = await fetch(`${origin}/static/js/index.deadbeef.js`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-type")).toContain("javascript");
+    const script = await response.text();
+    const replacements: string[] = [];
+    const location = {
+      href: `${origin}/?theme=dark#/search?keyword=music`,
+      replace: (url: string) => replacements.push(url),
+    };
+    runInNewContext(script, { URL, location });
+    expect(replacements).toHaveLength(1);
+    const next = new URL(replacements[0], origin);
+    expect(next.searchParams.get("theme")).toBe("dark");
+    expect(next.searchParams.has("__biu_stale_entry")).toBe(true);
+    expect(next.hash).toBe("#/search?keyword=music");
+    location.href = next.href;
+    runInNewContext(script, { URL, location });
+    expect(replacements).toHaveLength(1);
+
+    const head = await fetch(`${origin}/static/js/index.deadbeef.js`, { method: "HEAD" });
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+    expect(head.headers.get("content-length")).toBe(String(Buffer.byteLength(script)));
+    const current = await fetch(`${origin}/static/js/index.01234567.js`);
+    expect(await current.text()).toBe("current-entry");
+    expect(current.headers.get("cache-control")).toContain("immutable");
+    for (const missing of ["index.js", "index.typo.js", "lib-react.deadbeef.js", "index.deadbeef.js.map"]) {
+      expect((await fetch(`${origin}/static/js/${missing}`)).status).toBe(404);
+    }
+    expect((await fetch(`${origin}/static/css/index.deadbeef.css`)).status).toBe(404);
+    expect((await fetch(`${origin}/static/js/index.deadbeef.js`, { method: "POST" })).status).toBe(405);
   });
 
   it("does not fall through unknown internal routes or symlinks outside dist/web", async () => {
