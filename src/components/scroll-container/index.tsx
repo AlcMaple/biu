@@ -29,12 +29,12 @@ const ScrollContainer = ({
   const [showBackToTop, setShowBackToTop] = useState(false);
   const customScrollbars = options && typeof options === "object" ? options.scrollbars : undefined;
 
-  // 统一的滚动重置逻辑
   useEffect(() => {
-    if (!scrollRef?.current || !resetOnChange) return;
+    if (!scrollRef.current || resetOnChange === undefined) return;
     const viewport = scrollRef.current.osInstance()?.elements().viewport as HTMLElement | null;
     if (viewport) {
       viewport.scrollTop = 0;
+      viewport.scrollLeft = 0;
       setShowBackToTop(false);
     }
   }, [resetOnChange, scrollRef]);

@@ -15,7 +15,8 @@ async function bootstrap() {
     }
   }
 
-  if (!isWeb) document.documentElement.dataset.hoverEffects = "enabled";
+  if (isWeb) document.documentElement.dataset.platform = "web";
+  else document.documentElement.dataset.hoverEffects = "enabled";
 
   createRoot(document.getElementById("root") as Element, {
     onRecoverableError: captureRecoverableError
