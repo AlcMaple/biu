@@ -28,7 +28,12 @@ const Search = () => {
   }
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollerRef} className="h-full w-full">
+    <ScrollContainer
+      enableBackToTop
+      ref={scrollerRef}
+      resetOnChange={`${searchRevision}:${searchType}`}
+      className="h-full w-full"
+    >
       <div className="px-4">
         <h1>搜索【{keyword}】的结果</h1>
         <div className="flex items-center justify-between py-4">

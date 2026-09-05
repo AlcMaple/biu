@@ -73,6 +73,7 @@ describe("hover platform marker", () => {
   beforeEach(() => {
     vi.resetModules();
     document.documentElement.removeAttribute("data-hover-effects");
+    document.documentElement.removeAttribute("data-platform");
     document.body.innerHTML = '<div id="root"></div>';
     rootMocks.createRoot.mockReset();
     rootMocks.render.mockReset();
@@ -113,5 +114,6 @@ describe("hover platform marker", () => {
 
     expect(markerAtCreateRoot).toEqual([expectedMarker]);
     expect(document.documentElement.dataset.hoverEffects).toBe(expectedMarker);
+    expect(document.documentElement.dataset.platform).toBe(expectedMarker ? undefined : "web");
   });
 });
