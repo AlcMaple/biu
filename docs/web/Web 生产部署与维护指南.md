@@ -610,11 +610,11 @@ mv -Tf "$rollback_link" "$STATIC_ROOT/current"
 
 ### 10.1 Biu 项目块
 
-在已定义 `dot` 的私有 `mstatus` 中加入以下项目块，标签以目标机器实际 LaunchAgent 为准。Web 和云同步使用独立服务与隧道，分开显示才能定位哪条链路异常；不要因某项异常一并重启其他服务。
+在已定义 `dot` 的私有 `mstatus` 中加入以下项目块，标签以目标机器实际 LaunchAgent 为准。标题行显示实际访问域名，与其他项目一致；下面的 `music.example.com` 仅为公开示例，部署时替换为自己的域名。Web 和云同步使用独立服务与隧道，分开显示才能定位哪条链路异常；不要因某项异常一并重启其他服务。
 
 ```bash
 echo
-echo -e "${BOLD}【Biu 音乐】${RESET}  Web / 桌面云同步"
+echo -e "${BOLD}【Biu 音乐】${RESET}  music.example.com"
 echo -e "  $(dot com.biu.web)  Web 服务  com.biu.web"
 echo -e "  $(dot com.biu.web.tunnel)  Web 隧道  com.biu.web.tunnel"
 echo -e "  $(dot com.biu.sync)  云同步服务  com.biu.sync"
