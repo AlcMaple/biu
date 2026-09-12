@@ -18,6 +18,7 @@ interface RecordedRequest {
 
 const FILE_BYTES = Buffer.from("0123456789");
 const RANGE_TARGET = "https://upos-sz-mirror08h.bilivideo.com/upgcxcode/range.m4s";
+const REGIONAL_TARGET = "https://cn-gdjm-cm-01-01.bilivideo.com/upgcxcode/range.m4s";
 const REDIRECT_TARGET = "https://upos-sz-mirror08h.bilivideo.com/upgcxcode/redirect.m4s";
 const SLOW_TARGET = "https://upos-sz-mirror08h.bilivideo.com/upgcxcode/slow.m4s";
 const PCDN_TARGET = "https://xy123.mcdn.bilivideo.cn:8082/upgcxcode/pcdn.m4s";
@@ -64,7 +65,9 @@ describe("Web Bilibili BFF integration", () => {
             ? REDIRECT_TARGET
             : url.searchParams.get("case") === "slow"
               ? SLOW_TARGET
-              : RANGE_TARGET;
+              : url.searchParams.get("case") === "regional"
+                ? REGIONAL_TARGET
+                : RANGE_TARGET;
         response.setHeader("Content-Type", "application/json");
         response.setHeader("Set-Cookie", ["SESSDATA=rotated-secret; HttpOnly", "bili_jct=rotated-csrf; HttpOnly"]);
         response.end(
@@ -305,19 +308,23 @@ describe("Web Bilibili BFF integration", () => {
     expect(mappedTargets).toHaveLength(before);
   });
 
-  it("relays byte ranges and Content-Range without exposing the target URL", async () => {
-    const { mediaCookie, stream } = await issueMediaToken();
-    const response = await fetch(`${proxyOrigin}${stream.backupUrl[0]}`, {
-      headers: { Cookie: mediaCookie, Range: "bytes=4-7" },
-    });
+  it.each(["range", "regional"])(
+    "relays byte ranges and Content-Range through %s CDN without exposing the target URL",
+    async mediaCase => {
+      const { mediaCookie, stream } = await issueMediaToken(mediaCase);
+      expect(stream.backupUrl).toHaveLength(1);
+      const response = await fetch(`${proxyOrigin}${stream.backupUrl[0]}`, {
+        headers: { Cookie: mediaCookie, Range: "bytes=4-7" },
+      });
 
-    expect(response.status).toBe(206);
-    expect(response.headers.get("accept-ranges")).toBe("bytes");
-    expect(response.headers.get("content-range")).toBe("bytes 4-7/10");
-    // 关键：iOS 的 <audio> 靠这个正确的音频类型才肯解码（上游是 octet-stream）
-    expect(response.headers.get("content-type")).toBe("audio/mp4");
-    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("4567");
-  });
+      expect(response.status).toBe(206);
+      expect(response.headers.get("accept-ranges")).toBe("bytes");
+      expect(response.headers.get("content-range")).toBe("bytes 4-7/10");
+      // 关键：iOS 的 <audio> 靠这个正确的音频类型才肯解码（上游是 octet-stream）
+      expect(response.headers.get("content-type")).toBe("audio/mp4");
+      expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("4567");
+    },
+  );
 
   it("rejects URL query proxies, wrong media sessions, and non-UPOS redirects", async () => {
     const { mediaCookie, stream } = await issueMediaToken("redirect");
