@@ -106,5 +106,5 @@ location / {
 - 若配置 `BIU_ACME_CHALLENGE_ORIGIN`，BFF 仅转发合法 HTTP-01 token 到固定 loopback origin，不能成为任意本地 URL 代理。
 - 登录会话、匿名媒体会话和不透明媒体 token 都是单进程内存状态。服务重启会退出 Web 登录并使旧媒体 token 失效；当前实现不能直接横向启动多个互不共享状态的 worker。
 - 媒体字节经过部署方服务器。播放和拖动会产生 Range 请求，`206`、`Content-Range` 和客户端取消会流式透传，因此带宽与出站流量由部署方承担。
-- 媒体端点只接受 BFF 签发的短期不透明 token，不接受 URL 参数；上游目标和每一次重定向都会重新经过固定 UPOS allowlist 校验。
+- 媒体端点只接受 BFF 签发的短期不透明 token，不接受 URL 参数；上游目标和每一次重定向都会重新经过固定 CDN allowlist 校验（UPOS 与限定区域/运营商/节点格式的 `cn-…bilivideo.com`，HTTPS 标准端口与媒体路径白名单不变）。
 - `/__biu_auth/*`、`/__biu_proxy/*`、`/__biu_sync/*` 和 `/__biu_health` 均不得缓存。普通 HTML 也使用 `no-store`；带内容哈希的静态资源由 Node 返回长期缓存头。

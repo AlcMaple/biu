@@ -68,6 +68,60 @@ describe("Web Bilibili proxy contracts", () => {
     ).toBeUndefined();
   });
 
+  it("accepts regional operator CDN media but still rejects PCDN and lookalike hosts", () => {
+    const target = "https://cn-gdjm-cm-01-01.bilivideo.com/upgcxcode/test/audio.m4s";
+    expect(isAllowedBilibiliMediaUrl(target)).toBe(true);
+    for (const bad of [
+      target.replace(".com/", ".com.evil.example/"),
+      target.replace("https://", "http://"),
+      target.replace(".com/", ".com:8082/"),
+      target.replace("upgcxcode/test/audio.m4s", "private/config"),
+      target.replace("cn-gdjm-cm-01-01", "cn-gdjm-unknown-01-01"),
+      target.replace("https://", "https://user:password@"),
+      "https://edge.mountaintoys.cn/upgcxcode/test/audio.m4s",
+      "https://127.0.0.1/upgcxcode/test/audio.m4s",
+      PCDN_TARGET,
+    ])
+      expect(isAllowedBilibiliMediaUrl(bad)).toBe(false);
+  });
+
+  it("preserves the operator backup when a search track has no UPOS candidates", () => {
+    const target = "https://cn-gdjm-cm-01-01.bilivideo.com/upgcxcode/test/audio.m4s";
+    const result = rewriteBilibiliMediaPayload(
+      {
+        data: {
+          dash: {
+            audio: [
+              {
+                baseUrl: PCDN_TARGET,
+                base_url: PCDN_TARGET,
+                backupUrl: [PCDN_TARGET, target],
+                backup_url: [target],
+              },
+            ],
+          },
+        },
+      },
+      () => `${BILIBILI_MEDIA_PROXY_PREFIX}/${MEDIA_TOKEN}`,
+    );
+    expect(result.rewritten).toBe(1);
+    expect(result.payload).toEqual({
+      data: {
+        dash: {
+          audio: [
+            {
+              baseUrl: "",
+              base_url: "",
+              backupUrl: [`${BILIBILI_MEDIA_PROXY_PREFIX}/${MEDIA_TOKEN}`],
+              backup_url: [`${BILIBILI_MEDIA_PROXY_PREFIX}/${MEDIA_TOKEN}`],
+            },
+          ],
+        },
+      },
+    });
+    expect(JSON.stringify(result.payload)).not.toContain("bilivideo");
+  });
+
   it("allows only stable HTTPS UPOS paths and ports", () => {
     expect(isAllowedBilibiliMediaUrl(MEDIA_TARGET)).toBe(true);
     expect(isAllowedBilibiliMediaUrl(MEDIA_TARGET.replace("https://", "http://"))).toBe(false);

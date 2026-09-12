@@ -16,6 +16,12 @@ const isAllowedMediaHostAndPort = (url: URL) => {
     return url.port === "" || url.port === "443";
   }
 
+  // playurl 的部分音轨只返回 PCDN 主源 + cn-运营商备用源；只认 UPOS 会把可播备用地址一起清空。
+  // 限定观察到的区域/运营商/节点格式，仍拒绝泛域名、PCDN 和非标准端口。
+  if (/^cn-[a-z0-9]+-(?:cm|ct|cu)-[0-9]{2}-[0-9]{2}\.bilivideo\.com$/.test(hostname)) {
+    return url.port === "" || url.port === "443";
+  }
+
   if (/^upos-[a-z0-9-]+\.akamaized\.net$/.test(hostname)) return url.port === "" || url.port === "443";
 
   return false;
