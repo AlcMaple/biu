@@ -4,6 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
+const viewRequest = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock("@/service/request", () => ({ apiRequest: { get: viewRequest.get } }));
+
 vi.mock("@heroui/react", () => {
   const Box = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
   const Button = ({
@@ -56,11 +59,13 @@ vi.mock("@/store/music-fav", () => ({ useMusicFavStore: { getState: () => ({ ref
 
 import { toPlaybackFavoriteModalData } from "@/common/utils/fav";
 import FavoritesSelectModal from "@/components/favorites-select-modal";
+import { getWebInterfaceView } from "@/service/web-interface-view";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore, type LocalFavItem } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useSettings } from "@/store/settings";
 import { useTagStore, getItemTagKey } from "@/store/tags";
+import { useUser } from "@/store/user";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -76,6 +81,8 @@ const item: LocalFavItem = {
 };
 
 beforeEach(() => {
+  viewRequest.get.mockReset();
+  useUser.setState({ user: null });
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div");
   document.body.append(container);
@@ -126,4 +133,62 @@ test("首次打开即勾选已有收藏与分集标签，复制及重开不产�
   expect(container.querySelector('input[aria-label="目标"]')).toBeChecked();
   expect(container.querySelector("[data-tags]")).toHaveTextContent("7");
   expect([...container.querySelectorAll("button")].find(b => b.textContent === "确认")).toBeDisabled();
+});
+
+const openOnline = (bvid: string) =>
+  useModalStore.getState().onOpenFavSelectModal({
+    rid: 123,
+    type: 2,
+    itemInfo: { title: "搜索歌曲", bvid },
+  });
+const singlePage = { code: 0, data: { pages: [{ cid: 11, page: 1, part: "第一集" }] } };
+
+test("播放取得单集元数据后，收藏不显示加载中且零新增请求", async () => {
+  viewRequest.get.mockResolvedValue(singlePage);
+  await getWebInterfaceView({ bvid: "cached-single" });
+  await act(async () => openOnline("cached-single"));
+  expect(container).not.toHaveTextContent("加载中");
+  expect(container.querySelector('input[aria-label="已有"]')).toBeInTheDocument();
+  expect(viewRequest.get).toHaveBeenCalledTimes(1);
+});
+
+test("缓存多集仍进入选集，取消冷请求后迟到结果不覆盖新弹窗", async () => {
+  let resolve!: (value: typeof singlePage) => void;
+  viewRequest.get.mockReturnValueOnce(
+    new Promise(done => {
+      resolve = done;
+    }),
+  );
+  await act(async () => openOnline("slow-video"));
+  expect(container).toHaveTextContent("加载中");
+  await act(async () => useModalStore.getState().onCloseFavSelectModal());
+  viewRequest.get.mockResolvedValue({
+    code: 0,
+    data: {
+      pages: [
+        { cid: 21, page: 1, part: "新视频第一集" },
+        { cid: 22, page: 2, part: "新视频第二集" },
+      ],
+    },
+  });
+  await getWebInterfaceView({ bvid: "cached-multi" });
+  await act(async () => openOnline("cached-multi"));
+  expect(container).toHaveTextContent("收藏整个视频（共 2 集）");
+  expect(container).toHaveTextContent("新视频第二集");
+  await act(async () => resolve(singlePage));
+  expect(container).toHaveTextContent("新视频第二集");
+  expect(viewRequest.get).toHaveBeenCalledTimes(2);
+});
+
+test("失败明确提示且仅手动重试，不把未知分集当成单集", async () => {
+  viewRequest.get.mockResolvedValueOnce({ code: -412 });
+  await act(async () => openOnline("failed-video"));
+  expect(container.querySelector('[role="alert"]')).toHaveTextContent("分集信息加载失败，请重试");
+  expect([...container.querySelectorAll("button")].find(b => b.textContent === "确认")).toBeUndefined();
+  expect(viewRequest.get).toHaveBeenCalledTimes(1);
+  viewRequest.get.mockResolvedValueOnce(singlePage);
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "重试")!.click());
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.querySelector('input[aria-label="已有"]')).toBeInTheDocument();
+  expect(viewRequest.get).toHaveBeenCalledTimes(2);
 });

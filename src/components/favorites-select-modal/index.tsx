@@ -25,7 +25,7 @@ import { getFavFolderCreatedListAll } from "@/service/fav-folder-created-list-al
 import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
-import { getWebInterfaceView } from "@/service/web-interface-view";
+import { getCachedVideoPages, getVideoPages } from "@/service/web-interface-view";
 import { useFavoritesStore } from "@/store/favorite";
 import { useHeartbeat } from "@/store/heartbeat";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -104,6 +104,8 @@ const FavoritesSelectModal = () => {
   // 正在请求分集数据时为 true，避免先闪现收藏夹列表再切换到选集步骤
   const needsFetchPages = Boolean(type === 2 && !isLocal && !fromLocalFavorite && itemInfo?.bvid);
   const [isPagesLoading, setIsPagesLoading] = useState(false);
+  const [pagesError, setPagesError] = useState(false);
+  const [pagesRetry, setPagesRetry] = useState(0);
 
   useEffect(() => {
     if (!isFavSelectModalOpen) {
@@ -113,12 +115,13 @@ const FavoritesSelectModal = () => {
       setPickedCid(fromLocalFavorite ? (itemInfo?.cid ?? "whole") : "whole");
       setStep(1);
       setIsPagesLoading(false);
+      setPagesError(false);
       prevSelectedRef.current = [];
     } else {
       // 对多P视频提前进入加载态，防止收藏夹列表闪现
-      setIsPagesLoading(needsFetchPages);
+      setIsPagesLoading(Boolean(needsFetchPages && itemInfo?.bvid && !getCachedVideoPages(itemInfo.bvid)));
     }
-  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, needsFetchPages, rid]);
+  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.bvid, itemInfo?.cid, needsFetchPages, rid]);
 
   // 标签初始状态：分集使用 bvid + cid，整稿使用 bvid/aid。
   useEffect(() => {
@@ -143,31 +146,33 @@ const FavoritesSelectModal = () => {
     type,
   ]);
 
-  // 获取多P视频分集列表，决定是否显示选集步骤
-  useRequest(
-    async () => {
-      const bvid = itemInfo?.bvid;
-      if (!bvid || type !== 2 || isLocal) return [];
-      const res = await getWebInterfaceView({ bvid });
-      return res?.data?.pages ?? [];
-    },
-    {
-      ready: Boolean(isFavSelectModalOpen && type === 2 && !isLocal && !fromLocalFavorite && itemInfo?.bvid),
-      refreshDeps: [isFavSelectModalOpen, itemInfo?.bvid, fromLocalFavorite],
-      onSuccess: pages => {
+  // 命中播放/上次收藏留下的元数据时，直接进入对应步骤；冷请求关闭后不再更新弹窗。
+  useEffect(() => {
+    if (!isFavSelectModalOpen || !needsFetchPages || !itemInfo?.bvid) return;
+    let active = true;
+    const applyPages = (pages: Page[]) => {
+      if (!active) return;
+      setVideoPages(pages);
+      setPickedCid(pages.length > 1 ? (itemInfo.cid ?? "whole") : "whole");
+      setStep(pages.length > 1 ? 0 : 1);
+      setIsPagesLoading(false);
+    };
+    setPagesError(false);
+    const cached = getCachedVideoPages(itemInfo.bvid);
+    if (cached) {
+      applyPages(cached);
+    } else {
+      setIsPagesLoading(true);
+      void getVideoPages(itemInfo.bvid).then(applyPages, () => {
+        if (!active) return;
         setIsPagesLoading(false);
-        if (pages && pages.length > 1) {
-          setVideoPages(pages);
-          // 若调用方传入了当前分集 cid，预选该分集；否则默认"整个视频"
-          setPickedCid(itemInfo?.cid ?? "whole");
-          setStep(0);
-        }
-      },
-      onError: () => {
-        setIsPagesLoading(false);
-      },
-    },
-  );
+        setPagesError(true);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [isFavSelectModalOpen, needsFetchPages, itemInfo?.bvid, itemInfo?.cid, pagesRetry]);
 
   // 本地收藏夹的初始选中状态（选集步骤完成后再初始化）
   useEffect(() => {
@@ -424,7 +429,11 @@ const FavoritesSelectModal = () => {
       <ModalContent>
         <ModalHeader className="text-base font-medium">{title}</ModalHeader>
         <ModalBody className="px-0">
-          {isPagesLoading ? (
+          {pagesError ? (
+            <div role="alert" className="px-4 py-10 text-sm text-zinc-400">
+              分集信息加载失败，请重试
+            </div>
+          ) : isPagesLoading ? (
             /* 等待分集数据，避免收藏夹列表闪现 */
             <div className="flex items-center justify-center py-10 text-sm text-zinc-400">加载中…</div>
           ) : showPagePicker ? (
@@ -536,7 +545,11 @@ const FavoritesSelectModal = () => {
           <Button variant="light" onPress={handleCancel} isDisabled={submitting}>
             取消
           </Button>
-          {isPagesLoading ? (
+          {pagesError ? (
+            <Button color="primary" onPress={() => setPagesRetry(value => value + 1)}>
+              重试
+            </Button>
+          ) : isPagesLoading ? (
             <Button color="primary" isDisabled>
               下一步
             </Button>
