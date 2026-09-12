@@ -1,3 +1,5 @@
+import { useUser } from "@/store/user";
+
 import { apiRequest } from "./request";
 
 /**
@@ -247,11 +249,64 @@ export interface Honor {
   weekly_recommend_num: number; // 每周推荐数
 }
 
-/**
- * 获取视频详细信息(web端)
- * @param params 请求参数
- * @returns Promise<WebInterfaceViewResponse>
- */
+const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+const PAGE_CACHE_MAX_ENTRIES = 100;
+const pageCache = new Map<string, { pages: Page[]; expiresAt: number }>();
+const pendingViews = new Map<string, Promise<WebInterfaceViewResponse>>();
+const pageCacheKey = (bvid: string) => `${useUser.getState().user?.mid ?? "anonymous"}:${bvid}`;
+
+const responsePages = (response: WebInterfaceViewResponse): Page[] | undefined => {
+  const pages = response?.data?.pages;
+  if (response?.code !== 0 || !Array.isArray(pages) || !pages.length) return undefined;
+  if (
+    !pages.every(
+      page => Number.isSafeInteger(page.cid) && page.cid > 0 && Number.isSafeInteger(page.page) && page.page > 0,
+    )
+  )
+    return undefined;
+  return pages;
+};
+
+export const getCachedVideoPages = (bvid: string): Page[] | undefined => {
+  const key = pageCacheKey(bvid);
+  const entry = pageCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    pageCache.delete(key);
+    return undefined;
+  }
+  return entry.pages;
+};
+
 export const getWebInterfaceView = (params: WebInterfaceViewRequestParams) => {
-  return apiRequest.get<WebInterfaceViewResponse>("/x/web-interface/view", { params });
+  const key = params.bvid ? pageCacheKey(params.bvid) : undefined;
+  const request = apiRequest.get<WebInterfaceViewResponse>("/x/web-interface/view", { params }).then(response => {
+    const pages = responsePages(response);
+    if (key && pages) {
+      // 只保留分集元数据，不缓存完整响应、用户关系、播放地址或错误结果。
+      pageCache.delete(key);
+      while (pageCache.size >= PAGE_CACHE_MAX_ENTRIES) pageCache.delete(pageCache.keys().next().value!);
+      pageCache.set(key, { pages: pages.map(page => ({ ...page })), expiresAt: Date.now() + PAGE_CACHE_TTL_MS });
+    }
+    return response;
+  });
+  if (key) {
+    pendingViews.set(key, request);
+    const clear = () => {
+      if (pendingViews.get(key) === request) pendingViews.delete(key);
+    };
+    // 同时处理成功/失败，避免清理用的派生 Promise 产生未处理拒绝；原请求仍向调用者报错。
+    void request.then(clear, clear);
+  }
+  return request;
+};
+
+export const getVideoPages = async (bvid: string): Promise<Page[]> => {
+  const cached = getCachedVideoPages(bvid);
+  if (cached) return cached;
+  // 播放正在回查同一视频时，收藏只借用该请求的分集结果，不另发请求。
+  const response = await (pendingViews.get(pageCacheKey(bvid)) ?? getWebInterfaceView({ bvid }));
+  const pages = responsePages(response);
+  if (!pages) throw new Error("分集信息加载失败，请重试");
+  return pages;
 };
