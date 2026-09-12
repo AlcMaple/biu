@@ -1,6 +1,9 @@
 import { chunk } from "es-toolkit/array";
 
-import { bv2av } from "@/common/utils/bv";
+import type { FavSelectModalData } from "@/store/modal/fav-select-modal";
+import type { PlayData } from "@/store/play-list";
+
+import { bv2av, getFavoriteResourceRid } from "@/common/utils/bv";
 import { resolvePlayCount } from "@/common/utils/number";
 import { parseDuration } from "@/common/utils/time";
 import { getFavResourceIds, type FavMedia } from "@/service/fav-resource";
@@ -52,6 +55,53 @@ export const toLocalFavoriteModalData = (item: LocalFavItem) => {
       cid: item.cid,
       page: item.page,
       partTitle: item.partTitle,
+    },
+  };
+};
+
+// 队列 id 不是收藏 rid；已有分集必须按 bvid + cid 回到原条目，不能按稿件 aid 再存一份。
+export const findPlaybackLocalFavorite = (playItem: PlayData, items: LocalFavItem[]) => {
+  const rid = getFavoriteResourceRid(playItem);
+  const sameSource = items.filter(item => isLocalSourceItem(item) === (playItem.source === "local"));
+  if (playItem.source === "local" || playItem.type === "audio") {
+    return sameSource.find(item => item.type === 12 && rid !== undefined && String(item.rid) === rid);
+  }
+  const videos = sameSource.filter(
+    item =>
+      item.type === 2 &&
+      (playItem.bvid && item.bvid
+        ? item.bvid === playItem.bvid
+        : !item.cid && rid !== undefined && String(item.rid) === rid),
+  );
+  const part = playItem.cid ? videos.find(item => item.cid && String(item.cid) === String(playItem.cid)) : undefined;
+  return part ?? videos.find(item => !item.cid);
+};
+
+export const toPlaybackFavoriteModalData = (
+  playItem: PlayData,
+  items: LocalFavItem[],
+): FavSelectModalData | undefined => {
+  const existing = findPlaybackLocalFavorite(playItem, items);
+  if (existing) return toLocalFavoriteModalData(existing);
+  const rid = getFavoriteResourceRid(playItem);
+  if (rid === undefined) return undefined;
+  const isLocal = playItem.source === "local";
+  return {
+    rid,
+    type: playItem.type === "mv" ? 2 : 12,
+    isLocal,
+    title: "收藏",
+    itemInfo: {
+      title: playItem.title,
+      cover: playItem.cover,
+      bvid: playItem.bvid,
+      audioUrl: isLocal ? playItem.audioUrl : undefined,
+      source: isLocal ? "local" : "online",
+      ownerName: playItem.ownerName,
+      ownerMid: playItem.ownerMid,
+      cid: playItem.cid,
+      duration: playItem.duration,
+      playCount: playItem.playCount,
     },
   };
 };

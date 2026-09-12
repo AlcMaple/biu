@@ -6,11 +6,14 @@ import { uniqBy } from "es-toolkit/array";
 
 import { PlayMode } from "@/common/constants/audio";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { toPlaybackFavoriteModalData } from "@/common/utils/fav";
 import { getPlayListDisplayKey, isSamePlayListDisplayItem } from "@/common/utils/playlist-display";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
 import platform from "@/platform";
+import { useFavoritesStore } from "@/store/favorite";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList, type PlayData } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -42,21 +45,15 @@ const PlayListDrawer = () => {
 
   const handleAction = useCallback(async (key: string, item: PlayData) => {
     switch (key) {
-      case "favorite":
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: item.type === "mv" ? (item.aid ?? item.bvid ?? item.id) : (item.sid ?? item.id),
-          type: item.type === "mv" ? 2 : 12,
-          title: item.title,
-          itemInfo: {
-            title: item.title,
-            cover: item.cover,
-            bvid: item.bvid,
-            ownerName: item.ownerName,
-            ownerMid: item.ownerMid,
-            duration: item.duration,
-          },
-        });
+      case "favorite": {
+        const localItems = useFavoritesStore
+          .getState()
+          .createdFavorites.filter(folder => folder.isLocal)
+          .flatMap(folder => useLocalFavItemsStore.getState().folderItems[folder.id] ?? []);
+        const modalData = toPlaybackFavoriteModalData(item, localItems);
+        if (modalData) useModalStore.getState().onOpenFavSelectModal(modalData);
         break;
+      }
       case "download-audio":
         await platform.addMediaDownloadTask({
           outputFileType: "audio",

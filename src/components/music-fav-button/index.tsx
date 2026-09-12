@@ -3,8 +3,10 @@ import { useLocation, useNavigate } from "react-router";
 
 import { RiStarFill, RiStarLine } from "@remixicon/react";
 
-import { getFavoriteResourceRid } from "@/common/utils/bv";
+import { toPlaybackFavoriteModalData } from "@/common/utils/fav";
 import IconButton from "@/components/icon-button";
+import { useFavoritesStore } from "@/store/favorite";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
 import { usePlayList } from "@/store/play-list";
@@ -27,26 +29,14 @@ const MusicFavButton = () => {
 
   const handleOpen = () => {
     if (!playItem) return;
-    const isLocal = playItem.source === "local";
-    const rid = getFavoriteResourceRid(playItem);
-    if (rid === undefined) return;
+    const localItems = useFavoritesStore
+      .getState()
+      .createdFavorites.filter(folder => folder.isLocal)
+      .flatMap(folder => useLocalFavItemsStore.getState().folderItems[folder.id] ?? []);
+    const modalData = toPlaybackFavoriteModalData(playItem, localItems);
+    if (!modalData) return;
     onOpenFavSelectModal({
-      rid,
-      type: playItem.type === "mv" ? 2 : 12,
-      isLocal,
-      title: "收藏",
-      itemInfo: {
-        title: playItem.title,
-        cover: playItem.cover,
-        bvid: playItem.bvid,
-        audioUrl: isLocal ? playItem.audioUrl : undefined,
-        source: isLocal ? "local" : "online",
-        ownerName: playItem.ownerName,
-        ownerMid: playItem.ownerMid,
-        cid: playItem.cid,
-        duration: playItem.duration,
-        playCount: playItem.playCount,
-      },
+      ...modalData,
       onSuccess: selectedIds => {
         setIsFav(Boolean(selectedIds?.length));
 
