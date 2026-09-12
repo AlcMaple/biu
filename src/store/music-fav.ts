@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { findPlaybackLocalFavorite } from "@/common/utils/fav";
 import { getCollResourceCheck } from "@/service/medialist-gateway-coll-resource-check";
 import { getWebInterfaceArchiveRelation } from "@/service/web-interface-archive-relation";
 import { useFavoritesStore } from "@/store/favorite";
@@ -38,17 +39,10 @@ export const useMusicFavStore = create<State & Action>()(set => ({
     // 无论是本地歌曲还是在线歌曲，首先检查是否已在任意本地收藏夹中
     const localFolders = useFavoritesStore.getState().createdFavorites.filter(f => f.isLocal);
     const folderItems = useLocalFavItemsStore.getState().folderItems;
-    const targetRid =
-      playItem.source === "local"
-        ? playItem.id
-        : playItem.type === "mv"
-          ? playItem.aid || playItem.bvid || playItem.id
-          : playItem.sid;
-
-    // 加强判断，兼容播放列表中的 item 可能丢失 aid 的情况，通过 bvid 兜底匹配
-    const isInAnyLocalFolder = localFolders.some(f =>
-      (folderItems[f.id] ?? []).some(
-        i => String(i.rid) === String(targetRid) || (playItem.bvid && i.bvid === playItem.bvid),
+    const isInAnyLocalFolder = Boolean(
+      findPlaybackLocalFavorite(
+        playItem,
+        localFolders.flatMap(folder => folderItems[folder.id] ?? []),
       ),
     );
 

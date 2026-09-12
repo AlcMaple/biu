@@ -96,6 +96,8 @@ const FavoritesSelectModal = () => {
   // "whole" = 收藏整个视频，数字字符串 = 收藏指定分集的 cid
   const [videoPages, setVideoPages] = useState<Page[]>([]);
   const [pickedCid, setPickedCid] = useState<string>("whole");
+  // 本地入口第一次打开就使用原条目的身份，避免沿用上次弹窗的选集状态读错标签。
+  const selectedCid = fromLocalFavorite ? (itemInfo?.cid ?? "whole") : pickedCid;
   // step 0: 选集 step 1: 选收藏夹
   const [step, setStep] = useState<0 | 1>(1);
   const showPagePicker = step === 0;
@@ -122,11 +124,11 @@ const FavoritesSelectModal = () => {
   useEffect(() => {
     if (!isFavSelectModalOpen || !rid || showPagePicker) return;
     const tagTarget = createTagTarget({
-      rid: pickedCid !== "whole" ? pickedCid : rid,
+      rid: selectedCid !== "whole" ? selectedCid : rid,
       type,
       source: itemInfo?.source ?? (isLocal ? "local" : "online"),
       bvid: itemInfo?.bvid,
-      cid: pickedCid !== "whole" ? pickedCid : undefined,
+      cid: selectedCid !== "whole" ? selectedCid : undefined,
     });
     if (tagTarget) setSelectedTagIds(getItemTagIds(tagTarget));
   }, [
@@ -135,7 +137,7 @@ const FavoritesSelectModal = () => {
     isLocal,
     itemInfo?.bvid,
     itemInfo?.source,
-    pickedCid,
+    selectedCid,
     rid,
     showPagePicker,
     type,
@@ -171,7 +173,7 @@ const FavoritesSelectModal = () => {
   useEffect(() => {
     if (!isFavSelectModalOpen || !rid || showPagePicker) return;
     // 当有选集时，使用分集 cid 作为 localRid；本地歌单来源即使状态尚未切到 cid，也优先读原条目的 cid。
-    const localRid = pickedCid !== "whole" ? pickedCid : fromLocalFavorite ? (itemInfo?.cid ?? rid) : rid;
+    const localRid = selectedCid !== "whole" ? selectedCid : fromLocalFavorite ? (itemInfo?.cid ?? rid) : rid;
     const localSelectedIds = localFolders
       .filter(f => (folderItems[f.id] ?? []).some(i => String(i.rid) === String(localRid)))
       .map(f => f.id);
@@ -183,7 +185,7 @@ const FavoritesSelectModal = () => {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, rid, showPagePicker, pickedCid]);
+  }, [fromLocalFavorite, isFavSelectModalOpen, itemInfo?.cid, rid, showPagePicker, selectedCid]);
 
   const { data } = useRequest(
     async () => {
@@ -238,7 +240,7 @@ const FavoritesSelectModal = () => {
     const localFolderIdSet = new Set(localFolders.map(f => f.id));
 
     // 计算分集信息（选了具体分集时生效）。本地歌单来源没有重新请求 pages，直接沿用已有 cid/page/title。
-    const pageInfo = pickedCid !== "whole" ? videoPages.find(p => String(p.cid) === pickedCid) : null;
+    const pageInfo = selectedCid !== "whole" ? videoPages.find(p => String(p.cid) === selectedCid) : null;
     const selection = resolveLocalFavoriteSelection({
       rid: rid as string | number,
       itemInfo: {
@@ -380,11 +382,11 @@ const FavoritesSelectModal = () => {
   };
 
   const tagTarget = createTagTarget({
-    rid: pickedCid !== "whole" ? pickedCid : rid,
+    rid: selectedCid !== "whole" ? selectedCid : rid,
     type,
     source: itemInfo?.source ?? (isLocal ? "local" : "online"),
     bvid: itemInfo?.bvid,
-    cid: pickedCid !== "whole" ? pickedCid : undefined,
+    cid: selectedCid !== "whole" ? selectedCid : undefined,
   });
 
   const allItems = [
@@ -429,7 +431,7 @@ const FavoritesSelectModal = () => {
             /* 选集步骤 */
             <ScrollContainer style={{ height: "100%" }} className="os-thin">
               <div className="flex flex-col gap-1 px-4">
-                <RadioGroup value={pickedCid} onValueChange={setPickedCid}>
+                <RadioGroup value={selectedCid} onValueChange={setPickedCid}>
                   <Radio value="whole">
                     <span className="text-sm">收藏整个视频（共 {videoPages.length} 集）</span>
                   </Radio>
