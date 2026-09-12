@@ -77,7 +77,7 @@ set +a
 
 - **公开流程与私有取值分离**（§0）。公开仓库只写「做什么、如何验证、何时停止」，真实主机/路径/凭据放仓库外的一个 `600` 权限文件，用变量名引用。缺私有配置就**停止**，不要猜。
 - **发布前硬停止条件**（§2）。线上跑的功能必须在当前分支有可追溯 commit；备份和回滚点必须在动手前就位。这两条防的是「用缺功能的 checkout 覆盖生产」和「出事了退不回去」。
-- **签发失败的判据**（§5.0）。`During secondary validation` 就不是你的配置问题。这条能省掉几个小时的无效排查。
+- **签发失败的判据**（§5.0）。`During secondary validation` 是多视角验证失败的线索，不是排除配置问题的证据；按 §5.0 分层检查。
 - **分层验收顺序**（§4）：本机 → 内网 → 公网 → 真实浏览器。跳过任何一层都会出现「本机好好的，用户打不开」。
 - **脱敏检查清单**（§8）。
 
@@ -93,7 +93,7 @@ set +a
 | 私有隧道（应用在内网）    | 应用与反代同机、K8s Service                   | 1、3.2     |
 | Certbot                   | acme.sh、Caddy 自动 TLS、云厂商托管证书       | 5          |
 
-**注意 Caddy / 云厂商托管证书会让 §5 大部分失效**——它们自动续期、自动重载，你只需要保留 §5.0 的失败判据。
+**注意 Caddy / 云厂商托管证书会让 §5 大部分失效**——它们自动续期、自动重载，仍需核对续期归属、告警与实际对外证书，保留 §5.0 的排查思路。
 
 ### C 类：必须自己生成的部分（含生成步骤）
 
@@ -217,10 +217,12 @@ tar -tzf "$package_file" | grep -Ec '\.env$|node_modules|\.pem$|\.key$'   # 必�
 使用私有 SSH 别名，不在公开文档中记录 IP、root 账号、密钥文件名或跳板路径。
 
 ```bash
-ssh "$BIU_CLOUD_SSH_ALIAS" 'mkdir -p "$BIU_CLOUD_ARTIFACT_DIR"'
+ssh "$BIU_CLOUD_SSH_ALIAS" "mkdir -p '$BIU_CLOUD_ARTIFACT_DIR'"
 scp "$package_file" "$BIU_CLOUD_SSH_ALIAS:$BIU_CLOUD_ARTIFACT_DIR/$(basename "$package_file")"
-ssh "$BIU_CLOUD_SSH_ALIAS" "shasum -a 256 $BIU_CLOUD_ARTIFACT_DIR/$(basename "$package_file")"
+ssh "$BIU_CLOUD_SSH_ALIAS" "shasum -a 256 '$BIU_CLOUD_ARTIFACT_DIR/$(basename "$package_file")'"
 ```
+
+以上远程命令由本地展开路径；路径约定不含单引号或换行，SSH 不会自动传递本地环境变量。跨终端时先加载同一份字段配置，并带入本次 `release_stamp`、包名和预期 SHA-256。
 
 在 Mac mini 私有终端中，下载到临时目录、再次核对 SHA-256，并解包到新的 release 目录；不要覆盖旧 release。
 
@@ -241,24 +243,31 @@ test -f "$release_root/dist/server/web-server/index.js"
 在未使用的 loopback 端口启动新 release；端口、Node 路径、环境变量及静态根目录均从私有配置读取。不要在文档中复制完整生产环境变量。
 
 ```bash
+set -eu
 test_port="$BIU_WEB_TEST_PORT"
-lsof -nP -iTCP:"$test_port" -sTCP:LISTEN
+if lsof -nP -iTCP:"$test_port" -sTCP:LISTEN; then
+  echo '测试端口已占用：核实进程归属后停止本次试运行' >&2
+  exit 1
+fi
 cd "$release_root"
 BIU_WEB_HOST=127.0.0.1 \
 BIU_WEB_PORT="$test_port" \
 BIU_WEB_PUBLIC_ORIGIN="$BIU_PUBLIC_ORIGIN" \
 BIU_SYNC_INTERNAL_ORIGIN="$BIU_SYNC_INTERNAL_ORIGIN" \
-BIU_ACME_CHALLENGE_ORIGIN="$BIU_ACME_CHALLENGE_ORIGIN" \
-"$BIU_WEB_NODE" dist/server/web-server/index.js
+BIU_ACME_CHALLENGE_ORIGIN="${BIU_ACME_CHALLENGE_ORIGIN:-}" \
+BIU_WEB_CLIENT_LOG_DIR= \
+"$BIU_WEB_NODE" dist/server/web-server/index.js > logs/test.log 2>&1 &
+test_pid=$!
+trap 'kill "$test_pid" 2>/dev/null || true; wait "$test_pid" 2>/dev/null || true' EXIT
+sleep 2
+kill -0 "$test_pid"
+curl --max-time 10 -fsS "http://127.0.0.1:$test_port$BIU_HEALTH_PATH"
+lsof -a -p "$test_pid" -nP -iTCP:"$test_port" -sTCP:LISTEN
 ```
 
-另一个私有终端检查：
+在独立 Bash 会话中执行，退出时只清理本次创建的 PID。`lsof` 必须已安装；若进程退出或监听 PID 不符，先读 `logs/test.log`，不要把旧进程的健康响应算作新包通过，更不要批量杀占用端口的未知进程。测试实例禁用回传日志，避免测试流量混入生产日志。
 
-```bash
-curl -fsS "http://127.0.0.1:$test_port$BIU_HEALTH_PATH"
-```
-
-完成后停止临时进程；不能让测试实例与生产端口长期同时运行。
+歌词验收同时覆盖 `/__biu_lyrics/netease/search`、`/__biu_lyrics/lrclib/search` 和结果预览；通过真实页面低频操作，确认返回 JSON 与可用结果，不将健康检查等同于上游出站能力正常。
 
 ### 3.4 切换 LaunchAgent
 
@@ -267,16 +276,24 @@ curl -fsS "http://127.0.0.1:$test_port$BIU_HEALTH_PATH"
 ```bash
 agent_file="$BIU_WEB_AGENT_FILE"
 cp "$agent_file" "$agent_file.bak-$release_stamp"
-plutil -replace ProgramArguments.1 -string "$release_root/dist/server/web-server/index.js" "$agent_file"
+# 清理历史追加的入口参数；前提是此服务只使用 Node + 入口两个参数。
+plutil -replace ProgramArguments -json '[]' "$agent_file"
+plutil -insert ProgramArguments.0 -string "$BIU_WEB_NODE" "$agent_file"
+plutil -insert ProgramArguments.1 -string "$release_root/dist/server/web-server/index.js" "$agent_file"
 plutil -replace WorkingDirectory -string "$release_root" "$agent_file"
 plutil -replace StandardOutPath -string "$release_root/logs/web.out.log" "$agent_file"
 plutil -replace StandardErrorPath -string "$release_root/logs/web.err.log" "$agent_file"
 plutil -lint "$agent_file"
 
 launchctl bootout "gui/$(id -u)/$BIU_WEB_SERVICE_LABEL"
+sleep 2
 launchctl bootstrap "gui/$(id -u)" "$agent_file"
 launchctl kickstart -k "gui/$(id -u)/$BIU_WEB_SERVICE_LABEL"
 ```
+
+若已有额外 Node 参数，先核实用途再整理，不要直接清空。`bootout` 异步卸载，短暂等待不保证成功；若出现 `Bootstrap failed: 5: Input/output error`，先检查服务状态与 plist，确认已卸载后再尝试一次 bootstrap，仍失败则按 §7 恢复备份，禁止无限重试。
+
+回传日志目录应按 §4.1 配在跨 release 的固定目录；只更新该环境字段，不整体替换 `EnvironmentVariables`。
 
 Web BFF 登录会话位于进程内存，重启后用户需要重新登录；这是预期行为，不是歌单数据丢失。
 
@@ -326,22 +343,39 @@ curl -sS -o /dev/null -w 'site=%{http_code} http=%{http_version} tls=%{ssl_verif
 curl -sS -o /dev/null -w 'health=%{http_code}\n' "$BIU_PUBLIC_ORIGIN$BIU_HEALTH_PATH"
 ```
 
+云反代主机还需检查其 loopback 隧道端点（从私有拓扑读取），确认请求到达本次 Web 实例；本机正常而这层失败时先查隧道，不直接重签证书。
+
 再用真实浏览器完成：登录、歌单读取、播放、拖动进度。媒体 Range 必须真实得到 `206` / `Content-Range`，不能只凭首页 `200` 判定发布成功。
 
 对跨端歌单，使用受控测试账号验证新增、修改、删除、离线恢复和同条目冲突；正常在线时通过通知通道在亚秒到数秒级收敛，离线/休眠设备在恢复后拉取并最终一致。
 
+### 4.1 日常维护：网页回传日志
+
+BFF 只有配置 `BIU_WEB_CLIENT_LOG_DIR` 才启用持久化回传日志；默认关闭。将其设置为 release 外的受限绝对目录，授予 Web 服务用户写入权限，切换版本时保留该环境变量。字段模板见 `ops/production.example.env`，配置依据为 `web-server/index.ts` 与 `web-server/client-log-store.ts`。
+
+```bash
+: "${BIU_WEB_CLIENT_LOG_DIR:?需要先启用回传日志}"
+ls -lh "$BIU_WEB_CLIENT_LOG_DIR"
+tail -n 100 "$BIU_WEB_CLIENT_LOG_DIR/web-client-$(date -u +%Y-%m-%d).log"
+grep '"level":"error"' "$BIU_WEB_CLIENT_LOG_DIR"/web-client-*.log | tail -n 50
+```
+
+这些命令只在私有终端运行。每天一个 NDJSON 文件，以 `receivedAt` 为服务端时间，另有 `clientAt`、`level`、`message`、`context`、`sessionId`、`ip`、`userAgent`。`sessionId` 是标签页会话标识，不是可信账号 ID；日志含 IP 等元数据，即便消息中的敏感串已脱敏，也不要公开原始日志。请求返回 `202` 仅表示接收，不代表异步落盘成功，验收需核对实际文件。
+
+默认保留 7 天、总容量目标 200 MiB（配置字段单位名为 MB）；可用 `BIU_WEB_CLIENT_LOG_RETENTION_DAYS`、`BIU_WEB_CLIENT_LOG_MAX_MB` 调整。清理随日志写入按间隔触发，不是到点立即执行的定时删除，也不是磁盘硬配额；无需重复加清理 cron，仍需监测权限和磁盘空间。排查播放问题先按服务端时间与会话串关联，再结合进程日志和 Sentry；回传受限流与网络影响，不承诺覆盖所有错误。
+
 ## 5. 证书与自动续期
 
-Let's Encrypt 证书免费且通常为 90 天有效期。
+证书以实际 `notAfter` 为准，不把历史有效期或固定续期窗口写成长期保证。
 
 **同一台反代主机上可能并存多套互不相干的签发体系**，动手前先确认当前域名属于哪一套，否则会照着错的那套排查很久。常见两种形态：
 
 - **挑战回落到内网服务**：证书由内网主机上的 Certbot 签发，公网反代把挑战路径转发到固定的 loopback 端口。这种形态下挑战路径只能转发到那个固定服务，**不能成为任意本地 URL 代理**。
 - **反代主机本机签发**：Certbot 直接在反代主机上以 Web 服务器插件完成验证，**没有挑战反代**。这种域名的 vhost 里不应出现挑战转发配置；从前一种形态的 vhost 复制配置是常见错误。
 
-判断当前域名归哪套管，看反代主机上该域名的续期配置里的 `authenticator` 字段；不在本机 Certbot 管理下的，就属于前一种形态。
+判断当前域名归哪套管，要同时核对 TLS 实际证书路径、签发机的 renewal 配置和调度任务。反代主机没有 renewal 配置，也可能是外部 DNS-01 签发后复制或托管证书，不足以证明存在 HTTP 挑战反代。
 
-私有配置应提供两套体系各自的 Certbot 二进制、配置目录、工作目录、日志目录、续期任务标签和挑战路径。只读检查示例：
+私有配置应提供两套体系各自的 Certbot 二进制、配置目录、工作目录、日志目录、续期任务标签和挑战路径。状态检查与测试续期示例（dry-run 会连接 ACME 测试服务并执行验证，不是纯只读）：
 
 ```bash
 launchctl print "gui/$(id -u)/$BIU_ACME_SERVICE_LABEL" | grep -E 'state =|last exit code|path ='
@@ -359,16 +393,11 @@ launchctl print "gui/$(id -u)/$BIU_ACME_SERVICE_LABEL" | grep -E 'state =|last e
 
 如果反复失败、且错误信息**每次都不一样**（DNS SERVFAIL、CAA 查询失败、DNSSEC 异常、挑战路径连接超时轮流出现），先看错误里有没有 `During secondary validation`。
 
-**有这句就不是你的配置问题。** Let's Encrypt 会从多个地理位置的观察点重复验证，全部通过才签发；主验证点通过而二次验证点失败，说明卡在观察点到你主机的网络路径上。此时**不要**改 vhost、防火墙、DNS 记录，也不要加挑战反代——那些改动解决不了问题，还会引入新的错误配置。
+这只能说明某个二次验证视角失败，不能排除权威 DNS、CAA、DNSSEC、AAAA 指向、区域防火墙或挑战路径配置问题。先从独立网络核对 DNS 与 HTTP-01 路径；主验证通过不代表其他位置必然可达。不要未定位就改 vhost 或照抄其他域名的挑战反代。
 
-两条出路：
+HTTP 可达性不稳定、通配符证书或不开放 80 端口时，可以采用 DNS-01；DNS 自身故障仍须修复。优先按当前安装方式选兼容的 DNS 插件，不将系统包管理器与随意 pip 安装混用。手工模式要有自动 auth/cleanup hook 才能无人值守续期。依据：[Let's Encrypt 挑战类型](https://letsencrypt.org/docs/challenge-types/)、[Certbot 用户指南](https://eff-certbot.readthedocs.io/en/stable/using.html)。
 
-- **改用 DNS-01 验证**。只需要观察点查一条 TXT 记录，不需要从境外连你的 HTTP 端口，直接消掉一整类失败。用 DNS 服务商的 API 配 Certbot 的 auth/cleanup hook 即可；老版本 Certbot 不要用 pip 硬装第三方 DNS 插件，会破坏包管理器安装的版本。
-- **重试**。续期本身有 30 天窗口、每天多次尝试，几乎总能成功——这也是既有证书长期无感续期的原因。但新签发没有这个窗口，靠重试是抽奖。
-
-具体命令、凭据位置和权限最小化要求写在私有运维配置中。
-
-## 5.1 HTTPS 响应头基线
+### 5.1 HTTPS 响应头基线
 
 发布后在公网检查安全响应头。`nosniff` 与严格的 `Referrer-Policy` 是最低要求；HSTS、反嵌入和 CSP 需要先在测试环境验证，不能为了“补头”而破坏登录、媒体或第三方 API。
 
@@ -379,6 +408,35 @@ curl -sSI "$BIU_PUBLIC_ORIGIN/" | grep -Ei '^(strict-transport-security|content-
 - HSTS 仅在该域名长期稳定使用 HTTPS 后启用；不要未经审计加入 `includeSubDomains` 或 `preload`。
 - 用 `Content-Security-Policy-Report-Only` 观察真实页面依赖后，再收紧为执行策略。
 - 反嵌入应通过 CSP `frame-ancestors` 或等效响应头完成，并在登录页和播放器页实际验证。
+
+### 5.2 DNS-01 签发与续期接管
+
+以下在**签发机**执行；新增 `BIU_TLS_DOMAIN`、`BIU_TLS_CERT_NAME`、`BIU_DNS_AUTH_HOOK`、`BIU_DNS_CLEANUP_HOOK` 由私有配置填写。hook 路径及参数作为完整字符串配置；DNS 凭据由脚本从受限文件读取，不写入命令行。首次使用先按当前 Certbot 版本准备账户注册信息。
+
+```bash
+"$BIU_CERTBOT_BIN" certonly --manual --preferred-challenges dns \
+  --cert-name "$BIU_TLS_CERT_NAME" -d "$BIU_TLS_DOMAIN" \
+  --manual-auth-hook "$BIU_DNS_AUTH_HOOK" \
+  --manual-cleanup-hook "$BIU_DNS_CLEANUP_HOOK" \
+  --config-dir "$BIU_CERTBOT_CONFIG_DIR" \
+  --work-dir "$BIU_CERTBOT_WORK_DIR" \
+  --logs-dir "$BIU_CERTBOT_LOG_DIR"
+```
+
+签发不等于安装或自动续期完成。hook 应只创建本次验证 TXT，等传播后返回，清理时只删除本次记录；API 权限限于所需区域的 DNS 修改，不使用主账号密钥。
+
+签发机可与 Web 主机分离；复制证书不会把接收机自动纳入 Certbot 管理。必须明确负责续期的机器、调度器、renewal 配置、证书传输与 TLS reload hook，并验证整条链路。可由签发机通过受限 SSH 调用 DNS hook，避免把 DNS 凭据复制到临时机器。
+
+```bash
+test -f "$BIU_CERTBOT_CONFIG_DIR/renewal/$BIU_TLS_CERT_NAME.conf"
+"$BIU_CERTBOT_BIN" renew --cert-name "$BIU_TLS_CERT_NAME" --dry-run \
+  --config-dir "$BIU_CERTBOT_CONFIG_DIR" \
+  --work-dir "$BIU_CERTBOT_WORK_DIR" \
+  --logs-dir "$BIU_CERTBOT_LOG_DIR"
+curl --max-time 15 -sS -o /dev/null -w 'http=%{http_code} verify=%{ssl_verify_result}\n' "https://$BIU_TLS_DOMAIN/"
+```
+
+验收还包括调度器已启用、失败告警、实际对外证书的签发者/到期日。正常 TLS 校验禁止加 `-k`，再用未手工信任旧证书的独立设备验证。没有续期归属就记录为未接管并安排处理，不凭复制文件或一次 dry-run 宣称全自动；已有 HTTP-01 证书不必批量迁移，但续期失败应告警处理，不假设重试总能成功。
 
 ## 6. 修改 sync 服务或迁移数据
 
@@ -400,7 +458,7 @@ curl -sSI "$BIU_PUBLIC_ORIGIN/" | grep -Ei '^(strict-transport-security|content-
 | 桌面同步失败 | sync 本机健康检查、sync 隧道、既有同步 API | 新建第二份数据目录或从 Web release 找数据 |
 | Web 登录后歌单不同步 | 登录状态、同步桥接、通知通道、源码一致性 | 导出 Cookie/JWT 到前端、覆盖服务器 JSON |
 | 证书续期失败 | 先确认域名归哪套签发体系、再看对应 ACME 日志与续期任务状态 | 删除旧证书、暴露终端/SSH、部署测试证书 |
-| 新域名签发失败 | 错误里有无 `During secondary validation`；有则改用 DNS-01，见 5.0 | 改 vhost/防火墙/DNS 记录、从别的域名复制挑战反代 |
+| 新域名签发失败 | 核对 DNS、多视角可达性和挑战方式，见 5.0 / 5.2 | 未定位就改配置、从别的域名复制挑战反代 |
 | 数据不一致 | 冻结写入、备份、版本/历史比较 | 手改数据、删历史、全量重新上传 |
 
 Web 回滚：保留新 release，恢复发布前保存的 LaunchAgent 或把路径指回已验证 release，语法检查后重新加载服务，再完成本机、外网和真实浏览器验收。
@@ -422,3 +480,129 @@ git grep -Il -E -e 'BEGIN [A-Z ]*PRIVATE KEY' -e 'AKIA[0-9A-Z]{16}' -e 'SESSDATA
 当前文件被清理并不等于历史已清理。首次将既有仓库公开前，必须在**所有 Git refs**上运行本地秘密扫描；一旦命中真实个人标识、凭据或私有基础设施信息，停止推送。若仓库尚未公开，优先创建不带旧历史的新公开仓库；若必须保留历史，先做完整备份并在获授权后使用专门的历史清理工具重写，再 force-push。
 
 公开文档可说明安全边界和变量名；私有配置、SSH 映射、真实基础设施清单及任何恢复副本路径必须留在访问受限的位置。
+
+## 9. 移植到纯静态站：另一条部署路径
+
+**本节用于复用运维流程到其他项目，不用于 Biu Web。** Biu 的登录、媒体代理和同步依赖 Node BFF，仍须同时发布 `dist/web` 与 `dist/server`。
+
+| 判断 | 部署路径 |
+| --- | --- |
+| 需要维护 Node / Python 等常驻应用进程 | 进程管理器 + 反代，应用在内网时才需要隧道 |
+| 构建后只有 HTML / CSS / JS / 图片，无自管服务进程 | 公网 Web 服务器直接读构建产物，无需新建内网进程与隧道 |
+
+不能只凭 Vite / Astro 等工具名称判定；要看是否包含 SSR、服务端接口和运行时密钥。浏览器调用第三方公开 API 不自动等于要部署自管后端。仅上传已审查的构建产物，源码与构建工具不必留在静态服务器。
+
+### 9.1 DNS 与 TLS 准备
+
+- A / AAAA 必须指向实际提供服务的入口。开发机开启 TUN / DNS 劫持时，`dig` 甚至指定权威 NS 的查询都可能被拦截；看到 fake-IP 不应立即判定权威记录错误。到独立服务器查询，或通过可信 DoH 交叉核对；只有可信权威响应才能据以判断 NXDOMAIN。
+- 示例 `portal.team.example.com` 在 `example.com` 区域中的主机记录为 `portal.team`，不是完整域名重复拼接。
+- 证书按 §5.2 或该环境已验证的 HTTP-01 流程签发。静态站不需要照搬内网挑战反代；使用 webroot HTTP-01 时要单独保留挑战目录的可访问性。
+- 配置前备份 HTTP / HTTPS vhost。首次启用需要配置检查、启用站点并 reload；后续仅切换产物软链通常无需 reload。
+
+### 9.2 构建、传包与不可变 release
+
+下面的 `STATIC_BUILD_DIR`、`STATIC_PACKAGE`、`STATIC_RELEASE_ID`、`STATIC_ROOT`、`STATIC_PREVIOUS_RELEASE` 都是**本节临时运维变量**，不是 Biu 应用配置；值由该静态项目的私有运行手册提供。服务器示例针对 Linux / GNU 工具，路径禁止单引号和换行，release ID 限字母数字、点、下划线及连字符。
+
+开发机按该项目锁文件安装并构建，确认产物目录不含 `.env`、源码、日志、source map、私钥或用户数据后：
+
+```bash
+: "${STATIC_BUILD_DIR:?}" "${STATIC_RELEASE_ID:?}" "${STATIC_PACKAGE:?}"
+test -f "$STATIC_BUILD_DIR/index.html"
+tar -C "$STATIC_BUILD_DIR" -czf "$STATIC_PACKAGE" .
+shasum -a 256 "$STATIC_PACKAGE"
+scp "$STATIC_PACKAGE" "$BIU_CLOUD_SSH_ALIAS:$BIU_CLOUD_ARTIFACT_DIR/"
+```
+
+服务器加载自己的私有配置，将 `STATIC_PACKAGE` 设为服务器上的接收包路径；核对开发机与服务器 SHA-256 一致，再确认归档条目无绝对路径、`..` 越界或外部软链。不要解包来路不明的归档。
+
+```bash
+set -eu
+: "${STATIC_ROOT:?}" "${STATIC_RELEASE_ID:?}" "${STATIC_PACKAGE:?}"
+sha256sum "$STATIC_PACKAGE"
+release="$STATIC_ROOT/releases/$STATIC_RELEASE_ID"
+test ! -e "$release"
+mkdir -p "$release"
+tar -xzf "$STATIC_PACKAGE" -C "$release"
+test -f "$release/index.html"
+find "$release" -type d -exec chmod 755 {} \;
+find "$release" -type f -exec chmod 644 {} \;
+# 现有站点发布前，将此输出记到私有发布记录；首次部署没有 previous。
+if test -L "$STATIC_ROOT/current"; then readlink "$STATIC_ROOT/current"; fi
+# 临时链接与 current 位于同一文件系统；GNU mv -T 原子替换链接本身。
+next="$STATIC_ROOT/.next-$STATIC_RELEASE_ID"
+test ! -e "$next" && test ! -L "$next"
+ln -s "$release" "$next"
+mv -Tf "$next" "$STATIC_ROOT/current"
+```
+
+由发布用户管理文件，Web 服务用户只需读权限；不必赋予 Web 进程修改所有产物的权限。首次部署确认父目录可遍历；`current` 必须是软链而非真实目录。保留旧 release，清理前核对当前与回滚点。
+
+### 9.3 Apache 配置与缓存
+
+以下是 HTTPS vhost **内部片段**，不是完整站点配置；将示例路径替换为该站点根目录，补齐 `ServerName`、TLS 证书配置与模块启用。纯静态站不配置应用 `ProxyPass`；HTTP vhost 重定向到 HTTPS，使用 HTTP-01 时保留正确挑战处理。
+
+```apache
+DocumentRoot /var/www/example-static/current
+<Directory /var/www/example-static/current>
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+AddType image/webp .webp
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff2?|webp|jpe?g|png|svg|ico)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+    <FilesMatch "^index\.html$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+```
+
+只有确定文件名包含**内容哈希且永不覆盖同名文件**时，才对那些文件单独配置一年 `immutable` 缓存；不要按 `.js` / `.css` 扩展名一刀切。未哈希图片短缓存，HTML 必须重新验证；如需立即换图，应变更 URL。HSTS 与反嵌入按 §5.1 评估后加。缺失资源应返回真实 404，SPA 回退只覆盖业务路由，不能让 `.env`、README 或缺失图片回退成首页 200。
+
+配置变更后在服务器执行 `apache2ctl -t`，通过才 `systemctl reload apache2`；失败先恢复 vhost 备份再检查。图片在构建前按实际展示尺寸压缩，文字截图可比较 WebP 效果，不将原始大图和归档目录直接发布。
+
+### 9.4 验收与回滚
+
+`STATIC_ORIGIN` 是该静态站的 HTTPS origin，`STATIC_WEBP_PATH` 是本次实际发布的图片路径；另外手动检查 HTTP 入口跳转到 HTTPS。
+
+```bash
+curl --max-time 15 -sS -o /dev/null -w 'http=%{http_code} verify=%{ssl_verify_result}\n' "$STATIC_ORIGIN/"
+curl --max-time 15 -sSI "$STATIC_ORIGIN/index.html"
+curl --max-time 15 -sSI "$STATIC_ORIGIN/$STATIC_WEBP_PATH"
+curl --max-time 15 -sS -o /dev/null -w '%{http_code}\n' "$STATIC_ORIGIN/README.md"
+curl --max-time 15 -sS -o /dev/null -w '%{http_code}\n' "$STATIC_ORIGIN/.env"
+```
+
+分别确认首页 200 且 TLS 校验为 0、入口非长期缓存、图片 `image/webp`、未发布文件 404（或明确的 403）；真实浏览器再看图片、内部路由、刷新与移动端加载。首页 200 不是完整验收。
+
+回滚在服务器执行，把 `STATIC_PREVIOUS_RELEASE` 设为发布前记录且仍完整保留的 release 绝对路径：
+
+```bash
+set -eu
+: "${STATIC_ROOT:?}" "${STATIC_PREVIOUS_RELEASE:?}"
+test -f "$STATIC_PREVIOUS_RELEASE/index.html"
+rollback_link="$STATIC_ROOT/.rollback-$(date -u +%Y%m%dT%H%M%SZ)"
+ln -s "$STATIC_PREVIOUS_RELEASE" "$rollback_link"
+mv -Tf "$rollback_link" "$STATIC_ROOT/current"
+```
+
+回滚后重复上述验收，不覆盖或删除失败 release。软链切换只恢复服务器文件，已被浏览器强缓存的同名资源不会自动失效；这也是长期缓存必须配合内容哈希的原因。
+
+## 10. 可选：接入自有运维状态面板
+
+私有环境可能有 `mstatus` 一类脚本，**仓库未提供该脚本及其辅助函数**。先在目标机器读取现有实现，按其契约修改；不要把某台机器已安装当成公共部署前置条件。非交互 SSH 的 PATH 可能不含用户 `bin`，使用私有配置中记录的绝对路径。
+
+| 目标 | 面板应该展示 | 不该推断 |
+| --- | --- | --- |
+| 常驻应用 / 隧道 | 实际服务标签或容器的运行状态 | 进程存在就等于公网可用 |
+| 纯静态站 | 限时 HTTP 探测的状态码与耗时 | 本机没有 LaunchAgent 就是服务故障 |
+| 定时任务 | 调度器是否加载、上次结果、执行机器 | 当前没运行就是正常，或就是故障 |
+| 未自动接管的证书 | 到期日、剩余天数、续期负责人 | 复制证书后会自动续期 |
+
+如果已有 `dot` / `container_dot` / `site_row`，确认前两者是返回圆点供调用方拼行，还是整行输出；`site_row` 若自己打印整行就直接调用，不再包 `echo`。建议 HTTP 探测带 `curl --max-time 6`，时间上限属于面板策略，不是可用性保证。常规证书可在独立告警系统监测，面板是否显示另行选择。
+
+修改面板前备份；仅当脚本确认为 Bash 时执行 `bash -n "$STATUS_SCRIPT"`，通过后运行 `"$STATUS_SCRIPT"` 核对正常、超时与故障展示。失败恢复备份后再次语法检查。定时任务文字清单不会自动同步，新增、迁移、撤销任务时必须同步，并注明执行机器，避免显示已经撤掉的任务。
