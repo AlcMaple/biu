@@ -606,3 +606,21 @@ mv -Tf "$rollback_link" "$STATIC_ROOT/current"
 如果已有 `dot` / `container_dot` / `site_row`，确认前两者是返回圆点供调用方拼行，还是整行输出；`site_row` 若自己打印整行就直接调用，不再包 `echo`。建议 HTTP 探测带 `curl --max-time 6`，时间上限属于面板策略，不是可用性保证。常规证书可在独立告警系统监测，面板是否显示另行选择。
 
 修改面板前备份；仅当脚本确认为 Bash 时执行 `bash -n "$STATUS_SCRIPT"`，通过后运行 `"$STATUS_SCRIPT"` 核对正常、超时与故障展示。失败恢复备份后再次语法检查。定时任务文字清单不会自动同步，新增、迁移、撤销任务时必须同步，并注明执行机器，避免显示已经撤掉的任务。
+
+
+### 10.1 Biu 项目块
+
+在已定义 `dot` 的私有 `mstatus` 中加入以下项目块，标签以目标机器实际 LaunchAgent 为准。Web 和云同步使用独立服务与隧道，分开显示才能定位哪条链路异常；不要因某项异常一并重启其他服务。
+
+```bash
+echo
+echo -e "${BOLD}【Biu 音乐】${RESET}  Web / 桌面云同步"
+echo -e "  $(dot com.biu.web)  Web 服务  com.biu.web"
+echo -e "  $(dot com.biu.web.tunnel)  Web 隧道  com.biu.web.tunnel"
+echo -e "  $(dot com.biu.sync)  云同步服务  com.biu.sync"
+echo -e "  $(dot com.biu.sync.tunnel)  云同步隧道  com.biu.sync.tunnel"
+```
+
+现有 `dot` 的显示约定：`running` 为绿色实心圆，查询不到状态为空心圆，其他状态为红色实心圆并附状态文字。这四项都是常驻服务，空心圆需要排查，不能套用定时任务的“平时没运行正常”解释。绿色只代表进程运行，不证明隧道远端转发、公网访问或真实播放正常，业务验收仍按 §4 执行。
+
+本块不添加新的轮询、定时任务或服务重启命令，也不把证书续期任务伪装成常驻服务。修改后先对候选副本执行 `bash -n` 并运行核对，保留原脚本与权限，再替换；回滚时恢复备份并重复语法与面板检查。真实主机、脚本备份路径及完整面板输出留在私有运维记录中。
