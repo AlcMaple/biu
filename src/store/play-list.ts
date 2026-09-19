@@ -9,6 +9,7 @@ import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { isOfflineDemo } from "@/common/offline-demo";
 import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/common/utils/audio";
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
+import { tryBv2av } from "@/common/utils/bv";
 import { attachMediaSourceAudio, shouldUseMediaSource, type MediaSourceController } from "@/common/utils/media-source";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
 import { isSamePlaybackUrl, normalizePlaybackUrl, sanitizePersistedPlaybackUrls } from "@/common/utils/playback-url";
@@ -17,6 +18,7 @@ import { formatUrlProtocol } from "@/common/utils/url";
 import platform from "@/platform";
 import { log } from "@/platform";
 import { getAudioSongInfo } from "@/service/audio-song-info";
+import { getPlayerPagelist } from "@/service/player-pagelist";
 import { getWebInterfaceView } from "@/service/web-interface-view";
 import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
@@ -165,7 +167,27 @@ const pushUnique = (arr: string[], id: string) => {
   }
 };
 
-const getMVData = async (bvid: string) => {
+const getMVData = async (bvid: string, existing?: PlayData): Promise<PlayData[]> => {
+  // 队列已有标题、封面、作者，切歌只缺分 P。view 可能捎带数 MB 的合集详情，
+  // 让预取和切歌都卡在同一大响应上；pagelist 返回相同的 pages，不下载无关合集。
+  if (existing) {
+    const res = await getPlayerPagelist({ bvid });
+    const pages = res?.data || [];
+    const aid = existing.aid || tryBv2av(bvid);
+    return pages.map(page => ({
+      ...existing,
+      aid: aid ? String(aid) : undefined,
+      id: idGenerator(),
+      cid: String(page.cid),
+      hasMultiPart: pages.length > 1,
+      pageIndex: page.page,
+      pageTitle: pages.length > 1 ? page.part : existing.pageTitle || existing.title,
+      pageCover: formatUrlProtocol(page.first_frame || existing.pageCover || existing.cover),
+      totalPage: pages.length,
+      duration: page.duration,
+    }));
+  }
+
   const res = await getWebInterfaceView({ bvid });
   const hasMultiPart = (res?.data?.pages?.length ?? 0) > 1;
 
@@ -490,7 +512,10 @@ const setAudioSource = (
 
   if (!url) {
     clearPendingSeekDisplay();
-    audio.src = "";
+    // 空字符串仍是媒体资源选择输入，会在 Chrome 触发 MEDIA_ERR_SRC_NOT_SUPPORTED。
+    // 解析下一首时应真正卸载旧源，而不是制造一次虚假的播放失败。
+    audio.removeAttribute("src");
+    audio.load();
     return;
   }
 
@@ -689,14 +714,14 @@ export const usePlayList = create<State & Action>()(
         return picked;
       };
 
-      const ensureAudioSrcValid = async () => {
+      const resolveAudioSrc = async (): Promise<boolean> => {
         const { playId, list } = get();
-        const currentPlayItem = list.find(item => item.id === playId);
+        let currentPlayItem = list.find(item => item.id === playId);
         if (isOfflineDemo) {
           // The demo represents playback state without mounting a media URL. This
           // keeps the real playlist controls usable while guaranteeing that no
           // browser media loader or source-refresh path can issue a request.
-          return;
+          return true;
         }
         if (currentPlayItem?.source === "local" && currentPlayItem?.audioUrl) {
           const currentTime = usePlayProgress.getState().currentTime;
@@ -709,7 +734,7 @@ export const usePlayList = create<State & Action>()(
           } else if (typeof currentTime === "number" && currentTime > 0) {
             seekAudioTo(currentTime);
           }
-          return;
+          return true;
         }
         if (isUrlValid(currentPlayItem?.audioUrl)) {
           const currentTime = usePlayProgress.getState().currentTime;
@@ -725,12 +750,30 @@ export const usePlayList = create<State & Action>()(
           } else if (typeof currentTime === "number" && currentTime > 0) {
             seekAudioTo(currentTime);
           }
-          return;
+          return true;
+        }
+
+        // 首次切歌的元数据请求可能超时；播放按钮也必须能补全 cid，而不是对空 src 调 play()。
+        if (currentPlayItem?.type === "mv" && currentPlayItem.bvid && !currentPlayItem.cid) {
+          const [first, ...rest] = await getMVData(currentPlayItem.bvid, currentPlayItem);
+          if (get().playId !== playId) return false;
+          if (!first?.cid) {
+            if (!(await dropCurrentIfInvalid(currentPlayItem.id, currentPlayItem))) {
+              toastError("获取播放信息失败，请点击播放重试");
+            }
+            return false;
+          }
+          const resolved = { ...first, id: currentPlayItem.id };
+          set(state => {
+            const index = state.list.findIndex(item => item.id === playId);
+            if (index >= 0) state.list.splice(index, 1, resolved, ...rest);
+          });
+          currentPlayItem = resolved;
         }
 
         if (currentPlayItem?.type === "mv" && currentPlayItem?.bvid && currentPlayItem?.cid) {
           const mvPlayData = await getDashUrl(currentPlayItem.bvid, currentPlayItem.cid);
-          if (get().playId !== playId) return;
+          if (get().playId !== playId) return false;
           if (mvPlayData?.audioUrl) {
             if (!isSameCurrentSource(mvPlayData.audioUrl)) {
               const currentTime = usePlayProgress.getState().currentTime;
@@ -755,6 +798,7 @@ export const usePlayList = create<State & Action>()(
                 listItem.isDolby = mvPlayData.isDolby;
               }
             });
+            return true;
           } else {
             log.error("无法获取音频播放链接", {
               type: "mv",
@@ -771,7 +815,7 @@ export const usePlayList = create<State & Action>()(
 
         if (currentPlayItem?.type === "audio" && currentPlayItem?.sid) {
           const musicPlayData = await getAudioUrl(currentPlayItem.sid);
-          if (get().playId !== playId) return;
+          if (get().playId !== playId) return false;
           if (musicPlayData?.audioUrl) {
             if (!isSameCurrentSource(musicPlayData.audioUrl)) {
               const currentTime = usePlayProgress.getState().currentTime;
@@ -791,6 +835,7 @@ export const usePlayList = create<State & Action>()(
                 listItem.audioCodecs = musicPlayData.audioCodecs;
               }
             });
+            return true;
           } else {
             log.error("无法获取音频播放链接", {
               type: "audio",
@@ -803,6 +848,28 @@ export const usePlayList = create<State & Action>()(
             }
           }
         }
+        return false;
+      };
+
+      // 同一曲目的连续点击复用加载；失败后释放，下一次手动点击重新请求。
+      const sourceFlights = new Map<string, Promise<boolean>>();
+      const ensureAudioSrcValid = (): Promise<boolean> => {
+        const playId = get().playId;
+        if (!playId) return Promise.resolve(false);
+        const existing = sourceFlights.get(playId);
+        if (existing) return existing;
+        const flight = resolveAudioSrc()
+          .catch(error => {
+            if (get().playId === playId) handlePlayError(error);
+            return false;
+          })
+          .then(ready => {
+            if (!ready && get().playId === playId) set({ isPlaying: false });
+            return ready && get().playId === playId;
+          })
+          .finally(() => sourceFlights.delete(playId));
+        sourceFlights.set(playId, flight);
+        return flight;
       };
 
       return {
@@ -1185,11 +1252,7 @@ export const usePlayList = create<State & Action>()(
           }
 
           if (audio.paused) {
-            set(state => {
-              state.isPlaying = true;
-            });
-            await ensureAudioSrcValid();
-            await playAudioSafely();
+            if (await ensureAudioSrcValid()) await playAudioSafely();
           } else {
             audio.pause();
             set(state => {
@@ -1241,8 +1304,7 @@ export const usePlayList = create<State & Action>()(
               });
             }
             if (audio.paused) {
-              await ensureAudioSrcValid();
-              await playAudioSafely();
+              if (await ensureAudioSrcValid()) await playAudioSafely();
             }
             return;
           }
@@ -1272,8 +1334,7 @@ export const usePlayList = create<State & Action>()(
                 state.playId = existItem.id;
               });
               try {
-                await ensureAudioSrcValid();
-                await playAudioSafely();
+                if (await ensureAudioSrcValid()) await playAudioSafely();
               } catch (error) {
                 handlePlayError(error);
               }
@@ -1301,8 +1362,7 @@ export const usePlayList = create<State & Action>()(
                   state.playId = existItem.id;
                 });
                 try {
-                  await ensureAudioSrcValid();
-                  await playAudioSafely();
+                  if (await ensureAudioSrcValid()) await playAudioSafely();
                 } catch (error) {
                   handlePlayError(error);
                 }
@@ -2375,10 +2435,10 @@ async function prefetchAudioSource(targetPlayId: string) {
     // 多P占位项还没解析出 cid：先补 cid，再取地址（否则切过去仍要走两次网络请求）
     let cid = playItem.cid;
     if (!cid) {
-      const mvData = await getMVData(playItem.bvid);
+      const mvData = await getMVData(playItem.bvid, playItem);
       cid = mvData[0]?.cid;
       if (!cid) return;
-      applyToItem({ cid });
+      applyToItem({ cid, aid: mvData[0]?.aid });
     }
     const mvPlayData = await getDashUrl(playItem.bvid, cid);
     if (!mvPlayData?.audioUrl) return;
@@ -2399,67 +2459,173 @@ async function prefetchAudioSource(targetPlayId: string) {
 
 // 切换歌曲时，更新当前播放的歌曲信息
 usePlayList.subscribe(async (state, prevState) => {
-  if (state.playId !== prevState.playId) {
-    if (isOfflineDemo) return;
+  try {
+    if (state.playId !== prevState.playId) {
+      if (isOfflineDemo) return;
 
-    if (!state.playId) {
-      const prevPlayItem = prevState.list.find(item => item.id === prevState.playId);
-      if (shouldReportPlayRecord(prevPlayItem)) {
-        endPlayReport();
-      }
-    }
-
-    const nextPlayItem = state.playId ? state.list.find(item => item.id === state.playId) : undefined;
-    // 地址已就绪（本地文件 / 已预取且未过期）：这条路是**纯同步**的，
-    // 下面会立刻 setAudioSource + play()。手机锁屏后能否续播就取决于这里不出现异步空档。
-    const readyUrl =
-      nextPlayItem && audio.paused
-        ? nextPlayItem.source === "local"
-          ? nextPlayItem.audioUrl
-          : isUrlValid(nextPlayItem.audioUrl)
-            ? nextPlayItem.audioUrl
-            : undefined
-        : undefined;
-
-    if (audio && !audio.paused) {
-      audio.pause();
-    }
-    if (audio && !readyUrl) {
-      audio.currentTime = 0;
-      // 新歌地址尚未解析完成时，不能保留旧 src；否则用户在这个间隙点播放会恢复上一首。
-      // 反之地址已就绪时**不要**清空：清空 src 会中断音频会话，锁屏下再 play() 会被浏览器拒。
-      setAudioSource(""); // 同时 abort 可能在跑的 MSE 挂载
-    }
-    usePlayProgress.getState().setCurrentTime(0);
-    // 切换歌曲
-    if (state.playId) {
-      const requestedPlayId = state.playId;
-      const playItem = state.list.find(item => item.id === state.playId);
-      if (playItem) {
-        if (shouldReportPlayRecord(playItem)) {
-          void beginPlayReport(playItem);
+      if (!state.playId) {
+        const prevPlayItem = prevState.list.find(item => item.id === prevState.playId);
+        if (shouldReportPlayRecord(prevPlayItem)) {
+          endPlayReport();
         }
       }
-      if (readyUrl && playItem) {
-        // 锁屏时也要把标题/封面更新到系统媒体控制中心，否则显示的还是上一首
-        updateMediaSession({
-          title: playItem.pageTitle || playItem.title,
-          artist: playItem.ownerName,
-          cover: playItem.pageCover || playItem.cover,
-        });
-        resetAudioAndPlay(readyUrl);
-        return;
-      }
 
-      if (playItem?.type === "mv") {
-        if (playItem?.bvid && playItem?.cid) {
-          const mvPlayData = await getDashUrl(playItem.bvid, playItem.cid);
+      const nextPlayItem = state.playId ? state.list.find(item => item.id === state.playId) : undefined;
+      // 地址已就绪（本地文件 / 已预取且未过期）：这条路是**纯同步**的，
+      // 下面会立刻 setAudioSource + play()。手机锁屏后能否续播就取决于这里不出现异步空档。
+      const readyUrl =
+        nextPlayItem && audio.paused
+          ? nextPlayItem.source === "local"
+            ? nextPlayItem.audioUrl
+            : isUrlValid(nextPlayItem.audioUrl)
+              ? nextPlayItem.audioUrl
+              : undefined
+          : undefined;
+
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+      if (audio && !readyUrl) {
+        audio.currentTime = 0;
+        // 新歌地址尚未解析完成时，不能保留旧 src；否则用户在这个间隙点播放会恢复上一首。
+        // 反之地址已就绪时**不要**清空：清空 src 会中断音频会话，锁屏下再 play() 会被浏览器拒。
+        setAudioSource(""); // 同时 abort 可能在跑的 MSE 挂载
+      }
+      usePlayProgress.getState().setCurrentTime(0);
+      // 切换歌曲
+      if (state.playId) {
+        const requestedPlayId = state.playId;
+        const playItem = state.list.find(item => item.id === state.playId);
+        if (playItem) {
+          if (shouldReportPlayRecord(playItem)) {
+            void beginPlayReport(playItem);
+          }
+        }
+        if (readyUrl && playItem) {
+          // 锁屏时也要把标题/封面更新到系统媒体控制中心，否则显示的还是上一首
+          updateMediaSession({
+            title: playItem.pageTitle || playItem.title,
+            artist: playItem.ownerName,
+            cover: playItem.pageCover || playItem.cover,
+          });
+          resetAudioAndPlay(readyUrl);
+          return;
+        }
+
+        if (playItem?.type === "mv") {
+          if (playItem?.bvid && playItem?.cid) {
+            const mvPlayData = await getDashUrl(playItem.bvid, playItem.cid);
+            if (usePlayList.getState().playId !== requestedPlayId) return;
+            if (mvPlayData?.audioUrl) {
+              resetAudioAndPlay(mvPlayData?.audioUrl);
+
+              updateMediaSession({
+                title: playItem.pageTitle || playItem.title,
+                artist: playItem.ownerName,
+                cover: playItem.pageCover,
+              });
+
+              usePlayList.setState(state => {
+                if (state.playId !== requestedPlayId) return;
+                const listItem = state.list.find(item => item.id === requestedPlayId);
+                if (listItem) {
+                  listItem.audioUrl = mvPlayData?.audioUrl;
+                  listItem.audioUrlCandidates = mvPlayData?.audioUrlCandidates;
+                  listItem.videoUrl = mvPlayData?.videoUrl;
+                  listItem.isLossless = mvPlayData?.isLossless;
+                  listItem.audioCodecs = mvPlayData?.audioCodecs;
+                  listItem.audioBandwidth = mvPlayData?.audioBandwidth;
+                  listItem.isDolby = mvPlayData?.isDolby;
+                }
+              });
+            } else {
+              log.error("无法获取音频播放链接", {
+                type: "mv",
+                bvid: playItem.bvid,
+                cid: playItem.cid,
+                title: playItem.title,
+                mvPlayData,
+              });
+              if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+                toastError("无法获取音频播放链接");
+              }
+            }
+          } else if (playItem?.bvid) {
+            const mvData = await getMVData(playItem.bvid, playItem);
+            if (usePlayList.getState().playId !== requestedPlayId) return;
+            const [firstMV, ...restMV] = mvData;
+            if (firstMV?.cid) {
+              const mvPlayData = await getDashUrl(playItem.bvid, firstMV.cid);
+              if (usePlayList.getState().playId !== requestedPlayId) return;
+              if (mvPlayData?.audioUrl) {
+                let applied = false;
+                usePlayList.setState(state => {
+                  if (state.playId !== playItem.id) return;
+                  const listItemIndex = state.list.findIndex(item => item.id === state.playId);
+                  if (listItemIndex < 0) return;
+                  state.list.splice(
+                    listItemIndex,
+                    1,
+                    {
+                      ...firstMV,
+                      // 保留占位项 id，避免解析多P后改变 playId 再触发一次订阅与媒体请求。
+                      id: playItem.id,
+                      ...{
+                        audioUrl: mvPlayData?.audioUrl,
+                        audioUrlCandidates: mvPlayData?.audioUrlCandidates,
+                        videoUrl: mvPlayData?.videoUrl,
+                        isLossless: mvPlayData?.isLossless,
+                        isDolby: mvPlayData?.isDolby,
+                        audioCodecs: mvPlayData?.audioCodecs,
+                        audioBandwidth: mvPlayData?.audioBandwidth,
+                      },
+                    },
+                    ...restMV,
+                  );
+                  applied = true;
+                });
+                if (!applied) return;
+
+                updateMediaSession({
+                  title: firstMV.pageTitle || firstMV.title,
+                  artist: firstMV.ownerName,
+                  cover: firstMV.pageCover,
+                });
+                resetAudioAndPlay(mvPlayData?.audioUrl);
+              } else {
+                log.error("无法获取音频播放链接", {
+                  type: "mv",
+                  bvid: playItem.bvid,
+                  cid: firstMV.cid,
+                  title: firstMV.title,
+                  mvPlayData,
+                });
+                if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+                  toastError("无法获取音频播放链接");
+                }
+              }
+            } else {
+              log.error("无法获取音频播放链接", {
+                type: "mv",
+                bvid: playItem.bvid,
+                title: playItem.title,
+                mvData,
+              });
+              if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
+                toastError("无法获取音频播放链接");
+              }
+            }
+          }
+        }
+
+        if (playItem?.type === "audio" && playItem?.sid) {
+          const musicPlayData = await getAudioUrl(playItem.sid);
           if (usePlayList.getState().playId !== requestedPlayId) return;
-          if (mvPlayData?.audioUrl) {
-            resetAudioAndPlay(mvPlayData?.audioUrl);
+          if (musicPlayData?.audioUrl) {
+            resetAudioAndPlay(musicPlayData?.audioUrl);
 
             updateMediaSession({
-              title: playItem.pageTitle || playItem.title,
+              title: playItem.title,
               artist: playItem.ownerName,
               cover: playItem.pageCover,
             });
@@ -2468,87 +2634,16 @@ usePlayList.subscribe(async (state, prevState) => {
               if (state.playId !== requestedPlayId) return;
               const listItem = state.list.find(item => item.id === requestedPlayId);
               if (listItem) {
-                listItem.audioUrl = mvPlayData?.audioUrl;
-                listItem.audioUrlCandidates = mvPlayData?.audioUrlCandidates;
-                listItem.videoUrl = mvPlayData?.videoUrl;
-                listItem.isLossless = mvPlayData?.isLossless;
-                listItem.audioCodecs = mvPlayData?.audioCodecs;
-                listItem.audioBandwidth = mvPlayData?.audioBandwidth;
-                listItem.isDolby = mvPlayData?.isDolby;
+                listItem.audioUrl = musicPlayData?.audioUrl;
+                listItem.audioUrlCandidates = musicPlayData?.audioUrlCandidates;
               }
             });
           } else {
             log.error("无法获取音频播放链接", {
-              type: "mv",
-              bvid: playItem.bvid,
-              cid: playItem.cid,
+              type: "audio",
+              sid: playItem.sid,
               title: playItem.title,
-              mvPlayData,
-            });
-            if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
-              toastError("无法获取音频播放链接");
-            }
-          }
-        } else if (playItem?.bvid) {
-          const mvData = await getMVData(playItem.bvid);
-          if (usePlayList.getState().playId !== requestedPlayId) return;
-          const [firstMV, ...restMV] = mvData;
-          if (firstMV?.cid) {
-            const mvPlayData = await getDashUrl(playItem.bvid, firstMV.cid);
-            if (usePlayList.getState().playId !== requestedPlayId) return;
-            if (mvPlayData?.audioUrl) {
-              let applied = false;
-              usePlayList.setState(state => {
-                if (state.playId !== playItem.id) return;
-                const listItemIndex = state.list.findIndex(item => item.id === state.playId);
-                if (listItemIndex < 0) return;
-                state.list.splice(
-                  listItemIndex,
-                  1,
-                  {
-                    ...firstMV,
-                    // 保留占位项 id，避免解析多P后改变 playId 再触发一次订阅与媒体请求。
-                    id: playItem.id,
-                    ...{
-                      audioUrl: mvPlayData?.audioUrl,
-                      audioUrlCandidates: mvPlayData?.audioUrlCandidates,
-                      videoUrl: mvPlayData?.videoUrl,
-                      isLossless: mvPlayData?.isLossless,
-                      isDolby: mvPlayData?.isDolby,
-                      audioCodecs: mvPlayData?.audioCodecs,
-                      audioBandwidth: mvPlayData?.audioBandwidth,
-                    },
-                  },
-                  ...restMV,
-                );
-                applied = true;
-              });
-              if (!applied) return;
-
-              updateMediaSession({
-                title: firstMV.pageTitle || firstMV.title,
-                artist: firstMV.ownerName,
-                cover: firstMV.pageCover,
-              });
-              resetAudioAndPlay(mvPlayData?.audioUrl);
-            } else {
-              log.error("无法获取音频播放链接", {
-                type: "mv",
-                bvid: playItem.bvid,
-                cid: firstMV.cid,
-                title: firstMV.title,
-                mvPlayData,
-              });
-              if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
-                toastError("无法获取音频播放链接");
-              }
-            }
-          } else {
-            log.error("无法获取音频播放链接", {
-              type: "mv",
-              bvid: playItem.bvid,
-              title: playItem.title,
-              mvData,
+              musicPlayData,
             });
             if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
               toastError("无法获取音频播放链接");
@@ -2556,39 +2651,11 @@ usePlayList.subscribe(async (state, prevState) => {
           }
         }
       }
-
-      if (playItem?.type === "audio" && playItem?.sid) {
-        const musicPlayData = await getAudioUrl(playItem.sid);
-        if (usePlayList.getState().playId !== requestedPlayId) return;
-        if (musicPlayData?.audioUrl) {
-          resetAudioAndPlay(musicPlayData?.audioUrl);
-
-          updateMediaSession({
-            title: playItem.title,
-            artist: playItem.ownerName,
-            cover: playItem.pageCover,
-          });
-
-          usePlayList.setState(state => {
-            if (state.playId !== requestedPlayId) return;
-            const listItem = state.list.find(item => item.id === requestedPlayId);
-            if (listItem) {
-              listItem.audioUrl = musicPlayData?.audioUrl;
-              listItem.audioUrlCandidates = musicPlayData?.audioUrlCandidates;
-            }
-          });
-        } else {
-          log.error("无法获取音频播放链接", {
-            type: "audio",
-            sid: playItem.sid,
-            title: playItem.title,
-            musicPlayData,
-          });
-          if (!(await dropCurrentIfInvalid(playItem.id, playItem))) {
-            toastError("无法获取音频播放链接");
-          }
-        }
-      }
+    }
+  } catch (error) {
+    if (usePlayList.getState().playId === state.playId) {
+      usePlayList.setState({ isPlaying: false });
+      handlePlayError(error);
     }
   }
 });
