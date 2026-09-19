@@ -45,6 +45,9 @@ class FakeAudio {
   getAttribute(name: string) {
     return name === "src" ? this.src || null : null;
   }
+  removeAttribute(name: string) {
+    if (name === "src") this.src = "";
+  }
   addEventListener(type: string, listener: (event: any) => void) {
     const bucket = this.listeners.get(type) ?? new Set();
     bucket.add(listener);

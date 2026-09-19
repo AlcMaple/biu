@@ -41,6 +41,16 @@ vi.mock("@/service/audio-song-info", () => ({
   })),
 }));
 
+vi.mock("@/service/player-pagelist", () => ({
+  getPlayerPagelist: vi.fn(async () => ({
+    code: 0,
+    data: [
+      { cid: 11, page: 1, part: "p1", duration: 60, first_frame: "https://ff.test/1.png" },
+      { cid: 12, page: 2, part: "p2", duration: 60, first_frame: "https://ff.test/2.png" },
+    ],
+  })),
+}));
+
 vi.mock("@/service/web-interface-view", () => ({
   getWebInterfaceView: vi.fn(async () => ({
     data: {
@@ -200,11 +210,17 @@ describe("play-list store", () => {
     const s = usePlayList.getState();
     await s.init();
     const audio = s.getAudio();
-    const load = vi.spyOn(audio, "load");
+    const loadedSources: string[] = [];
+    const originalLoad = audio.load.bind(audio);
+    vi.spyOn(audio, "load").mockImplementation(() => {
+      if (audio.getAttribute("src")) loadedSources.push(audio.src);
+      originalLoad();
+    });
 
     await s.play({ type: "mv", bvid: "BVx", title: "mv" });
 
-    expect(load).toHaveBeenCalledTimes(1);
+    // 卸载空源也调用 load()，只统计实际媒体源挂载，仍须恰好一次。
+    expect(loadedSources).toEqual(["https://video.test/a.mp3"]);
     expect(usePlayList.getState().list).toHaveLength(2);
     expect(usePlayList.getState().playId).toBe(usePlayList.getState().list[0].id);
   });
@@ -872,4 +888,192 @@ describe("play-list store", () => {
     await s.addList([{ type: "audio", sid: 303, title: "x", cover: "c", ownerName: "o", ownerMid: 1, playCount: 777 }]);
     expect(usePlayList.getState().list.some(i => i.playCount === 777)).toBe(true);
   });
+});
+
+describe("播放加载失败后的手动恢复", () => {
+  test("首次缺少 cid 且元数据返回空，点击播放补全信息并保持队列 id", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getPlayerPagelist } = await import("@/service/player-pagelist");
+    vi.mocked(getPlayerPagelist).mockResolvedValueOnce({ code: -1 } as any);
+    usePlayList.setState({
+      list: [{ id: "retry-mv", type: "mv", bvid: "BV_retry", title: "retry" }],
+      playId: "retry-mv",
+    });
+    await vi.waitFor(() => expect(getPlayerPagelist).toHaveBeenCalledTimes(1));
+    await s.togglePlay();
+    expect(usePlayList.getState().getPlayItem()?.cid).toBe("11");
+    expect(usePlayList.getState().playId).toBe("retry-mv");
+    expect(s.getAudio().src).toBe("https://video.test/a.mp3");
+    expect(usePlayList.getState().isPlaying).toBe(true);
+  });
+
+  test("取流返回空时不播放空源、不假装播放中，下一次点击可恢复", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getDashUrl } = await import("@/common/utils/audio");
+    vi.mocked(getDashUrl).mockResolvedValueOnce({ isLossless: false });
+    usePlayList.setState({
+      list: [{ id: "empty-mv", type: "mv", bvid: "BV_empty", cid: "11", title: "empty" }],
+      playId: "empty-mv",
+    });
+    await vi.waitFor(() => expect(getDashUrl).toHaveBeenCalledTimes(1));
+    const play = vi.spyOn(s.getAudio(), "play");
+    vi.mocked(getDashUrl).mockResolvedValueOnce({ isLossless: false });
+    await s.togglePlay();
+    expect(play).not.toHaveBeenCalled();
+    expect(usePlayList.getState().isPlaying).toBe(false);
+    expect(usePlayList.getState().list).toHaveLength(1);
+    await s.togglePlay();
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(usePlayList.getState().isPlaying).toBe(true);
+  });
+
+  test("音频请求超时被接住，保留歌曲并允许重新播放", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getAudioUrl } = await import("@/common/utils/audio");
+    vi.mocked(getAudioUrl).mockRejectedValueOnce(new Error("timeout of 10000ms exceeded"));
+    usePlayList.setState({
+      list: [{ id: "timeout-audio", type: "audio", sid: 9, title: "timeout" }],
+      playId: "timeout-audio",
+    });
+    await vi.waitFor(() => expect(getAudioUrl).toHaveBeenCalledTimes(1));
+    vi.mocked(getAudioUrl).mockRejectedValueOnce(new Error("timeout of 10000ms exceeded"));
+    await expect(s.togglePlay()).resolves.toBeUndefined();
+    expect(usePlayList.getState().isPlaying).toBe(false);
+    expect(usePlayList.getState().list).toHaveLength(1);
+    await s.togglePlay();
+    expect(usePlayList.getState().isPlaying).toBe(true);
+  });
+
+  test("旧曲重试未完成就切歌，旧请求不得启动新曲或覆盖新源", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getDashUrl } = await import("@/common/utils/audio");
+    vi.mocked(getDashUrl).mockResolvedValueOnce({ isLossless: false });
+    usePlayList.setState({ list: [{ id: "old", type: "mv", bvid: "BV_old", cid: "11", title: "old" }], playId: "old" });
+    await vi.waitFor(() => expect(getDashUrl).toHaveBeenCalledTimes(1));
+    let finish!: (value: any) => void;
+    vi.mocked(getDashUrl).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
+    const retry = s.togglePlay();
+    const play = vi.spyOn(s.getAudio(), "play");
+    usePlayList.setState({
+      list: [{ id: "new", type: "audio", source: "local", audioUrl: "https://local.test/new.mp3", title: "new" }],
+      playId: "new",
+    });
+    expect(play).toHaveBeenCalledTimes(1);
+    finish({ audioUrl: "https://old.test/old.mp3", isLossless: false });
+    await retry;
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(s.getAudio().src).toBe("https://local.test/new.mp3");
+  });
+});
+
+describe("连续切歌使用轻量分集请求", () => {
+  test("播放结束自动连续切换 20 首，无需点击恢复，也不下载合集详情", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getPlayerPagelist } = await import("@/service/player-pagelist");
+    const { getWebInterfaceView } = await import("@/service/web-interface-view");
+    vi.mocked(getPlayerPagelist).mockResolvedValue({
+      code: 0,
+      data: [{ cid: 11, page: 1, part: "track", duration: 180 }],
+    } as any);
+    // 重现大 view 响应超时：连续播放不应再依赖这个接口。
+    vi.mocked(getWebInterfaceView).mockRejectedValue(new Error("timeout of 10000ms exceeded"));
+    usePlayList.setState({ playMode: PlayMode.Loop });
+    await s.playList(
+      Array.from({ length: 20 }, (_, i) => ({
+        type: "mv" as const,
+        bvid: `BV_continuous_${i}`,
+        title: `song-${i}`,
+        ownerName: "original-owner",
+        cover: "https://cover.test/original.png",
+      })),
+    );
+    const audio = s.getAudio();
+    for (let i = 0; i < 20; i += 1) {
+      await vi.waitFor(() => {
+        expect(usePlayList.getState().getPlayItem()?.title).toBe(`song-${i}`);
+        expect(usePlayList.getState().getPlayItem()?.audioUrl).toBeTruthy();
+        expect(usePlayList.getState().isPlaying).toBe(true);
+      });
+      expect(usePlayList.getState().getPlayItem()?.ownerName).toBe("original-owner");
+      if (i < 19) {
+        audio.pause();
+        audio.onended?.(new Event("ended"));
+      }
+    }
+    expect(getPlayerPagelist).toHaveBeenCalledTimes(20);
+    expect(getWebInterfaceView).not.toHaveBeenCalled();
+  });
+
+  test("预取只下载分集，播完后同步切入下一首，不再发起元数据请求", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getPlayerPagelist } = await import("@/service/player-pagelist");
+    const { getWebInterfaceView } = await import("@/service/web-interface-view");
+    vi.mocked(getPlayerPagelist).mockResolvedValue({
+      code: 0,
+      data: [{ cid: 11, page: 1, part: "next", duration: 180 }],
+    } as any);
+    usePlayList.setState({
+      playMode: PlayMode.Loop,
+      list: [
+        {
+          id: "light-current",
+          type: "audio",
+          source: "local",
+          audioUrl: "https://local.test/current.mp3",
+          title: "current",
+        },
+        { id: "light-next", type: "mv", bvid: "BV_light", title: "next", ownerName: "owner" },
+      ],
+      playId: "light-current",
+    });
+    const audio = s.getAudio();
+    Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+    audio.currentTime = 80;
+    audio.ontimeupdate?.(new Event("timeupdate"));
+    await vi.waitFor(() => expect(usePlayList.getState().list[1].audioUrl).toBeTruthy());
+    expect(getPlayerPagelist).toHaveBeenCalledTimes(1);
+    expect(getWebInterfaceView).not.toHaveBeenCalled();
+    audio.pause();
+    audio.onended?.(new Event("ended"));
+    expect(usePlayList.getState().playId).toBe("light-next");
+    expect(usePlayList.getState().isPlaying).toBe(true);
+    expect(audio.src).toBe("https://video.test/a.mp3");
+    expect(getPlayerPagelist).toHaveBeenCalledTimes(1);
+  });
+});
+
+test("切歌等待分集请求时真正移除媒体 src，避免空字符串触发媒体错误", async () => {
+  const s = usePlayList.getState();
+  await s.init();
+  const audio = s.getAudio();
+  const remove = vi.spyOn(audio, "removeAttribute");
+  const load = vi.spyOn(audio, "load");
+  const { getPlayerPagelist } = await import("@/service/player-pagelist");
+  let finish!: (value: any) => void;
+  vi.mocked(getPlayerPagelist).mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  usePlayList.setState({
+    list: [{ id: "empty-source", type: "mv", bvid: "BV_empty_source", title: "waiting" }],
+    playId: "empty-source",
+  });
+  expect(remove).toHaveBeenCalledWith("src");
+  expect(load).toHaveBeenCalled();
+  expect(audio.getAttribute("src")).toBeNull();
+  finish({ code: 0, data: [{ cid: 11, page: 1, part: "waiting", duration: 120 }] });
+  await vi.waitFor(() => expect(usePlayList.getState().isPlaying).toBe(true));
 });
