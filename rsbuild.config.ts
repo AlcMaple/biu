@@ -90,6 +90,7 @@ export default defineConfig(({ command }) => {
     },
     html: {
       template: "./src/index.html",
+      favicon: "./src/assets/favicon.svg",
       ...(umamiTrackingTag ? { tags: [umamiTrackingTag] } : {}),
     },
     plugins: [
