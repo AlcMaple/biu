@@ -23,7 +23,17 @@ const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
 const DEFAULT_FONT_SIZE = 20;
 
-const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: boolean; showControls?: boolean }) => {
+const Lyrics = ({
+  color,
+  centered,
+  showControls,
+  stableTypography = false,
+}: {
+  color?: string;
+  centered?: boolean;
+  showControls?: boolean;
+  stableTypography?: boolean;
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -224,7 +234,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
   const renderLine = (line: { time: number; text: string }, index: number) => {
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
-    const activeWeight = isActive ? "font-extrabold" : "font-normal";
+    const activeWeight = stableTypography ? "font-medium" : isActive ? "font-extrabold" : "font-normal";
     const activeShadow = isActive ? activeTextBase : "";
 
     return (
@@ -234,20 +244,30 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
           lineRefs.current[index] = node;
         }}
         className={clsx(
-          "w-full transform-none py-2 transition-all duration-300 ease-out",
+          "w-full transform-none py-2 duration-300 ease-out",
+          stableTypography ? "transition-opacity" : "transition-all",
           centered ? "text-center" : "text-left",
-          isActive ? "opacity-100" : "opacity-60",
+          isActive ? "opacity-100" : stableTypography ? "opacity-80" : "opacity-60",
         )}
-        style={{ fontSize: isActive ? fontSize * 1.5 : fontSize, transform: "none" }}
+        style={{
+          fontSize: isActive && !stableTypography ? fontSize * 1.5 : fontSize,
+          transform: "none",
+          overflowWrap: stableTypography ? "anywhere" : undefined,
+        }}
       >
         <div
           className={clsx("leading-snug break-words whitespace-pre-wrap", activeWeight, activeShadow)}
-          style={{ color: color || undefined }}
+          style={{ color: color || undefined, overflowWrap: stableTypography ? "anywhere" : undefined }}
         >
           {line.text}
         </div>
         {translation ? (
-          <div className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80">{translation}</div>
+          <div
+            className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80"
+            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+          >
+            {translation}
+          </div>
         ) : null}
       </div>
     );
@@ -268,7 +288,7 @@ const Lyrics = ({ color, centered, showControls }: { color?: string; centered?: 
         >
           {lyrics.length ? (
             <div
-              className="space-y-2"
+              className={clsx("space-y-2", stableTypography && "pr-16")}
               style={{
                 paddingTop: centerPadding,
                 paddingBottom: centerPadding,

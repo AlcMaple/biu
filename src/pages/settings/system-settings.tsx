@@ -328,13 +328,16 @@ export const SystemSettingsTab = ({
         />
       </div>
 
-      <Divider />
-      <h2>全屏播放器</h2>
-      {/* 精美播放器图片册 */}
-      <div className="w-full space-y-1">
-        <div className="text-medium font-medium">精美播放器背景图片册</div>
-        <FancyPlayerImageAlbum />
-      </div>
+      {!isWeb && (
+        <>
+          <Divider />
+          <h2>全屏播放器</h2>
+          <div className="w-full space-y-1">
+            <div className="text-medium font-medium">精美播放器背景图片册</div>
+            <FancyPlayerImageAlbum />
+          </div>
+        </>
+      )}
 
       {showFileSystemSettings && <Divider />}
       {showFileSystemSettings && <h2>下载</h2>}

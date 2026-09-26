@@ -20,6 +20,8 @@ import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 
+import "./styles.css";
+
 const appPlatform = platform.getPlatform();
 
 /** 将路径转为 <img src> 可用的字符串 */
@@ -254,8 +256,7 @@ const FancyFullScreenPlayer = () => {
             <Empty />
           ) : (
             <DrawerBody
-              className="relative flex flex-col gap-0 overflow-hidden bg-transparent p-0 text-white select-none"
-              style={{ drop_shadow: "0 0 2px rgba(255,255,255,0.3)" } as React.CSSProperties}
+              className="fancy-player relative flex flex-col gap-0 overflow-hidden bg-transparent p-0 text-white select-none"
               onMouseEnter={isWeb ? undefined : handleMouseEnter}
               onMouseLeave={isWeb ? undefined : () => scheduleHideUi(3000)}
               onMouseMove={
@@ -275,14 +276,6 @@ const FancyFullScreenPlayer = () => {
                   50%  { transform: scale(1.18) translate(-1%,   2%);   }
                   75%  { transform: scale(1.12) translate( 2%,   1%);   }
                   100% { transform: scale(1.15) translate(0%,    0%);   }
-                }
-                @keyframes fancy-breathing-glow {
-                  0%, 100% {
-                    text-shadow: 0 0 15px rgba(255,255,255,0.8), 0 0 30px rgba(255,255,255,0.4);
-                  }
-                  50% {
-                    text-shadow: 0 0 20px rgba(255,255,255,0.9), 0 0 40px rgba(255,255,255,0.6);
-                  }
                 }
               `}</style>
 
@@ -322,16 +315,19 @@ const FancyFullScreenPlayer = () => {
               <div
                 aria-hidden
                 className="pointer-events-none fixed inset-0 z-[1]"
-                style={{ background: "rgba(0,0,0,0.20)" }}
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(0,0,0,0.60), rgba(0,0,0,0.72) 60%), linear-gradient(0deg, rgba(0,0,0,0.35), transparent 35%)",
+                }}
               />
 
               {/* ══ 主容器：flex 纵向布局，与 HTML 完全对应 ══ */}
-              <div className="relative z-10 flex h-full w-full flex-col px-[5%] pt-8">
+              <div className="fancy-player-layout relative z-10 flex h-full w-full flex-col px-[5%] pt-8">
                 {/* ── Header ── */}
-                <header className="mb-4 flex items-center justify-between">
+                <header className="mb-4 flex shrink-0 items-center justify-between gap-4">
                   <div
                     className={clsx(
-                      "window-no-drag flex items-center space-x-2 transition-opacity duration-200",
+                      "window-no-drag flex min-w-0 items-center space-x-2 transition-opacity duration-200 [&>button]:shrink-0",
                       isUiVisible ? "opacity-100" : "pointer-events-none opacity-0",
                     )}
                   >
@@ -339,7 +335,8 @@ const FancyFullScreenPlayer = () => {
                       <RiArrowDownSLine size={28} />
                     </IconButton>
                     <span
-                      className="text-2xl tracking-widest text-white/90 italic select-none"
+                      className="fancy-player-header-title min-w-0 truncate text-white/90 select-none"
+                      title={playItem.pageTitle || playItem.title}
                       style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
                     >
                       {playItem.pageTitle || playItem.title}
@@ -368,7 +365,7 @@ const FancyFullScreenPlayer = () => {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="window-no-drag">
+                  <div className="window-no-drag shrink-0">
                     {isElectron && (appPlatform === "linux" || appPlatform === "windows") && isUiVisible && (
                       <WindowAction />
                     )}
@@ -378,7 +375,7 @@ const FancyFullScreenPlayer = () => {
                 {/* ── Main（flex-grow 撑满中间区域）── */}
                 <main className="flex min-h-0 flex-grow items-center justify-between">
                   {/* 左侧：专辑卡片（与背景图同一张图） */}
-                  <div className="flex w-1/2 items-center justify-start">
+                  <div className="flex w-1/2 min-w-0 items-center justify-start">
                     <div className="group relative">
                       {/* 装饰线 */}
                       <div className="absolute -top-12 -left-12 hidden h-px w-24 bg-white/30 lg:block" />
@@ -386,7 +383,7 @@ const FancyFullScreenPlayer = () => {
 
                       {/* 卡片本体 —— 与背景共用同一套 A/B 双缓冲，保证同步过渡 */}
                       <div
-                        className="h-[24rem] w-[24rem] transform overflow-hidden rounded-[3rem] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02] xl:h-[32rem] xl:w-[32rem] xl:rounded-[4rem]"
+                        className="fancy-player-cover transform overflow-hidden rounded-[3rem] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]"
                         style={{ boxShadow: "0 40px 100px -20px rgba(0,0,0,0.5)" }}
                       >
                         {imgA || imgB ? (
@@ -432,20 +429,20 @@ const FancyFullScreenPlayer = () => {
                   </div>
 
                   {/* 右侧：歌曲信息 + 歌词 */}
-                  <div className="flex h-full min-h-0 w-1/2 flex-col justify-center pl-8 xl:pl-12">
+                  <div className="fancy-player-info flex h-full min-h-0 w-1/2 min-w-0 flex-col justify-center pl-8 xl:pl-12">
                     {/* 标题 & 作者 */}
-                    <div className="mb-8 xl:mb-12">
+                    <div className="fancy-player-metadata shrink-0">
                       <h1
-                        className="mb-2 text-4xl leading-tight tracking-tight text-white italic drop-shadow-md xl:text-6xl"
+                        className="fancy-player-title mb-3 text-white"
+                        title={playItem.pageTitle || playItem.title}
                         style={{
                           fontFamily: "Georgia, 'Noto Serif', serif",
-                          textShadow: "0 0 15px rgba(255,255,255,0.8), 0 0 30px rgba(255,255,255,0.4)",
                         }}
                       >
                         {playItem.pageTitle || playItem.title}
                       </h1>
-                      <div className="flex items-center gap-4">
-                        <div className="h-px w-8 bg-white/40" />
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="h-px w-6 shrink-0 bg-white/40" />
                         {isArtistEditOpen ? (
                           <input
                             ref={artistInputRef}
@@ -464,18 +461,18 @@ const FancyFullScreenPlayer = () => {
                             }}
                             placeholder="输入歌手名"
                             spellCheck={false}
-                            className="min-w-[12rem] border-b border-white/50 bg-transparent pb-1 text-lg text-white/90 caret-white outline-none placeholder:text-white/30 xl:text-xl"
+                            className="fancy-player-artist w-full min-w-0 border-b border-white/50 bg-black/20 pb-1 text-white/90 caret-white outline-none placeholder:text-white/70"
                             style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
                           />
                         ) : (
                           <button
                             type="button"
                             onClick={openArtistEditor}
-                            className="group/artist flex items-center gap-2 border-b border-transparent pb-1 transition-colors hover:border-white/30"
+                            className="group/artist flex min-w-0 items-center gap-2 border-b border-transparent pb-1"
                             title={isWeb ? undefined : displayArtist ? "编辑歌手" : "添加歌手"}
                           >
                             <span
-                              className={clsx("text-lg xl:text-xl", displayArtist ? "text-white/90" : "text-white/40")}
+                              className="fancy-player-artist text-white/90"
                               style={{ fontFamily: "Georgia, 'Noto Serif', serif" }}
                             >
                               {displayArtist || "添加歌手"}
@@ -483,7 +480,7 @@ const FancyFullScreenPlayer = () => {
                             <RiPencilLine
                               size={13}
                               className={clsx(
-                                "text-white/50",
+                                "shrink-0 text-white/80",
                                 isWeb ? "opacity-100" : "opacity-0 transition-opacity group-hover/artist:opacity-100",
                               )}
                             />
@@ -494,20 +491,15 @@ const FancyFullScreenPlayer = () => {
 
                     {/* 歌词 */}
                     {showLyrics && (
-                      <div
-                        className="h-auto max-h-[30vh] overflow-hidden pr-12 xl:max-h-[350px]"
-                        style={{
-                          maskImage: "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
-                        }}
-                      >
-                        <Lyrics color="#ffffff" centered={false} showControls={isUiVisible} />
+                      <div className="fancy-player-lyrics min-h-0 overflow-hidden">
+                        <Lyrics color="#ffffff" centered={false} showControls={isUiVisible} stableTypography />
                       </div>
                     )}
                   </div>
                 </main>
 
                 {/* ── Footer ── */}
-                <footer className="mt-auto flex flex-col pb-2 xl:pb-4">
+                <footer className="mt-auto flex shrink-0 flex-col pb-2 xl:pb-4">
                   {/* 进度条行 */}
                   <div className="mb-4 flex w-full items-center gap-6 xl:mb-6">
                     <MusicPlayProgress className="w-full" trackClassName="h-[2px]" />
