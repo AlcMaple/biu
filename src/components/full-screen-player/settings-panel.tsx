@@ -7,6 +7,7 @@ import { useShallow } from "zustand/shallow";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { isHex } from "@/common/utils/color";
 import ColorPicker from "@/components/color-picker";
+import { isWeb } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { usePlayList } from "@/store/play-list";
 
@@ -130,17 +131,19 @@ const FullScreenPlayerSettingsPanel = ({ isUiVisible = true }: { isUiVisible?: b
 
   return (
     <div className={isMobileLayout ? "w-[min(82vw,340px)] min-w-0 space-y-4" : "min-w-[320px] space-y-4"}>
-      <div className="flex items-center justify-between">
-        <div className="mr-6 space-y-0.5">
-          <div className="text-medium">精美全屏播放器</div>
-          <div className="text-xs text-zinc-500">使用艺术风格的沉浸式界面</div>
+      {!isWeb && (
+        <div className="flex items-center justify-between">
+          <div className="mr-6 space-y-0.5">
+            <div className="text-medium">精美全屏播放器</div>
+            <div className="text-xs text-zinc-500">使用艺术风格的沉浸式界面</div>
+          </div>
+          <Controller
+            control={control}
+            name="useFancyPlayer"
+            render={({ field }) => <Switch isSelected={field.value} onValueChange={field.onChange} />}
+          />
         </div>
-        <Controller
-          control={control}
-          name="useFancyPlayer"
-          render={({ field }) => <Switch isSelected={field.value} onValueChange={field.onChange} />}
-        />
-      </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="text-medium mr-6">显示歌词</div>

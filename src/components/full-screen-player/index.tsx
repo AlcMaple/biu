@@ -200,7 +200,7 @@ const FullScreenPlayer = () => {
 
   if (isMobileLayout) return <MobileFullScreenPlayer />;
 
-  if (useFancyPlayer) return <FancyFullScreenPlayer />;
+  if (!isWeb && useFancyPlayer) return <FancyFullScreenPlayer />;
 
   const coverWidth = Math.max(260, Math.min(windowWidth * 0.7, windowHeight * 0.48, 520));
   const coverHeight = coverWidth * 0.75;
