@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /__biu_
+
+Sitemap: https://music.alcmaple.cn/sitemap.xml
