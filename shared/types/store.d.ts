@@ -16,7 +16,26 @@ declare global {
     [StoreNameMap.HeartbeatSession]: { active: boolean; sessionIds: string[] };
     [StoreNameMap.PlaylistSyncMeta]: PlaylistSyncMetaData;
     [StoreNameMap.PlaylistSyncBackups]: PlaylistSyncBackupsData;
+    [StoreNameMap.PlayCounts]: PlayCountsData;
   };
+
+  /** 单首歌的播放统计，key 为 `${source}:${bvid||sid}:${cid||""}` */
+  interface PlayCountRecord {
+    key: string;
+    title: string;
+    cover?: string;
+    ownerName?: string;
+    ownerMid?: number;
+    bvid?: string;
+    isLossless?: boolean;
+    isDolby?: boolean;
+    /** 累计播放次数，不受下面时间戳裁剪影响 */
+    totalCount: number;
+    /** 最近若干次播放的时间戳（epoch ms），用于聚合"最近一周"，超出窗口的会被裁剪 */
+    recentPlays: number[];
+  }
+
+  type PlayCountsData = Record<string, PlayCountRecord>;
 
   /**
    * 每 mid、每 store 一条按时间倒序的备份队列（最新在前），每次同步**推送之前**

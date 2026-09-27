@@ -24,6 +24,7 @@ import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
 import { useLocalFavItemsStore } from "./local-fav-items";
 import { usePlayProgress } from "./play-progress";
+import { recordPlayCount } from "./play-ranking";
 
 export type PlayDataType = "mv" | "audio";
 
@@ -2500,6 +2501,7 @@ usePlayList.subscribe(async (state, prevState) => {
           if (shouldReportPlayRecord(playItem)) {
             void beginPlayReport(playItem);
           }
+          void recordPlayCount(playItem);
         }
         if (readyUrl && playItem) {
           // 锁屏时也要把标题/封面更新到系统媒体控制中心，否则显示的还是上一首

@@ -11,6 +11,7 @@ import {
   localFavItemsStore,
   localFavoritesStore,
   lyricsCacheStore,
+  playCountsStore,
   playlistSyncBackupsStore,
   playlistSyncMetaStore,
   shortcutKeyStore,
@@ -101,6 +102,10 @@ export function registerStoreHandlers() {
     if (name === StoreNameMap.PlaylistSyncBackups) {
       return playlistSyncBackupsStore.store;
     }
+
+    if (name === StoreNameMap.PlayCounts) {
+      return playCountsStore.store;
+    }
   });
 
   ipcMain.handle(channel.store.set, async (_, name: StoreName, value: any) => {
@@ -158,6 +163,10 @@ export function registerStoreHandlers() {
       if (name === StoreNameMap.PlaylistSyncBackups) {
         await setStoreWithRetry(name, playlistSyncBackupsStore, value);
       }
+
+      if (name === StoreNameMap.PlayCounts) {
+        await setStoreWithRetry(name, playCountsStore, value);
+      }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
     }
@@ -210,6 +219,10 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.PlaylistSyncBackups) {
       playlistSyncBackupsStore.clear();
+    }
+
+    if (name === StoreNameMap.PlayCounts) {
+      playCountsStore.clear();
     }
 
     return true;
