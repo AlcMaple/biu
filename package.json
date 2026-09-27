@@ -1,6 +1,6 @@
 {
   "name": "biu",
-  "version": "2.5.4",
+  "version": "2.6.0",
   "private": true,
   "engines": {
     "node": "22.17.1"
