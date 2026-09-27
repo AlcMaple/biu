@@ -16,6 +16,7 @@ import LocalMusicPage from "./pages/local-music";
 import MiniPlayer from "./pages/mini-player";
 import MusicRecommend from "./pages/music-recommend";
 import NotFound from "./pages/not-found";
+import PlayRanking from "./pages/play-ranking";
 import Search from "./pages/search";
 import Settings from "./pages/settings";
 import UserProfile from "./pages/user-profile";
@@ -42,6 +43,10 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "history",
         element: <History />,
+      },
+      {
+        path: "play-ranking",
+        element: <PlayRanking />,
       },
       {
         path: "follow",

@@ -13,6 +13,8 @@ import {
   RiCalendarScheduleFill,
   RiFolderMusicLine,
   RiFolderMusicFill,
+  RiTrophyLine,
+  RiTrophyFill,
 } from "@remixicon/react";
 
 import { type MenuItemProps } from "@/components/menu/menu-item";
@@ -55,6 +57,12 @@ export const DefaultMenuList: DefaultMenuItem[] = [
     needLogin: true,
     icon: RiHistoryLine,
     activeIcon: RiHistoryFill,
+  },
+  {
+    title: "听歌排行",
+    href: "/play-ranking",
+    icon: RiTrophyLine,
+    activeIcon: RiTrophyFill,
   },
   {
     title: "本地音乐",

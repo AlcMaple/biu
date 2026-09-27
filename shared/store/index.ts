@@ -15,4 +15,6 @@ export enum StoreNameMap {
   PlaylistSyncMeta = "playlist-sync-meta",
   /** 本地歌单每次同步前的滚动备份（每个 store 保留最近若干份），纯设备本地状态 */
   PlaylistSyncBackups = "playlist-sync-backups",
+  /** 个人听歌排行：每首歌的播放次数与最近播放时间戳，纯设备本地统计 */
+  PlayCounts = "play-counts",
 }

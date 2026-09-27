@@ -46,6 +46,12 @@ export const lyricsCacheStore = new Store<Record<string, MusicLyrics>>({
   defaults: {},
 });
 
+export const playCountsStore = new Store<PlayCountsData>({
+  name: StoreNameMap.PlayCounts,
+  cwd: getUserDataPath(),
+  defaults: {},
+});
+
 export const windowStateStore = new Store<{
   desktopLyrics?: Electron.Rectangle;
 }>({

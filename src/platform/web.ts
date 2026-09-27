@@ -18,6 +18,7 @@ const highCapacityStores = new Set<StoreName>([
   StoreNameMap.Tags,
   StoreNameMap.PlaylistSyncMeta,
   StoreNameMap.PlaylistSyncBackups,
+  StoreNameMap.PlayCounts,
 ]);
 
 let databasePromise: Promise<IDBDatabase | undefined> | undefined;
