@@ -16,6 +16,7 @@ import { Client } from "ssh2";
 
 import { createWindowsUpdateMetadata, getWindowsUpdateManifestFilename } from "../shared/update-signing.js";
 import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
+import { replaceRemoteFile } from "./update-sftp.js";
 import { loadUpdateSigningPrivateKey, signUpdateMetadata } from "./update-signature.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -106,10 +107,6 @@ function putFile(sftp, localPath, remotePath) {
   });
 }
 
-function rename(sftp, source, target) {
-  return new Promise((resolve, reject) => sftp.rename(source, target, error => (error ? reject(error) : resolve())));
-}
-
 function publicFileUrl(publicOrigin, filename) {
   const base = publicOrigin.endsWith("/") ? publicOrigin : `${publicOrigin}/`;
   return new URL(filename, base).toString();
@@ -180,7 +177,7 @@ async function createSignedWindowsManifests(files) {
 async function atomicPublish(sftp, localPath, filename, remoteDir) {
   const temporaryName = `${filename}.${process.pid}.tmp`;
   await putFile(sftp, localPath, remoteFile(remoteDir, temporaryName));
-  await rename(sftp, remoteFile(remoteDir, temporaryName), remoteFile(remoteDir, filename));
+  await replaceRemoteFile(sftp, remoteFile(remoteDir, temporaryName), remoteFile(remoteDir, filename));
 }
 
 if (!fs.existsSync(ARTIFACTS_DIR)) {
