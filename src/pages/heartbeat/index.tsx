@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { addToast, Switch } from "@heroui/react";
-import { RiHeart3Fill, RiHeart3Line, RiHeartPulseFill } from "@remixicon/react";
+import { addToast } from "@heroui/react";
+import { RiHeart3Fill, RiHeart3Line, RiHeartPulseFill, RiSparklingLine } from "@remixicon/react";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import { restoreSession, useHeartbeat } from "@/store/heartbeat";
@@ -151,10 +151,19 @@ const Heartbeat = () => {
         apiRef={nebulaRef}
       />
 
-      <div className="absolute top-4 right-5 z-10 flex items-center gap-2 text-xs text-zinc-400">
-        <span>简化特效</span>
-        <Switch size="sm" isSelected={lite} onValueChange={setLite} aria-label="简化特效" />
-      </div>
+      <button
+        type="button"
+        onClick={() => setLite(!lite)}
+        aria-pressed={lite}
+        className={`absolute top-4 right-5 z-10 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs backdrop-blur-md transition-colors ${
+          lite
+            ? "border-white/10 bg-white/5 text-zinc-500"
+            : "border-primary/40 bg-primary/10 text-primary shadow-[0_0_16px_-4px_var(--heroui-primary)]"
+        }`}
+      >
+        <RiSparklingLine size={14} />
+        {lite ? "特效已简化" : "完整特效"}
+      </button>
 
       {/* 黑胶唱片 */}
       <div className="relative flex h-72 w-72 max-w-[70vw] items-center justify-center" style={{ maxHeight: "70vw" }}>
@@ -195,10 +204,6 @@ const Heartbeat = () => {
       </div>
 
       <div className="relative flex max-w-2xl flex-col items-center gap-3 text-center">
-        <div className="text-primary flex items-center gap-1.5 text-xs font-medium tracking-[0.3em]">
-          <RiHeartPulseFill size={14} style={{ animation: "fm-beat 1.6s ease-in-out infinite", ...spin }} />
-          PRIVATE FM
-        </div>
         {/* 歌名：逐字模糊浮现，随后一道高光扫过；换歌重新入场 */}
         <div
           key={title}
@@ -267,7 +272,7 @@ const Heartbeat = () => {
           )}
         </button>
         <div className="text-[11px] tracking-widest text-zinc-500">
-          {isLiked ? `已在${LIKED_FOLDER_TITLE}` : `点按收藏 · 长按有惊喜`}
+          {isLiked ? "已收藏" : `加入${LIKED_FOLDER_TITLE}`}
         </div>
       </div>
     </div>
