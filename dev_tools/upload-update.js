@@ -16,8 +16,11 @@ import { Client } from "ssh2";
 
 import { createWindowsUpdateMetadata, getWindowsUpdateManifestFilename } from "../shared/update-signing.js";
 import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
+import { loadUpdateEnvironment } from "./update-env.js";
 import { replaceRemoteFile } from "./update-sftp.js";
 import { loadUpdateSigningPrivateKey, signUpdateMetadata } from "./update-signature.js";
+
+loadUpdateEnvironment();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, "..");
@@ -59,6 +62,8 @@ const fileGroups = {
     `Biu-${version}-mac-arm64.dmg.blockmap`,
     `Biu-${version}-mac-x64.dmg`,
     `Biu-${version}-mac-x64.dmg.blockmap`,
+    `Biu-${version}-mac-arm64.zip`,
+    `Biu-${version}-mac-x64.zip`,
     "latest-mac.yml",
   ],
   linux: [`Biu-${version}-linux-x64.AppImage`, `Biu-${version}-linux-arm64.AppImage`, "latest-linux.yml"],

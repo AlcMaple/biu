@@ -8,6 +8,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { loadUpdateEnvironment } from "./update-env.js";
+
+loadUpdateEnvironment();
+
 function resolveKeyPath(environment = process.env) {
   return (
     environment.BIU_UPDATE_SIGNING_KEY?.trim() ||
