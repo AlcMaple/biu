@@ -19,6 +19,10 @@ describe("toSeconds", () => {
 });
 
 describe("isPureSongCandidate", () => {
+  it("rejects stage/live performances", () => {
+    expect(isPureSongCandidate({ ...base, title: "星宫莓入学舞台《アイドル活動！》" })).toBe(false);
+  });
+
   it("accepts a normal single song", () => {
     expect(isPureSongCandidate(base)).toBe(true);
   });
