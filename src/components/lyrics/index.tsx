@@ -227,9 +227,10 @@ const Lyrics = ({
     const el = lineRefs.current[activeIndex];
     if (el && wrapper) {
       const top = el.offsetTop - wrapper.clientHeight / 2 + el.clientHeight / 2;
-      wrapper.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      const reduceMotion = stableTypography && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      wrapper.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? "auto" : "smooth" });
     }
-  }, [activeIndex, centerPadding]);
+  }, [activeIndex, centerPadding, stableTypography]);
 
   const renderLine = (line: { time: number; text: string }, index: number) => {
     const isActive = index === activeIndex;
@@ -240,14 +241,17 @@ const Lyrics = ({
     return (
       <div
         key={`${line.time}-${index}`}
+        aria-current={isActive ? "true" : undefined}
+        data-lyric-state={isActive ? "active" : index < activeIndex ? "past" : "upcoming"}
         ref={node => {
           lineRefs.current[index] = node;
         }}
         className={clsx(
           "w-full transform-none py-2 duration-300 ease-out",
           stableTypography ? "transition-opacity" : "transition-all",
+          stableTypography && "fancy-lyric-line",
           centered ? "text-center" : "text-left",
-          isActive ? "opacity-100" : stableTypography ? "opacity-80" : "opacity-60",
+          stableTypography || isActive ? "opacity-100" : "opacity-60",
         )}
         style={{
           fontSize: isActive && !stableTypography ? fontSize * 1.5 : fontSize,
@@ -256,8 +260,15 @@ const Lyrics = ({
         }}
       >
         <div
-          className={clsx("leading-snug break-words whitespace-pre-wrap", activeWeight, activeShadow)}
-          style={{ color: color || undefined, overflowWrap: stableTypography ? "anywhere" : undefined }}
+          className={clsx(
+            "leading-snug break-words whitespace-pre-wrap",
+            activeWeight,
+            !stableTypography && activeShadow,
+          )}
+          style={{
+            color: stableTypography ? undefined : color || undefined,
+            overflowWrap: stableTypography ? "anywhere" : undefined,
+          }}
         >
           {line.text}
         </div>

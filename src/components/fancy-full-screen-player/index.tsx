@@ -20,6 +20,8 @@ import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 
+import CinematicStage from "./cinematic-stage";
+
 import "./styles.css";
 
 const appPlatform = platform.getPlatform();
@@ -44,6 +46,15 @@ const FancyFullScreenPlayer = () => {
   const { playId, list, duration } = usePlayList(
     useShallow(s => ({ playId: s.playId, list: s.list, duration: s.duration })),
   );
+  const isPlaying = usePlayList(s => s.isPlaying);
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const updateVisibility = () => setIsPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
   const playItem = list.find(item => item.id === playId);
   const { showLyrics } = useFullScreenPlayerSettings(useShallow(s => ({ showLyrics: s.showLyrics })));
   const { getRandomImage } = useFancyPlayerImages(useShallow(s => ({ getRandomImage: s.getRandomImage })));
@@ -256,6 +267,7 @@ const FancyFullScreenPlayer = () => {
             <Empty />
           ) : (
             <DrawerBody
+              data-motion={isPlaying && isPageVisible ? "playing" : "paused"}
               className="fancy-player relative flex flex-col gap-0 overflow-hidden bg-transparent p-0 text-white select-none"
               onMouseEnter={isWeb ? undefined : handleMouseEnter}
               onMouseLeave={isWeb ? undefined : () => scheduleHideUi(3000)}
@@ -268,17 +280,6 @@ const FancyFullScreenPlayer = () => {
                     }
               }
             >
-              {/* ══ CSS 动画定义 ══ */}
-              <style>{`
-                @keyframes fancy-bg-drift {
-                  0%   { transform: scale(1.15) translate(0%,    0%);   }
-                  25%  { transform: scale(1.12) translate(-2%,  -1.5%); }
-                  50%  { transform: scale(1.18) translate(-1%,   2%);   }
-                  75%  { transform: scale(1.12) translate( 2%,   1%);   }
-                  100% { transform: scale(1.15) translate(0%,    0%);   }
-                }
-              `}</style>
-
               {/* ══ 背景层 A ══ */}
               <div
                 aria-hidden
@@ -286,11 +287,9 @@ const FancyFullScreenPlayer = () => {
                 style={{ opacity: activeBg === "a" ? 1 : 0, transition: "opacity 1200ms ease" }}
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="fancy-player-background absolute inset-0 bg-cover bg-center"
                   style={{
                     backgroundImage: toBgUrl(imgA),
-                    animation: "fancy-bg-drift 20s ease-in-out infinite",
-                    willChange: "transform",
                   }}
                 />
               </div>
@@ -302,11 +301,9 @@ const FancyFullScreenPlayer = () => {
                 style={{ opacity: activeBg === "b" ? 1 : 0, transition: "opacity 1200ms ease" }}
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="fancy-player-background absolute inset-0 bg-cover bg-center"
                   style={{
                     backgroundImage: toBgUrl(imgB),
-                    animation: "fancy-bg-drift 20s ease-in-out infinite",
-                    willChange: "transform",
                   }}
                 />
               </div>
@@ -321,7 +318,14 @@ const FancyFullScreenPlayer = () => {
                 }}
               />
 
-              {/* ══ 主容器：flex 纵向布局，与 HTML 完全对应 ══ */}
+              <div className="fancy-player-atmosphere" aria-hidden>
+                <div className="fancy-player-aura fancy-player-aura-warm" />
+                <div className="fancy-player-aura fancy-player-aura-cool" />
+              </div>
+
+              <CinematicStage running={isPlaying && isPageVisible} />
+
+              {/* 主舞台 */}
               <div className="fancy-player-layout relative z-10 flex h-full w-full flex-col px-[5%] pt-8">
                 {/* ── Header ── */}
                 <header className="mb-4 flex shrink-0 items-center justify-between gap-4">
@@ -376,14 +380,13 @@ const FancyFullScreenPlayer = () => {
                 <main className="flex min-h-0 flex-grow items-center justify-between">
                   {/* 左侧：专辑卡片（与背景图同一张图） */}
                   <div className="flex w-1/2 min-w-0 items-center justify-start">
-                    <div className="group relative">
-                      {/* 装饰线 */}
-                      <div className="absolute -top-12 -left-12 hidden h-px w-24 bg-white/30 lg:block" />
-                      <div className="absolute -right-12 -bottom-12 hidden h-24 w-px bg-white/30 lg:block" />
+                    <div className="fancy-player-artwork group relative">
+                      <div className="fancy-player-orbit" aria-hidden />
+                      <div className="fancy-player-orbit fancy-player-orbit-inner" aria-hidden />
 
                       {/* 卡片本体 —— 与背景共用同一套 A/B 双缓冲，保证同步过渡 */}
                       <div
-                        className="fancy-player-cover transform overflow-hidden rounded-[3rem] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]"
+                        className="fancy-player-cover overflow-hidden shadow-2xl"
                         style={{ boxShadow: "0 40px 100px -20px rgba(0,0,0,0.5)" }}
                       >
                         {imgA || imgB ? (
@@ -432,6 +435,11 @@ const FancyFullScreenPlayer = () => {
                   <div className="fancy-player-info flex h-full min-h-0 w-1/2 min-w-0 flex-col justify-center pl-8 xl:pl-12">
                     {/* 标题 & 作者 */}
                     <div className="fancy-player-metadata shrink-0">
+                      <div className="fancy-player-eyebrow">
+                        <span className="fancy-player-status-dot" aria-hidden />
+                        {isPlaying ? "正在播放" : "已暂停"}
+                        <span className="fancy-player-eyebrow-line" aria-hidden />
+                      </div>
                       <h1
                         className="fancy-player-title mb-3 text-white"
                         title={playItem.pageTitle || playItem.title}
@@ -508,9 +516,9 @@ const FancyFullScreenPlayer = () => {
                   {/* 控制按钮 —— 玻璃胶囊，max-w-md，与 HTML 一致 */}
                   <div className="mx-auto mb-2 flex w-full max-w-md items-center justify-center">
                     <div
-                      className="flex w-full items-center justify-center rounded-full border border-white/20 px-12 py-2 shadow-xl xl:py-3"
+                      className="fancy-player-controls flex w-full items-center justify-center rounded-full border border-white/20 px-12 py-2 shadow-xl xl:py-3"
                       style={{
-                        background: "rgba(255,255,255,0.15)",
+                        background: "rgba(15,18,25,0.78)",
                         backdropFilter: "blur(24px)",
                         WebkitBackdropFilter: "blur(24px)",
                       }}
