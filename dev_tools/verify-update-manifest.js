@@ -6,7 +6,9 @@ import {
   normalizeUpdateOrigin,
   verifySignedUpdateEnvelope,
 } from "../shared/update-signing.js";
+import { loadUpdateEnvironment } from "./update-env.js";
 
+loadUpdateEnvironment();
 const args = new Set(process.argv.slice(2));
 if ([...args].some(arg => arg !== "--arm64" && arg !== "--x64")) {
   throw new Error("只支持 --x64 或 --arm64");
