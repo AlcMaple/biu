@@ -123,7 +123,9 @@ export const NebulaCanvas = ({ seed, cover, playing, lite, anchorRef, apiRef }: 
     const dir = rnd() < 0.5 ? 1 : -1;
     const hueGap = 35 + rnd() * 110;
     let hue1 = h32 % 360;
-    const count = lite ? 110 : 520;
+    // 四种形态按歌曲种子选取：星盘 / 曲速穿梭 / 同心轨道 / 萤火上升
+    const mode = (h32 >>> 8) % 4;
+    const count = lite ? 90 : mode === 0 ? 360 : 260;
     const stars: Star[] = Array.from({ length: count }, () => {
       const r = 0.16 + Math.pow(rnd(), 0.8) * 0.9;
       return {
@@ -203,11 +205,14 @@ export const NebulaCanvas = ({ seed, cover, playing, lite, anchorRef, apiRef }: 
     let raf = 0;
     let last = performance.now();
     let t = 0;
+    let lastDraw = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
-      if (lite && now % 2 < 1 && Math.random() < 0.5) return; // 简化模式约 30fps
+      // 帧率上限：普通 ~40fps，简化 / 暂停 ~24fps；切到后台直接跳过
+      if (document.hidden || now - lastDraw < (lite || !playingRef.current ? 41 : 25)) return;
+      lastDraw = now;
       const on = playingRef.current;
       t += dt * (on ? 1 : 0.15);
 
@@ -247,16 +252,58 @@ export const NebulaCanvas = ({ seed, cover, playing, lite, anchorRef, apiRef }: 
       ctx.fillStyle = g;
       ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
 
-      for (const s of stars) {
-        const ang = dir * (t * s.w) + (s.arm * Math.PI * 2) / arms + s.r * twist + s.ang;
-        const rr = R * s.r * (1 + bass * 0.12 * (1.2 - s.r)) * (1 - charge * 0.35);
-        const x = cx + Math.cos(ang) * rr;
-        const y = cy + Math.sin(ang) * rr * 0.62; // 压扁成倾斜星盘
-        const tw = 0.55 + 0.45 * Math.sin(t * 3 + s.tw) + treble * 0.9;
-        const a = Math.min(1, (0.25 + 0.5 * (1 - s.r)) * tw + charge * 0.4);
-        ctx.fillStyle = `hsla(${hueA + (hueB - hueA) * s.mix},90%,${65 + treble * 20}%,${a})`;
-        const sz = s.size * (1 + treble * 0.8 + charge);
-        ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+      const lum = 65 + treble * 20;
+      if (mode === 1) {
+        // 曲速穿梭：星点从中心向外拉出光条，两色各一次描边
+        ctx.lineCap = "round";
+        for (let k = 0; k < 2; k++) {
+          ctx.strokeStyle = `hsla(${k ? hueB : hueA},90%,${lum}%,${0.55 + treble * 0.4})`;
+          ctx.lineWidth = lite ? 1.2 : 1.8;
+          ctx.beginPath();
+          for (const s of stars) {
+            if (s.mix < 0.5 !== !k) continue;
+            const p = (t * s.w * 0.35 * (1 + bass * 1.5) + s.tw) % 1;
+            const ca = Math.cos(s.tw * 7 + s.arm);
+            const sa = Math.sin(s.tw * 7 + s.arm);
+            const r1 = R * 1.25 * Math.pow(p, 1.7) * (1 - charge * 0.4) + R * 0.3;
+            const r0 = r1 - (6 + p * 26) * (1 + bass);
+            ctx.moveTo(cx + ca * r0, cy + sa * r0 * 0.75);
+            ctx.lineTo(cx + ca * r1, cy + sa * r1 * 0.75);
+          }
+          ctx.stroke();
+        }
+      } else {
+        for (const s of stars) {
+          let x: number;
+          let y: number;
+          let a: number;
+          const tw = 0.55 + 0.45 * Math.sin(t * 3 + s.tw) + treble * 0.9;
+          if (mode === 0) {
+            const ang = dir * (t * s.w) + (s.arm * Math.PI * 2) / arms + s.r * twist + s.ang;
+            const rr = R * s.r * (1 + bass * 0.12 * (1.2 - s.r)) * (1 - charge * 0.35);
+            x = cx + Math.cos(ang) * rr;
+            y = cy + Math.sin(ang) * rr * 0.62; // 压扁成倾斜星盘
+            a = (0.25 + 0.5 * (1 - s.r)) * tw;
+          } else if (mode === 2) {
+            // 同心轨道：环间交替反向旋转，低频让外环整体弹一下
+            const ring = s.arm % 6;
+            const rr = R * (0.3 + ring * 0.13) * (1 + bass * 0.1 * ring * 0.4) * (1 - charge * 0.35);
+            const ang = (ring % 2 ? -1 : 1) * dir * t * (0.5 - ring * 0.05) + s.tw * 3 + s.ang;
+            x = cx + Math.cos(ang) * rr;
+            y = cy + Math.sin(ang) * rr * 0.7;
+            a = 0.5 * tw;
+          } else {
+            // 萤火上升：自下而上飘起并左右摇摆，向中心聚拢时被蓄力吸住
+            const p = (t * s.w * 0.12 + s.tw) % 1;
+            const spread = (s.mix - 0.5) * R * 2.6 * (1 - charge * 0.7);
+            x = cx + spread + Math.sin(t * 0.9 + s.tw * 9) * 18;
+            y = cy + R * 0.75 - p * R * 1.7;
+            a = Math.sin(p * Math.PI) * 0.9 * tw;
+          }
+          ctx.fillStyle = `hsla(${hueA + (hueB - hueA) * s.mix},90%,${lum}%,${Math.min(1, a + charge * 0.4)})`;
+          const sz = s.size * (1 + treble * 0.8 + charge);
+          ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+        }
       }
 
       // 冲击波
