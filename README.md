@@ -15,6 +15,17 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg" alt="License" /></a>
 </p>
 
+> **关于本仓库 / About this fork**
+>
+> 本项目是 [wood3n/biu](https://github.com/wood3n/biu) 的 Fork 与二次开发版本。上游仓库保持原有的桌面端定位；本仓库在其基础上继续扩展：
+>
+> - 🌐 **Web 版**：浏览器 / 手机端可用，含 iOS 分段流式播放与锁屏续播适配
+> - 🎤 **歌词增强**：网易云 / LrcLib 歌词搜索与采用、桌面歌词
+> - 🎵 **听歌识曲**（Shazam）与 **私人 FM / 心动模式**
+> - ☁️ **同步服务**：`biu-sync-server`、`biu-lyrics-server`
+>
+> 原作者 [wood3n](https://github.com/wood3n) 及上游贡献者的版权与许可证（PolyForm Noncommercial 1.0.0）保持不变。需要原版桌面应用请前往[上游仓库](https://github.com/wood3n/biu)。
+
 <table>
   <tr>
     <td width="50%" align="center">

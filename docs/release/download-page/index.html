@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Biu 下载</title>
+<meta name="description" content="Biu 音乐播放器下载：基于哔哩哔哩公开接口的跨平台音乐播放器" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7.17157 2.75737L10.414 5.99948H13.585L16.8284 2.75737C17.219 2.36685 17.8521 2.36685 18.2426 2.75737C18.6332 3.1479 18.6332 3.78106 18.2426 4.17158L16.414 5.99948L18.5 6.00001C20.433 6.00001 22 7.56701 22 9.50001V17.5C22 19.433 20.433 21 18.5 21H5.5C3.567 21 2 19.433 2 17.5V9.50001C2 7.56701 3.567 6.00001 5.5 6.00001L7.585 5.99948L5.75736 4.17158C5.36684 3.78106 5.36684 3.1479 5.75736 2.75737C6.14788 2.36685 6.78105 2.36685 7.17157 2.75737ZM18.5 8.00001H5.5C4.7203 8.00001 4.07955 8.5949 4.00687 9.35555L4 9.50001V17.5C4 18.2797 4.59489 18.9205 5.35554 18.9931L5.5 19H18.5C19.2797 19 19.9204 18.4051 19.9931 17.6445L20 17.5V9.50001C20 8.67158 19.3284 8.00001 18.5 8.00001Z' fill='%2317C964'/%3E%3Cpath d='M15.1767 12.643C15.8229 13.0316 15.8229 13.9684 15.1766 14.357L10.9158 16.9189C10.2493 17.3197 9.40048 16.8396 9.40049 16.0619L9.40059 10.9379C9.4006 10.1602 10.2494 9.68015 10.9159 10.0809L15.1767 12.643Z' fill='%2317C964'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg:#f7fcf9; --fg:#1b1b2f; --muted:#6b6b85; --card:#ffffffcc; --line:#dcefe3;
+    --accent:#17c964; --accent2:#0e9f6e; --glow1:#17c96433; --glow2:#6ee7b744; --shadow:0 10px 30px #17c96414;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0b110e; --fg:#ececf8; --muted:#9a98b8; --card:#17162399; --line:#22362b;
+      --accent:#17c964; --accent2:#12a150; --glow1:#17c96422; --glow2:#6ee7b711; --shadow:0 10px 30px #00000066;
+    }
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; color:var(--fg); min-height:100vh;
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    background:
+      radial-gradient(600px 400px at 15% -5%, var(--glow1), transparent 70%),
+      radial-gradient(500px 380px at 90% 5%, var(--glow2), transparent 70%),
+      var(--bg);
+    background-attachment:fixed;
+  }
+  main { max-width:880px; margin:0 auto; padding:64px 16px 48px; }
+
+  .hero { text-align:center; margin-bottom:40px; }
+  .logo {
+    width:84px; height:84px; margin:0 auto 20px; border-radius:22px;
+    background:var(--card); border:1px solid var(--line);
+    display:grid; place-items:center; box-shadow:0 12px 32px #17c96444;
+  }
+  .logo svg { width:52px; height:52px; }
+  h1 { margin:0; font-size:clamp(30px,6vw,44px); line-height:1.2; letter-spacing:-.5px; }
+  h1 span { background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--muted); margin:12px auto 18px; max-width:520px; }
+  .ver {
+    display:inline-flex; align-items:center; gap:8px; padding:4px 14px;
+    border:1px solid var(--line); border-radius:999px; font-size:13px; color:var(--muted); background:var(--card);
+  }
+  .dot { width:8px; height:8px; border-radius:50%; background:#22c55e; }
+  .dot.load { background:#f59e0b; animation:pulse 1s infinite; }
+  .dot.err { background:#ef4444; }
+  @keyframes pulse { 50% { opacity:.3; } }
+
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; }
+  @media (max-width:640px) { .grid { grid-template-columns:1fr; } main { padding-top:40px; } }
+  .card {
+    position:relative; padding:24px; border-radius:20px; background:var(--card); border:1px solid var(--line);
+    backdrop-filter:blur(10px); box-shadow:var(--shadow); transition:transform .2s, border-color .2s;
+  }
+  .card:hover { transform:translateY(-3px); border-color:var(--accent); }
+  .card.rec { border-color:var(--accent); }
+  .badge {
+    position:absolute; top:16px; right:16px; padding:1px 10px; border-radius:999px; font-size:12px;
+    color:#fff; background:linear-gradient(90deg,var(--accent),var(--accent2));
+  }
+  .head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .head svg { width:32px; height:32px; fill:var(--fg); flex:none; }
+  .head h2 { margin:0; font-size:20px; }
+  .head small { display:block; color:var(--muted); font-size:13px; }
+  .btns { display:flex; flex-direction:column; gap:10px; }
+  a.btn {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-radius:12px;
+    text-decoration:none; font-weight:600; font-size:15px; color:#fff;
+    background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:filter .15s, transform .15s;
+  }
+  a.btn:hover { filter:brightness(1.08); transform:scale(1.015); }
+  a.btn.alt { background:transparent; color:var(--fg); border:1px solid var(--line); font-weight:500; }
+  a.btn.alt:hover { border-color:var(--accent); color:var(--accent); filter:none; }
+  a.btn em { font-style:normal; font-weight:400; font-size:12px; opacity:.8; }
+  .note { margin:14px 0 0; font-size:13px; color:var(--muted); }
+  .fail { color:var(--muted); font-size:14px; margin:0; }
+
+  .tips { margin-top:28px; padding:20px 24px; border-radius:16px; border:1px dashed var(--line); color:var(--muted); font-size:14px; }
+  .tips b { color:var(--fg); }
+  .tips ul { margin:8px 0 0; padding-left:20px; }
+  footer { margin-top:40px; text-align:center; font-size:13px; color:var(--muted); }
+  footer a { color:var(--accent); text-decoration:none; }
+  footer a:hover { text-decoration:underline; }
+  footer p { margin:4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7.17157 2.75737L10.414 5.99948H13.585L16.8284 2.75737C17.219 2.36685 17.8521 2.36685 18.2426 2.75737C18.6332 3.1479 18.6332 3.78106 18.2426 4.17158L16.414 5.99948L18.5 6.00001C20.433 6.00001 22 7.56701 22 9.50001V17.5C22 19.433 20.433 21 18.5 21H5.5C3.567 21 2 19.433 2 17.5V9.50001C2 7.56701 3.567 6.00001 5.5 6.00001L7.585 5.99948L5.75736 4.17158C5.36684 3.78106 5.36684 3.1479 5.75736 2.75737C6.14788 2.36685 6.78105 2.36685 7.17157 2.75737ZM18.5 8.00001H5.5C4.7203 8.00001 4.07955 8.5949 4.00687 9.35555L4 9.50001V17.5C4 18.2797 4.59489 18.9205 5.35554 18.9931L5.5 19H18.5C19.2797 19 19.9204 18.4051 19.9931 17.6445L20 17.5V9.50001C20 8.67158 19.3284 8.00001 18.5 8.00001Z" fill="#17C964"/><path d="M15.1767 12.643C15.8229 13.0316 15.8229 13.9684 15.1766 14.357L10.9158 16.9189C10.2493 17.3197 9.40048 16.8396 9.40049 16.0619L9.40059 10.9379C9.4006 10.1602 10.2494 9.68015 10.9159 10.0809L15.1767 12.643Z" fill="#17C964"/></svg></div>
+    <h1><span>Biu</span> 音乐播放器</h1>
+    <p class="sub">基于哔哩哔哩公开接口的跨平台音乐播放器，高品质音频、歌词、听歌识曲，一应俱全。</p>
+    <span class="ver"><i class="dot load" id="dot"></i><span id="ver">正在获取最新版本…</span></span>
+  </header>
+
+  <div class="grid">
+    <section class="card" id="card-win">
+      <span class="badge" hidden>适合你的系统</span>
+      <div class="head">
+        <svg viewBox="0 0 24 24"><path d="M3 5.5 10.5 4.5V11H3zM11.5 4.4 21 3v8h-9.5zM3 12h7.5v6.5L3 17.5zM11.5 12H21v9l-9.5-1.4z"/></svg>
+        <div><h2>Windows</h2><small>Windows 10 / 11</small></div>
+      </div>
+      <div class="btns" id="win"></div>
+      <p class="note">推荐安装版（支持自动更新）。不确定选 x64；Windows on ARM 设备选 arm64。</p>
+    </section>
+
+    <section class="card" id="card-mac">
+      <span class="badge" hidden>适合你的系统</span>
+      <div class="head">
+        <svg viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7l1 3h2v2H8v-2h2l1-3H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></svg>
+        <div><h2>macOS</h2><small>macOS 11 及以上</small></div>
+      </div>
+      <div class="btns" id="mac"></div>
+      <p class="note">Apple 芯片（M 系列）选 arm64，Intel 芯片选 x64。</p>
+    </section>
+  </div>
+
+  <aside class="tips">
+    <b>首次打开提示</b>
+    <ul>
+      <li>macOS 若提示"无法验证开发者"：在 Finder 中右键应用选择"打开"，或到"系统设置 → 隐私与安全性"点"仍要打开"。</li>
+      <li>Windows 若弹出 SmartScreen：点"更多信息 → 仍要运行"。</li>
+      <li>本软件为非官方项目，仅供个人学习交流，不得商用。</li>
+    </ul>
+  </aside>
+
+  <footer>
+    <p>
+      <a href="https://github.com/AlcMaple/biu">源码 AlcMaple/biu</a> ·
+      Fork 自 <a href="https://github.com/wood3n/biu">wood3n/biu</a> ·
+      <a href="https://music.alcmaple.cn">Web 版</a>
+    </p>
+    <p>许可证 PolyForm Noncommercial 1.0.0 · 与哔哩哔哩无任何官方关联</p>
+  </footer>
+</main>
+
+<script>
+  // 安装包与 latest*.yml 都在同域的 /biu/updates/ 下，由 dev_tools/upload-update.js 上传
+  var BASE = "/biu/updates/";
+
+  function latestVersion(file) {
+    return fetch(BASE + file + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (t) { var m = t.match(/^version:\s*['"]?([\w.\-+]+)/m); return m ? m[1] : null; })
+      .catch(function () { return null; });
+  }
+
+  function render(id, version, items) {
+    var box = document.getElementById(id);
+    if (!version) {
+      box.innerHTML = '<p class="fail">暂时无法获取该平台的最新版本，请稍后刷新重试。</p>';
+      return;
+    }
+    items.forEach(function (it, i) {
+      var a = document.createElement("a");
+      a.className = "btn" + (i ? " alt" : "");
+      a.href = BASE + "Biu-" + version + "-" + it.file;
+      a.innerHTML = "<span>" + it.label + "</span><em>" + it.hint + "</em>";
+      box.appendChild(a);
+    });
+  }
+
+  // 高亮与访问者系统匹配的卡片，并放到最前
+  (function highlight() {
+    var ua = navigator.userAgent;
+    var id = /Windows/i.test(ua) ? "card-win" : /Macintosh|Mac OS X/i.test(ua) && !/Mobile/i.test(ua) ? "card-mac" : null;
+    if (!id) return;
+    var card = document.getElementById(id);
+    card.classList.add("rec");
+    card.querySelector(".badge").hidden = false;
+    card.parentNode.insertBefore(card, card.parentNode.firstChild);
+  })();
+
+  Promise.all([latestVersion("latest.yml"), latestVersion("latest-mac.yml")]).then(function (v) {
+    var win = v[0], mac = v[1], dot = document.getElementById("dot");
+    dot.className = "dot" + ((win || mac) ? "" : " err");
+    document.getElementById("ver").textContent = (win || mac) ? "最新版本 v" + (win || mac) : "版本信息获取失败，请稍后重试";
+    render("win", win, [
+      { label: "安装版 x64", hint: "推荐", file: "win-setup-x64.exe" },
+      { label: "安装版 arm64", hint: "ARM 设备", file: "win-setup-arm64.exe" }
+    ]);
+    render("mac", mac, [
+      { label: "Apple 芯片 (arm64)", hint: "dmg · M 系列", file: "mac-arm64.dmg" },
+      { label: "Intel (x64)", hint: "dmg", file: "mac-x64.dmg" }
+    ]);
+  });
+</script>
+</body>
+</html>
