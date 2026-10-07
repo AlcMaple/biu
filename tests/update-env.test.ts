@@ -23,11 +23,11 @@ describe("release config auto-loading", () => {
     loadUpdateEnvironment({
       environment,
       homeDirectory: home(
-        'BIU_UPDATE_PUBLISH_HOST=updates.example.com\nBIU_UPDATE_PUBLISH_KEY="C:/Users/Test User/key"',
+        'BIU_UPDATE_PUBLISH_HOST=updates.example.com\nBIU_UPDATE_PUBLISH_KEY="C:/Test Fixtures/keys/publisher"',
       ),
     });
     expect(environment.BIU_UPDATE_PUBLISH_HOST).toBe("updates.example.com");
-    expect(environment.BIU_UPDATE_PUBLISH_KEY).toBe("C:/Users/Test User/key");
+    expect(environment.BIU_UPDATE_PUBLISH_KEY).toBe("C:/Test Fixtures/keys/publisher");
   });
   it("preserves explicitly supplied process variables", () => {
     const environment = { BIU_UPDATE_PUBLISH_HOST: "ci.example.com" };

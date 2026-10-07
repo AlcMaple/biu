@@ -130,12 +130,12 @@ pnpm build
 
 | 安装方式 | 默认 Python 路径 |
 |---|---|
-| Python.org（用户安装） | `C:\Users\{你的用户名}\AppData\Local\Programs\Python\Python3XX\python.exe` |
+| Python.org（用户安装） | `%USERPROFILE%\AppData\Local\Programs\Python\Python3XX\python.exe` |
 | Python.org（系统安装） | `C:\Program Files\Python3XX\python.exe` |
-| Anaconda（用户安装） | `C:\Users\{你的用户名}\anaconda3\python.exe` |
-| Miniconda（用户安装） | `C:\Users\{你的用户名}\miniconda3\python.exe` |
-| Miniforge（用户安装） | `C:\Users\{你的用户名}\miniforge3\python.exe` |
+| Anaconda（用户安装） | `%USERPROFILE%\anaconda3\python.exe` |
+| Miniconda（用户安装） | `%USERPROFILE%\miniconda3\python.exe` |
+| Miniforge（用户安装） | `%USERPROFILE%\miniforge3\python.exe` |
 | Anaconda（全局安装） | `C:\ProgramData\anaconda3\python.exe` |
-| MS Store Python | `C:\Users\{你的用户名}\AppData\Local\Microsoft\WindowsApps\python.exe` |
+| MS Store Python | `%USERPROFILE%\AppData\Local\Microsoft\WindowsApps\python.exe` |
 
-> `{你的用户名}` 替换为实际用户名，即 `C:\Users\` 下的目录名。
+> `%USERPROFILE%` 表示当前用户目录；可在 PowerShell 中运行 `$env:USERPROFILE` 查看，再替换成实际路径。

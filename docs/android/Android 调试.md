@@ -207,13 +207,13 @@ keytool -genkeypair -v \
 创建被 Git 忽略的 `android/keystore.properties`：
 
 ```properties
-storeFile=/Users/你的用户名/.biu/biu-release.keystore
+storeFile=/Users/yourname/.biu/biu-release.keystore
 storePassword=你的密码
 keyAlias=biu
 keyPassword=你的密码
 ```
 
-Windows 路径使用正斜杠，例如 `C:/Users/name/.biu/biu-release.keystore`。`keystore.properties`、`*.jks` 和 `*.keystore` 已由 `android/.gitignore` 忽略，不要提交秘密。Gradle 的条件签名逻辑已在仓库中，无需再手改 `build.gradle`。
+示例中的 `yourname` 需替换为实际用户名。Windows 路径使用正斜杠，例如 `C:/Users/yourname/.biu/biu-release.keystore`。`keystore.properties`、`*.jks` 和 `*.keystore` 已由 `android/.gitignore` 忽略，不要提交秘密。Gradle 的条件签名逻辑已在仓库中，无需再手改 `build.gradle`。
 
 ### 6.3 构建与验签
 
