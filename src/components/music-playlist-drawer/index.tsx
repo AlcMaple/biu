@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { addToast, Drawer, DrawerBody, DrawerContent, DrawerHeader, Switch } from "@heroui/react";
 import { RiDeleteBinLine, RiFocus3Line } from "@remixicon/react";
@@ -90,33 +90,51 @@ const PlayListDrawer = () => {
     }
   }, []);
 
-  const scrollToPlayItem = useCallback(() => {
-    if (!playItem) {
-      addToast({ title: "当前没有正在播放的歌曲", color: "warning" });
-      return;
-    }
+  const scrollToPlayItem = useCallback(
+    (behavior: ScrollBehavior = "smooth", notify = true) => {
+      if (!playItem) {
+        if (notify) addToast({ title: "当前没有正在播放的歌曲", color: "warning" });
+        return true;
+      }
 
-    const targetIndex = pureList.findIndex(item => isSamePlayListDisplayItem(playItem, item));
-    if (targetIndex < 0) {
-      addToast({ title: "未在列表中找到当前播放的歌曲", color: "warning" });
-      return;
-    }
+      const targetIndex = pureList.findIndex(item => isSamePlayListDisplayItem(playItem, item));
+      if (targetIndex < 0) {
+        if (notify) addToast({ title: "未在列表中找到当前播放的歌曲", color: "warning" });
+        return true;
+      }
 
-    const viewport = scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null;
-    if (!viewport) {
-      return;
-    }
+      const viewport = scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null;
+      if (!viewport || viewport.clientHeight === 0 || viewport.scrollHeight === 0) {
+        return false;
+      }
 
-    const targetTop = targetIndex * RowHeight;
-    const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
-    const nextTop = Math.min(targetTop, maxTop);
+      const targetTop = targetIndex * RowHeight;
+      const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      const nextTop = Math.min(targetTop, maxTop);
 
-    if (typeof viewport.scrollTo === "function") {
-      viewport.scrollTo({ top: nextTop, behavior: "smooth" });
-    } else {
-      viewport.scrollTop = nextTop;
-    }
-  }, [playItem, pureList]);
+      if (typeof viewport.scrollTo === "function") {
+        viewport.scrollTo({ top: nextTop, behavior });
+      } else {
+        viewport.scrollTop = nextTop;
+      }
+      return true;
+    },
+    [playItem, pureList],
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let frameId: number;
+    const positionCurrentItem = () => {
+      // Wait for the drawer viewport, then follow the current song while open.
+      if (!scrollToPlayItem("instant", false)) {
+        frameId = requestAnimationFrame(positionCurrentItem);
+      }
+    };
+    frameId = requestAnimationFrame(positionCurrentItem);
+    return () => cancelAnimationFrame(frameId);
+  }, [isOpen, scrollToPlayItem]);
 
   return (
     <Drawer
@@ -144,7 +162,7 @@ const PlayListDrawer = () => {
           <div className="flex items-center">
             {Boolean(pureList?.length) && (
               <>
-                <IconButton tooltip="定位当前播放" onPress={scrollToPlayItem}>
+                <IconButton tooltip="定位当前播放" onPress={() => scrollToPlayItem()}>
                   <RiFocus3Line size={16} />
                 </IconButton>
                 <IconButton tooltip="清空播放列表" onPress={clear} className="hover:text-danger">
