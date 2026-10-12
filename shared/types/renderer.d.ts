@@ -46,6 +46,8 @@ declare global {
     getNeteaseSimilarSongs: (params: GetSimiSongByNeteaseParams) => Promise<GetSimiSongByNeteaseResponse>;
     /** 获取网易云歌词 */
     getNeteaseLyrics: (params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>;
+    /** 网易云听歌识曲：用 afp 指纹查询网易云曲库 */
+    neteaseAudioMatch: (params: NeteaseAudioMatchParams) => Promise<NeteaseAudioMatchResponse>;
     /** 在 LrcLib 搜索歌曲/歌词 */
     searchLrclibLyrics: (params: SearchSongByLrclibParams) => Promise<SearchSongByLrclibResponse[]>;
     /** 获取当前应用平台 */

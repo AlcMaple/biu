@@ -1,30 +1,58 @@
 import { useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
-import { addToast, Button, Image, Modal, ModalBody, ModalContent, ModalHeader, useDisclosure } from "@heroui/react";
-import { RiComputerLine, RiExternalLinkLine, RiFingerprintLine, RiMicLine, RiMusicLine } from "@remixicon/react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalHeader,
+  ScrollShadow,
+  Spinner,
+  useDisclosure,
+} from "@heroui/react";
+import { RiComputerLine, RiFingerprintLine, RiMicLine, RiMusicLine, RiSearchLine } from "@remixicon/react";
+import clx from "classnames";
 import { motion } from "framer-motion";
 
+import {
+  AFP_SAMPLE_RATE,
+  encodeWav,
+  generateAudioFP,
+  lrcToLines,
+  PcmRecorder,
+  resample,
+} from "@/common/utils/audio-match";
 import IconButton from "@/components/icon-button";
-import platform from "@/platform";
+import platform, { isElectron, log } from "@/platform";
 import { usePlayList } from "@/store/play-list";
+import { useSearchHistory } from "@/store/search-history";
 
 type RecordState = "idle" | "listening" | "success" | "error";
 
-interface ShazamResult {
+interface MatchCandidate {
+  key: string;
+  neteaseId?: number;
   title: string;
   artist: string;
+  album?: string;
   cover?: string;
-  url?: string;
+  source: "netease" | "shazam";
 }
+
+type LyricsState = { status: "loading" } | { status: "done"; lines: string[]; from: string } | { status: "empty" };
 
 /** 总流程时长（秒） */
 const TOTAL_DURATION = 15;
 
-/** 各阶段发起识别的时间点（秒） */
-const RECOGNIZE_AT = [5, 8, 13] as const;
+/**
+ * 发起网易云匹配的时间点及所取片段长度（秒）。
+ * 实测网易云匹配端点只接受 3 的倍数时长（5/7/8/10 秒一律无结果），超过 12 秒收益不大。
+ */
+const MATCH_PLAN: Record<number, number> = { 3: 3, 6: 6, 9: 9, 12: 12, 15: 12 };
 
-/** 弹出非阻断式提示的时间点（秒） */
-const TOAST_AT = 10;
+/** 桌面端网易云未命中时，用 Shazam 兜底的时间点 */
+const SHAZAM_FALLBACK_AT = 12;
 
 const isWindows = typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
 const isMac = typeof navigator !== "undefined" && /macintosh/i.test(navigator.userAgent);
@@ -33,13 +61,19 @@ const formatMediaError = (err: unknown, source: "mic" | "system") => {
   const name = err instanceof Error ? err.name : "";
   const message = err instanceof Error ? err.message : String(err);
 
+  if (source === "mic" && !navigator.mediaDevices?.getUserMedia) {
+    return "当前浏览器不支持录音，请使用 HTTPS 访问，并在 Safari / Chrome 中打开";
+  }
+
   if (source === "mic" && name === "NotAllowedError") {
     if (/system/i.test(message)) {
       return isWindows
         ? "系统拒绝了麦克风权限。请打开「Windows 设置 → 隐私和安全性 → 麦克风」，确认已开启「麦克风访问」「让应用访问你的麦克风」以及最底部的「允许桌面应用访问你的麦克风」，然后重启应用重试"
         : "系统拒绝了麦克风权限，请在操作系统的隐私设置中为本应用开启麦克风后重试";
     }
-    return "麦克风权限被拒绝，请允许访问后重试";
+    return isElectron
+      ? "麦克风权限被拒绝，请允许访问后重试"
+      : "麦克风权限被拒绝。iPhone 请到「设置 → Safari → 麦克风」或地址栏「aA → 网站设置」中允许后重试";
   }
 
   if (source === "mic" && name === "NotFoundError") {
@@ -54,7 +88,7 @@ const formatMediaError = (err: unknown, source: "mic" | "system") => {
   if (source === "system") {
     if (name === "NotAllowedError" || /Could not start video source/i.test(message)) {
       return isMac
-        ? "系统拒绝了屏幕录制权限。请前往「系统设置 → 隐私与安全性 → 屏幕录制」，为本应用开启权限后重启应用重试"
+        ? "没有屏幕与系统录音权限。请在「系统设置 → 隐私与安全性 → 屏幕与系统录音」中点「+」添加本应用（开发环境下是名为 Electron 的应用）并打开开关，然后完全退出应用重开"
         : "无法捕获系统音频，请检查屏幕录制/音频权限设置后重试";
     }
     if (name === "NotReadableError") {
@@ -67,26 +101,45 @@ const formatMediaError = (err: unknown, source: "mic" | "system") => {
 
 /** 根据已过秒数返回阶段提示文案 */
 const getPhaseText = (elapsed: number): string => {
-  if (elapsed < 5) return `录音中（${elapsed}s）`;
-  if (elapsed < 8) return `搜索中（${elapsed}s）`;
-  if (elapsed < 13) return `正在努力匹配（${elapsed}s）`;
-  return `扩大识别范围（${elapsed}s）`;
+  if (elapsed < 3) return "正在聆听…";
+  if (elapsed < 9) return "正在匹配曲库…";
+  return "继续聆听，扩大识别范围…";
 };
 
-const WaveBars = () => (
+/** 把网易云结果转成候选，去重并把伴奏 / 纯音乐版本排到后面 */
+const toCandidates = (resp: NeteaseAudioMatchResponse): MatchCandidate[] => {
+  const seen = new Set<number>();
+  const list: MatchCandidate[] = [];
+  for (const item of resp.data?.result ?? []) {
+    const song = item.song;
+    if (!song?.id || seen.has(song.id)) continue;
+    seen.add(song.id);
+    list.push({
+      key: `netease-${song.id}`,
+      neteaseId: song.id,
+      title: song.name,
+      artist: (song.artists ?? [])
+        .map(a => a.name)
+        .filter(Boolean)
+        .join(" / "),
+      album: song.album?.name,
+      cover: song.album?.picUrl?.replace(/^http:/, "https:"),
+      source: "netease",
+    });
+  }
+  const isAccompaniment = (c: MatchCandidate) => /伴奏|instrumental|karaoke|off vocal/i.test(c.title);
+  return [...list.filter(c => !isAccompaniment(c)), ...list.filter(isAccompaniment)];
+};
+
+const WaveBars = ({ level }: { level: number }) => (
   <div className="flex items-center justify-center gap-[3px]" style={{ height: 48 }}>
     {[0, 1, 2, 3, 4, 5, 6].map(i => (
       <motion.div
         key={i}
         className="bg-primary w-1.5 rounded-full"
         style={{ height: 32, originY: 0.5 }}
-        animate={{ scaleY: [0.4, 1.4, 0.4] }}
-        transition={{
-          duration: 0.8,
-          repeat: Infinity,
-          delay: i * 0.1,
-          ease: "easeInOut",
-        }}
+        animate={{ scaleY: [0.3, 0.5 + Math.min(1, level * 4), 0.3] }}
+        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
       />
     ))}
   </div>
@@ -94,24 +147,33 @@ const WaveBars = () => (
 
 const ShazamModal = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const navigate = useNavigate();
   const [state, setState] = useState<RecordState>("idle");
   const [elapsed, setElapsed] = useState(0);
-  const [result, setResult] = useState<ShazamResult | null>(null);
+  const [level, setLevel] = useState(0);
+  const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
+  const [selected, setSelected] = useState(0);
+  const [lyrics, setLyrics] = useState<LyricsState>({ status: "loading" });
   const [error, setError] = useState("");
+  const [needScreenPermission, setNeedScreenPermission] = useState(false);
+  const lastSourceRef = useRef<"mic" | "system">("mic");
 
   const isPlaying = usePlayList(s => s.isPlaying);
   const togglePlay = usePlayList(s => s.togglePlay);
   const wasPlayingRef = useRef(false);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recorderRef = useRef<PcmRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const cancelledRef = useRef(false);
-  const recognizedRef = useRef(false);
-  const toastShownRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** 每轮识别的编号：关闭/重开后，上一轮迟到的响应据此丢弃 */
+  const sessionRef = useRef(0);
+  const doneRef = useRef(false);
+  /** 3 秒短片段的结果噪声下易误识别，先暂存，等更长片段确认 */
+  const tentativeRef = useRef<MatchCandidate[] | null>(null);
+  const failuresRef = useRef<{ service: number; total: number }>({ service: 0, total: 0 });
+  const lyricsReqRef = useRef(0);
+  const maxPeakRef = useRef(0);
 
-  /** 恢复播放（仅在之前暂停过的情况下），调用后清除标记防止重复触发 */
   const restorePlayback = useCallback(() => {
     if (wasPlayingRef.current) {
       togglePlay();
@@ -119,208 +181,260 @@ const ShazamModal = () => {
     }
   }, [togglePlay]);
 
-  /** 停止录音、清理计时器和媒体流 */
-  const stopEverything = useCallback(() => {
-    cancelledRef.current = true;
+  /** 停止采集、释放麦克风（不使本轮已发出的请求失效） */
+  const stopCapture = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
+    recorderRef.current?.stop();
+    recorderRef.current = null;
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
   }, []);
 
-  /** 收集当前已录制的 chunks 发送识别请求，识别成功立即结束流程 */
-  const sendRecognition = useCallback(async () => {
-    if (cancelledRef.current || recognizedRef.current) return;
-
-    const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
-    const blob = new Blob([...chunksRef.current], { type: mimeType });
-    if (blob.size === 0) return;
-
-    const arrayBuffer = await blob.arrayBuffer();
-
+  const loadLyrics = useCallback(async (c: MatchCandidate) => {
+    const req = ++lyricsReqRef.current;
+    setLyrics({ status: "loading" });
+    const finish = (s: LyricsState) => {
+      if (req === lyricsReqRef.current) setLyrics(s);
+    };
     try {
-      const raw = await platform.recognizeSong(arrayBuffer);
+      if (c.neteaseId) {
+        const res = await platform.getNeteaseLyrics({ id: c.neteaseId });
+        const lines = lrcToLines(res?.lrc?.lyric ?? "");
+        if (lines.length) return finish({ status: "done", lines, from: "网易云音乐" });
+      }
+    } catch {
+      /* 继续尝试 LRCLIB */
+    }
+    try {
+      const list = await platform.searchLrclibLyrics({
+        q: `${c.title} ${c.artist}`.trim(),
+      } as SearchSongByLrclibParams);
+      const hit = (list ?? []).find(x => x.plainLyrics || x.syncedLyrics);
+      const text = hit?.plainLyrics || hit?.syncedLyrics || "";
+      const lines = lrcToLines(text);
+      if (lines.length) return finish({ status: "done", lines, from: "LRCLIB" });
+    } catch {
+      /* ignore */
+    }
+    finish({ status: "empty" });
+  }, []);
 
-      if (cancelledRef.current || recognizedRef.current) return;
-      if (raw.error || !raw.track) return;
-
-      // 识别成功
-      recognizedRef.current = true;
-      stopEverything();
-
-      const track = raw.track as {
-        title?: string;
-        subtitle?: string;
-        images?: { coverart?: string };
-        url?: string;
-      };
-
-      setResult({
-        title: track.title ?? "",
-        artist: track.subtitle ?? "",
-        cover: track.images?.coverart,
-        url: track.url,
-      });
+  const showResult = useCallback(
+    (list: MatchCandidate[]) => {
+      if (doneRef.current || !list.length) return;
+      doneRef.current = true;
+      stopCapture();
+      setCandidates(list);
+      setSelected(0);
       setState("success");
       restorePlayback();
-    } catch {
-      // 网络等异常静默忽略，等待下一次识别尝试
+      void loadLyrics(list[0]);
+    },
+    [stopCapture, restorePlayback, loadLyrics],
+  );
+
+  const finishWithoutMatch = useCallback(() => {
+    if (doneRef.current) return;
+    if (tentativeRef.current?.length) return showResult(tentativeRef.current);
+    doneRef.current = true;
+    stopCapture();
+    const { service, total } = failuresRef.current;
+    if (total > 0 && service === total) {
+      setError("识曲服务暂时不可用，请检查网络后重试");
+    } else if (maxPeakRef.current < 0.01) {
+      setError("没有识别到歌曲。麦克风几乎没收到声音，请靠近音源或调大音量后重试");
+    } else {
+      setError("没有识别到歌曲。请靠近音源、减少环境噪声后重试（曲库中没有版权的歌曲也无法识别）");
     }
-  }, [stopEverything, restorePlayback]);
+    setState("error");
+    restorePlayback();
+  }, [showResult, stopCapture, restorePlayback]);
+
+  const matchNetease = useCallback(
+    async (session: number, seconds: number, isLast: boolean) => {
+      const recorder = recorderRef.current;
+      if (!recorder) return;
+      const raw = recorder.tail(seconds);
+      failuresRef.current.total += 1;
+      try {
+        const pcm8k = await resample(raw, recorder.sampleRate, AFP_SAMPLE_RATE);
+        const audioFP = await generateAudioFP(pcm8k);
+        const resp = await platform.neteaseAudioMatch({ duration: seconds, audioFP });
+        if (session !== sessionRef.current || doneRef.current) return;
+        const list = toCandidates(resp);
+        if (list.length) {
+          const prev = tentativeRef.current;
+          if (seconds > 3) {
+            // 若与 3 秒结果有交集，优先展示双方都命中的那首
+            const agreed = prev ? list.find(c => prev.some(p => p.key === c.key)) : undefined;
+            showResult(agreed ? [agreed, ...list.filter(c => c !== agreed)] : list);
+          } else {
+            tentativeRef.current = list;
+          }
+        }
+      } catch (err) {
+        failuresRef.current.service += 1;
+        log.warn("[shazam-modal] netease match failed", err);
+      }
+      if (isLast && session === sessionRef.current) finishWithoutMatch();
+    },
+    [showResult, finishWithoutMatch],
+  );
+
+  /** 桌面端兜底：网易云曲库没有的歌（如部分欧美 / 无版权歌曲）交给 Shazam */
+  const matchShazam = useCallback(
+    async (session: number) => {
+      const recorder = recorderRef.current;
+      if (!recorder || !isElectron) return;
+      try {
+        const pcm16k = await resample(recorder.tail(SHAZAM_FALLBACK_AT), recorder.sampleRate, 16000);
+        const raw = await platform.recognizeSong(encodeWav(pcm16k, 16000));
+        if (session !== sessionRef.current || doneRef.current) return;
+        const track = raw?.track as
+          | { key?: string; title?: string; subtitle?: string; images?: { coverart?: string } }
+          | undefined;
+        if (!track?.title) return;
+        showResult([
+          {
+            key: `shazam-${track.key ?? track.title}`,
+            title: track.title,
+            artist: track.subtitle ?? "",
+            cover: track.images?.coverart,
+            source: "shazam",
+          },
+        ]);
+      } catch {
+        /* 兜底失败不影响主流程 */
+      }
+    },
+    [showResult],
+  );
 
   const startRecording = useCallback(
     async (source: "mic" | "system") => {
-      chunksRef.current = [];
-      cancelledRef.current = false;
-      recognizedRef.current = false;
-      toastShownRef.current = false;
-      setState("listening");
+      const session = ++sessionRef.current;
+      lastSourceRef.current = source;
+      setNeedScreenPermission(false);
+      doneRef.current = false;
+      tentativeRef.current = null;
+      failuresRef.current = { service: 0, total: 0 };
+      maxPeakRef.current = 0;
+      setCandidates([]);
+      setError("");
+      setLevel(0);
       setElapsed(0);
+      setState("listening");
 
-      // 识别前暂停播放
+      // iOS 要求 AudioContext 在用户手势内同步创建
+      let recorder: PcmRecorder;
+      try {
+        recorder = new PcmRecorder();
+      } catch {
+        setError("当前浏览器不支持音频采集，请更新浏览器后重试");
+        setState("error");
+        return;
+      }
+
       wasPlayingRef.current = isPlaying;
       if (isPlaying) togglePlay();
 
       let stream: MediaStream;
       try {
         if (source === "mic") {
+          if (!navigator.mediaDevices?.getUserMedia) throw new Error("unsupported");
           await platform.requestMicPermission();
           stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-            },
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
             video: false,
           });
         } else {
-          const sources = await platform.getDesktopSources();
-          if (!sources.length) throw new Error("无法获取系统音频源");
-
-          const sourceId = sources[0].id;
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              // @ts-expect-error Electron-specific constraint
-              mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId },
-            },
-            video: {
-              // @ts-expect-error Electron-specific constraint
-              mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId, maxWidth: 1, maxHeight: 1 },
-            },
-          });
-          stream.getVideoTracks().forEach(t => {
-            try {
-              t.stop();
-            } catch {
-              /* ignore */
-            }
-          });
+          // 主进程 setDisplayMediaRequestHandler 会自动选主屏 + loopback 音频，不弹系统选择器
+          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: { width: 1, height: 1 } });
+          stream.getVideoTracks().forEach(t => t.stop());
           if (stream.getAudioTracks().length === 0) {
-            stream.getTracks().forEach(t => {
-              try {
-                t.stop();
-              } catch {
-                /* ignore */
-              }
-            });
-            throw new Error(
-              "未获取到系统音频轨道。macOS 不支持直接捕获系统音频，请改用麦克风，或安装虚拟音频设备（如 BlackHole）后将系统输出路由到麦克风输入",
-            );
+            stream.getTracks().forEach(t => t.stop());
+            throw new Error("未获取到系统音频轨道（macOS 需 13 及以上版本），请改用麦克风识别");
           }
         }
+        if (session !== sessionRef.current) {
+          stream.getTracks().forEach(t => t.stop());
+          recorder.stop();
+          return;
+        }
+        await recorder.start(stream);
       } catch (err) {
+        recorder.stop();
+        if (session !== sessionRef.current) return;
         setError(formatMediaError(err, source));
+        setNeedScreenPermission(isMac && source === "system" && err instanceof Error && err.name === "NotAllowedError");
         setState("error");
         restorePlayback();
         return;
       }
 
       streamRef.current = stream;
+      recorderRef.current = recorder;
+      // 预热指纹组件，避免第一次匹配时才下载
+      void import("@/common/utils/audio-match").then(m => m.loadAfp()).catch(() => {});
 
-      const recorderOptions: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        recorderOptions.mimeType = "audio/webm;codecs=opus";
-      }
-      recorderOptions.audioBitsPerSecond = 128000;
-      const recorder = new MediaRecorder(stream, recorderOptions);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-      };
-
-      // 每秒产出一个 chunk，以便分阶段截取不同长度的音频
-      recorder.start(1000);
-
-      let currentElapsed = 0;
-      const recognizeAtSet = new Set<number>(RECOGNIZE_AT);
-
+      let tick = 0;
       timerRef.current = setInterval(() => {
-        if (cancelledRef.current || recognizedRef.current) {
-          clearInterval(timerRef.current!);
+        if (session !== sessionRef.current || doneRef.current) return;
+        tick += 1;
+        setElapsed(tick);
+        const peak = recorderRef.current?.peak ?? 0;
+        maxPeakRef.current = Math.max(maxPeakRef.current, peak);
+        setLevel(peak);
+
+        const seconds = MATCH_PLAN[tick];
+        if (seconds) void matchNetease(session, seconds, tick >= TOTAL_DURATION);
+        if (tick === SHAZAM_FALLBACK_AT) void matchShazam(session);
+        if (tick >= TOTAL_DURATION) {
+          // 停止采集，但等待最后一次匹配返回
+          if (timerRef.current) clearInterval(timerRef.current);
           timerRef.current = null;
-          return;
-        }
-
-        currentElapsed += 1;
-        setElapsed(currentElapsed);
-
-        // 在指定时间点发起识别请求（异步，不阻塞录音）
-        if (recognizeAtSet.has(currentElapsed)) {
-          sendRecognition();
-        }
-
-        // 10 秒时弹出非阻断式提示
-        if (currentElapsed === TOAST_AT && !toastShownRef.current && !recognizedRef.current) {
-          toastShownRef.current = true;
-          addToast({ title: "未识别到音乐，请靠近音源再试", color: "warning" });
-        }
-
-        // 15 秒到达，结束整个流程
-        if (currentElapsed >= TOTAL_DURATION && !recognizedRef.current) {
-          stopEverything();
-          setError("未能识别到歌曲，请确保音乐声音足够大后重试（建议在安静环境下使用麦克风）");
-          setState("error");
-          restorePlayback();
         }
       }, 1000);
     },
-    [isPlaying, togglePlay, sendRecognition, stopEverything, restorePlayback],
+    [isPlaying, togglePlay, restorePlayback, matchNetease, matchShazam],
   );
 
-  /** 停止按钮：取消整个流程，不触发识别 */
-  const handleCancel = useCallback(() => {
-    stopEverything();
+  const reset = useCallback(() => {
+    sessionRef.current += 1;
+    lyricsReqRef.current += 1;
+    stopCapture();
     setState("idle");
-    setResult(null);
+    setCandidates([]);
     setError("");
+  }, [stopCapture]);
+
+  const handleCancel = () => {
+    reset();
     restorePlayback();
-  }, [stopEverything, restorePlayback]);
+  };
 
   const handleClose = () => {
-    stopEverything();
-    setState("idle");
-    setResult(null);
-    setError("");
+    reset();
     restorePlayback();
     onClose();
   };
 
-  const handleRetry = () => {
-    setState("idle");
-    setResult(null);
-    setError("");
+  const selectCandidate = (index: number) => {
+    setSelected(index);
+    void loadLyrics(candidates[index]);
   };
+
+  const searchInApp = (c: MatchCandidate) => {
+    const keyword = `${c.title} ${c.artist.split(" / ")[0] ?? ""}`.trim();
+    useSearchHistory.getState().add(keyword);
+    handleClose();
+    navigate("/search");
+  };
+
+  const current = candidates[selected];
 
   return (
     <>
@@ -328,69 +442,126 @@ const ShazamModal = () => {
         <RiFingerprintLine size={18} />
       </IconButton>
 
-      <Modal isOpen={isOpen} onClose={handleClose} size="sm" isDismissable={state !== "listening"}>
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        size="md"
+        placement="center"
+        scrollBehavior="inside"
+        isDismissable={state !== "listening"}
+      >
         <ModalContent>
           <ModalHeader>听歌识曲</ModalHeader>
           <ModalBody className="pb-6">
             {state === "idle" && (
               <div className="flex flex-col items-center gap-5 py-4">
-                <p className="text-foreground-400 text-sm">选择声音来源，最长录制 {TOTAL_DURATION} 秒自动识别</p>
+                <p className="text-foreground-400 text-center text-sm">
+                  对准正在播放的音乐，最长聆听 {TOTAL_DURATION} 秒，通常 3~6 秒出结果
+                </p>
                 <div className="flex gap-3">
-                  <Button
-                    variant="bordered"
-                    startContent={<RiMicLine size={18} />}
-                    onPress={() => startRecording("mic")}
-                  >
-                    麦克风
+                  <Button color="primary" startContent={<RiMicLine size={18} />} onPress={() => startRecording("mic")}>
+                    开始识别
                   </Button>
-                  <Button
-                    variant="bordered"
-                    startContent={<RiComputerLine size={18} />}
-                    onPress={() => startRecording("system")}
-                  >
-                    系统声音
-                  </Button>
+                  {isElectron && (
+                    <Button
+                      variant="bordered"
+                      startContent={<RiComputerLine size={18} />}
+                      onPress={() => startRecording("system")}
+                    >
+                      系统声音
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
 
             {state === "listening" && (
               <div className="flex flex-col items-center gap-4 py-4">
-                <WaveBars />
-                <p className="text-foreground-400 text-sm">{getPhaseText(elapsed)}</p>
+                <WaveBars level={level} />
+                <p className="text-foreground-400 text-sm">
+                  {getPhaseText(elapsed)}（{elapsed}s）
+                </p>
+                {elapsed >= 3 && level < 0.01 && <p className="text-warning text-xs">几乎没有收到声音，请靠近音源</p>}
                 <Button size="sm" variant="flat" onPress={handleCancel}>
                   停止
                 </Button>
               </div>
             )}
 
-            {state === "success" && result && (
-              <div className="flex flex-col items-center gap-4 py-2">
-                {result.cover ? (
-                  <Image src={result.cover} width={120} height={120} className="rounded-lg" />
-                ) : (
-                  <div className="bg-content2 flex h-24 w-24 items-center justify-center rounded-lg">
-                    <RiMusicLine size={32} className="text-foreground-400" />
+            {state === "success" && current && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  {current.cover ? (
+                    <img
+                      src={current.source === "netease" ? `${current.cover}?param=200y200` : current.cover}
+                      alt={current.title}
+                      referrerPolicy="no-referrer"
+                      className="h-22 w-22 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="bg-content2 flex h-22 w-22 shrink-0 items-center justify-center rounded-lg">
+                      <RiMusicLine size={32} className="text-foreground-400" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-semibold">{current.title}</p>
+                    <p className="text-foreground-500 truncate text-sm">{current.artist}</p>
+                    {current.album && <p className="text-foreground-400 truncate text-xs">{current.album}</p>}
+                  </div>
+                </div>
+
+                {candidates.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-foreground-400 self-center text-xs">其他可能：</span>
+                    {candidates.slice(0, 5).map((c, i) => (
+                      <button
+                        type="button"
+                        key={c.key}
+                        onClick={() => selectCandidate(i)}
+                        className={clx("max-w-full truncate rounded-full border px-2 py-0.5 text-xs", {
+                          "border-primary text-primary": i === selected,
+                          "border-default-200 text-foreground-500": i !== selected,
+                        })}
+                      >
+                        {c.title} - {c.artist}
+                      </button>
+                    ))}
                   </div>
                 )}
-                <div className="text-center">
-                  <p className="text-lg font-semibold">{result.title}</p>
-                  <p className="text-foreground-400 text-sm">{result.artist}</p>
+
+                <div className="bg-content2 rounded-lg p-3">
+                  {lyrics.status === "loading" && (
+                    <div className="flex justify-center py-6">
+                      <Spinner size="sm" />
+                    </div>
+                  )}
+                  {lyrics.status === "empty" && (
+                    <p className="text-foreground-400 py-4 text-center text-sm">暂无歌词（可能是纯音乐）</p>
+                  )}
+                  {lyrics.status === "done" && (
+                    <>
+                      <ScrollShadow className="max-h-[40vh] space-y-1.5 text-center text-sm leading-relaxed">
+                        {lyrics.lines.map((line, i) => (
+                          <p key={i}>{line}</p>
+                        ))}
+                      </ScrollShadow>
+                      <p className="text-foreground-400 mt-2 text-right text-[10px]">歌词来源：{lyrics.from}</p>
+                    </>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="flat" onPress={handleRetry}>
+
+                <div className="flex justify-center gap-2">
+                  <Button size="sm" variant="flat" onPress={() => startRecording("mic")}>
                     再次识别
                   </Button>
-                  {result.url && (
-                    <Button
-                      size="sm"
-                      color="primary"
-                      endContent={<RiExternalLinkLine size={14} />}
-                      onPress={() => platform.openExternal(result.url!)}
-                    >
-                      查看详情
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    color="primary"
+                    startContent={<RiSearchLine size={14} />}
+                    onPress={() => searchInApp(current)}
+                  >
+                    在 Biu 中搜索
+                  </Button>
                 </div>
               </div>
             )}
@@ -398,9 +569,29 @@ const ShazamModal = () => {
             {state === "error" && (
               <div className="flex flex-col items-center gap-4 py-4">
                 <p className="text-danger text-center text-sm">{error}</p>
-                <Button size="sm" variant="flat" onPress={handleRetry}>
-                  重试
-                </Button>
+                <div className="flex gap-2">
+                  {needScreenPermission && (
+                    <Button
+                      size="sm"
+                      color="primary"
+                      onPress={() =>
+                        platform.openExternal(
+                          "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+                        )
+                      }
+                    >
+                      打开系统设置
+                    </Button>
+                  )}
+                  <Button size="sm" variant="flat" onPress={() => startRecording(lastSourceRef.current)}>
+                    重试
+                  </Button>
+                  {lastSourceRef.current === "system" && (
+                    <Button size="sm" variant="flat" onPress={() => startRecording("mic")}>
+                      改用麦克风
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </ModalBody>

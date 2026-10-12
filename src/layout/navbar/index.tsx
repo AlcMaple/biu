@@ -38,6 +38,7 @@ const LayoutNavbar = () => {
         <div className="min-w-0 flex-1">
           <Search onFocusChange={setIsSearchFocused} />
         </div>
+        <ShazamModal />
         <UserCard onDropdownOpenChange={setIsUserDropdownOpen} />
       </div>
     );

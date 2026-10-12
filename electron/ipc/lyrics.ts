@@ -3,6 +3,7 @@ import { ipcMain } from "electron";
 import { getLyricsByLrclib, type SeachSongByLrclibParams } from "./api/lrclib-lyric";
 import {
   getLyricsByNetease,
+  matchAudioByNetease,
   getSongByNetease,
   type GetLyricsByNeteaseParams,
   type SearchSongByNeteaseParams,
@@ -28,6 +29,10 @@ export function registerLyricsHandlers() {
 
   ipcMain.handle(channel.lyrics.getNeteaseLyrics, async (_, params: GetLyricsByNeteaseParams) => {
     return getLyricsByNetease(params);
+  });
+
+  ipcMain.handle(channel.lyrics.neteaseAudioMatch, async (_, params: NeteaseAudioMatchParams) => {
+    return matchAudioByNetease(params);
   });
 
   ipcMain.handle(channel.lyrics.searchLrclib, async (_, params: SeachSongByLrclibParams) => {

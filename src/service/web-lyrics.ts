@@ -13,3 +13,7 @@ export function getWebNeteaseLyrics(params: GetLyricsByNeteaseParams): Promise<G
 export function searchWebLrclibLyrics(params: SearchSongByLrclibParams): Promise<SearchSongByLrclibResponse[]> {
   return axiosInstance.get<SearchSongByLrclibResponse[]>(WEB_LYRICS_PROXY_PATHS.lrclibSearch, { params });
 }
+
+export function matchWebNeteaseAudio(params: NeteaseAudioMatchParams): Promise<NeteaseAudioMatchResponse> {
+  return axiosInstance.get<NeteaseAudioMatchResponse>(WEB_LYRICS_PROXY_PATHS.neteaseAudioMatch, { params });
+}

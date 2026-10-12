@@ -141,3 +141,29 @@ interface MusicLyrics {
   lyrics?: string;
   tLyrics?: string;
 }
+
+interface NeteaseAudioMatchParams {
+  /** 指纹对应的音频时长（秒） */
+  duration: number;
+  /** afp.wasm 生成的 base64 指纹 */
+  audioFP: string;
+}
+
+interface NeteaseAudioMatchSong {
+  id: number;
+  name: string;
+  duration?: number;
+  alias?: string[];
+  transNames?: string[];
+  artists?: { id?: number; name?: string }[];
+  album?: { id?: number; name?: string; picUrl?: string };
+}
+
+interface NeteaseAudioMatchResponse {
+  code?: number;
+  data?: {
+    type?: number;
+    queryId?: string;
+    result?: { startTime?: number; song?: NeteaseAudioMatchSong }[] | null;
+  };
+}

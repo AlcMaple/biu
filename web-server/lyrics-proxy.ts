@@ -13,6 +13,8 @@ const NETEASE_ORIGIN = "https://interface.music.163.com";
 const LRCLIB_ORIGIN = "https://lrclib.net";
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_QUERY_LENGTH = 256;
+/** 听歌识曲指纹（base64），15 秒片段实测远小于此上限 */
+const MAX_AUDIO_FP_LENGTH = 32_768;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const UPSTREAM_HEADERS = {
   Accept: "application/json",
@@ -82,6 +84,22 @@ function matchLyricsRoute(url: URL): LyricsRoute | undefined {
     target.searchParams.set("type", String(readIntegerQuery(url, "type", 1, 1, 1000)));
     target.searchParams.set("limit", String(readIntegerQuery(url, "limit", 20, 1, 100)));
     target.searchParams.set("offset", String(readIntegerQuery(url, "offset", 0, 0, 10_000)));
+    return { target };
+  }
+
+  if (url.pathname === WEB_LYRICS_PROXY_PATHS.neteaseAudioMatch) {
+    assertAllowedQuery(url, new Set(["duration", "audioFP"]));
+    const audioFP = readSingleQuery(url, "audioFP", true)!;
+    if (!audioFP || audioFP.length > MAX_AUDIO_FP_LENGTH || !/^[A-Za-z0-9+/]+=*$/.test(audioFP)) {
+      throw new ProxyRequestError("歌词请求参数不合法", 400);
+    }
+    const target = new URL("/api/music/audio/match", NETEASE_ORIGIN);
+    target.searchParams.set("sessionId", "0123456789abcdef");
+    target.searchParams.set("algorithmCode", "shazam_v2");
+    target.searchParams.set("duration", String(readIntegerQuery(url, "duration", 0, 1, 30)));
+    target.searchParams.set("rawdata", audioFP);
+    target.searchParams.set("times", "1");
+    target.searchParams.set("decrypt", "1");
     return { target };
   }
 

@@ -72,6 +72,12 @@ describe("Web 歌词 BFF", () => {
       { result: { songs: [{ id: 1, name: "螺旋" }] } },
     ],
     [
+      "网易云听歌识曲",
+      `${WEB_LYRICS_PROXY_PATHS.neteaseAudioMatch}?duration=6&audioFP=ab%2Bc%2F%3D`,
+      "https://interface.music.163.com/api/music/audio/match?sessionId=0123456789abcdef&algorithmCode=shazam_v2&duration=6&rawdata=ab%2Bc%2F%3D&times=1&decrypt=1",
+      { data: { result: [{ song: { id: 1, name: "螺旋" } }] } },
+    ],
+    [
       "网易云歌词",
       `${WEB_LYRICS_PROXY_PATHS.neteaseLyrics}?id=1`,
       "https://interface.music.163.com/api/song/lyric?id=1&tv=-1&lv=-1&rv=-1&kv=-1&_nmclfl=1",

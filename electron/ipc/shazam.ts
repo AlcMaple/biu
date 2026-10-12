@@ -1,4 +1,4 @@
-import { desktopCapturer, ipcMain, systemPreferences } from "electron";
+import { app, desktopCapturer, ipcMain, session, systemPreferences } from "electron";
 import log from "electron-log";
 import { Shazam } from "node-shazam";
 import { execFile } from "node:child_process";
@@ -38,6 +38,28 @@ function convertToWav(inputPath: string, outputPath: string): Promise<void> {
 const shazam = new Shazam();
 
 export function registerShazamHandlers() {
+  /**
+   * 「系统声音」识曲：渲染端调用 getDisplayMedia，这里直接选中主屏并开启 loopback 音频。
+   * macOS 13+ 走 ScreenCaptureKit，Windows 走 WASAPI loopback；旧的 chromeMediaSource=desktop 约束在 macOS 上拿不到音频。
+   */
+  app.whenReady().then(() => {
+    session.defaultSession.setDisplayMediaRequestHandler(
+      (_request, callback) => {
+        desktopCapturer
+          .getSources({ types: ["screen"] })
+          .then(sources => {
+            if (!sources.length) return callback({});
+            callback({ video: sources[0], audio: "loopback" });
+          })
+          .catch(err => {
+            log.error("[shazam] display media request error:", err);
+            callback({});
+          });
+      },
+      { useSystemPicker: false },
+    );
+  });
+
   /**
    * 识别音频：接收渲染进程录制的 ArrayBuffer，写入临时文件后调用 node-shazam 识别。
    * node-shazam v1.2+ 内部使用 shazamio-core (WASM) 生成音频指纹，无需 Python 或外部 ffmpeg。

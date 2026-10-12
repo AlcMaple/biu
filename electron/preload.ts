@@ -22,6 +22,7 @@ const api: ElectronAPI = {
   searchNeteaseSongs: params => ipcRenderer.invoke(channel.lyrics.searchNeteaseSongs, params),
   getNeteaseSimilarSongs: params => ipcRenderer.invoke(channel.lyrics.getNeteaseSimilarSongs, params),
   getNeteaseLyrics: params => ipcRenderer.invoke(channel.lyrics.getNeteaseLyrics, params),
+  neteaseAudioMatch: params => ipcRenderer.invoke(channel.lyrics.neteaseAudioMatch, params),
   searchLrclibLyrics: params => ipcRenderer.invoke(channel.lyrics.searchLrclib, params),
   setProxySettings: proxySettings => ipcRenderer.invoke(channel.app.setProxySettings, proxySettings),
   scanLocalMusic: dirs => ipcRenderer.invoke(channel.localMusic.scan, dirs),

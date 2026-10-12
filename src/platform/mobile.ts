@@ -105,6 +105,7 @@ const platform: Platform = {
   searchNeteaseSongs: async () => ({}),
   getNeteaseSimilarSongs: async () => ({}),
   getNeteaseLyrics: async () => ({}),
+  neteaseAudioMatch: async () => ({}),
   searchLrclibLyrics: async () => [],
   getPlatform: () => (isIOS ? "ios" : "android"),
   setProxySettings: asyncNoop,
