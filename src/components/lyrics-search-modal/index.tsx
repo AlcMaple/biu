@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
+import { extractSongInfo } from "@/components/lyrics/auto-match";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
@@ -44,7 +45,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
     if (!isOpen) return;
     const playItem = getPlayItem();
     if (playItem) {
-      setKeyword(playItem.pageTitle || playItem.title);
+      setKeyword(extractSongInfo(playItem.pageTitle || playItem.title).title);
       setNeteaseSongs([]);
       setLrclibSongs([]);
     }

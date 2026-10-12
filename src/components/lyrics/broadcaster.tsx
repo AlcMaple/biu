@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import { autoMatchLyrics } from "@/components/lyrics/auto-match";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform from "@/platform";
@@ -13,6 +14,11 @@ import { StoreNameMap } from "@shared/store";
 const TAIL_LINE_DURATION_MS = 5000;
 
 const DEFAULT_OFFSET = 0;
+
+/** 切歌后等待多久才开始自动匹配歌词 */
+const AUTO_MATCH_DEBOUNCE_MS = 1500;
+
+const autoTried = new Set<string>();
 
 /**
  * Headless component — always mounted in the layout.
@@ -66,7 +72,24 @@ const LyricsBroadcaster = () => {
           }
         }
 
-        if (!canceled) setLyrics([]);
+        if (canceled) return;
+        setLyrics([]);
+
+        // 无缓存：按标题 + 时长自动匹配歌词；每首歌每次会话只尝试一次，命中后写入缓存
+        if (autoTried.has(cacheKey)) return;
+        // 防抖：快速连切歌时，停留不足该时长的歌不发起任何请求（effect 清理会置 canceled）
+        // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- 取消由 canceled 标志处理
+        await new Promise(resolve => setTimeout(resolve, AUTO_MATCH_DEBOUNCE_MS));
+        if (canceled) return;
+        autoTried.add(cacheKey);
+        const hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled);
+        if (canceled || !hit) return;
+        setLyrics(parseLrc(hit.lyrics), parseLrc(hit.tLyrics));
+        const latest = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
+        await platform.setStore(StoreNameMap.LyricsCache, {
+          ...latest,
+          [cacheKey]: { ...(latest[cacheKey] || {}), lyrics: hit.lyrics, tLyrics: hit.tLyrics },
+        });
       } catch {
         if (!canceled) setLyrics([]);
       } finally {
