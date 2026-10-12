@@ -69,33 +69,11 @@ body {
   }
 }
 
-/* 沿用移动断点；触屏设备横过来超过断点后，也不把滚动交回浏览器工具栏。 */
-@media (width <= 767px), (hover: none) and (pointer: coarse) {
-  :root[data-platform="web"],
-  :root[data-platform="web"] body {
-    width: 100%;
-    min-height: 0;
-    overflow: hidden;
-    overscroll-behavior-y: none;
-  }
-
-  /* 仅裁切不足以挡住 iOS 根页面的橡皮筋；代价是停用原生下拉刷新。 */
-  :root[data-platform="web"] body,
-  :root[data-platform="web"] #root {
-    position: fixed;
-    inset: 0;
-  }
-
-  :root[data-platform="web"] #root {
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  /* 滚动仍由现有列表负责，不再套第二层滚动框或拦截 touchmove。 */
-  :root[data-platform="web"] [data-overlayscrollbars-viewport] {
-    overscroll-behavior-y: contain;
-  }
-}
+/*
+ * 不要把 body / #root 钉成 position:fixed，也不要给根文档 overflow:hidden / overscroll-behavior:none：
+ * 系统下拉刷新依赖根文档在顶部继续下拉的橡皮筋。内部列表用默认 overscroll（auto），
+ * 滚到顶后手势才能链到根文档触发刷新。
+ */
 
 .no-scrollbar {
   -ms-overflow-style: none;
