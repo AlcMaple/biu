@@ -1,7 +1,10 @@
 import type { AddressInfo } from "node:net";
 
+import os from "node:os";
 import path from "node:path";
 
+import { defaultWebSessionStore } from "./auth/handler.js";
+import { createSessionPersistence } from "./auth/session-persistence.js";
 import { DEFAULT_CLIENT_LOG_MAX_TOTAL_BYTES, DEFAULT_CLIENT_LOG_RETENTION_DAYS } from "./client-log-store.js";
 import { captureWebStartupError, isWebMonitoringEnabled } from "./monitoring.js";
 import { normalizePublicOrigin } from "./proxy-common.js";
@@ -34,6 +37,9 @@ function isLoopbackHost(host: string) {
 export interface WebServerEnvironment {
   clientIpHeader?: string;
   clientLogDir?: string;
+  /** 登录会话落盘目录（默认 ~/.biu-web/sessions）；undefined = 显式关闭，只存内存 */
+  sessionDir?: string;
+  sessionKey?: string;
   clientLogMaxTotalBytes: number;
   clientLogRetentionDays: number;
   host: string;
@@ -56,7 +62,16 @@ export function readWebServerEnvironment(environment: NodeJS.ProcessEnv = proces
     ? path.resolve(process.cwd(), environment.BIU_WEB_CLIENT_LOG_DIR)
     : undefined;
 
+  // 默认落盘到用户目录（与随版本变化的 release 目录分离）；仅在显式设为 "memory" 时退回纯内存（如一次性测试）
+  const sessionDirSetting = environment.BIU_WEB_SESSION_DIR;
+  const sessionDir =
+    sessionDirSetting === "memory"
+      ? undefined
+      : path.resolve(process.cwd(), sessionDirSetting || path.join(os.homedir(), ".biu-web", "sessions"));
+
   return {
+    sessionDir,
+    sessionKey: environment.BIU_WEB_SESSION_KEY || undefined,
     clientIpHeader: environment.BIU_WEB_CLIENT_IP_HEADER,
     clientLogDir,
     clientLogMaxTotalBytes:
@@ -81,6 +96,12 @@ export function readWebServerEnvironment(environment: NodeJS.ProcessEnv = proces
 
 async function main() {
   const config = readWebServerEnvironment();
+  if (config.sessionDir) {
+    const restored = await defaultWebSessionStore.enablePersistence(
+      createSessionPersistence({ dir: config.sessionDir, key: config.sessionKey }),
+    );
+    console.info(`[web] Sessions persisted to ${config.sessionDir} (${restored} restored)`);
+  }
   const server = await createProductionWebServer(config);
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -92,7 +113,11 @@ async function main() {
   const localOrigin = `http://${displayHost}:${address.port}`;
   console.info(`[web] Biu is listening at ${config.publicOrigin ?? localOrigin}`);
   console.info(`[web] Health check: ${config.publicOrigin ?? localOrigin}/__biu_health`);
-  console.info("[web] Sessions are stored in this process only; restarting it signs Web users out.");
+  if (!config.sessionDir) {
+    console.info(
+      "[web] Sessions are stored in this process only; restarting it signs Web users out (BIU_WEB_SESSION_DIR=memory).",
+    );
+  }
   console.info(`[web] Sentry monitoring: ${isWebMonitoringEnabled ? "enabled" : "disabled"}`);
   console.info(
     config.clientLogDir
@@ -104,10 +129,12 @@ async function main() {
   const stop = () => {
     if (stopping) return;
     stopping = true;
-    void closeProductionWebServer(server).catch(error => {
-      console.error("[web] Failed to stop cleanly", error);
-      process.exitCode = 1;
-    });
+    void closeProductionWebServer(server)
+      .finally(() => defaultWebSessionStore.flush())
+      .catch(error => {
+        console.error("[web] Failed to stop cleanly", error);
+        process.exitCode = 1;
+      });
   };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);

@@ -22,11 +22,13 @@ import {
 import { QrRateLimiter, type QrRateLimitAction } from "./rate-limit.js";
 import { WEB_SESSION_REFRESH_CHECK_INTERVAL_MS, WebSessionRefreshCoordinator } from "./session-refresh.js";
 import {
+  WEB_SESSION_COOKIE_NAME,
   WebSessionStore,
   formatBilibiliCookieHeader,
   hasWebSessionCookie,
   parseCookieHeader,
   serializeClearedWebSessionCookie,
+  serializeWebSessionCookie,
   type BilibiliCookie,
   type WebSessionRecord,
 } from "./session-store.js";
@@ -315,6 +317,15 @@ export function createWebSessionResolver(
     }
 
     setWebRequestUser(request, resolved.session.user);
+
+    // 滑动续期：定期重新下发会话 Cookie，让浏览器端的 Max-Age 也一起顺延
+    if (response && !response.headersSent) {
+      const renewal = sessionStore.consumeCookieRenewal(resolved.session);
+      const token = parseCookieHeader(
+        Array.isArray(request.headers.cookie) ? request.headers.cookie.join("; ") : (request.headers.cookie ?? ""),
+      ).get(WEB_SESSION_COOKIE_NAME);
+      if (renewal && token) appendSetCookie(response, serializeWebSessionCookie(token, renewal.maxAgeSeconds));
+    }
 
     if (refreshCoordinator) {
       const refresh = refreshCoordinator.refreshIfDue(resolved);

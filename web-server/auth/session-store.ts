@@ -3,9 +3,19 @@ import type { IncomingMessage } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 
 import type { BiuMonitoringUser } from "../../shared/monitoring-user.js";
+import type { SessionPersistence } from "./session-persistence.js";
 
 export const WEB_SESSION_COOKIE_NAME = "__Host-biu_session";
-export const DEFAULT_WEB_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * 滑动有效期：每次使用都顺延，只有连续这么久没打开才会失效。
+ * 取 180 天与 B 站 SESSDATA 的有效期同量级；Cookie 状态检查（session-refresh）会负责续期上游 Cookie。
+ */
+export const DEFAULT_WEB_SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+/** 服务端顺延 / 落盘的最小间隔：避免每个请求都写盘 */
+const TOUCH_PERSIST_INTERVAL_MS = 10 * 60 * 1000;
+/** 浏览器 Cookie 重新下发（刷新 Max-Age）的最小间隔 */
+const COOKIE_RENEW_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const PERSIST_DEBOUNCE_MS = 2000;
 
 export interface BilibiliCookie {
   domain: string;
@@ -21,6 +31,8 @@ export interface WebSessionRecord {
   createdAt: number;
   expiresAt: number;
   lastAccessAt: number;
+  /** 上次向浏览器重新下发会话 Cookie 的时间（滑动续期用） */
+  cookieRenewedAt?: number;
   lastRefreshCheckAt: number;
   refreshToken?: string;
   user?: BiuMonitoringUser;
@@ -202,6 +214,61 @@ export class WebSessionStore {
   private readonly randomToken: () => string;
   private readonly sessionTtlMs: number;
   private readonly sessions = new Map<string, WebSessionRecord>();
+  private persistence?: SessionPersistence;
+  private persistTimer?: ReturnType<typeof setTimeout>;
+  private persistChain: Promise<void> = Promise.resolve();
+  private dirty = false;
+
+  /** 挂载磁盘持久化：先载入已有会话，之后任何变更都防抖落盘。 */
+  async enablePersistence(persistence: SessionPersistence): Promise<number> {
+    const entries = (await persistence.load()) ?? [];
+    const now = this.now();
+    for (const entry of entries) {
+      const restored = restoreEntry(entry, now);
+      if (restored) this.sessions.set(restored.key, restored.record);
+    }
+    this.persistence = persistence;
+    return this.sessions.size;
+  }
+
+  /** 立即把待写入的变更落盘（进程退出前调用）。 */
+  async flush(): Promise<void> {
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+    this.persistTimer = undefined;
+    if (!this.persistence || !this.dirty) return this.persistChain;
+    this.dirty = false;
+    const persistence = this.persistence;
+    const entries = [...this.sessions].map(([key, record]) => serializeEntry(key, record));
+    this.persistChain = this.persistChain
+      .then(() => persistence.save(entries))
+      .catch(error => {
+        this.dirty = true;
+        console.warn("[web-auth] failed to persist sessions", error);
+      });
+    return this.persistChain;
+  }
+
+  private markDirty() {
+    if (!this.persistence) return;
+    this.dirty = true;
+    if (this.persistTimer) return;
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = undefined;
+      void this.flush();
+    }, PERSIST_DEBOUNCE_MS);
+    this.persistTimer.unref?.();
+  }
+
+  /** 该会话的浏览器 Cookie 是否到了重新下发的时间（让浏览器端 Max-Age 也滑动）。 */
+  consumeCookieRenewal(session: WebSessionRecord): { maxAgeSeconds: number } | undefined {
+    const now = this.now();
+    if (session.cookieRenewedAt !== undefined && now - session.cookieRenewedAt < COOKIE_RENEW_INTERVAL_MS) {
+      return undefined;
+    }
+    session.cookieRenewedAt = now;
+    this.markDirty();
+    return { maxAgeSeconds: this.sessionTtlMs / 1000 };
+  }
 
   constructor(options: WebSessionStoreOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -227,9 +294,11 @@ export class WebSessionStore {
       lastAccessAt: now,
       // QR 登录刚经过一次服务端身份校验，可从这里开始计算下一次 Cookie 状态检查。
       lastRefreshCheckAt: now,
+      cookieRenewedAt: now,
       refreshToken: input.refreshToken,
       ...(input.user ? { user: input.user } : {}),
     });
+    this.markDirty();
 
     return {
       cookieHeader: serializeWebSessionCookie(token, this.sessionTtlMs / 1000),
@@ -248,10 +317,14 @@ export class WebSessionStore {
     const now = this.now();
     if (session.expiresAt <= now) {
       this.sessions.delete(key);
+      this.markDirty();
       return undefined;
     }
 
+    // 滑动有效期：用一次顺延一次；落盘节流，避免每个请求都写盘
+    if (now - session.lastAccessAt >= TOUCH_PERSIST_INTERVAL_MS) this.markDirty();
     session.lastAccessAt = now;
+    session.expiresAt = now + this.sessionTtlMs;
     return { session, sessionId: key };
   }
 
@@ -277,6 +350,7 @@ export class WebSessionStore {
     if (update.cookies) session.cookies = mergeBilibiliCookies(session.cookies.values(), update.cookies, this.now());
     if (update.refreshToken !== undefined) session.refreshToken = update.refreshToken;
     if (update.user !== undefined) session.user = update.user ?? undefined;
+    this.markDirty();
     return true;
   }
 
@@ -286,24 +360,29 @@ export class WebSessionStore {
   ): boolean {
     const session = this.sessions.get(sessionId);
     if (!session || session.expiresAt <= this.now()) {
-      this.sessions.delete(sessionId);
+      if (this.sessions.delete(sessionId)) this.markDirty();
       return false;
     }
 
     if (update.cookies) session.cookies = mergeBilibiliCookies(session.cookies.values(), update.cookies, this.now());
     if (update.refreshToken !== undefined) session.refreshToken = update.refreshToken;
     if (update.user !== undefined) session.user = update.user ?? undefined;
+    this.markDirty();
     return true;
   }
 
   destroySession(request: RequestWithHeaders): boolean {
     const token = parseCookieHeader(requestCookieHeader(request)).get(WEB_SESSION_COOKIE_NAME);
     if (!token || !SESSION_TOKEN_PATTERN.test(token)) return false;
-    return this.sessions.delete(hashToken(token));
+    const removed = this.sessions.delete(hashToken(token));
+    if (removed) this.markDirty();
+    return removed;
   }
 
   destroySessionById(sessionId: string): boolean {
-    return this.sessions.delete(sessionId);
+    const removed = this.sessions.delete(sessionId);
+    if (removed) this.markDirty();
+    return removed;
   }
 
   get size(): number {
@@ -314,7 +393,27 @@ export class WebSessionStore {
   private deleteExpired() {
     const now = this.now();
     for (const [key, session] of this.sessions) {
-      if (session.expiresAt <= now) this.sessions.delete(key);
+      if (session.expiresAt <= now) {
+        this.sessions.delete(key);
+        this.markDirty();
+      }
     }
   }
+}
+
+interface PersistedEntry {
+  key: string;
+  record: Omit<WebSessionRecord, "cookies"> & { cookies: BilibiliCookie[] };
+}
+
+function serializeEntry(key: string, record: WebSessionRecord): PersistedEntry {
+  return { key, record: { ...record, cookies: [...record.cookies.values()] } };
+}
+
+function restoreEntry(entry: unknown, now: number): { key: string; record: WebSessionRecord } | undefined {
+  const { key, record } = (entry ?? {}) as Partial<PersistedEntry>;
+  if (typeof key !== "string" || !/^[a-f0-9]{64}$/.test(key) || !record || typeof record !== "object") return undefined;
+  if (typeof record.expiresAt !== "number" || record.expiresAt <= now || !Array.isArray(record.cookies))
+    return undefined;
+  return { key, record: { ...record, cookies: cloneCookies(record.cookies, now) } };
 }

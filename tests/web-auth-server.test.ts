@@ -271,7 +271,8 @@ describe("Web server session store", () => {
     const firstResponse = createResponse();
     const first = await resolver(cookieRequest(SESSION_TOKEN_A), firstResponse.response);
     expect(first?.cookieHeaderFor(API_TARGET)).toContain("SESSDATA=expired");
-    expect(firstResponse.headers.has("set-cookie")).toBe(false);
+    // 会话仍有效：可能顺带下发续期 Cookie（滑动有效期），但绝不能是清除
+    expect(String(firstResponse.headers.get("set-cookie") ?? "")).not.toContain("Max-Age=0");
     await vi.waitFor(() => expect(store.size).toBe(0));
 
     const nextResponse = createResponse();
