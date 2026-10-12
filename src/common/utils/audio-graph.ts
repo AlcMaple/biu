@@ -1,3 +1,4 @@
+import { isWeb } from "@/platform/detect";
 import { audio } from "@/store/play-list";
 
 /**
@@ -97,8 +98,17 @@ export const resumeAudioGraph = () => {
   }
 };
 
-/** 获取频谱分析节点（波形可视化用）。图未就绪时返回 null。 */
+/**
+ * Android 浏览器：纯装饰性的可视化不去建图。
+ * createMediaElementSource 一旦建好就无法撤销，音频从此走 AudioContext——后台里 AudioContext
+ * 容易被挂起（静音），也更像「非媒体播放」，在激进杀后台的机型上更容易被清掉。
+ * 用户主动开了音量增强（setVolumeBoost）时才建图，此后频谱可顺带使用。
+ */
+const isAndroidBrowser = isWeb && typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+/** 获取频谱分析节点（波形可视化用）。图未就绪（或在 Android 浏览器上被刻意跳过）时返回 null。 */
 export const getAnalyser = (): AnalyserNode | null => {
+  if (isAndroidBrowser && !audioContext) return null;
   ensureAudioGraph();
   return analyserNode;
 };

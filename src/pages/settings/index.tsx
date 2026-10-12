@@ -6,10 +6,11 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import ScrollContainer from "@/components/scroll-container";
-import platform from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useSettings } from "@/store/settings";
 
+import BackgroundPlayGuide from "./background-play-guide";
 import MenuSettings from "./menu-settings";
 import ProxySettings from "./proxy-settings";
 import ShortcutSettingsPage from "./shortcut-settings";
@@ -150,6 +151,11 @@ const SettingsPage = () => {
             {!isMobileLayout && (
               <Tab key="shortcut" title="快捷键设置">
                 <ShortcutSettingsPage />
+              </Tab>
+            )}
+            {isWeb && isMobileLayout && (
+              <Tab key="background-play" title="后台播放">
+                <BackgroundPlayGuide />
               </Tab>
             )}
             <Tab key="proxy" title="代理设置">

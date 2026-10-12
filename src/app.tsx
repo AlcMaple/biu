@@ -5,6 +5,7 @@ import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import moment from "moment";
 
 import platform, { isWeb, log } from "@/platform";
+import { installWebLifecycleDiagnostics } from "@/platform/web-lifecycle-diagnostics";
 
 import { useIsMobileLayout } from "./common/hooks/use-responsive";
 import { getCookitFromBSite } from "./common/utils/cookie";
@@ -15,6 +16,7 @@ import {
   shouldHandleSpaceAsPlayback,
 } from "./common/utils/focus";
 import { toggleMiniMode } from "./common/utils/mini-player";
+import { installPwaPromptCapture } from "./common/utils/pwa-install";
 import { mapKeyToElectronAccelerator } from "./common/utils/shortcut";
 import Theme from "./components/theme";
 import routes from "./routes";
@@ -208,6 +210,12 @@ export function App() {
       removeListener();
     };
   }, [setUpdate]);
+
+  useEffect(() => {
+    if (!isWeb) return;
+    installWebLifecycleDiagnostics();
+    installPwaPromptCapture();
+  }, []);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
