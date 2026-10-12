@@ -4,6 +4,7 @@ import { addToast } from "@heroui/react";
 import { RiHeart3Fill, RiHeart3Line, RiHeartPulseFill, RiSparklingLine } from "@remixicon/react";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
+import Image from "@/components/image";
 import { restoreSession, useHeartbeat } from "@/store/heartbeat";
 import { useHeartbeatFx } from "@/store/heartbeat-fx";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -192,7 +193,15 @@ const Heartbeat = () => {
           />
           <div className="bg-content2 absolute inset-[27%] overflow-hidden rounded-full ring-4 ring-black/70">
             {cover ? (
-              <img src={cover} alt={title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <Image
+                key={cover}
+                removeWrapper
+                radius="none"
+                src={cover}
+                alt={title}
+                params="672w_378h_1c.avif"
+                classNames={{ img: "h-full w-full object-cover" }}
+              />
             ) : (
               <div className="text-primary flex h-full w-full items-center justify-center">
                 <RiHeartPulseFill size={40} />
