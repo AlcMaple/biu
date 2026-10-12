@@ -10,6 +10,13 @@ import {
 
 import { isWeb } from "@/platform";
 
+/**
+ * 触屏设备（手机 / 平板）：滑动时浏览器工具栏收放会让视口高度逐帧变化，自定义滚动条的手柄随之
+ * 不停重算、闪烁；触屏本来也不需要常驻的滚动条，所以直接不显示。
+ */
+const isTouchPrimary =
+  typeof window !== "undefined" && window.matchMedia?.("(hover: none) and (pointer: coarse)").matches === true;
+
 const ScrollContainer = ({
   ref,
   options,
@@ -63,6 +70,7 @@ const ScrollContainer = ({
           theme: "os-theme-light",
           ...customScrollbars,
           ...(isWeb ? { autoHide: "never" as const } : {}),
+          ...(isTouchPrimary ? { visibility: "hidden" as const } : {}),
         },
       }}
       events={{

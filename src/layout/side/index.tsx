@@ -166,7 +166,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
           classNames={{ base: "w-[260px] max-w-[72vw]" }}
         >
           <DrawerContent>
-            <DrawerBody className="flex flex-col gap-0 p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
+            <DrawerBody className="flex flex-col gap-0 p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[var(--safe-bottom)] pl-[env(safe-area-inset-left)]">
               <Logo isCollapsed={false} />
               <ScrollContainer className="min-h-0 flex-1 px-4 pb-2">
                 <DefaultMenus isCollapsed={false} onOpenAddFavorite={handleOpenAddFavorite} />

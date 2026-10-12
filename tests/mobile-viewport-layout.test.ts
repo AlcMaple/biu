@@ -47,7 +47,12 @@ describe("mobile viewport height chain", () => {
 
     expect(html).toContain("viewport-fit=cover");
     expect(layout).toContain("h-[calc(4rem+env(safe-area-inset-top))]");
-    expect(layout).toContain("h-[calc(88px+env(safe-area-inset-bottom))]");
+    // 底部安全区经 --safe-bottom：浏览器标签页里是常量，避免 iOS 工具栏收放时 env() 逐帧抖动
+    expect(layout).toContain("h-[calc(88px+var(--safe-bottom))]");
+    expect(layout).not.toContain("env(safe-area-inset-bottom)");
+    const css = await readFile(path.resolve(process.cwd(), "src/app.css"), "utf8");
+    expect(css).toContain("--safe-bottom: env(safe-area-inset-bottom");
+    expect(css).toMatch(/display-mode: browser[\s\S]*--safe-bottom: 10px/);
     expect(layout.match(/<Outlet\s*\/>/g)).toHaveLength(1);
     expect(layout).toContain('<div className="min-h-0 flex-1 overflow-hidden">');
   });

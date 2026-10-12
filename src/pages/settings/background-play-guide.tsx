@@ -73,7 +73,50 @@ const BRAND_GUIDES: BrandGuide[] = [
   },
 ];
 
+const isIOS =
+  typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+const isIOSChrome = typeof navigator !== "undefined" && /CriOS/i.test(navigator.userAgent);
+
+const IOSGuide = () => (
+  <div className="space-y-5 py-2">
+    <section className="space-y-2">
+      <h3 className="text-medium font-semibold">iPhone / iPad 一般不需要设置</h3>
+      <p className="text-small text-default-500">
+        iOS 对后台音频很友好：播放中切走或锁屏，音乐会继续播放，不需要像部分 Android 手机那样给它放行。
+      </p>
+    </section>
+    <section className="space-y-2">
+      <h3 className="text-medium font-semibold">想要像 App 一样全屏打开？（可选）</h3>
+      {isIOSChrome && (
+        <p className="text-small text-warning">
+          你现在用的是 iOS 版 Chrome，它的分享菜单里没有「添加到主屏幕」。请改用 Safari 打开本页再操作。
+        </p>
+      )}
+      <ol className="text-small text-default-600 list-decimal space-y-1.5 pl-5">
+        <li>用 Safari 打开 Biu，点底部工具栏的「分享」按钮。</li>
+        <li>在菜单里往下找到「添加到主屏幕」（在列表较靠下的位置，需要上滑），点它。</li>
+        <li>确认名称后点「添加」，之后从主屏幕图标打开，就是没有浏览器工具栏的全屏模式。</li>
+      </ol>
+    </section>
+    <section className="space-y-1">
+      <h3 className="text-medium font-semibold">播放被打断？</h3>
+      <p className="text-small text-default-500">
+        来电、闹钟或其他 App 抢占音频时会暂停，处理完后在通知中心 / 锁屏的媒体控件里点播放，或回到 Biu
+        再点一下播放即可。
+      </p>
+    </section>
+  </div>
+);
+
 const BackgroundPlayGuide = () => {
+  if (isIOS) return <IOSGuide />;
+  return <AndroidGuide />;
+};
+
+const AndroidGuide = () => {
   const [canInstall, setCanInstall] = useState(canPromptPwaInstall());
   const standalone = isRunningStandalone();
 

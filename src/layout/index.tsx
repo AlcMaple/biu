@@ -89,7 +89,7 @@ const Layout = () => {
           </div>
           <div
             className={clx("relative z-50 w-full flex-none shadow-2xl", {
-              "h-[calc(88px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]": isMobileLayout,
+              "h-[calc(88px+var(--safe-bottom))] pb-[var(--safe-bottom)]": isMobileLayout,
               "h-[88px]": !isMobileLayout,
             })}
           >

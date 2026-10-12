@@ -150,7 +150,7 @@ const PlayListDrawer = () => {
         backdrop: "z-200 window-no-drag",
         wrapper: "z-200 window-no-drag",
         base: isMobileLayout
-          ? "data-[placement=right]:mr-[env(safe-area-inset-right)] data-[placement=right]:mb-[calc(88px+env(safe-area-inset-bottom))] w-4/5 max-w-[360px]"
+          ? "data-[placement=right]:mr-[env(safe-area-inset-right)] data-[placement=right]:mb-[calc(88px+var(--safe-bottom))] w-4/5 max-w-[360px]"
           : "data-[placement=right]:mb-22",
       }}
     >
