@@ -31,7 +31,7 @@ export const toSeconds = (d: number | string | undefined | null): number => {
  * 这是过滤噪声的主力（B 站音乐区搜索里大量 40 分钟循环歌单、reaction、直拍、测评）。
  */
 const TITLE_BLOCK =
-  /(合集|歌单|串烧|联唱|medley|mashup|混剪|直拍|翻跳|对比|测评|评测|开箱|拆箱|vlog|盘点|排行|top\s*\d|一小时|1\s*小时|半小时|\d{2,}\s*首|循环\s*歌|\bloop\b|repeat|教学|教程|扒谱|reaction|react\b|解说|讲解|直播|录播|回放|舞台|全专|专辑|电台|采访|剪辑|同台|演唱会|演唱會|the\s*first\s*take|ファースト・?テイク)/i;
+  /(合集|歌单|串烧|联唱|medley|mashup|混剪|直拍|翻跳|对比|测评|评测|开箱|拆箱|vlog|盘点|排行|top\s*\d|一小时|1\s*小时|半小时|\d{2,}\s*首|循环\s*歌|\bloop\b|repeat|教学|教程|单簧管|番外|小剧场|扒谱|reaction|react\b|解说|讲解|直播|录播|回放|舞台|全专|专辑|电台|采访|剪辑|同台|演唱会|演唱會|the\s*first\s*take|ファースト・?テイク)/i;
 
 /**
  * 中文听歌 reaction 常不写 reaction / 直播 / 切片，只用「让某人听某歌」「听完有什么反应」包装标题。
