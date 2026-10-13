@@ -86,7 +86,7 @@ const formatMediaError = (err: unknown, source: "mic" | "system") => {
 
   // 系统声音捕获需要屏幕录制权限（macOS）或桌面视频源
   if (source === "system") {
-    if (name === "NotAllowedError" || /Could not start video source/i.test(message)) {
+    if (name === "NotAllowedError") {
       return isMac
         ? "没有屏幕与系统录音权限。请在「系统设置 → 隐私与安全性 → 屏幕与系统录音」中点「+」添加本应用（开发环境下是名为 Electron 的应用）并打开开关，然后完全退出应用重开"
         : "无法捕获系统音频，请检查屏幕录制/音频权限设置后重试";
@@ -352,7 +352,8 @@ const ShazamModal = () => {
           });
         } else {
           // 主进程 setDisplayMediaRequestHandler 会自动选主屏 + loopback 音频，不弹系统选择器
-          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: { width: 1, height: 1 } });
+          // 不加分辨率约束：ScreenCaptureKit 对 1x1 之类的约束会直接报 "Could not start video source"
+          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
           stream.getVideoTracks().forEach(t => t.stop());
           if (stream.getAudioTracks().length === 0) {
             stream.getTracks().forEach(t => t.stop());
@@ -368,6 +369,7 @@ const ShazamModal = () => {
       } catch (err) {
         recorder.stop();
         if (session !== sessionRef.current) return;
+        log.warn("[shazam-modal] capture failed", source, err instanceof Error ? `${err.name}: ${err.message}` : err);
         setError(formatMediaError(err, source));
         setNeedScreenPermission(isMac && source === "system" && err instanceof Error && err.name === "NotAllowedError");
         setState("error");

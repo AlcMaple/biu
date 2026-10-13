@@ -69,6 +69,9 @@ export default defineConfig(({ command }) => {
       },
     },
     output: {
+      // 听歌识曲指纹组件（网易云 afp.wasm）按需以 <script> 注入，不进主包。
+      // 不放 public/：Electron 开发模式从 dist/web 读文件，而 dev 的 writeToDisk 不会落盘 public 目录。
+      copy: [{ from: "./vendor/afp", to: "afp" }],
       distPath: {
         root: isDemoTarget ? "./docs/responsive-prototype/runtime" : "./dist/web",
       },
