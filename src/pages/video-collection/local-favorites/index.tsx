@@ -530,7 +530,7 @@ const LocalFavorites = () => {
             </DropdownMenu>
           </Dropdown>
         </div>
-        <div className={isMobileLayout ? "flex min-w-0 items-center gap-2" : "flex items-center space-x-2"}>
+        <div className={isMobileLayout ? "flex w-full min-w-0 items-center gap-2" : "flex items-center space-x-2"}>
           {isMobileLayout && tagFilter}
           {!isMobileLayout && invalidButton}
           {!isMobileLayout && tagFilter}

@@ -15,16 +15,8 @@ const SearchWithSort = ({ onKeywordSearch, orderOptions, order, onOrderChange }:
   const hasOrderOptions = Boolean(orderOptions?.length);
 
   return (
-    <div
-      className={
-        isMobileLayout
-          ? hasOrderOptions
-            ? "flex min-w-0 flex-1 flex-col items-stretch gap-2"
-            : "flex min-w-0 flex-1 items-center"
-          : "flex items-center space-x-2"
-      }
-    >
-      <SearchButton onSearch={onKeywordSearch} className={isMobileLayout ? "w-full min-w-0" : undefined} />
+    <div className={isMobileLayout ? "flex min-w-0 flex-1 items-center gap-2" : "flex items-center space-x-2"}>
+      <SearchButton onSearch={onKeywordSearch} className={isMobileLayout ? "min-w-0 flex-1" : undefined} />
       {hasOrderOptions && (
         <Select
           radius="md"
@@ -42,9 +34,11 @@ const SearchWithSort = ({ onKeywordSearch, orderOptions, order, onOrderChange }:
             color: "primary",
             hideSelectedIcon: true,
           }}
-          className={isMobileLayout ? "w-full max-w-none min-w-0" : "max-w-xs"}
+          aria-label="排序方式"
+          className={isMobileLayout ? "w-[112px] max-w-none flex-none" : "max-w-xs"}
           classNames={{
             innerWrapper: "w-20",
+            popoverContent: isMobileLayout ? "min-w-[132px]" : undefined,
           }}
         >
           {item => (

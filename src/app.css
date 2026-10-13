@@ -108,3 +108,12 @@ body {
 :root[data-hover-effects="enabled"] .os-scrollbar {
   --os-handle-bg-hover: hsl(var(--heroui-default-400) / 100%);
 }
+
+/* iOS 聚焦字号小于 16px 的输入框会自动放大页面且不会缩回；只在触屏上抬到 16px，桌面外观不变 */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

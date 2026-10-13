@@ -23,28 +23,35 @@ const HistorySearch = ({ onSearch, onDateRangeChange }: Props) => {
     { wait: 500 },
   );
 
+  const input = (
+    <Input
+      placeholder="搜索标题/UP主名称"
+      startContent={<RiSearchLine size={16} />}
+      value={keyword}
+      onValueChange={setKeyword}
+      onKeyDown={e => e.key === "Enter" && handleSearch(keyword)}
+      isClearable
+      onClear={() => {
+        handleSearch("");
+      }}
+      radius="md"
+      className={isMobileLayout ? "min-w-0 flex-1" : "max-w-50 flex-auto"}
+      classNames={{ inputWrapper: "h-10" }}
+    />
+  );
+
+  if (isMobileLayout) {
+    return (
+      <div className="w-full py-2">
+        <DateRangePicker onDateRangeChange={onDateRangeChange}>{input}</DateRangePicker>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={
-        isMobileLayout
-          ? "flex w-full flex-col items-stretch gap-2 py-2"
-          : "flex w-full items-center justify-between space-x-2 py-2"
-      }
-    >
+    <div className="flex w-full items-center justify-between space-x-2 py-2">
       <DateRangePicker onDateRangeChange={onDateRangeChange} />
-      <Input
-        placeholder="搜索标题/UP主名称"
-        startContent={<RiSearchLine size={16} />}
-        value={keyword}
-        onValueChange={setKeyword}
-        onKeyDown={e => e.key === "Enter" && handleSearch(keyword)}
-        isClearable
-        onClear={() => {
-          handleSearch("");
-        }}
-        radius="md"
-        className={isMobileLayout ? "w-full" : "max-w-50 flex-auto"}
-      />
+      {input}
     </div>
   );
 };

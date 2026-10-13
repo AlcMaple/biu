@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router";
 
 import { App } from "./app";
+import { installIosKeyboardFocus } from "./common/utils/ios-keyboard-focus";
 import { isWeb } from "./platform/detect";
 
 async function bootstrap() {
@@ -17,6 +18,8 @@ async function bootstrap() {
 
   if (isWeb) document.documentElement.dataset.platform = "web";
   else document.documentElement.dataset.hoverEffects = "enabled";
+
+  installIosKeyboardFocus();
 
   createRoot(document.getElementById("root") as Element, {
     onRecoverableError: captureRecoverableError
