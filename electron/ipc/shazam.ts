@@ -44,17 +44,12 @@ export function registerShazamHandlers() {
    */
   app.whenReady().then(() => {
     session.defaultSession.setDisplayMediaRequestHandler(
-      (_request, callback) => {
-        desktopCapturer
-          .getSources({ types: ["screen"] })
-          .then(sources => {
-            if (!sources.length) return callback({});
-            callback({ video: sources[0], audio: "loopback" });
-          })
-          .catch(err => {
-            log.error("[shazam] display media request error:", err);
-            callback({});
-          });
+      (request, callback) => {
+        // 视频源直接给发起请求的窗口自身：识曲只要音频，而 macOS 上屏幕视频源（screen:x:0）
+        // 经 ScreenCaptureKit 启动经常报 "Could not start video source"（权限已授予也一样），连带音频也拿不到。
+        // 窗口自身做视频源不经过屏幕捕获，loopback 音频照常采集整机系统声音。
+        if (!request.frame) return callback({});
+        callback({ video: request.frame, audio: "loopback" });
       },
       { useSystemPicker: false },
     );

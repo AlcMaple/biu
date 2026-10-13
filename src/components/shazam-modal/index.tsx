@@ -160,7 +160,6 @@ const ShazamModal = () => {
 
   const isPlaying = usePlayList(s => s.isPlaying);
   const togglePlay = usePlayList(s => s.togglePlay);
-  const wasPlayingRef = useRef(false);
 
   const recorderRef = useRef<PcmRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -173,13 +172,6 @@ const ShazamModal = () => {
   const failuresRef = useRef<{ service: number; total: number }>({ service: 0, total: 0 });
   const lyricsReqRef = useRef(0);
   const maxPeakRef = useRef(0);
-
-  const restorePlayback = useCallback(() => {
-    if (wasPlayingRef.current) {
-      togglePlay();
-      wasPlayingRef.current = false;
-    }
-  }, [togglePlay]);
 
   /** 停止采集、释放麦克风（不使本轮已发出的请求失效） */
   const stopCapture = useCallback(() => {
@@ -230,10 +222,9 @@ const ShazamModal = () => {
       setCandidates(list);
       setSelected(0);
       setState("success");
-      restorePlayback();
       void loadLyrics(list[0]);
     },
-    [stopCapture, restorePlayback, loadLyrics],
+    [stopCapture, loadLyrics],
   );
 
   const finishWithoutMatch = useCallback(() => {
@@ -250,8 +241,7 @@ const ShazamModal = () => {
       setError("没有识别到歌曲。请靠近音源、减少环境噪声后重试（曲库中没有版权的歌曲也无法识别）");
     }
     setState("error");
-    restorePlayback();
-  }, [showResult, stopCapture, restorePlayback]);
+  }, [showResult, stopCapture]);
 
   const matchNetease = useCallback(
     async (session: number, seconds: number, isLast: boolean) => {
@@ -338,7 +328,8 @@ const ShazamModal = () => {
         return;
       }
 
-      wasPlayingRef.current = isPlaying;
+      // 与网易云一致：开始识别即暂停本应用自己的播放（不影响其他应用的声音），
+      // 识别结束后保持暂停，由用户手动恢复
       if (isPlaying) togglePlay();
 
       let stream: MediaStream;
@@ -373,7 +364,6 @@ const ShazamModal = () => {
         setError(formatMediaError(err, source));
         setNeedScreenPermission(isMac && source === "system" && err instanceof Error && err.name === "NotAllowedError");
         setState("error");
-        restorePlayback();
         return;
       }
 
@@ -401,7 +391,7 @@ const ShazamModal = () => {
         }
       }, 1000);
     },
-    [isPlaying, togglePlay, restorePlayback, matchNetease, matchShazam],
+    [isPlaying, togglePlay, matchNetease, matchShazam],
   );
 
   const reset = useCallback(() => {
@@ -415,12 +405,10 @@ const ShazamModal = () => {
 
   const handleCancel = () => {
     reset();
-    restorePlayback();
   };
 
   const handleClose = () => {
     reset();
-    restorePlayback();
     onClose();
   };
 
