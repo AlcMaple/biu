@@ -32,6 +32,7 @@ const Layout = () => {
   // 抽屉在断点切换时带着 open 状态卸载，会被那次回调反手切回 true —— 拉宽再拉窄就凭空弹出抽屉。
   const [isSideDrawerOpen, setSideDrawerOpen] = useState(false);
   const openSideDrawer = useCallback(() => setSideDrawerOpen(true), []);
+  const closeSideDrawer = useCallback(() => setSideDrawerOpen(false), []);
 
   useEffect(() => {
     void updateUser().catch(error => {
@@ -60,7 +61,7 @@ const Layout = () => {
         if (isWeb) window.__biuMonitoring?.captureException(error, info.componentStack ?? undefined);
       }}
     >
-      <SideDrawerContext.Provider value={{ openSideDrawer }}>
+      <SideDrawerContext.Provider value={{ openSideDrawer, closeSideDrawer }}>
         {/*
          * 移动与桌面共用同一棵元素树：SideNav 在移动形态下渲染的是抽屉（Portal，不占布局），
          * 所以只需切换类名而不是切换两套 JSX。分成两棵树会让断点切换时 Outlet 整体重挂，

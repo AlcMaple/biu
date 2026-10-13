@@ -5,6 +5,8 @@ import { Avatar, Button, Tooltip } from "@heroui/react";
 import clx from "classnames";
 import { twMerge } from "tailwind-merge";
 
+import { useSideDrawer } from "@/layout/side-drawer-context";
+
 export interface MenuItemProps {
   /** 菜单项标签 */
   title: string;
@@ -39,9 +41,13 @@ const MenuItem: React.FC<MenuItemProps> = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const sideDrawer = useSideDrawer();
 
   const handlePress = () => {
-    if (href) navigate(href);
+    if (href) {
+      navigate(href);
+      sideDrawer?.closeSideDrawer();
+    }
     onPress?.();
   };
 

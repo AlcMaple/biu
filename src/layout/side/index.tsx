@@ -163,7 +163,7 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
           onOpenChange={onDrawerOpenChange}
           placement="left"
           hideCloseButton
-          classNames={{ base: "w-[260px] max-w-[72vw]" }}
+          classNames={{ base: "w-[220px] max-w-[64vw]" }}
         >
           <DrawerContent>
             <DrawerBody className="flex flex-col gap-0 p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[var(--safe-bottom)] pl-[env(safe-area-inset-left)]">

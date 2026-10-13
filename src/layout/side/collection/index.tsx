@@ -23,6 +23,7 @@ import {
 } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
+import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { getAllFavMedia, getLocalFavMedia, getLocalFolderLatestCover } from "@/common/utils/fav";
 import { type ContextMenuItem } from "@/components/context-menu";
 import MenuGroup from "@/components/menu/menu-group";
@@ -123,7 +124,9 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
 
   const filteredCollectedFavorites = collectedFavorites.filter(item => !hiddenMenuKeys.includes(String(item.id)));
   const filteredCreatedFavorites = createdFavorites.filter(item => !hiddenMenuKeys.includes(String(item.id)));
-  const isDragEnabled = !isCollapsed;
+  // 手机抽屉里条目的 touch-action: none 会让手指落在条目上时无法滚动列表（只有缝隙能滚），所以手机形态不开拖拽排序
+  const isMobileLayout = useIsMobileLayout();
+  const isDragEnabled = !isCollapsed && !isMobileLayout;
   const isCreatedDragEnabled = isDragEnabled && !createdFolded;
   const isCollectedDragEnabled = isDragEnabled && !collectedFolded;
   const sensors = useSensors(
