@@ -1,4 +1,4 @@
-import axios, { type AxiosAdapter, type CreateAxiosDefaults } from "axios";
+import axios, { isAxiosError, type AxiosAdapter, type CreateAxiosDefaults } from "axios";
 
 import { isOfflineDemo } from "@/common/offline-demo";
 import { isNativeMobile, isWeb } from "@/platform/detect";
@@ -61,9 +61,16 @@ memberRequest.interceptors.request.use(requestInterceptors);
 
 apiRequest.interceptors.response.use(geetestInterceptors);
 
-axiosInstance.interceptors.response.use(res => res.data);
-biliRequest.interceptors.response.use(res => res.data);
-apiRequest.interceptors.response.use(res => res.data);
-passportRequest.interceptors.response.use(res => res.data);
-searchRequest.interceptors.response.use(res => res.data);
-memberRequest.interceptors.response.use(res => res.data);
+// axios 原文「timeout of 10000ms exceeded」会被页面直接 toast 出来，用户看不懂也分不清是断网还是服务慢
+const describeRequestError = (error: unknown) => {
+  if (isAxiosError(error) && (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")) {
+    error.message = isWeb
+      ? "服务器响应超时：可能正在缓冲音频或网络较慢，稍后再试"
+      : "请求超时：B 站响应较慢，请稍后再试";
+  }
+  return Promise.reject(error);
+};
+
+for (const instance of [axiosInstance, biliRequest, apiRequest, passportRequest, searchRequest, memberRequest]) {
+  instance.interceptors.response.use(res => res.data, describeRequestError);
+}

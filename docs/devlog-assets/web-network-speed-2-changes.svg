@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="637" viewBox="0 0 1160 637" role="img" aria-labelledby="title">
+  <title id="title">网页版网络（2/3）：这次改了什么</title>
+  <defs><style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style></defs>
+  <rect x="1" y="1" width="1158" height="635" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" class="title" fill="#282529">网页版网络（2/3）：这次改了什么</text>
+  <text x="34" y="64" class="subtitle" fill="#756f73">结论：文字类数据压缩到约 1/3，音频不再抢占接口的线路，收藏夹再次打开立即显示。</text>
+  <rect x="24" y="84" width="1112" height="163" rx="10" fill="#edf7f1" stroke="#7fad91" />
+  <text x="44" y="112" class="block" fill="#282529">① 三处改动，各管一个瓶颈</text>
+  <rect x="44" y="128" width="344" height="99" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58" y="151" class="card-t" fill="#316247">文字内容先压缩再发</text>
+  <text x="58" y="172" class="body" fill="#316247">页面脚本 589 KB → 205 KB</text>
+  <text x="58" y="191" class="body" fill="#316247">收藏夹一页 21 KB → 7.9 KB</text>
+  <text x="58" y="210" class="body" fill="#316247">（实测本站真实数据；音频本身已压缩，不再处理）</text>
+  <rect x="408" y="128" width="344" height="99" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="422" y="151" class="card-t" fill="#316247">音频匀速发送</text>
+  <text x="422" y="172" class="body" fill="#316247">开头 15 秒的量全速发，起播和拖动不受影响；</text>
+  <text x="422" y="191" class="body" fill="#316247">之后按「码率的 2 倍」发，最多 160 KB/s，</text>
+  <text x="422" y="210" class="body" fill="#316247">剩下的带宽留给接口。</text>
+  <rect x="772" y="128" width="344" height="99" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="786" y="151" class="card-t" fill="#316247">收藏夹先显示、后对齐</text>
+  <text x="786" y="172" class="body" fill="#316247">再次打开：立刻显示上次的列表和播放量，</text>
+  <text x="786" y="191" class="body" fill="#316247">同时后台向 B 站重拉并整页替换；</text>
+  <text x="786" y="210" class="body" fill="#316247">下一页提前取好，滚到底不再等待。</text>
+  <rect x="24" y="267" width="1112" height="163" rx="10" fill="#eef4f8" stroke="#91adc1" />
+  <text x="44" y="295" class="block" fill="#282529">② 打开收藏夹时，用户看到的 / 背后在做的</text>
+  <rect x="44" y="311" width="344" height="99" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="58" y="334" class="card-t" fill="#36566d">第一次打开</text>
+  <text x="58" y="355" class="body" fill="#36566d">看到：短暂加载，然后每一行都带播放量出现</text>
+  <text x="58" y="374" class="body" fill="#36566d">背后：取列表 → 补齐缺的播放量 → 一起显示</text>
+  <text x="58" y="393" class="body" fill="#36566d">不会先显示「-」再跳成数字</text>
+  <rect x="408" y="311" width="344" height="99" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="422" y="334" class="card-t" fill="#36566d">再次打开（同一次访问内）</text>
+  <text x="422" y="355" class="body" fill="#36566d">看到：列表瞬间出现</text>
+  <text x="422" y="374" class="body" fill="#36566d">背后：用上次的结果先显示，再向 B 站重拉；</text>
+  <text x="422" y="393" class="body" fill="#36566d">B 站那边新增的补上、删掉的消失</text>
+  <rect x="772" y="311" width="344" height="99" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="786" y="334" class="card-t" fill="#36566d">滚到底部</text>
+  <text x="786" y="355" class="body" fill="#36566d">看到：下一页直接接上</text>
+  <text x="786" y="374" class="body" fill="#36566d">背后：上一页显示后就已在后台取好；</text>
+  <text x="786" y="393" class="body" fill="#36566d">5 分钟内有效，过期就重新取</text>
+  <rect x="24" y="450" width="1112" height="163" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="44" y="478" class="block" fill="#282529">③ 边界情况</text>
+  <rect x="44" y="494" width="253" height="99" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="517" class="card-t" fill="#7a6234">在本站删除或清理失效内容</text>
+  <text x="58" y="538" class="body" fill="#7a6234">这个收藏夹的缓存立刻作废，</text>
+  <text x="58" y="557" class="body" fill="#7a6234">不会先显示被删的歌再纠正。</text>
+  <rect x="317" y="494" width="253" height="99" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="331" y="517" class="card-t" fill="#7a6234">后台重拉失败</text>
+  <text x="331" y="538" class="body" fill="#7a6234">已在显示的列表保持不动，不弹错误；</text>
+  <text x="331" y="557" class="body" fill="#7a6234">失败会记进日志，方便排查。</text>
+  <rect x="590" y="494" width="253" height="99" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="517" class="card-t" fill="#7a6234">刷新网页</text>
+  <text x="604" y="538" class="body" fill="#7a6234">缓存只存在于当前页面，刷新后清空，</text>
+  <text x="604" y="557" class="body" fill="#7a6234">按「第一次打开」走。</text>
+  <rect x="863" y="494" width="253" height="99" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="877" y="517" class="card-t" fill="#7a6234">超时提示</text>
+  <text x="877" y="538" class="body" fill="#7a6234">不再显示英文原文，改为：</text>
+  <text x="877" y="557" class="body" fill="#7a6234">「服务器响应超时：可能正在</text>
+  <text x="877" y="576" class="body" fill="#7a6234">缓冲音频或网络较慢，稍后再试」</text>
+</svg>

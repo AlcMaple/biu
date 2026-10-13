@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
 
+import { acceptsGzip, gzipBody, markGzipped } from "./compression.js";
 import { findCsrfInCookieHeader, injectCsrfIntoBody, injectCsrfIntoQuery, readCsrfFromCookieHeader } from "./csrf.js";
 import {
   ProxyRequestError,
@@ -104,6 +105,12 @@ async function proxyApiResponse(
           response.statusCode = upstream.statusCode ?? 502;
           copyUpstreamResponseHeaders(response, upstream.headers, true);
           response.setHeader("Cache-Control", "no-store");
+          if (input.acceptsGzip) {
+            const gzipped = gzipBody(transformed);
+            markGzipped(response, gzipped.length);
+            response.end(gzipped);
+            return;
+          }
           response.setHeader("Content-Length", transformed.length);
           response.end(transformed);
           return;
@@ -162,6 +169,7 @@ export function createBilibiliApiProxyHandler(options: BilibiliApiProxyHandlerOp
       }
 
       const input: UpstreamRequestInput = {
+        acceptsGzip: acceptsGzip(request),
         body,
         headers: createUpstreamRequestHeaders(request, { body, cookie: cookieHeader }),
         kind: "api",

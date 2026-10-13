@@ -6,6 +6,7 @@ import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
 import { fillFavMediaPlayCount, getAllFavMedia } from "@/common/utils/fav";
+import { favPageKey, forgetFavFolder, readFavPage, writeFavPage } from "@/common/utils/fav-page-cache";
 import { resolvePlayCount } from "@/common/utils/number";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
@@ -154,26 +155,81 @@ const Favorites = () => {
     [favFolderId],
   );
 
+  const currentQueryRef = useRef("");
+
+  // 列表接口对部分视频返回 play=0，要回查 infos 补全播放量。补全放在渲染前，保证看到的行都带播放量，
+  // 不出现先「-」再跳数字；已见过的播放量记在缓存里，第二次起不再多一次往返。
+  const fetchFilledPage = useCallback(
+    async (targetPage: number, keywordValue: string, orderValue: string) => {
+      const pageData = await fetchPageData(targetPage, keywordValue, orderValue);
+      if (!pageData) return null;
+      const medias = await fillFavMediaPlayCount(pageData.medias);
+      writeFavPage(favPageKey(String(favFolderId), orderValue, keywordValue, targetPage), medias, pageData.hasMore);
+      return { medias, hasMore: pageData.hasMore };
+    },
+    [favFolderId, fetchPageData],
+  );
+
+  // 命中缓存时立刻展示，再后台向 B 站拉新的并整页替换：B 站侧新增的会补上、删掉的会消失。
+  // 只替换第一页那一段，用户此时已经翻到的后续页保持不动
+  const revalidateFirstPage = useCallback(
+    async (query: string, keywordValue: string, orderValue: string, stale: FavMedia[]) => {
+      try {
+        const fresh = await fetchFilledPage(1, keywordValue, orderValue);
+        if (!fresh || currentQueryRef.current !== query) return;
+        const current = useFavFolderItemsStore.getState().items;
+        const freshIds = new Set(fresh.medias.map(item => item.id));
+        const rest = current.slice(stale.length).filter(item => !freshIds.has(item.id));
+        setItems([...fresh.medias, ...rest]);
+        if (current.length <= stale.length) setHasMore(fresh.hasMore);
+      } catch (error) {
+        // 已经有缓存在显示，后台刷新失败不打断用户，但要留痕
+        console.warn("[favorites] 后台刷新收藏夹失败", error);
+      }
+    },
+    [fetchFilledPage, setItems],
+  );
+
   const loadPage = useCallback(
     async (targetPage: number, keywordValue = keyword, orderValue = order) => {
+      const query = `${favFolderId}|${orderValue}|${keywordValue}`;
+      currentQueryRef.current = query;
+      const cached = readFavPage(favPageKey(String(favFolderId), orderValue, keywordValue, targetPage), targetPage);
+      if (cached) {
+        setHasMore(cached.hasMore);
+        if (targetPage === 1) {
+          setItems(cached.medias);
+          void revalidateFirstPage(query, keywordValue, orderValue, cached.medias);
+        } else {
+          appendItems(cached.medias);
+        }
+        return;
+      }
+
       setListLoading(true);
       try {
-        const pageData = await fetchPageData(targetPage, keywordValue, orderValue);
+        const pageData = await fetchFilledPage(targetPage, keywordValue, orderValue);
+        if (currentQueryRef.current !== query) return;
         if (!pageData) {
           setHasMore(false);
           return;
         }
 
-        // 列表接口对部分视频返回 play=0，回查 infos 补全播放量，避免显示为「-」
-        const medias = await fillFavMediaPlayCount(pageData.medias);
-
         setHasMore(pageData.hasMore);
         if (targetPage === 1) {
-          setItems(medias);
+          setItems(pageData.medias);
         } else {
-          appendItems(medias);
+          appendItems(pageData.medias);
+        }
+
+        // 预取下一页进缓存，滚到底时直接拿，不用再等一次往返
+        if (pageData.hasMore) {
+          void fetchFilledPage(targetPage + 1, keywordValue, orderValue).catch(error =>
+            console.warn("[favorites] 预取下一页失败", error),
+          );
         }
       } catch (error) {
+        if (currentQueryRef.current !== query) return;
         addToast({
           title: error instanceof Error ? error.message : "获取收藏夹内容失败",
           color: "danger",
@@ -183,7 +239,7 @@ const Favorites = () => {
         setListLoading(false);
       }
     },
-    [appendItems, fetchPageData, keyword, order, setItems],
+    [appendItems, favFolderId, fetchFilledPage, keyword, order, revalidateFirstPage, setItems],
   );
 
   // 初次或收藏夹变化时加载数据
@@ -208,9 +264,10 @@ const Favorites = () => {
 
   const handleRemoveItem = useCallback(
     (id: number) => {
+      forgetFavFolder(String(favFolderId));
       removeItem(id);
     },
-    [removeItem],
+    [favFolderId, removeItem],
   );
 
   const handleOrderChange = useCallback(
@@ -359,6 +416,7 @@ const Favorites = () => {
   };
 
   const clearInvalid = async () => {
+    forgetFavFolder(String(favFolderId));
     const res = await postFavResourceClean({
       media_id: Number(favFolderId),
     });

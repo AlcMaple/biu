@@ -4,6 +4,7 @@ import type { FavSelectModalData } from "@/store/modal/fav-select-modal";
 import type { PlayData } from "@/store/play-list";
 
 import { bv2av, getFavoriteResourceRid } from "@/common/utils/bv";
+import { favMediaKey, getCachedPlayCount, rememberPlayCount } from "@/common/utils/fav-page-cache";
 import { resolvePlayCount } from "@/common/utils/number";
 import { parseDuration } from "@/common/utils/time";
 import { getFavResourceIds, type FavMedia } from "@/service/fav-resource";
@@ -241,10 +242,15 @@ export const detectInvalidLocalFavItems = async (items: LocalFavItem[]) => {
  * - 存在异常项的页：每页最多触发一次 infos（≤50 个一批），与「打开收藏夹批量查失效」同等量级，不会放大风控。
  */
 export const fillFavMediaPlayCount = async (medias: FavMedia[]): Promise<FavMedia[]> => {
-  const missing = medias.filter(m => [2, 12].includes(m.type) && !m.cnt_info?.play && !m.cnt_info?.vt);
-  if (missing.length === 0) return medias;
-
   const playMap = new Map<string, number>();
+  const missing = medias.filter(m => {
+    if (![2, 12].includes(m.type) || m.cnt_info?.play || m.cnt_info?.vt) return false;
+    const cached = getCachedPlayCount(m);
+    if (cached) playMap.set(favMediaKey(m), cached);
+    return !cached;
+  });
+  if (missing.length === 0 && playMap.size === 0) return medias;
+
   const chunks = chunk(missing, 50);
   const results = await Promise.allSettled(
     chunks.map(items =>
@@ -257,6 +263,7 @@ export const fillFavMediaPlayCount = async (medias: FavMedia[]): Promise<FavMedi
       // infos 侧同样可能把播放量放在 vt（老视频取 play、新视频取 vt），两者都认
       const play = resolvePlayCount(info.cnt_info?.play, info.cnt_info?.vt);
       if (play > 0) playMap.set(`${info.id}:${info.type}`, play);
+      rememberPlayCount(info, play);
     }
   }
   if (playMap.size === 0) return medias;

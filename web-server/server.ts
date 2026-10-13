@@ -1,12 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { createReadStream } from "node:fs";
-import { realpath, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
 import { createWebApplicationHandler } from "./application.js";
+import { gzipBody, markGzipped, shouldGzip } from "./compression.js";
 import { captureWebRequestError, ensureWebRequestId, withWebRequestMonitoring } from "./monitoring.js";
 import { sendProxyJson } from "./proxy-common.js";
 
@@ -83,6 +84,8 @@ function isInsideRoot(root: string, target: string) {
 
 export async function createStaticWebHandler(staticRoot: string) {
   const root = await realpath(staticRoot);
+  // 带 hash 的产物不可变，按「路径 + mtime + 大小」缓存压缩结果，重新部署后键自然失效
+  const gzipCache = new Map<string, Buffer>();
 
   return async (request: IncomingMessage, response: ServerResponse) => {
     response.setHeader("Referrer-Policy", "no-referrer");
@@ -147,9 +150,28 @@ export async function createStaticWebHandler(staticRoot: string) {
           ? "public, max-age=31536000, immutable"
           : "no-cache",
     );
+    const contentType = CONTENT_TYPES[extension] ?? "application/octet-stream";
     response.setHeader("Content-Length", fileStat.size);
-    response.setHeader("Content-Type", CONTENT_TYPES[extension] ?? "application/octet-stream");
+    response.setHeader("Content-Type", contentType);
     response.setHeader("X-Content-Type-Options", "nosniff");
+
+    if (shouldGzip(request, contentType, fileStat.size)) {
+      try {
+        const cacheKey = `${filePath}:${fileStat.mtimeMs}:${fileStat.size}`;
+        let gzipped = gzipCache.get(cacheKey);
+        if (!gzipped) {
+          gzipped = gzipBody(await readFile(filePath));
+          if (gzipCache.size > 256) gzipCache.clear();
+          gzipCache.set(cacheKey, gzipped);
+        }
+        markGzipped(response, gzipped.length);
+        response.end(method === "HEAD" ? undefined : gzipped);
+      } catch (error) {
+        if (!response.destroyed) response.destroy(error instanceof Error ? error : undefined);
+      }
+      return;
+    }
+
     if (method === "HEAD") {
       response.end();
       return;

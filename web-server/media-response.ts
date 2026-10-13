@@ -10,12 +10,12 @@ export function isBilibiliMediaResponse(target: URL) {
 
 export function rewriteBilibiliMediaPayload(
   payload: unknown,
-  register: (target: string) => string | undefined,
+  register: (target: string, bandwidth?: number) => string | undefined,
 ): { payload: unknown; rewritten: number } {
   let rewritten = 0;
   const registered = new Map<string, string>();
 
-  const rewriteUrl = (value: unknown) => {
+  const rewriteUrl = (value: unknown, bandwidth?: number) => {
     if (typeof value !== "string") return undefined;
     const normalized = normalizeBilibiliMediaSource(value);
     if (!normalized || !isAllowedBilibiliMediaUrl(normalized)) return undefined;
@@ -23,7 +23,7 @@ export function rewriteBilibiliMediaPayload(
     const existing = registered.get(normalized);
     if (existing) return existing;
 
-    const proxyUrl = register(normalized);
+    const proxyUrl = register(normalized, bandwidth);
     if (!proxyUrl) return undefined;
     registered.set(normalized, proxyUrl);
     rewritten += 1;
@@ -35,15 +35,17 @@ export function rewriteBilibiliMediaPayload(
     if (!value || typeof value !== "object") return value;
 
     const object = value as Record<string, unknown>;
+    // DASH 音轨自带码率（bit/s），随 token 存下来给媒体限速用；music-service 的 cdns 没有，走默认速率
+    const bandwidth = typeof object.bandwidth === "number" ? object.bandwidth : undefined;
     for (const [key, child] of Object.entries(object)) {
       if (MEDIA_SINGLE_URL_KEYS.has(key)) {
-        object[key] = rewriteUrl(child) ?? "";
+        object[key] = rewriteUrl(child, bandwidth) ?? "";
         continue;
       }
 
       if (MEDIA_URL_ARRAY_KEYS.has(key)) {
         object[key] = Array.isArray(child)
-          ? child.map(item => rewriteUrl(item)).filter((item): item is string => Boolean(item))
+          ? child.map(item => rewriteUrl(item, bandwidth)).filter((item): item is string => Boolean(item))
           : [];
         continue;
       }

@@ -9,6 +9,9 @@ import type {
 import http from "node:http";
 import https from "node:https";
 import { pipeline } from "node:stream/promises";
+import { constants, createGzip } from "node:zlib";
+
+import { createMediaPacer } from "./media-pacer.js";
 
 export const BILIBILI_PROXY_REQUEST_HEADERS = {
   "Accept-Encoding": "identity",
@@ -181,10 +184,12 @@ function requestTransport(target: URL) {
 }
 
 export interface UpstreamRequestInput {
+  acceptsGzip?: boolean;
   body: Buffer;
   headers: OutgoingHttpHeaders;
   kind: ProxyKind;
   mapUpstreamForTest?: UpstreamMapper;
+  mediaRateBytes?: number;
   method: string;
   signal: AbortSignal;
   target: URL;
@@ -226,6 +231,20 @@ export async function relayUpstreamStream(
   if (input.method === "HEAD") {
     upstream.resume();
     downstream.end();
+    return;
+  }
+  if (input.kind === "api" && input.acceptsGzip && !upstream.headers["content-encoding"]) {
+    const contentType = firstHeader(upstream.headers["content-type"]);
+    if (contentType && /json|javascript|text\//i.test(contentType)) {
+      downstream.setHeader("Content-Encoding", "gzip");
+      downstream.setHeader("Vary", "Accept-Encoding");
+      downstream.removeHeader("Content-Length");
+      await pipeline(upstream, createGzip({ level: constants.Z_BEST_SPEED }), downstream, { signal: input.signal });
+      return;
+    }
+  }
+  if (input.kind === "media" && input.mediaRateBytes) {
+    await pipeline(upstream, createMediaPacer(input.mediaRateBytes), downstream, { signal: input.signal });
     return;
   }
   await pipeline(upstream, downstream, { signal: input.signal });

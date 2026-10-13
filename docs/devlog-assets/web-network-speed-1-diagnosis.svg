@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="710" viewBox="0 0 1160 710" role="img" aria-labelledby="title">
+  <title id="title">网页版网络（1/3）：慢的是线路，不是服务器</title>
+  <defs><style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style></defs>
+  <rect x="1" y="1" width="1158" height="708" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" class="title" fill="#282529">网页版网络（1/3）：慢的是线路，不是服务器</text>
+  <text x="34" y="64" class="subtitle" fill="#756f73">结论：同一台服务器，直连广州时起播 0.1 秒、下载 400 KB/s；绕境外线路只剩 33 KB/s，起播慢、卡顿、超时都出在这里。</text>
+  <rect x="24" y="84" width="1112" height="144" rx="10" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="44" y="112" class="block" fill="#282529">① 用户遇到了什么</text>
+  <rect x="44" y="128" width="344" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="151" class="card-t" fill="#96434f">起播要等好几秒，偶尔播不出来</text>
+  <text x="58" y="172" class="body" fill="#96434f">点歌后播放栏一直转圈；</text>
+  <text x="58" y="191" class="body" fill="#96434f">慢到一定程度就直接放弃这首。</text>
+  <rect x="408" y="128" width="344" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="422" y="151" class="card-t" fill="#96434f">播到一半卡一下</text>
+  <text x="422" y="172" class="body" fill="#96434f">网络稍一抖动，缓冲就被吃完；</text>
+  <text x="422" y="191" class="body" fill="#96434f">过一会儿自己恢复，像是「卡了一下」。</text>
+  <rect x="772" y="128" width="344" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="786" y="151" class="card-t" fill="#96434f">收藏夹加载失败</text>
+  <text x="786" y="172" class="body" fill="#96434f">右下角弹出「timeout of 10000ms exceeded」，</text>
+  <text x="786" y="191" class="body" fill="#96434f">列表空白，显示「暂无内容」。</text>
+  <rect x="24" y="248" width="1112" height="274" rx="10" fill="#eef4f8" stroke="#91adc1" />
+  <text x="44" y="276" class="block" fill="#282529">② 实测：同一台服务器，两条路（2026-10-14 实测，广州电信宽带）</text>
+  <rect x="44" y="292" width="526" height="118" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58" y="315" class="card-t" fill="#316247">直连：广州用户 → 广州机房</text>
+  <text x="58" y="336" class="body" fill="#316247">普通接口：0.10 秒</text>
+  <text x="58" y="355" class="body" fill="#316247">取播放地址：0.15 秒</text>
+  <text x="58" y="374" class="body" fill="#316247">音频第一个字节：0.11 秒</text>
+  <text x="58" y="393" class="body" fill="#316247">整首下载：380~435 KB/s（约码率的 16 倍）</text>
+  <rect x="590" y="292" width="526" height="118" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="604" y="315" class="card-t" fill="#96434f">绕路：经台湾代理 → 再回广州机房</text>
+  <text x="604" y="336" class="body" fill="#96434f">普通接口：0.7~3.3 秒</text>
+  <text x="604" y="355" class="body" fill="#96434f">取播放地址：0.5~0.9 秒</text>
+  <text x="604" y="374" class="body" fill="#96434f">音频第一个字节：0.8~1.5 秒</text>
+  <text x="604" y="393" class="body" fill="#96434f">整首下载：33~38 KB/s（≈ 192K 码率，零余量）</text>
+  <rect x="44" y="422" width="526" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58" y="445" class="card-t" fill="#316247">机房到家里 Mac mini 再到 B 站：不是瓶颈</text>
+  <text x="58" y="466" class="body" fill="#316247">服务器直接从隧道取同一首歌：第一个字节 0.09 秒，8 MB/s。</text>
+  <text x="58" y="485" class="body" fill="#316247">隧道自 10-11 起没有断开过。</text>
+  <rect x="590" y="422" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="445" class="card-t" fill="#7a6234">海外用户就是「绕路」这条</text>
+  <text x="604" y="466" class="body" fill="#7a6234">境外访问大陆机房要过出入境链路，晚高峰常只有几十 KB/s，</text>
+  <text x="604" y="485" class="body" fill="#7a6234">和绕台湾代理测到的情况一致。</text>
+  <rect x="24" y="542" width="1112" height="144" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="44" y="570" class="block" fill="#282529">③ 为什么慢线路会同时出这三个问题</text>
+  <rect x="44" y="586" width="344" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="609" class="card-t" fill="#7a6234">音频把线路占满</text>
+  <text x="58" y="630" class="body" fill="#7a6234">浏览器拉音频是能多快就多快，</text>
+  <text x="58" y="649" class="body" fill="#7a6234">慢线路上一首歌就把带宽吃光。</text>
+  <rect x="408" y="586" width="344" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="422" y="609" class="card-t" fill="#7a6234">接口排在音频后面</text>
+  <text x="422" y="630" class="body" fill="#7a6234">音频和接口共用同一条连接，</text>
+  <text x="422" y="649" class="body" fill="#7a6234">收藏夹排队超过 10 秒就算失败。</text>
+  <rect x="772" y="586" width="344" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="786" y="609" class="card-t" fill="#7a6234">缓冲没有余量</text>
+  <text x="786" y="630" class="body" fill="#7a6234">下载速度≈播放速度，</text>
+  <text x="786" y="649" class="body" fill="#7a6234">稍有抖动就断粮，表现为卡一下。</text>
+</svg>

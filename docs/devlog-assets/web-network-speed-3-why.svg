@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="600" viewBox="0 0 1160 600" role="img" aria-labelledby="title">
+  <title id="title">网页版网络（3/3）：为什么不那样做，别改回去</title>
+  <defs><style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style></defs>
+  <rect x="1" y="1" width="1158" height="598" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" class="title" fill="#282529">网页版网络（3/3）：为什么不那样做，别改回去</text>
+  <text x="34" y="64" class="subtitle" fill="#756f73">结论：音质、缓存位置、测速方法都有反直觉的取舍，改之前先看这里。</text>
+  <rect x="24" y="84" width="1112" height="236" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="44" y="112" class="block" fill="#282529">① 为什么不那样做</text>
+  <rect x="44" y="128" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="151" class="card-t" fill="#7a6234">为什么不降低默认音质？</text>
+  <text x="58" y="172" class="body" fill="#7a6234">音质由账号权限决定，能拿到最高就给最高；</text>
+  <text x="58" y="191" class="body" fill="#7a6234">带宽问题在发送速度上解决，不牺牲音质。</text>
+  <rect x="590" y="128" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="151" class="card-t" fill="#7a6234">为什么不在服务器上缓存收藏夹？</text>
+  <text x="604" y="172" class="body" fill="#7a6234">收藏夹是每个账号的私有数据，服务器缓存要处理账号隔离和失效；</text>
+  <text x="604" y="191" class="body" fill="#7a6234">浏览器里缓存 + 每次后台重拉，已经做到打开即显示。</text>
+  <rect x="44" y="220" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="243" class="card-t" fill="#7a6234">为什么开 BBR 不是关键？</text>
+  <text x="58" y="264" class="body" fill="#7a6234">服务器到广州用户实测 9 Mbps，并没有 3 Mbps 的上限；</text>
+  <text x="58" y="283" class="body" fill="#7a6234">真正慢的是跨境线路，换拥塞算法改变不了出入境链路的质量。</text>
+  <rect x="590" y="220" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="243" class="card-t" fill="#7a6234">为什么无损不会被限速卡住？</text>
+  <text x="604" y="264" class="body" fill="#7a6234">发送速度至少保留实时播放的 1.25 倍，</text>
+  <text x="604" y="283" class="body" fill="#7a6234">宁可让接口慢一点，也不让音乐断粮。</text>
+  <rect x="24" y="340" width="1112" height="236" rx="10" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="44" y="368" class="block" fill="#282529">② 改代码 / 排查时别踩回去</text>
+  <rect x="44" y="384" width="526" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="407" class="card-t" fill="#96434f">别把音频也拿去压缩</text>
+  <text x="58" y="428" class="body" fill="#96434f">音频本来就是压缩格式，再压一次只会浪费 CPU，</text>
+  <text x="58" y="447" class="body" fill="#96434f">还会破坏拖动进度条所依赖的分段下载。</text>
+  <rect x="590" y="384" width="526" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="604" y="407" class="card-t" fill="#96434f">别用电脑上的命令行结果判断网站快慢</text>
+  <text x="604" y="428" class="body" fill="#96434f">本机代理规则只让 Chrome 直连本站，命令行会绕台湾；</text>
+  <text x="604" y="447" class="body" fill="#96434f">上一轮就因此误判出「服务器只有 3 Mbps」。</text>
+  <rect x="44" y="476" width="526" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="499" class="card-t" fill="#96434f">本地改了收藏夹，就要作废缓存</text>
+  <text x="58" y="520" class="body" fill="#96434f">删除、清理失效之后不作废，</text>
+  <text x="58" y="539" class="body" fill="#96434f">再次打开会先闪出已删除的歌。</text>
+  <rect x="590" y="476" width="526" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="604" y="499" class="card-t" fill="#96434f">海外用户的根本问题还没解决</text>
+  <text x="604" y="520" class="body" fill="#96434f">这次只是缓解；要让海外流畅，</text>
+  <text x="604" y="539" class="body" fill="#96434f">需要海外入口机或按网速自动选音质。</text>
+</svg>

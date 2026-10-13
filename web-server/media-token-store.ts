@@ -6,6 +6,7 @@ import { isAllowedBilibiliMediaUrl } from "./routes.js";
 export const DEFAULT_MEDIA_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 
 interface MediaTokenRecord {
+  bandwidth?: number;
   expiresAt: number;
   sessionId: string;
   target: string;
@@ -43,7 +44,7 @@ export class MediaTokenStore {
     this.tokenTtlMs = options.tokenTtlMs ?? DEFAULT_MEDIA_TOKEN_TTL_MS;
   }
 
-  register(target: string, sessionId: string): string | undefined {
+  register(target: string, sessionId: string, bandwidth?: number): string | undefined {
     if (!isAllowedBilibiliMediaUrl(target)) return undefined;
     this.deleteExpired();
 
@@ -61,12 +62,16 @@ export class MediaTokenStore {
     if (!TOKEN_PATTERN.test(token)) throw new Error("generated media proxy token has an invalid shape");
     while (this.tokens.has(token)) token = this.randomToken();
 
-    this.tokens.set(token, { expiresAt, sessionId, target });
+    this.tokens.set(token, { bandwidth, expiresAt, sessionId, target });
     // 附带到期秒数：客户端据此判断旧地址是否该重新取址，而不是把同源地址视为永久有效
     return `${BILIBILI_MEDIA_PROXY_PREFIX}/${token}?e=${Math.floor(expiresAt / 1000)}`;
   }
 
   resolve(token: string, sessionId: string): URL | undefined {
+    return this.resolveRecord(token, sessionId)?.target;
+  }
+
+  resolveRecord(token: string, sessionId: string): { bandwidth?: number; target: URL } | undefined {
     if (!TOKEN_PATTERN.test(token)) return undefined;
 
     const record = this.tokens.get(token);
@@ -81,7 +86,7 @@ export class MediaTokenStore {
       return undefined;
     }
 
-    return new URL(record.target);
+    return { bandwidth: record.bandwidth, target: new URL(record.target) };
   }
 
   get size() {

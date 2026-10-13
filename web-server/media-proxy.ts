@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ApiResponseTransformer } from "./api-proxy.js";
 
 import { BILIBILI_MEDIA_PROXY_PREFIX } from "../shared/bilibili-web-proxy.js";
+import { resolveMediaRate } from "./media-pacer.js";
 import { isBilibiliMediaResponse, rewriteBilibiliMediaPayload } from "./media-response.js";
 import { MediaSessionStore } from "./media-session-store.js";
 import { MediaTokenStore } from "./media-token-store.js";
@@ -21,6 +22,8 @@ import { isAllowedBilibiliMediaUrl, matchBilibiliMediaProxyToken } from "./route
 const MEDIA_METHODS = new Set(["GET", "HEAD"]);
 const MAX_MEDIA_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_MEDIA_REDIRECTS = 3;
+// 3 Mbps 部署机的约 40%；单条流再快也只是让浏览器多囤缓冲，换来的是接口被挤超时
+const DEFAULT_MAX_MEDIA_RATE_BYTES = 160 * 1024;
 
 export interface MediaProxyRuntime {
   mediaSessions: MediaSessionStore;
@@ -29,6 +32,8 @@ export interface MediaProxyRuntime {
 
 export interface BilibiliMediaProxyHandlerOptions extends MediaProxyRuntime {
   logger?: ProxyLogger;
+  /** 单条媒体流的速率上限（字节/秒）；0 关闭限速 */
+  maxMediaRateBytes?: number;
   mapUpstreamForTest?: UpstreamMapper;
 }
 
@@ -51,9 +56,9 @@ export function createMediaApiResponseTransformer(runtime: MediaProxyRuntime): A
       }
 
       let mediaSessionId: string | undefined;
-      const rewritten = rewriteBilibiliMediaPayload(payload, target => {
+      const rewritten = rewriteBilibiliMediaPayload(payload, (target, bandwidth) => {
         mediaSessionId ??= runtime.mediaSessions.resolveOrCreate(request, response);
-        return runtime.mediaTokens.register(target, mediaSessionId);
+        return runtime.mediaTokens.register(target, mediaSessionId, bandwidth);
       });
       return Buffer.from(JSON.stringify(rewritten.payload));
     },
@@ -62,6 +67,7 @@ export function createMediaApiResponseTransformer(runtime: MediaProxyRuntime): A
 
 export function createBilibiliMediaProxyHandler(options: BilibiliMediaProxyHandlerOptions): BilibiliMediaProxyHandler {
   const logger = options.logger ?? console;
+  const maxMediaRate = options.maxMediaRateBytes ?? DEFAULT_MAX_MEDIA_RATE_BYTES;
 
   return async (request, response, next) => {
     const requestUrl = new URL(request.url ?? "/", "http://biu.local");
@@ -89,8 +95,8 @@ export function createBilibiliMediaProxyHandler(options: BilibiliMediaProxyHandl
       const mediaSessionId = options.mediaSessions.resolve(request);
       if (!token || !mediaSessionId) throw new ProxyRequestError("Bilibili media token was not found", 404);
 
-      const target = options.mediaTokens.resolve(token, mediaSessionId);
-      if (!target) throw new ProxyRequestError("Bilibili media token was not found", 404);
+      const record = options.mediaTokens.resolveRecord(token, mediaSessionId);
+      if (!record) throw new ProxyRequestError("Bilibili media token was not found", 404);
 
       const input: UpstreamRequestInput = {
         body: Buffer.alloc(0),
@@ -98,8 +104,9 @@ export function createBilibiliMediaProxyHandler(options: BilibiliMediaProxyHandl
         kind: "media",
         mapUpstreamForTest: options.mapUpstreamForTest,
         method,
+        mediaRateBytes: maxMediaRate > 0 ? resolveMediaRate(record.bandwidth, maxMediaRate) : undefined,
         signal: controller.signal,
-        target,
+        target: record.target,
       };
       await requestAndRelayStream(input, response, {
         redirectsLeft: MAX_MEDIA_REDIRECTS,
