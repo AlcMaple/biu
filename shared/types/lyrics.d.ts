@@ -140,6 +140,10 @@ interface MusicLyrics {
   offset?: number;
   lyrics?: string;
   tLyrics?: string;
+  /** 歌词来源：manual=用户手动采用（永不被自动结果覆盖）；缺省视为 manual（兼容旧缓存） */
+  source?: "manual" | "auto";
+  /** source=auto 时记录生成它的匹配算法版本，算法升级后会自动重新匹配 */
+  autoVersion?: number;
 }
 
 interface NeteaseAudioMatchParams {

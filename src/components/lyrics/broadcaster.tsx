@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 
-import { autoMatchLyrics } from "@/components/lyrics/auto-match";
+import { AUTO_MATCH_VERSION, autoMatchLyrics } from "@/components/lyrics/auto-match";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform from "@/platform";
@@ -61,19 +61,22 @@ const LyricsBroadcaster = () => {
         const cacheKey = isLocal ? `local-${playItem.id}` : `${playItem.bvid}-${playItem.cid}`;
         const store = await platform.getStore(StoreNameMap.LyricsCache);
         if (canceled) return;
+        let staleAuto = false;
         if (store && typeof store === "object") {
           const cached = store[cacheKey];
           if (cached) {
             setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
             if (cached.lyrics || cached.tLyrics) {
               setLyrics(parseLrc(cached.lyrics), parseLrc(cached.tLyrics));
-              return;
+              // 仅「自动匹配且算法已升级」的缓存才重新匹配；手动选择的永远保留
+              staleAuto = cached.source === "auto" && (cached.autoVersion ?? 0) < AUTO_MATCH_VERSION;
+              if (!staleAuto) return;
             }
           }
         }
 
         if (canceled) return;
-        setLyrics([]);
+        if (!staleAuto) setLyrics([]);
 
         // 无缓存：按标题 + 时长自动匹配歌词；每首歌每次会话只尝试一次，命中后写入缓存
         if (autoTried.has(cacheKey)) return;
@@ -84,11 +87,20 @@ const LyricsBroadcaster = () => {
         autoTried.add(cacheKey);
         const hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled);
         if (canceled || !hit) return;
-        setLyrics(parseLrc(hit.lyrics), parseLrc(hit.tLyrics));
         const latest = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
+        // 匹配期间用户可能已手动采用歌词，自动结果不得覆盖
+        const now = latest[cacheKey];
+        if (canceled || (now?.source !== "auto" && (now?.lyrics || now?.tLyrics))) return;
+        setLyrics(parseLrc(hit.lyrics), parseLrc(hit.tLyrics));
         await platform.setStore(StoreNameMap.LyricsCache, {
           ...latest,
-          [cacheKey]: { ...(latest[cacheKey] || {}), lyrics: hit.lyrics, tLyrics: hit.tLyrics },
+          [cacheKey]: {
+            ...(latest[cacheKey] || {}),
+            lyrics: hit.lyrics,
+            tLyrics: hit.tLyrics,
+            source: "auto",
+            autoVersion: AUTO_MATCH_VERSION,
+          },
         });
       } catch {
         if (!canceled) setLyrics([]);

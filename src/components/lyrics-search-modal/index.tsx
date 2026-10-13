@@ -126,6 +126,8 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
       const nextLyrics: MusicLyrics = {
         lyrics: lyricsText,
         tLyrics: tLyricsText,
+        source: "manual",
+        autoVersion: undefined,
       };
 
       try {

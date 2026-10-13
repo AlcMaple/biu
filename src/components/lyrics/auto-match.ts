@@ -3,6 +3,9 @@ import platform from "@/platform";
 import { parseLrc } from "./parse-lrc";
 import { foldVariants } from "./variant-fold";
 
+/** 自动匹配算法版本：改动标题提取/打分逻辑后 +1，旧的自动缓存会被重新匹配（手动选择的不受影响）。案例见 docs/lyrics/自动匹配歌词-错误案例.md */
+export const AUTO_MATCH_VERSION = 2;
+
 const NETEASE_TYPE_SONG = 1;
 /** 视频时长与曲库时长允许的最大差距（秒）：翻唱/搬运常有前后奏差异，过严会漏，过松会配错歌 */
 const MAX_DURATION_DIFF = 12;
@@ -37,6 +40,9 @@ export interface AutoLyricsResult {
 const BRACKET_PAIRS = /【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g;
 const BOOK_QUOTE = /《([^》]+)》/;
 const CORNER_QUOTE = /[「『]([^」』]+)[」』]/;
+/** 「」紧跟在 OP/ED/插曲 等标记后，里面基本就是歌名：超时空辉夜姬 ED「ray 超かぐや姫！Version」/ 歌手 */
+const SONG_MARK_BEFORE_CORNER = /(?:OP|ED|OST|IN|插曲|主题曲|片头曲|片尾曲|角色歌)\d*\s*[「『]/i;
+const ARTIST_LIST = /[、,，&＆]/;
 const SEPARATORS = /\s*[-－—–]\s*|\s*\/\s*|\s+covered?\s+by\s+|\s*cover\s*[:：]?\s+|\s+feat\.?\s+/i;
 /** 标题里的非歌名噪声词；遇到新的噪声往这里补 */
 const NOISE_WORDS =
@@ -60,6 +66,8 @@ export const extractTitleCandidates = (rawTitle: string): string[] => {
   };
 
   push(rawTitle.match(BOOK_QUOTE)?.[1]);
+  const cornerText = rawTitle.match(CORNER_QUOTE)?.[1];
+  if (cornerText && SONG_MARK_BEFORE_CORNER.test(rawTitle)) push(cornerText);
 
   const stripped = rawTitle
     .replace(/\s*covered?\s+by\s+.*$/i, " ")
@@ -74,7 +82,9 @@ export const extractTitleCandidates = (rawTitle: string): string[] => {
 
   if (parts.length > 1) {
     // 「歌手-歌名」与「歌名-歌手」都常见，两侧都当候选，让曲库结果裁决
-    parts.slice().reverse().forEach(push);
+    // 含顿号/逗号的多半是歌手列表，排到最后
+    const reversed = parts.slice().reverse();
+    [...reversed.filter(p => !ARTIST_LIST.test(p)), ...reversed.filter(p => ARTIST_LIST.test(p))].forEach(push);
     push(corner);
   } else {
     push(corner);
