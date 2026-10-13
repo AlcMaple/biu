@@ -47,6 +47,6 @@ export interface PlayerPagelistDimension {
  * @param params 请求参数
  * @returns Promise<PlayerPagelistResponse>
  */
-export const getPlayerPagelist = (params: PlayerPagelistRequestParams) => {
-  return apiRequest.get<PlayerPagelistResponse>("/x/player/pagelist", { params });
+export const getPlayerPagelist = (params: PlayerPagelistRequestParams, config?: { signal?: AbortSignal }) => {
+  return apiRequest.get<PlayerPagelistResponse>("/x/player/pagelist", { params, signal: config?.signal });
 };

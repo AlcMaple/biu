@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { Button } from "@heroui/react";
-import { RiPauseFill, RiPlayFill } from "@remixicon/react";
+import { RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
+import { useDoublePress } from "@/common/hooks/use-double-press";
 import { formatNumber } from "@/common/utils/number";
 import { formatDuration } from "@/common/utils/time";
 import Image from "@/components/image";
+import RowPlayButton from "@/components/row-play-button";
 import { isWeb } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -67,14 +69,11 @@ const MusicListItem = ({
   const navigate = useNavigate();
   const playId = usePlayList(state => state.playId);
   const list = usePlayList(state => state.list);
-  const isPlaying = usePlayList(state => state.isPlaying);
   const playItem = list.find(item => item.id === playId);
   const isPlay =
     isSame(playItem, { type, bvid, sid, source, id: itemId }) &&
     // 有 cid 时精确匹配分集，防止同视频不同分集同时高亮
     (!cid || !playItem?.cid || cid === playItem.cid);
-  /** 当前就是这一行且正在播放：显示暂停图标 */
-  const isPlayingThis = isPlay && isPlaying;
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
@@ -86,6 +85,9 @@ const MusicListItem = ({
     showPubTime,
     showDuration,
   } = useMusicListColumns(isCompact, hidePubTime);
+
+  // Web（PC 与手机）列表默认双击播放，避免滚动/误触就切歌；行首播放按钮仍可单击播放
+  const handleWebDoublePress = useDoublePress(onPress);
 
   const invalidBadge = invalid && (
     <span className="border-danger/40 text-danger flex-none rounded-sm border px-1 text-[10px] leading-4">失效</span>
@@ -101,7 +103,7 @@ const MusicListItem = ({
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
         onDoubleClick={!isMobileLayout && !isWeb ? onPress : undefined}
-        onPress={isMobileLayout || isWeb ? onPress : undefined}
+        onPress={isWeb ? handleWebDoublePress : isMobileLayout ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
           isCompact ? "h-9 min-h-9 min-w-0 px-0 text-sm" : "h-auto min-h-auto min-w-auto space-y-2 p-2",
@@ -211,29 +213,10 @@ const MusicListItem = ({
           <div className="flex h-full items-center justify-end gap-0.5">
             {/* 手机端整行点击的反馈不明显，给每行一个显式播放/暂停按钮：
                 当前行在播则点击暂停，否则点击播放；图标随播放状态变化，点了有即时反馈。
-                触屏没有 hover，封面上的 ▶ 蒙层用不上，这个按钮才是移动端的主要入口。 */}
-            {isMobileLayout && !invalid && typeof onPress === "function" && (
-              // 外层 span 只在冒泡阶段拦截，挡住事件继续冒到整行 Button（避免既播又暂停）；
-              // 不能用捕获阶段 stopPropagation，那样事件到不了里面的按钮，会导致按钮完全点不动。
-              // 按下(pointerdown)也要拦：heroui/react-aria 的 press 是基于 pointerdown 的，
-              // 不拦的话整行的 press 仍会被触发。
-              <span className="flex" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                <Button
-                  isIconOnly
-                  variant={isPlay ? "flat" : "light"}
-                  color={isPlay ? "primary" : "default"}
-                  size="sm"
-                  radius="full"
-                  aria-label={isPlayingThis ? "暂停" : "播放"}
-                  onPress={() => {
-                    // 已是当前曲：切换播放/暂停；否则开始播放这一行
-                    if (isPlay) usePlayList.getState().togglePlay();
-                    else onPress();
-                  }}
-                >
-                  {isPlayingThis ? <RiPauseFill size={18} /> : <RiPlayFill size={18} />}
-                </Button>
-              </span>
+                触屏没有 hover，封面上的 ▶ 蒙层用不上，这个按钮才是移动端的主要入口。
+                Web 整行改为双击播放，同样靠这个按钮提供单击入口。 */}
+            {(isMobileLayout || isWeb) && !invalid && typeof onPress === "function" && (
+              <RowPlayButton isCurrent={isPlay} onPlay={onPress} />
             )}
             {Boolean(menus.length) && <OperationMenu items={menus} onAction={onMenuAction} />}
           </div>

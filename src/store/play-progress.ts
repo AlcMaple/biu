@@ -29,6 +29,16 @@ export const usePlayProgress = create<ProgressState>((set, get) => ({
   },
   setCurrentTime: (time: number) => {
     set({ currentTime: time });
+    // 切歌清零必须立刻落盘：否则快速切歌后刷新，会把上一首的进度套到新歌上
+    if (time <= 0) {
+      lastPersistAt = 0;
+      try {
+        localStorage.removeItem("play-current-time");
+      } catch {
+        // 存储不可用时忽略
+      }
+      return;
+    }
     // 进程被杀时 beforeunload 不会触发，所以播放中也要定期落盘，下次打开才能接着上次的位置
     const now = Date.now();
     if (time > 0 && now - lastPersistAt >= PERSIST_INTERVAL_MS) {

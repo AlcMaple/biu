@@ -4,7 +4,7 @@ import { log } from "@/platform";
 import { getAudioWebStreamUrl } from "@/service/audio-web-url";
 import { getPlayerPlayurl, type DashAudio } from "@/service/player-playurl";
 import { useUser } from "@/store/user";
-import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
+import { getBilibiliMediaProxyExpiry, isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
 import { audioQualitySort } from "../constants/audio";
 import { VideoFnval } from "../constants/video";
@@ -75,13 +75,21 @@ function selectAudioByQuality(audioList: DashAudio[], quality: AudioQuality): Da
   }
 }
 
-export async function getDashUrl(bvid: string, cid: string | number, audioQuality: AudioQuality = "auto") {
+export async function getDashUrl(
+  bvid: string,
+  cid: string | number,
+  audioQuality: AudioQuality = "auto",
+  config?: { signal?: AbortSignal },
+) {
   try {
-    const getUrlInfoRes = await getPlayerPlayurl({
-      bvid,
-      cid,
-      fnval: VideoFnval.AllDash,
-    });
+    const getUrlInfoRes = await getPlayerPlayurl(
+      {
+        bvid,
+        cid,
+        fnval: VideoFnval.AllDash,
+      },
+      config,
+    );
 
     const bestVideoInfo = getUrlInfoRes?.data?.dash?.video?.[0];
     const videoResolution = `${bestVideoInfo?.width}x${bestVideoInfo?.height}`;
@@ -141,14 +149,17 @@ export async function getDashUrl(bvid: string, cid: string | number, audioQualit
 /**
  * 登录情况下获取音乐播放链接
  */
-export const getAudioUrl = async (sid: number | string) => {
-  const res = await getAudioWebStreamUrl({
-    songid: sid,
-    quality: useUser.getState().user?.vipStatus ? 3 : 2,
-    privilege: 2,
-    mid: useUser.getState().user?.mid || 0,
-    platform: "web",
-  });
+export const getAudioUrl = async (sid: number | string, config?: { signal?: AbortSignal }) => {
+  const res = await getAudioWebStreamUrl(
+    {
+      songid: sid,
+      quality: useUser.getState().user?.vipStatus ? 3 : 2,
+      privilege: 2,
+      mid: useUser.getState().user?.mid || 0,
+      platform: "web",
+    },
+    config,
+  );
 
   const isFlac = res?.data?.type === 3;
 
@@ -160,8 +171,18 @@ export const getAudioUrl = async (sid: number | string) => {
   };
 };
 
+/** 到期前预留的余量：暂停很久后回来点播放，地址可能在加载途中过期，提前换新更稳 */
+const URL_EXPIRY_MARGIN_SECONDS = 120;
+
 /** URL是否有效 */
 export const isUrlValid = (url?: string): url is string => {
   if (!url) return false;
-  return isBilibiliMediaProxyUrl(url) || moment().isBefore(moment.unix(Number(getUrlParams(url).deadline)));
+  if (isBilibiliMediaProxyUrl(url)) {
+    // 同源 token 只活到服务端记录的到期时间；过期后必然 404，必须重新取址
+    const expiry = getBilibiliMediaProxyExpiry(url);
+    return expiry === undefined || moment().add(URL_EXPIRY_MARGIN_SECONDS, "seconds").isBefore(moment.unix(expiry));
+  }
+  return moment()
+    .add(URL_EXPIRY_MARGIN_SECONDS, "seconds")
+    .isBefore(moment.unix(Number(getUrlParams(url).deadline)));
 };

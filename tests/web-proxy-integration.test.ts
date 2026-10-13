@@ -201,7 +201,7 @@ describe("Web Bilibili BFF integration", () => {
     );
     expect(stream.baseUrl).toBe("");
     expect(stream.backupUrl).toHaveLength(1);
-    expect(stream.backupUrl[0]).toMatch(new RegExp(`^${BILIBILI_MEDIA_PROXY_PREFIX}/[-_0-9A-Za-z]{32,128}$`));
+    expect(stream.backupUrl[0]).toMatch(new RegExp(`^${BILIBILI_MEDIA_PROXY_PREFIX}/[-_0-9A-Za-z]{32,128}\\?e=\\d+$`));
     expect(JSON.stringify(stream)).not.toContain("bilivideo.com");
   });
 

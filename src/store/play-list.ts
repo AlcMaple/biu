@@ -168,11 +168,11 @@ const pushUnique = (arr: string[], id: string) => {
   }
 };
 
-const getMVData = async (bvid: string, existing?: PlayData): Promise<PlayData[]> => {
+const getMVData = async (bvid: string, existing?: PlayData, signal?: AbortSignal): Promise<PlayData[]> => {
   // 队列已有标题、封面、作者，切歌只缺分 P。view 可能捎带数 MB 的合集详情，
   // 让预取和切歌都卡在同一大响应上；pagelist 返回相同的 pages，不下载无关合集。
   if (existing) {
-    const res = await getPlayerPagelist({ bvid });
+    const res = await getPlayerPagelist({ bvid }, { signal });
     const pages = res?.data || [];
     const aid = existing.aid || tryBv2av(bvid);
     return pages.map(page => ({
@@ -715,8 +715,15 @@ export const usePlayList = create<State & Action>()(
         return picked;
       };
 
+      // 快速连续切歌时，上一首还在途的取址请求已经没用了：直接中止，免得十几个请求排队
+      // 抢连接、把最后一首也拖到超时
+      let sourceResolveAbort: AbortController | undefined;
       const resolveAudioSrc = async (): Promise<boolean> => {
         const { playId, list } = get();
+        sourceResolveAbort?.abort();
+        const resolveController = new AbortController();
+        sourceResolveAbort = resolveController;
+        const { signal } = resolveController;
         let currentPlayItem = list.find(item => item.id === playId);
         if (isOfflineDemo) {
           // The demo represents playback state without mounting a media URL. This
@@ -756,7 +763,7 @@ export const usePlayList = create<State & Action>()(
 
         // 首次切歌的元数据请求可能超时；播放按钮也必须能补全 cid，而不是对空 src 调 play()。
         if (currentPlayItem?.type === "mv" && currentPlayItem.bvid && !currentPlayItem.cid) {
-          const [first, ...rest] = await getMVData(currentPlayItem.bvid, currentPlayItem);
+          const [first, ...rest] = await getMVData(currentPlayItem.bvid, currentPlayItem, signal);
           if (get().playId !== playId) return false;
           if (!first?.cid) {
             if (!(await dropCurrentIfInvalid(currentPlayItem.id, currentPlayItem))) {
@@ -773,7 +780,7 @@ export const usePlayList = create<State & Action>()(
         }
 
         if (currentPlayItem?.type === "mv" && currentPlayItem?.bvid && currentPlayItem?.cid) {
-          const mvPlayData = await getDashUrl(currentPlayItem.bvid, currentPlayItem.cid);
+          const mvPlayData = await getDashUrl(currentPlayItem.bvid, currentPlayItem.cid, undefined, { signal });
           if (get().playId !== playId) return false;
           if (mvPlayData?.audioUrl) {
             if (!isSameCurrentSource(mvPlayData.audioUrl)) {
@@ -815,7 +822,7 @@ export const usePlayList = create<State & Action>()(
         }
 
         if (currentPlayItem?.type === "audio" && currentPlayItem?.sid) {
-          const musicPlayData = await getAudioUrl(currentPlayItem.sid);
+          const musicPlayData = await getAudioUrl(currentPlayItem.sid, { signal });
           if (get().playId !== playId) return false;
           if (musicPlayData?.audioUrl) {
             if (!isSameCurrentSource(musicPlayData.audioUrl)) {
@@ -940,7 +947,8 @@ export const usePlayList = create<State & Action>()(
                 // 无可见进度：先探一次真实 HTTP 状态。iOS 原生加载器在缓冲大文件时
                 // currentTime/buffered 会长时间都是 0，但只要页面 fetch 拿得到字节、
                 // 且元素还在 LOADING，就是「还没缓冲够」而不是「卡死」——延长等待，别误杀。
-                const stalledSrc = audio.src;
+                // MSE 下 audio.src 是 blob:，必须用逻辑地址，否则探测与「token 失效先重新取址」都会漏判
+                const stalledSrc = currentSourceUrl || audio.src;
                 void probeMediaResponse(stalledSrc)
                   .then(probe => {
                     if (get().playId !== playId || audio.paused) return;
@@ -1129,7 +1137,7 @@ export const usePlayList = create<State & Action>()(
               // ABORTED(1) 是用户主动中止（切歌时旧请求被打断），不算播放失败
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
-              const erroredSrc = audio.src;
+              const erroredSrc = currentSourceUrl || audio.src;
               void probeMediaResponse(erroredSrc).then(probe => {
                 log.warn("音频元素报错", {
                   playId,

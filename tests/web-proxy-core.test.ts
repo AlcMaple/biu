@@ -5,7 +5,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 
-import { BILIBILI_MEDIA_PROXY_PREFIX, BILIBILI_UPSTREAMS, isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
+import {
+  BILIBILI_MEDIA_PROXY_PREFIX,
+  BILIBILI_UPSTREAMS,
+  getBilibiliMediaProxyExpiry,
+  isBilibiliMediaProxyUrl,
+} from "@shared/bilibili-web-proxy";
 
 import { injectCsrfIntoBody, injectCsrfIntoQuery } from "../web-server/csrf";
 import { rewriteBilibiliMediaPayload } from "../web-server/media-response";
@@ -63,6 +68,11 @@ describe("Web Bilibili proxy contracts", () => {
     expect(matchBilibiliMediaProxyToken(valid)).toBe(MEDIA_TOKEN);
     expect(isBilibiliMediaProxyUrl(`https://evil.example${valid}`)).toBe(false);
     expect(isBilibiliMediaProxyUrl(`${valid}?url=https://evil.example`)).toBe(false);
+    expect(isBilibiliMediaProxyUrl(`${valid}?e=1700000000`)).toBe(true);
+    expect(getBilibiliMediaProxyExpiry(`${valid}?e=1700000000`)).toBe(1700000000);
+    expect(getBilibiliMediaProxyExpiry(valid)).toBeUndefined();
+    expect(matchBilibiliMediaProxyToken(`${valid}?e=1700000000`)).toBe(MEDIA_TOKEN);
+    expect(matchBilibiliMediaProxyToken(`${valid}?e=1&url=x`)).toBeUndefined();
     expect(
       matchBilibiliMediaProxyToken(`${BILIBILI_MEDIA_PROXY_PREFIX}?url=${encodeURIComponent(MEDIA_TARGET)}`),
     ).toBeUndefined();
@@ -210,7 +220,7 @@ describe("Web media session and token stores", () => {
     });
     const proxyUrl = tokens.register(MEDIA_TARGET, "session-a");
 
-    expect(proxyUrl).toBe(`${BILIBILI_MEDIA_PROXY_PREFIX}/${MEDIA_TOKEN}`);
+    expect(proxyUrl).toBe(`${BILIBILI_MEDIA_PROXY_PREFIX}/${MEDIA_TOKEN}?e=6`);
     expect(tokens.resolve(MEDIA_TOKEN, "session-a")?.toString()).toBe(MEDIA_TARGET);
     expect(tokens.resolve(MEDIA_TOKEN, "session-b")).toBeUndefined();
     now = 6_001;

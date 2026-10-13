@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="816" viewBox="0 0 1160 816" role="img" aria-labelledby="title desc">
+  <title id="title">网页版播放（1/3）：用户会经历什么</title>
+  <desc id="desc">四个场景的以前与现在对照，以及刷新、取消、旧地址、正在播放时点按钮四种边界表现。</desc>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker>
+    <style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style>
+  </defs>
+  <rect x="1" y="1" width="1158" height="814" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" class="title" fill="#282529">网页版播放（1/3）：用户会经历什么</text>
+  <text x="34" y="64" class="subtitle" fill="#756f73">暂停很久也能接着播；连点好几首只加载最后一首；切歌后刷新不串进度；列表双击播放。</text>
+  <rect x="24" y="84" width="1112" height="460" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="112" class="block" fill="#282529">① 用户会经历什么：四件事以前都要你停下来动手</text>
+  <text x="44" y="150" class="card-t" fill="#282529">暂停很久后回来点播放</text>
+  <rect x="260" y="130" width="400" height="99" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="274" y="153" class="card-t" fill="#96434f">以前</text>
+  <text x="274" y="174" class="body" fill="#96434f">停在 1:30 去忙别的，回来点播放</text>
+  <text x="274" y="193" class="body" fill="#96434f">转圈好久，提示「播放源失效」</text>
+  <text x="274" y="212" class="body" fill="#96434f">有时直接跳到下一首</text>
+  <line x1="666" y1="179.5" x2="700" y2="179.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="706" y="130" width="410" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="720" y="153" class="card-t" fill="#316247">现在</text>
+  <text x="720" y="174" class="body" fill="#316247">点播放后照常从 1:30 接着播</text>
+  <text x="720" y="193" class="body" fill="#316247">背后先换一个新地址，用户无感</text>
+  <text x="44" y="261" class="card-t" fill="#282529">连续快速切歌</text>
+  <rect x="260" y="241" width="400" height="99" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="274" y="264" class="card-t" fill="#96434f">以前</text>
+  <text x="274" y="285" class="body" fill="#96434f">连点好几首，前面没用的请求还在跑</text>
+  <text x="274" y="304" class="body" fill="#96434f">最后那首被拖到超时</text>
+  <text x="274" y="323" class="body" fill="#96434f">提示「当前歌曲无法播放」</text>
+  <line x1="666" y1="290.5" x2="700" y2="290.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="706" y="241" width="410" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="720" y="264" class="card-t" fill="#316247">现在</text>
+  <text x="720" y="285" class="body" fill="#316247">只有最后点的那首真正去取地址</text>
+  <text x="720" y="304" class="body" fill="#316247">实测连点 5 首：取地址 1 次</text>
+  <text x="44" y="372" class="card-t" fill="#282529">切歌后马上刷新页面</text>
+  <rect x="260" y="352" width="400" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="274" y="375" class="card-t" fill="#96434f">以前</text>
+  <text x="274" y="396" class="body" fill="#96434f">新歌被套上上一首的进度</text>
+  <text x="274" y="415" class="body" fill="#96434f">比如新歌一开头就跳到 1:30</text>
+  <line x1="666" y1="392.0" x2="700" y2="392.0" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="706" y="352" width="410" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="720" y="375" class="card-t" fill="#316247">现在</text>
+  <text x="720" y="396" class="body" fill="#316247">切歌那一刻就把旧进度清掉</text>
+  <text x="720" y="415" class="body" fill="#316247">刷新后新歌从正确位置恢复</text>
+  <text x="44" y="464" class="card-t" fill="#282529">在列表里点歌</text>
+  <rect x="260" y="444" width="400" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="274" y="467" class="card-t" fill="#96434f">以前</text>
+  <text x="274" y="488" class="body" fill="#96434f">网页版单击就切歌</text>
+  <text x="274" y="507" class="body" fill="#96434f">滑动列表时一碰就换歌</text>
+  <line x1="666" y1="484.0" x2="700" y2="484.0" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="706" y="444" width="410" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="720" y="467" class="card-t" fill="#316247">现在</text>
+  <text x="720" y="488" class="body" fill="#316247">双击整行才播放</text>
+  <text x="720" y="507" class="body" fill="#316247">行尾的 ▶ 按钮单击就播</text>
+  <rect x="24" y="560" width="1112" height="232" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44" y="588" class="block" fill="#282529">② 边界情况：这些时候是什么表现</text>
+  <rect x="44" y="604" width="526" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58" y="627" class="card-t" fill="#316247">刷新或重开页面</text>
+  <text x="58" y="648" class="body" fill="#316247">恢复上次的歌和进度，但保持暂停</text>
+  <text x="58" y="667" class="body" fill="#316247">用户点 ▶ 才出声，不会突然响</text>
+  <rect x="590" y="604" width="526" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="604" y="627" class="card-t" fill="#316247">切歌途中前一首的请求被中止</text>
+  <text x="604" y="648" class="body" fill="#316247">属于主动取消，不算播放失败</text>
+  <text x="604" y="667" class="body" fill="#316247">不弹错误、不触发换源</text>
+  <rect x="44" y="696" width="526" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="58" y="719" class="card-t" fill="#4a4450">旧版服务器发的地址</text>
+  <text x="58" y="740" class="body" fill="#4a4450">没带到期时间：照旧当作有效</text>
+  <text x="58" y="759" class="body" fill="#4a4450">真失效了走「先重新取址」</text>
+  <rect x="590" y="696" width="526" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="604" y="719" class="card-t" fill="#4a4450">正在播的这首点行尾按钮</text>
+  <text x="604" y="740" class="body" fill="#4a4450">按钮显示 ⏸，单击就是暂停</text>
+  <text x="604" y="759" class="body" fill="#4a4450">不会重新从头播放</text>
+</svg>

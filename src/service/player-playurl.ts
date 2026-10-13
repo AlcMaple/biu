@@ -172,6 +172,10 @@ export interface SupportFormat {
  * 获取视频流地址(web端)
  * 获取 url 有效时间为 120min，超时失效需要重新获取
  */
-export const getPlayerPlayurl = (params: PlayerPlayurlRequestParams) => {
-  return apiRequest.get<PlayerPlayurlResponse>("/x/player/wbi/playurl", { params, useWbi: true });
+export const getPlayerPlayurl = (params: PlayerPlayurlRequestParams, config?: { signal?: AbortSignal }) => {
+  return apiRequest.get<PlayerPlayurlResponse>("/x/player/wbi/playurl", {
+    params,
+    useWbi: true,
+    signal: config?.signal,
+  });
 };

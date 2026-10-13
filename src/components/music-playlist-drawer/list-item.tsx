@@ -5,8 +5,10 @@ import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@
 import { RiMoreFill, RiMusic2Line, RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 
+import { useDoublePress } from "@/common/hooks/use-double-press";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import Image from "@/components/image";
+import RowPlayButton from "@/components/row-play-button";
 import { isWeb } from "@/platform";
 import { type PlayData } from "@/store/play-list";
 
@@ -25,6 +27,8 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const isMobileLayout = useIsMobileLayout();
+  // 与歌曲列表一致：Web 整行双击播放，行尾按钮单击播放；应用端保持单击
+  const handleWebDoublePress = useDoublePress(onPress);
 
   return (
     <Button
@@ -34,7 +38,7 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
       disableAnimation
       variant={isPlaying ? "flat" : "light"}
       color={isPlaying ? "primary" : "default"}
-      onPress={onPress}
+      onPress={isWeb ? handleWebDoublePress : onPress}
       className="group flex h-auto min-h-auto w-full min-w-auto items-center justify-between space-y-2 rounded-md p-2"
     >
       <div className="m-0 flex min-w-0 flex-1 items-center">
@@ -70,6 +74,7 @@ const ListItem = ({ data, isLogin, isPlaying, onAction, onClose, onPress }: Prop
             {data?.source === "local" ? "本地音乐" : data?.ownerName || "未知"}
           </span>
         </div>
+        {isWeb && onPress && <RowPlayButton isCurrent={Boolean(isPlaying)} onPlay={onPress} />}
         <span
           className="flex flex-none"
           onPointerDown={event => event.stopPropagation()}

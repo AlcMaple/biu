@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="558" viewBox="0 0 1160 558" role="img" aria-labelledby="title desc">
+  <title id="title">网页版播放（3/3）：为什么这么做，别改回去</title>
+  <desc id="desc">四个反直觉设计的理由，以及四条改代码时容易踩回去的红线。</desc>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker>
+    <style>
+      .title { font: 700 19px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .subtitle { font: 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .block { font: 700 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .card-t { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .body { font: 11px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style>
+  </defs>
+  <rect x="1" y="1" width="1158" height="556" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" class="title" fill="#282529">网页版播放（3/3）：为什么这么做，别改回去</text>
+  <text x="34" y="64" class="subtitle" fill="#756f73">这些设计看起来绕，但每一条都是踩过坑之后的结果。</text>
+  <rect x="24" y="84" width="1112" height="230" rx="10" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="44" y="112" class="block" fill="#282529">① 为什么不那样做</text>
+  <rect x="44" y="128" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="151" class="card-t" fill="#7a6234">为什么不把本站地址当成永久有效？</text>
+  <text x="58" y="172" class="body" fill="#7a6234">本站转发的地址最多活 2 小时，服务器重启就全部作废。</text>
+  <text x="58" y="191" class="body" fill="#7a6234">以前一看是本站地址就认为有效，暂停久了必然失败。</text>
+  <rect x="590" y="128" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="151" class="card-t" fill="#7a6234">为什么出错先重新取址，不先试备用地址？</text>
+  <text x="604" y="172" class="body" fill="#7a6234">一首歌的几个备用地址是同一次申请拿到的，</text>
+  <text x="604" y="191" class="body" fill="#7a6234">要失效一起失效，挨个试只是多等几轮、多打几次请求。</text>
+  <rect x="44" y="216" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58" y="239" class="card-t" fill="#7a6234">为什么不把有效期拉长、或多重试几次？</text>
+  <text x="58" y="260" class="body" fill="#7a6234">有效期受 B 站签名时间限制，拉长也没用；</text>
+  <text x="58" y="279" class="body" fill="#7a6234">多重试会放大请求，被限流时更糟，项目里吃过亏。</text>
+  <rect x="590" y="216" width="526" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="604" y="239" class="card-t" fill="#7a6234">为什么双击是自己判断，不用浏览器的双击？</text>
+  <text x="604" y="260" class="body" fill="#7a6234">手机浏览器的双击会被「双击放大」吞掉；</text>
+  <text x="604" y="279" class="body" fill="#7a6234">按两次点击间隔（0.4 秒内）判断，PC 和手机一致。</text>
+  <rect x="24" y="334" width="1112" height="200" rx="10" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="44" y="362" class="block" fill="#282529">② 改代码时别踩回去</text>
+  <rect x="44" y="378" width="526" height="61" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="401" class="card-t" fill="#96434f">判断播放地址时，别用播放器自己报告的地址</text>
+  <text x="58" y="422" class="body" fill="#96434f">iPhone 上那是内部临时地址，认不出来就会退回「挨个试旧地址」。</text>
+  <rect x="590" y="378" width="526" height="61" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="604" y="401" class="card-t" fill="#96434f">切歌时进度清零必须立刻存</text>
+  <text x="604" y="422" class="body" fill="#96434f">平时进度每 3 秒才存一次；清零也等的话，切歌后马上刷新就会串歌。</text>
+  <rect x="44" y="452" width="526" height="61" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58" y="475" class="card-t" fill="#96434f">地址上的到期时间只能是一个数字</text>
+  <text x="58" y="496" class="body" fill="#96434f">服务器只放行这一个参数；放开其他参数，就成了可被滥用的转发。</text>
+  <rect x="590" y="452" width="526" height="61" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="604" y="475" class="card-t" fill="#96434f">列表行尾的播放按钮要拦住点击</text>
+  <text x="604" y="496" class="body" fill="#96434f">否则一次点击会同时触发整行和按钮，变成「刚播放就暂停」。</text>
+</svg>

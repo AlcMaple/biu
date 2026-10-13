@@ -4,11 +4,13 @@ import { useNavigate } from "react-router";
 import { Button } from "@heroui/react";
 import clx from "classnames";
 
+import { useDoublePress } from "@/common/hooks/use-double-press";
 import { useLayoutMode } from "@/common/hooks/use-responsive";
 import { formatDuration } from "@/common/utils/time";
 import ContextMenu, { type ContextMenuItem } from "@/components/context-menu";
 import Image from "@/components/image";
 import OperationMenu from "@/components/music-list-item/operation";
+import RowPlayButton from "@/components/row-play-button";
 import { isWeb } from "@/platform";
 import { isSame, usePlayList } from "@/store/play-list";
 
@@ -50,6 +52,8 @@ const HistoryListItem = ({
   const list = usePlayList(state => state.list);
   const playItem = list.find(item => item.id === playId);
   const isPlay = isSame(playItem, { type, bvid });
+  // 与歌曲列表一致：Web（PC 与手机）整行双击播放，行尾播放按钮单击播放
+  const handleWebDoublePress = useDoublePress(onPress);
   const mode = useLayoutMode();
   const isMobile = mode === "mobile";
   const isTablet = mode === "tablet" || mode === "narrow-tablet";
@@ -76,8 +80,8 @@ const HistoryListItem = ({
         disableAnimation
         variant={isPlay ? "flat" : "light"}
         color={isPlay ? "primary" : "default"}
-        onDoubleClick={!isMobile ? onPress : undefined}
-        onPress={isMobile ? onPress : undefined}
+        onDoubleClick={!isMobile && !isWeb ? onPress : undefined}
+        onPress={isWeb ? handleWebDoublePress : isMobile ? onPress : undefined}
         className={clx(
           "group flex w-full items-center justify-between rounded-md",
           isMobile
@@ -161,7 +165,10 @@ const HistoryListItem = ({
           {!isMobile && !isTablet && <div className="text-foreground-500 text-right text-xs">{viewAt}</div>}
 
           {/* 6. Actions */}
-          <div className="flex h-full items-center justify-end">
+          <div className="flex h-full items-center justify-end gap-0.5">
+            {(isMobile || isWeb) && typeof onPress === "function" && (
+              <RowPlayButton isCurrent={isPlay} onPlay={onPress} />
+            )}
             <OperationMenu items={menus} onAction={onMenuAction} />
           </div>
         </div>

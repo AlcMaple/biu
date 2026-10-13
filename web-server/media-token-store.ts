@@ -62,7 +62,8 @@ export class MediaTokenStore {
     while (this.tokens.has(token)) token = this.randomToken();
 
     this.tokens.set(token, { expiresAt, sessionId, target });
-    return `${BILIBILI_MEDIA_PROXY_PREFIX}/${token}`;
+    // 附带到期秒数：客户端据此判断旧地址是否该重新取址，而不是把同源地址视为永久有效
+    return `${BILIBILI_MEDIA_PROXY_PREFIX}/${token}?e=${Math.floor(expiresAt / 1000)}`;
   }
 
   resolve(token: string, sessionId: string): URL | undefined {

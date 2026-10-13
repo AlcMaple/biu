@@ -79,7 +79,9 @@ export function matchBilibiliApiProxyRequest(requestUrl: string) {
 
 export function matchBilibiliMediaProxyToken(requestUrl: string): string | undefined {
   const url = new URL(requestUrl, "http://biu.local");
-  if (url.search !== "" || !url.pathname.startsWith(`${BILIBILI_MEDIA_PROXY_PREFIX}/`)) return undefined;
+  // 只允许携带到期提示 `?e=<秒>`，其他查询参数一律拒绝
+  const hasOnlyExpiry = url.search === "" || /^\?e=\d+$/.test(url.search);
+  if (!hasOnlyExpiry || !url.pathname.startsWith(`${BILIBILI_MEDIA_PROXY_PREFIX}/`)) return undefined;
 
   const token = url.pathname.slice(BILIBILI_MEDIA_PROXY_PREFIX.length + 1);
   return /^[-_0-9A-Za-z]{32,128}$/.test(token) ? token : undefined;

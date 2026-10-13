@@ -80,6 +80,6 @@ export interface AudioStreamUrlResponse {
  * 获取音频流URL（可获取付费音频）
  * @param params 请求参数
  */
-export const getAudioWebStreamUrl = (params: AudioStreamUrlRequestParams) => {
-  return apiRequest.get<AudioStreamUrlResponse>("/audio/music-service-c/url", { params });
+export const getAudioWebStreamUrl = (params: AudioStreamUrlRequestParams, config?: { signal?: AbortSignal }) => {
+  return apiRequest.get<AudioStreamUrlResponse>("/audio/music-service-c/url", { params, signal: config?.signal });
 };

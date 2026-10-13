@@ -5,8 +5,11 @@ import { RiPlayFill } from "@remixicon/react";
 import clx from "classnames";
 import { twMerge } from "tailwind-merge";
 
+import { useDoublePress } from "@/common/hooks/use-double-press";
 import { formatDuration } from "@/common/utils/time";
 import Image from "@/components/image";
+import RowPlayButton from "@/components/row-play-button";
+import { isWeb } from "@/platform";
 import { usePlayList, type PlayData } from "@/store/play-list";
 
 import Menus from "./menu";
@@ -23,6 +26,12 @@ interface Props {
 
 const ListItem = ({ data, isActive, onPressItem, hideCover, className, titleClassName }: Props) => {
   const playListItem = usePlayList(state => state.playListItem);
+  const playThis = () => {
+    playListItem(data.id);
+    onPressItem?.();
+  };
+  // 与歌曲列表一致：Web 整行双击播放，行尾按钮单击播放；应用端保持单击
+  const handleWebDoublePress = useDoublePress(playThis);
 
   return (
     <Button
@@ -32,10 +41,7 @@ const ListItem = ({ data, isActive, onPressItem, hideCover, className, titleClas
       disableAnimation
       variant={isActive ? "flat" : "light"}
       color={isActive ? "primary" : "default"}
-      onPress={() => {
-        playListItem(data.id);
-        onPressItem?.();
-      }}
+      onPress={isWeb ? handleWebDoublePress : playThis}
       className={twMerge(
         "group flex h-auto min-h-auto w-full min-w-auto items-center justify-between space-y-2 rounded-md p-2",
         className,
@@ -72,6 +78,7 @@ const ListItem = ({ data, isActive, onPressItem, hideCover, className, titleClas
             {getDisplayTitle(data)}
           </span>
         </div>
+        {isWeb && <RowPlayButton isCurrent={isActive} onPlay={playThis} />}
         <Menus data={data} />
         {Boolean(data.duration) && (
           <span className="text-foreground-500 ml-2 flex-none shrink-0 text-right text-sm whitespace-nowrap tabular-nums">
