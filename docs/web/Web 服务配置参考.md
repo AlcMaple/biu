@@ -1,6 +1,7 @@
-# Web 部署
+# Web 服务配置参考
 
-> 生产发布、数据备份、自动续期、验证与回滚请先读 [Web 生产部署与维护指南](./Web%20生产部署与维护指南.md)
+> 本文只说明 Web BFF 本身怎么构建、启动、配置环境变量、挂反代、写日志，以及它的运行边界。
+> 怎么发布到服务器、备份、证书续期、验证与回滚，见 [Web 生产部署与维护指南](./Web%20生产部署与维护指南.md)。
 
 ## 构建与启动
 
@@ -24,6 +25,8 @@ pnpm start:web
 | `BIU_WEB_PORT` | `5678` | 监听端口，范围 1–65535 |
 | `BIU_WEB_PUBLIC_ORIGIN` | 本机开发时按连接推导 | 对外完整 origin，例如 `https://music.example.com`；生产或非 loopback 监听时必填 |
 | `BIU_WEB_CLIENT_IP_HEADER` | 未启用 | 可信反代覆盖写入的单值客户端 IP header，例如 `X-Biu-Client-IP` |
+| `BIU_WEB_SESSION_DIR` | `~/.biu-web/sessions` | 登录会话落盘目录（目录权限 0700，`sessions.enc` 权限 0600，原子写入）；必须在 release 目录之外，才能在换版本时保留登录态。设为 `memory` 则不落盘，重启会让所有 Web 用户退出登录 |
+| `BIU_WEB_SESSION_KEY` | 未设置 | 会话文件的加密口令；缺省时在会话目录生成并复用权限 0600 的 `session.key`。更换口令会使旧会话文件无法解密 |
 | `BIU_SYNC_INTERNAL_ORIGIN` | `http://127.0.0.1:3002` | 本机 sync 服务的受信任内部 origin；HTTP 只允许 loopback |
 | `BIU_ACME_CHALLENGE_ORIGIN` | 未启用 | 可选的本机 HTTP-01 challenge 服务；只允许 loopback origin |
 | `BIU_WEB_CLIENT_LOG_DIR` | 未启用 | 网页端日志落盘目录（相对路径按启动目录解析）。不配置就不接收回传日志 |
@@ -100,11 +103,11 @@ location / {
 
 ## 运行边界
 
-- B 站 Cookie、refresh token、Gaia token 都只保存在服务端内存，浏览器只持有本站随机 HttpOnly 标识；上游 `Set-Cookie` 不会回传浏览器。
+- B 站 Cookie、refresh token、Gaia token 只保存在服务端（会话文件为 AES-256-GCM 加密、权限 0600），浏览器只持有本站随机 HttpOnly 标识；上游 `Set-Cookie` 不会回传浏览器。
 - Web 歌词搜索只经同源 `/__biu_lyrics/*` 访问固定的网易云与 LrcLib 上游；服务端需要能出站访问 `interface.music.163.com` 和 `lrclib.net`，浏览器不会直连或携带 B 站 Cookie。
 - Web 同步走同源 `/__biu_sync/*`：BFF 在服务端换取短期同步凭据，浏览器不会取得 B 站 Cookie 或同步 JWT。
 - 若配置 `BIU_ACME_CHALLENGE_ORIGIN`，BFF 仅转发合法 HTTP-01 token 到固定 loopback origin，不能成为任意本地 URL 代理。
-- 登录会话、匿名媒体会话和不透明媒体 token 都是单进程内存状态。服务重启会退出 Web 登录并使旧媒体 token 失效；当前实现不能直接横向启动多个互不共享状态的 worker。
+- 登录会话落盘，重启或换 release 后自动恢复（滑动有效期 180 天未使用才过期）；会话文件无法解密时会改名为 `sessions.enc.corrupt-<时间戳>` 并从空会话启动。匿名媒体会话和不透明媒体 token 仍是单进程内存状态，重启后旧媒体 token 失效，播放器会重新取址。会话文件只有单写入者，不能横向启动多个 worker。
 - 媒体字节经过部署方服务器。播放和拖动会产生 Range 请求，`206`、`Content-Range` 和客户端取消会流式透传，因此带宽与出站流量由部署方承担。
 - 媒体端点只接受 BFF 签发的短期不透明 token，不接受 URL 参数；上游目标和每一次重定向都会重新经过固定 CDN allowlist 校验（UPOS 与限定区域/运营商/节点格式的 `cn-…bilivideo.com`，HTTPS 标准端口与媒体路径白名单不变）。
 - `/__biu_auth/*`、`/__biu_proxy/*`、`/__biu_sync/*` 和 `/__biu_health` 均不得缓存。普通 HTML 也使用 `no-store`；带内容哈希的静态资源由 Node 返回长期缓存头。

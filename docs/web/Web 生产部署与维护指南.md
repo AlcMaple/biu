@@ -2,6 +2,8 @@
 
 > 域名、主机、账号、私钥位置、数据路径、端口、证书目录和备份位置只存在于受控终端的私有运维配置中
 
+> BFF 的启动方式、环境变量、反代示例和日志回传见 [Web 服务配置参考](./Web%20服务配置参考.md)；本文只讲发布与维护流程。
+
 ## 0. 使用方式：公开流程 + 私有运行时配置
 
 公开文档必须让接手者知道“做什么、如何验证、何时停止”；私有配置只回答“在哪台机器、哪个路径、用哪个凭据”。二者不可合并。
@@ -195,6 +197,34 @@ Web-only 更新不应触碰 sync 数据；只备份 Web 服务定义和当前 re
 
 ## 3. 常规 Web 更新流程
 
+### 3.0 最短路径：一条命令发布
+
+下面 3.1–3.4 是手动流程，也是脚本的权威说明。仓库提供了把它们串起来的模板 [ops/deploy-web.example.sh](../../ops/deploy-web.example.sh)：
+
+```bash
+export BIU_OPS_CONFIG="$HOME/.config/biu/production.env"
+ops/deploy-web.example.sh
+```
+
+它依次做：连通性检查 → `pnpm build:web` → 打包并检查不含敏感文件 → 上传云主机并比对 SHA-256 → Web 主机解包 → 测试端口试运行（含健康检查和歌词上游）→ 备份并切换 LaunchAgent → 公网健康检查。任一步失败立即停止，不会切换正式服务。
+
+使用前提：
+
+- 私有配置里填好 `BIU_WEB_SSH_ALIAS` 等字段（见 [ops/production.example.env](../../ops/production.example.env)）；
+- 开发机能免密 SSH 到云主机和 Web 主机，Web 主机能免密 `scp` 云主机；
+- 模板默认 Web 主机是 macOS + LaunchAgent。用 systemd / pm2 / Docker 的话，只替换脚本里「备份并切换」那一段，其余流程不变；
+- 脚本不提交代码。发布前先 `git status --short`，确认线上要的功能都已有 commit（见 §2.1）；
+- Web 登录会话加密落盘在跨 release 的固定目录，切换发布后自动恢复，用户不用重新登录；媒体 token 仍在内存，旧 token 会失效，播放器会自动重新取址。
+
+**连不上主机时先停下排查，不要穷举**：
+
+| 现象 | 常见原因 | 处理 |
+| --- | --- | --- |
+| `Permission denied (publickey...)` | 用户名写错（Tailscale 账号名、本机用户名都不等于目标机系统用户名） | 用私有配置里的别名，不要自己换用户名试 |
+| 主机名被解析成 `198.18.x.x` | 代理软件的 fake-ip 劫持了主机名 | SSH 别名里直接写 IP（如 Tailscale IP），不用主机名 |
+| 找不到 `/Users/<web 用户>/...` | 这些路径只存在于 Web 主机，不在开发机 | 通过 SSH 在 Web 主机上执行 |
+| 反复换密钥 / 用户名 | 暴力尝试可能触发安全策略拦截 | 自检失败就贴出完整报错并停止；需要新授权时只交出公钥，由机主追加到 `authorized_keys` |
+
 ### 3.1 本机构建并生成不可变发布包
 
 ```bash
@@ -295,7 +325,7 @@ launchctl kickstart -k "gui/$(id -u)/$BIU_WEB_SERVICE_LABEL"
 
 回传日志目录应按 §4.1 配在跨 release 的固定目录；只更新该环境字段，不整体替换 `EnvironmentVariables`。
 
-Web BFF 登录会话位于进程内存，重启后用户需要重新登录；这是预期行为，不是歌单数据丢失。
+Web BFF 登录会话默认加密落盘到 `~/.biu-web/sessions`（`BIU_WEB_SESSION_DIR` 可改），重启或换 release 后自动恢复；该目录必须在 release 目录之外，且同一时间只能有一个 Web 进程写它。启动日志出现 `Sessions persisted to … (N restored)` 即恢复成功。只有显式设为 `memory`、换了 `BIU_WEB_SESSION_KEY`、或会话文件损坏（会被改名为 `sessions.enc.corrupt-<时间戳>`）时，用户才需要重新扫码登录。
 
 ### 3.5 Sentry 监控接入
 
