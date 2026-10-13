@@ -35,7 +35,7 @@ const SearchWithSort = ({ onKeywordSearch, orderOptions, order, onOrderChange }:
             hideSelectedIcon: true,
           }}
           aria-label="排序方式"
-          className={isMobileLayout ? "w-[112px] max-w-none flex-none" : "max-w-xs"}
+          className={isMobileLayout ? "order-first w-[112px] max-w-none flex-none" : "max-w-xs"}
           classNames={{
             innerWrapper: "w-20",
             popoverContent: isMobileLayout ? "min-w-[132px]" : undefined,
