@@ -284,6 +284,7 @@ const FollowList = () => {
 
         <div className="flex min-h-0 min-w-0 flex-1">
           <ScrollContainer
+            pageScroll
             ref={scrollRef}
             enableBackToTop
             className={isMobileLayout ? "h-full w-full px-3" : "h-full w-full px-4"}
@@ -359,7 +360,7 @@ const FollowList = () => {
                   items={list}
                   itemKey="mid"
                   renderItem={item => <UserCard u={item} refresh={reload} onSetGroup={handleOpenSetGroup} />}
-                  getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null}
+                  getScrollElement={() => scrollRef.current?.getViewport() || null}
                   onLoadMore={loadMore}
                   rowHeight={isMobileLayout ? 190 : 240}
                   hasMore={hasMore}

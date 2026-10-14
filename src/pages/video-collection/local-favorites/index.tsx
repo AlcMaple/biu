@@ -479,7 +479,13 @@ const LocalFavorites = () => {
   );
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={folderIdStr} className="h-full w-full px-4 pb-6">
+    <ScrollContainer
+      pageScroll
+      enableBackToTop
+      ref={scrollRef}
+      resetOnChange={folderIdStr}
+      className="h-full w-full px-4 pb-6"
+    >
       <Header
         type={CollectionType.Favorite}
         cover={latestCover ?? folder?.cover}
@@ -553,9 +559,7 @@ const LocalFavorites = () => {
             hasMore={false}
             loading={false}
             rowHeight={isCompact ? 36 : 64}
-            getScrollElement={() =>
-              (scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null
-            }
+            getScrollElement={() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null}
             renderItem={(item, index) => (
               <MusicListItem
                 key={String(item.rid)}

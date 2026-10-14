@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { scrollEventTarget, scrollerClientHeight } from "@/common/utils/scroll-element";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getRelationFollowings } from "@/service/relation-followings";
 import { useUser } from "@/store/user";
@@ -64,7 +65,8 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
 
   const handleScroll = useCallback(() => {
     if (!scrollElement || loading || !hasMore || error) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+    const { scrollTop, scrollHeight } = scrollElement;
+    const clientHeight = scrollerClientHeight(scrollElement);
     if (scrollHeight - scrollTop - clientHeight < 200) {
       fetchFollowings(page + 1);
     }
@@ -77,12 +79,8 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
     }
 
     const initScrollElement = () => {
-      if (scrollRef.current) {
-        const instance = scrollRef.current.osInstance();
-        if (instance) {
-          setScrollElement(instance.elements().viewport);
-        }
-      }
+      const viewport = scrollRef.current?.getViewport();
+      if (viewport) setScrollElement(viewport);
     };
     initScrollElement();
     const timer = setTimeout(initScrollElement, 100);
@@ -90,13 +88,12 @@ const AuthorList: React.FC<AuthorListProps> = ({ selectedAuthorMid, onSelect }) 
   }, [isMobileLayout]);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    const instance = scrollRef.current.osInstance();
-    if (!instance) return;
-    const viewport = instance.elements().viewport;
-    viewport.addEventListener("scroll", handleScroll);
+    const viewport = scrollRef.current?.getViewport();
+    if (!viewport) return;
+    const target = scrollEventTarget(viewport);
+    target.addEventListener("scroll", handleScroll);
     return () => {
-      viewport.removeEventListener("scroll", handleScroll);
+      target.removeEventListener("scroll", handleScroll);
     };
   }, [handleScroll]);
 

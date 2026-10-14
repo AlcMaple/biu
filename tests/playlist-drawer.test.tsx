@@ -41,7 +41,7 @@ vi.mock("@/components/music-playlist-drawer/list-item", () => ({ default: () => 
 vi.mock("@/components/virtual-list", () => ({
   VirtualList: ({ scrollRef }: any) => {
     useLayoutEffect(() => {
-      scrollRef.current = { osInstance: () => ({ elements: () => ({ viewport: state.viewport }) }) };
+      scrollRef.current = { getViewport: () => state.viewport };
       return () => {
         scrollRef.current = null;
       };

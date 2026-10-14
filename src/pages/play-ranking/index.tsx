@@ -29,7 +29,7 @@ const PlayRanking = () => {
   }, [period]);
 
   return (
-    <ScrollContainer enableBackToTop className="h-full w-full px-4">
+    <ScrollContainer pageScroll enableBackToTop className="h-full w-full px-4">
       <div className="mb-2">
         <h1>我的听歌排行</h1>
         <Tabs selectedKey={period} onSelectionChange={key => setPeriod(key as Period)} size="sm" className="mt-2">

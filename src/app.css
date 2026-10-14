@@ -58,6 +58,13 @@ body {
   height: var(--app-h, 100dvh);
 }
 
+/* 手机网页由根文档滚动（见 use-document-scroll），根容器按内容自然撑高 */
+:root[data-scroll="document"],
+:root[data-scroll="document"] body,
+:root[data-scroll="document"] #root {
+  height: auto;
+}
+
 /*
  * 底部安全区。固定在底部的元素不能直接用 env(safe-area-inset-bottom)：
  * iOS Chrome / Safari 收放工具栏时它是逐帧变化的小数，会让底栏每一帧重排、抖动。

@@ -564,7 +564,13 @@ const Favorites = () => {
   );
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={favFolderId} className="h-full w-full px-4 pb-6">
+    <ScrollContainer
+      pageScroll
+      enableBackToTop
+      ref={scrollRef}
+      resetOnChange={favFolderId}
+      className="h-full w-full px-4 pb-6"
+    >
       <Header
         loading={loading}
         type={CollectionType.Favorite}
@@ -605,7 +611,7 @@ const Favorites = () => {
           items={filteredItems}
           hasMore={hasMore}
           loading={listLoading}
-          getScrollElement={() => (scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null}
+          getScrollElement={() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null}
           onLoadMore={handleLoadMore}
           isCreatedBySelf={isCreatedBySelf}
           onMenuAction={handleMenuAction}
@@ -617,7 +623,7 @@ const Favorites = () => {
           hasMore={hasMore}
           loading={listLoading}
           onLoadMore={handleLoadMore}
-          getScrollElement={() => (scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null}
+          getScrollElement={() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null}
           isCreatedBySelf={isCreatedBySelf}
           onMenuAction={handleMenuAction}
           onItemPress={handleItemPress}

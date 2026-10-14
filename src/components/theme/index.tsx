@@ -4,6 +4,7 @@ import { readableColor } from "color2k";
 import { useShallow } from "zustand/react/shallow";
 
 import { Themes } from "@/common/constants/theme";
+import { useDocumentScroll } from "@/common/hooks/use-document-scroll";
 import { hexToHsl, resolveTheme, isHex } from "@/common/utils/color";
 import { useSettings } from "@/store/settings";
 
@@ -85,6 +86,9 @@ const Theme = ({ children }: Props) => {
     rootStyle.fontFamily = validFontFamily || rootStyle.fontFamily;
   }, [fontFamily, primaryColor, borderRadius, themeMode, systemTheme, backgroundColor]);
 
+  // 手机网页由根文档滚动（见 useDocumentScroll），外壳不能再钉成可见视口高度。
+  const documentScroll = useDocumentScroll();
+
   const contextValue = useMemo(() => ({ theme: resolveTheme(themeMode, systemTheme) }), [themeMode, systemTheme]);
 
   return (
@@ -93,7 +97,7 @@ const Theme = ({ children }: Props) => {
     // measured root, which lets long pages push the playbar below the viewport.
     // Bind the shell directly to the measured visible height; unlike h-screen,
     // this does not reintroduce iOS Safari's large 100vh layout viewport.
-    <main className="h-[var(--app-h,100dvh)] w-full overflow-hidden">
+    <main className={documentScroll ? "w-full" : "h-[var(--app-h,100dvh)] w-full overflow-hidden"}>
       <ThemeNameContext value={contextValue}>{children}</ThemeNameContext>
     </main>
   );

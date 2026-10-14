@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSize } from "ahooks";
 import { twMerge } from "tailwind-merge";
 
+import { isDocumentScroller, scrollerObservers } from "@/common/utils/scroll-element";
 import Empty from "@/components/empty";
 
 export interface VirtualGridPageListProps<T> {
@@ -74,6 +75,7 @@ const VirtualGridPageList = <T,>({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement,
+    ...scrollerObservers,
     estimateSize: () => rowHeight + ROW_GAP,
     overscan: 5,
   });
@@ -121,7 +123,7 @@ const VirtualGridPageList = <T,>({
 
     // 创建新的 observer
     observerRef.current = new IntersectionObserver(handleIntersection, {
-      root: scrollElement,
+      root: isDocumentScroller(scrollElement) ? null : scrollElement,
       rootMargin: "0px 0px 200px 0px",
       threshold: 0,
     });

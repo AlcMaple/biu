@@ -132,7 +132,7 @@ const DownloadList = () => {
   };
 
   return (
-    <ScrollContainer enableBackToTop className="h-full w-full px-4">
+    <ScrollContainer pageScroll enableBackToTop className="h-full w-full px-4">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <h1 className="flex items-center space-x-1">下载记录</h1>
         <div className="flex items-center space-x-1">

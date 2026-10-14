@@ -5,6 +5,7 @@ import { RiDeleteBinLine, RiFolderAddLine, RiRefreshLine, RiPlayFill, RiPlayList
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { scrollerObservers } from "@/common/utils/scroll-element";
 import Empty from "@/components/empty";
 import IconButton from "@/components/icon-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
@@ -61,7 +62,8 @@ const LocalMusicPage = () => {
 
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
-    getScrollElement: () => scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null,
+    getScrollElement: () => scrollRef.current?.getViewport() as HTMLElement | null,
+    ...scrollerObservers,
     estimateSize: () => itemRowHeight,
     overscan: 10,
   });
@@ -200,7 +202,7 @@ const LocalMusicPage = () => {
   };
 
   return (
-    <ScrollContainer ref={scrollRef} enableBackToTop className="h-full w-full px-4">
+    <ScrollContainer pageScroll ref={scrollRef} enableBackToTop className="h-full w-full px-4">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <h1 className="flex items-center space-x-1">本地音乐</h1>
         <div className="flex items-center space-x-1">

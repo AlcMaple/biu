@@ -27,8 +27,13 @@ const MobilePlayBar = () => {
   const isEmptyPlayList = list.length === 0;
   const isSingle = list.length === 1;
 
+  // 底部安全区留白放在卡片内：放在外层的话卡片底边和阴影会在屏幕底上方画出一条线，看着和浏览器工具栏断开
   return (
-    <Card radius="none" shadow="sm" className="bg-background flex h-full flex-col gap-1 px-2 pt-1">
+    <Card
+      radius="none"
+      shadow="sm"
+      className="bg-background flex h-full flex-col gap-1 px-2 pt-1 pb-[var(--safe-bottom)]"
+    >
       <Slider
         aria-label="播放进度"
         hideThumb

@@ -235,7 +235,7 @@ const Series = () => {
   };
 
   const getScrollElement = useCallback(() => {
-    return scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null;
+    return scrollRef.current?.getViewport() as HTMLElement | null;
   }, []);
 
   const hasMore = useMemo(() => {
@@ -246,7 +246,7 @@ const Series = () => {
   const initialLoading = infoLoading || (medias.length === 0 && loadingMore);
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full px-4 pb-6">
+    <ScrollContainer pageScroll enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full px-4 pb-6">
       <Header
         type={CollectionType.VideoSeries}
         cover={medias?.[0]?.cover}

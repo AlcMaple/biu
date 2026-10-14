@@ -124,7 +124,7 @@ const SettingsPage = () => {
   const system = useSystemSettingsForm();
 
   return (
-    <ScrollContainer enableBackToTop className="h-full w-full">
+    <ScrollContainer pageScroll enableBackToTop className="h-full w-full">
       <div
         className={
           isMobileLayout ? "m-auto mb-6 w-full max-w-[900px] px-4 py-4" : "m-auto mb-6 max-w-[900px] px-8 py-4"

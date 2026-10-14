@@ -112,7 +112,7 @@ const MusicRecommend = () => {
   const listKey = `${activeTab}-${displayMode}-${activeTab === "pop" ? popLayoutVersion : 0}`;
 
   const getScrollElement = useCallback(() => {
-    return (scrollerRef.current?.osInstance()?.elements().viewport as HTMLElement | null) ?? null;
+    return (scrollerRef.current?.getViewport() as HTMLElement | null) ?? null;
   }, []);
 
   const handlePopLayoutChange = useCallback(() => {
@@ -333,7 +333,7 @@ const MusicRecommend = () => {
   }, []);
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollerRef} className="h-full w-full px-4">
+    <ScrollContainer pageScroll enableBackToTop ref={scrollerRef} className="h-full w-full px-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <Tabs
           variant="solid"

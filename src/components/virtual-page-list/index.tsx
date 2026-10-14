@@ -1,7 +1,14 @@
 import { type ReactNode, useRef, useLayoutEffect, useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@heroui/react";
-import { useVirtualizer, observeElementRect, type Virtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+
+import {
+  observeScrollerOffset,
+  observeScrollerRect,
+  scrollerClientHeight,
+  scrollerViewportTop,
+} from "@/common/utils/scroll-element";
 
 import Empty from "../empty";
 
@@ -38,8 +45,7 @@ export default function VirtualList<T>({
     const scrollEl = getScrollElement();
     if (el && scrollEl) {
       const rect = el.getBoundingClientRect();
-      const scrollRect = scrollEl.getBoundingClientRect();
-      const offset = rect.top - scrollRect.top + scrollEl.scrollTop;
+      const offset = rect.top - scrollerViewportTop(scrollEl) + scrollEl.scrollTop;
       setOffsetTop(prev => (Math.abs(prev - offset) > 1 ? offset : prev));
     }
   }, [getScrollElement]);
@@ -65,9 +71,9 @@ export default function VirtualList<T>({
     estimateSize: useCallback(() => rowHeight, [rowHeight]),
     overscan: 4,
     scrollMargin: offsetTop,
+    observeElementOffset: observeScrollerOffset,
     observeElementRect: (instance, cb) => {
-      // 使用 tanstack-virtual 内置的 observeElementRect，避免手动管理 ResizeObserver
-      return observeElementRect(instance, rect => {
+      return observeScrollerRect(instance, rect => {
         cb(rect);
         // 当容器尺寸变化时，重新检测是否填满
         // 使用 ref 调用 checkFill，确保获取到最新的闭包状态
@@ -92,7 +98,7 @@ export default function VirtualList<T>({
       if (!instance) return;
 
       // 获取滚动容器的高度
-      const scrollClientHeight = el.clientHeight;
+      const scrollClientHeight = scrollerClientHeight(el);
       // 获取列表总高度（包括已渲染项 + overscan）
       const totalSize = instance.getTotalSize();
 

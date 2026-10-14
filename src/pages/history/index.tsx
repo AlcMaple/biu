@@ -347,7 +347,7 @@ const History = () => {
   const isEmpty = !loading && list.length === 0;
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollerRef} className="h-full w-full px-4">
+    <ScrollContainer pageScroll enableBackToTop ref={scrollerRef} className="h-full w-full px-4">
       <div className="mb-2">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <h1 className="min-w-0 truncate">历史记录</h1>
@@ -381,7 +381,7 @@ const History = () => {
           hasMore={hasMore}
           loading={loadingMore}
           onLoadMore={handleLoadMore}
-          getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
+          getScrollElement={() => scrollerRef.current?.getViewport() || null}
           onMenuAction={handleMenuAction}
         />
       ) : (
@@ -390,7 +390,7 @@ const History = () => {
           hasMore={hasMore}
           loading={loadingMore}
           onLoadMore={handleLoadMore}
-          getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
+          getScrollElement={() => scrollerRef.current?.getViewport() || null}
           onMenuAction={handleMenuAction}
         />
       )}

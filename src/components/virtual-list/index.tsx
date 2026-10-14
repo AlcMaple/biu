@@ -31,9 +31,9 @@ export function VirtualList<T>({
   useEffect(() => {
     let rafId: number;
     const updateViewport = () => {
-      const instance = scrollerRef.current?.osInstance();
-      if (instance) {
-        setViewport(instance.elements().viewport as HTMLElement);
+      const nextViewport = scrollerRef.current?.getViewport();
+      if (nextViewport) {
+        setViewport(nextViewport);
       } else {
         rafId = requestAnimationFrame(updateViewport);
       }

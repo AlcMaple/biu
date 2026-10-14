@@ -103,7 +103,7 @@ const PlayListDrawer = () => {
         return true;
       }
 
-      const viewport = scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null;
+      const viewport = scrollRef.current?.getViewport() as HTMLElement | null;
       if (!viewport || viewport.clientHeight === 0 || viewport.scrollHeight === 0) {
         return false;
       }

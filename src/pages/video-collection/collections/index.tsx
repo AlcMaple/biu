@@ -237,11 +237,11 @@ const VideoCollections = () => {
   const isCreatedBySelf = data?.info?.upper?.mid === user?.mid;
 
   const getScrollElement = useCallback(() => {
-    return scrollRef.current?.osInstance()?.elements().viewport as HTMLElement | null;
+    return scrollRef.current?.getViewport() as HTMLElement | null;
   }, []);
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full px-4 pb-6">
+    <ScrollContainer pageScroll enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full px-4 pb-6">
       <Header
         type={CollectionType.VideoCollections}
         cover={data?.info?.cover}

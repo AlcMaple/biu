@@ -4,6 +4,7 @@ import { Spinner, Button } from "@heroui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { scrollEventTarget, scrollerClientHeight, scrollerObservers } from "@/common/utils/scroll-element";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getWebDynamicFeedAll, getWebDynamicFeedSpace, type WebDynamicItem } from "@/service/web-dynamic";
 
@@ -84,12 +85,8 @@ const DynamicFeedPage = () => {
 
   useEffect(() => {
     const initScrollElement = () => {
-      if (scrollRef.current) {
-        const instance = scrollRef.current.osInstance();
-        if (instance) {
-          setScrollElement(instance.elements().viewport);
-        }
-      }
+      const viewport = scrollRef.current?.getViewport();
+      if (viewport) setScrollElement(viewport);
     };
     initScrollElement();
     const timer = setTimeout(initScrollElement, 100);
@@ -99,13 +96,15 @@ const DynamicFeedPage = () => {
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElement,
+    ...scrollerObservers,
     estimateSize: () => 280,
     overscan: 5,
   });
 
   const handleScroll = useCallback(() => {
     if (!scrollElement || isLoading || !hasMore || error) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+    const { scrollTop, scrollHeight } = scrollElement;
+    const clientHeight = scrollerClientHeight(scrollElement);
     if (scrollHeight - scrollTop - clientHeight < 200) {
       fetchData(offset, selectedAuthorMid, requestIdRef.current);
     }
@@ -126,13 +125,12 @@ const DynamicFeedPage = () => {
   );
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    const instance = scrollRef.current.osInstance();
-    if (!instance) return;
-    const viewport = instance.elements().viewport;
-    viewport.addEventListener("scroll", handleScroll);
+    const viewport = scrollRef.current?.getViewport();
+    if (!viewport) return;
+    const target = scrollEventTarget(viewport);
+    target.addEventListener("scroll", handleScroll);
     return () => {
-      viewport.removeEventListener("scroll", handleScroll);
+      target.removeEventListener("scroll", handleScroll);
     };
   }, [handleScroll]);
 
@@ -141,7 +139,11 @@ const DynamicFeedPage = () => {
       <AuthorList selectedAuthorMid={selectedAuthorMid} onSelect={handleSelectAuthor} />
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        <ScrollContainer ref={scrollRef} className={isMobileLayout ? "h-full w-full px-3" : "h-full w-full px-4"}>
+        <ScrollContainer
+          pageScroll
+          ref={scrollRef}
+          className={isMobileLayout ? "h-full w-full px-3" : "h-full w-full px-4"}
+        >
           <div
             className={isMobileLayout ? "relative w-full px-0 py-3" : "relative w-full px-4 py-4"}
             style={{

@@ -92,28 +92,23 @@ const UserProfile = () => {
     {
       label: "动态",
       key: "dynamic",
-      content: (
-        <DynamicList
-          mid={Number(id)}
-          getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null}
-        />
-      ),
+      content: <DynamicList mid={Number(id)} getScrollElement={() => scrollRef.current?.getViewport() || null} />,
     },
     {
       label: "投稿",
       key: "video",
-      content: <VideoPost getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null} />,
+      content: <VideoPost getScrollElement={() => scrollRef.current?.getViewport() || null} />,
     },
     {
       label: "收藏夹",
       key: "collection",
       hidden: !isSelf && !spacePrivacy?.fav_video,
-      content: <Favorites getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null} />,
+      content: <Favorites getScrollElement={() => scrollRef.current?.getViewport() || null} />,
     },
     {
       label: "合集",
       key: "union",
-      content: <VideoSeries getScrollElement={() => scrollRef.current?.osInstance()?.elements().viewport || null} />,
+      content: <VideoSeries getScrollElement={() => scrollRef.current?.getViewport() || null} />,
     },
   ].filter(item => !item.hidden);
 
@@ -126,7 +121,7 @@ const UserProfile = () => {
   }
 
   return (
-    <ScrollContainer enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full">
+    <ScrollContainer pageScroll enableBackToTop ref={scrollRef} resetOnChange={id} className="h-full w-full">
       <SpaceInfo
         spaceInfo={userInfo}
         relationStats={relationStats}

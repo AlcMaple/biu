@@ -6,7 +6,7 @@ describe("mobile viewport height chain", () => {
   it("binds Theme directly to the measured visible height instead of an auto-height provider wrapper", async () => {
     const source = await readFile(path.resolve(process.cwd(), "src/components/theme/index.tsx"), "utf8");
 
-    expect(source).toContain('<main className="h-[var(--app-h,100dvh)] w-full overflow-hidden">');
+    expect(source).toContain('"h-[var(--app-h,100dvh)] w-full overflow-hidden"');
     expect(source).not.toContain('<main className="h-screen w-screen overflow-hidden">');
     expect(source).not.toContain('<main className="h-full w-full overflow-hidden">');
   });
@@ -54,6 +54,6 @@ describe("mobile viewport height chain", () => {
     expect(css).toContain("--safe-bottom: env(safe-area-inset-bottom");
     expect(css).toMatch(/display-mode: browser[\s\S]*--safe-bottom: 10px/);
     expect(layout.match(/<Outlet\s*\/>/g)).toHaveLength(1);
-    expect(layout).toContain('<div className="min-h-0 flex-1 overflow-hidden">');
+    expect(layout).toContain('"min-h-0 overflow-hidden": !documentScroll');
   });
 });

@@ -29,6 +29,7 @@ const Search = () => {
 
   return (
     <ScrollContainer
+      pageScroll
       enableBackToTop
       ref={scrollerRef}
       resetOnChange={`${searchRevision}:${searchType}`}
@@ -60,14 +61,14 @@ const Search = () => {
           <VideoList
             key={`video-${searchRevision}`}
             keyword={keyword}
-            getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
+            getScrollElement={() => scrollerRef.current?.getViewport() || null}
           />
         )}
         {isLoggedIn && searchType === SearchType.User && (
           <UserList
             key={`user-${searchRevision}`}
             keyword={keyword}
-            getScrollElement={() => scrollerRef.current?.osInstance()?.elements().viewport || null}
+            getScrollElement={() => scrollerRef.current?.getViewport() || null}
           />
         )}
       </>
