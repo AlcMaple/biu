@@ -75,7 +75,7 @@ App 启动后打开听歌识曲功能，然后查看日志文件：
 
 ## 第二步：将你的路径添加到代码
 
-找到文件 [`electron/ipc/shazam.ts`](../electron/ipc/shazam.ts)，定位到 `windowsPythonCandidates` 函数末尾的 `condaRoots` 数组。
+找到文件 [`electron/ipc/shazam.ts`](../../electron/ipc/shazam.ts)，定位到 `windowsPythonCandidates` 函数末尾的 `condaRoots` 数组。
 
 ### 示例
 

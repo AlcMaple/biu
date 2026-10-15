@@ -814,7 +814,7 @@
 - Wood3n <wangkka1@163.com>
 - Fly ([@flystar233](https://github.com/flystar233))
 
-## [1.6.0-beta.2](///compare/v1.6.0-beta.1...v1.6.0-beta.2) (2025-11-30)
+## [1.6.0-beta.2](https://github.com/wood3n/biu/compare/v1.6.0-beta.1...v1.6.0-beta.2) (2025-11-30)
 
 ### Features
 
@@ -825,7 +825,7 @@
 
 Thanks to [@flystar233](https://github.com/flystar233)
 
-## [1.6.0-beta.1](///compare/v1.6.0-beta.0...v1.6.0-beta.1) (2025-11-29)
+## [1.6.0-beta.1](https://github.com/wood3n/biu/compare/v1.6.0-beta.0...v1.6.0-beta.1) (2025-11-29)
 
 ### Bug Fixes
 
@@ -840,7 +840,7 @@ Thanks to [@flystar233](https://github.com/flystar233)
 
 Thanks to [@flystar233](https://github.com/flystar233)
 
-## [1.6.0-beta.0](///compare/v1.5.3-beta.1...v1.6.0-beta.0) (2025-11-28)
+## [1.6.0-beta.0](https://github.com/wood3n/biu/compare/v1.5.3-beta.1...v1.6.0-beta.0) (2025-11-28)
 
 ### Features
 

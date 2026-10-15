@@ -157,7 +157,7 @@ pnpm store prune
 
 ## 七、项目级配置说明
 
-项目根目录的 [.npmrc](../.npmrc) 已经固化了以下配置（对所有开发者生效）：
+项目根目录的 [.npmrc](../../.npmrc) 已经固化了以下配置（对所有开发者生效）：
 
 ```ini
 registry=https://registry.npmmirror.com        # 国内镜像
