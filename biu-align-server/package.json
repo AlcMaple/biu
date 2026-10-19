@@ -1,0 +1,30 @@
+{
+  "name": "biu-align-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Biu 歌词时间轴对齐服务 - 服务端拉 B 站音频，Demucs + MMS_FA 强制对齐，按投稿 + 歌词缓存；用户上传歌词经审核后共享",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.6"
+  }
+}
