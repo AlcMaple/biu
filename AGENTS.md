@@ -200,15 +200,15 @@
 
 # 提交规范
 
-- commit message 用 **Conventional Commits + 中文描述**：`<type>(<scope>): <描述>`（对齐仓库 `commitlint.config.mjs` 与 [`docs/Git.md`](./docs/Git.md)）。
+- commit message 用 **Conventional Commits + 中文描述**：`<type>(<scope>): <描述>`（对齐仓库 `commitlint.config.mjs` 与 [`docs/Git.md`](./docs/Git.md)）
   - type：`feat` `fix` `docs` `refactor` `perf` `style` `test` `build` `ci` `chore` `revert`
-  - scope 可选，用模块名（`play-list` `ipc` `lyrics` `android` 等）；改动全局或归不到具体模块就省略。
-- 标题写用户 / 开发者能看懂的**现象或结果**，不堆底层术语（术语放正文）。
-  例：`fix: 修复「我喜欢的音乐」歌单选中时其他本地歌单被选中`，不是 `fix: play-list store selectedId 比较逻辑`。
-- 正文按需写：简单改动只要标题；复杂 / 踩过坑的改动才写正文，正文只写关键原因 / 决策。
-- **不加 AI 署名 trailer**（如 `Co-Authored-By: Claude ...`）——提交历史统一以开发者身份呈现（与现有 `git log` 一致）。
-- 只在用户明确要求时才 commit / push；在默认分支上先建分支再改。
-- **提交前先按 [`DEVLOG.md`](./DEVLOG.md) 的分类规则补一条日志**——专题写入 `docs/devlog/<年份>-<专题>.md`，单次改动写根文件；交付前必经步骤，不是可选项。
+  - scope 可选，用模块名（`play-list` `ipc` `lyrics` `android` 等）；改动全局或归不到具体模块就省略
+- 标题写用户 / 开发者能看懂的**现象或结果**，不堆底层术语（术语放正文）
+  例：`fix: 修复「我喜欢的音乐」歌单选中时其他本地歌单被选中`，不是 `fix: play-list store selectedId 比较逻辑`
+- 正文按需写：简单改动只要标题；复杂 / 踩过坑的改动才写正文，正文只写关键原因 / 决策
+- **不加 AI 署名 trailer**（如 `Co-Authored-By: Claude ...`）——提交历史统一以开发者身份呈现（与现有 `git log` 一致）
+- 只在用户明确要求时才 commit / push
+- **提交前先按 [`DEVLOG.md`](./DEVLOG.md) 的分类规则补一条日志**——专题写入 `docs/devlog/<年份>-<专题>.md`，单次改动写根文件；交付前必经步骤，不是可选项
 
 # Compact instructions
 
