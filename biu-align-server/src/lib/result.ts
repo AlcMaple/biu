@@ -112,7 +112,10 @@ export function buildAlignment(
   const scores = output.lines.filter(l => l.t.length).map(l => l.score);
   return {
     alignerVersion: ALIGNER_VERSION,
-    ...target,
+    // 逐个取字段，不能 ...target：调用方传的是整个任务对象，展开会把提交者 mid、任务 id 一起写进缓存，再经公开接口返回给所有人
+    bvid: target.bvid,
+    cid: target.cid,
+    lyricsHash: target.lyricsHash,
     video: { title: page.title, part: page.part, durationSec: page.durationSec },
     lines,
     quality: {

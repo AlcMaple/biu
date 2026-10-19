@@ -126,6 +126,21 @@ describe("对齐 → 提交 → 审核 → 所有人可用", () => {
     );
 
     const pub = await call("GET", `/lyrics/${BV}/1`);
+    // 公开接口只能有这些字段：不能带出提交者 mid、任务 id 等内部信息
+    expect(Object.keys(pub.json.alignment).sort()).toEqual(
+      [
+        "alignerVersion",
+        "bvid",
+        "cid",
+        "createdAt",
+        "lines",
+        "lrc",
+        "lyricsHash",
+        "offsetSec",
+        "quality",
+        "video",
+      ].sort(),
+    );
     expect(pub.json.alignment.lyricsHash).toBe(done.json.alignment.lyricsHash);
     expect((await call("POST", "/lyrics/submissions", "2", { bvid: BV, cid: 1, lyrics: LYRICS })).json.error.code).toBe(
       "ALREADY_APPROVED",
