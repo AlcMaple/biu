@@ -70,11 +70,53 @@ venv/bin/python worker/align.py <音频> <歌词.json> /tmp/out.json /tmp/work  
 
 MMS_FA 权重是 **CC-BY-NC 4.0**（非商业）。Biu 本身非商业可以用；部署方若用于商业用途需另行评估。
 
-## 本地开发
+## 三种开发方式
+
+真对齐要 Python、约 1.3 GB 模型和每首约 2 分钟 CPU，但大多数开发工作用不到它。按你要改什么选：
+
+| 你要改的 | 用哪种 | 需要 Python / 模型 | 需要 B 站网络 |
+|---|---|---|---|
+| 接口、队列、审核流程、错误文案；客户端界面、轮询、预览 | **① mock 模式** | 不需要 | 不需要 |
+| 对齐效果本身（`worker/align.py`、判错阈值、清洗规则对结果的影响） | **② 完整本地** | 需要 | 需要 |
+| 只改客户端，想看真实对齐效果 | **③ 连已部署的服务** | 不需要 | 需要 |
+
+所有方式都先装 Node 依赖、生成配置：
 
 ```bash
 pnpm install
-cp .env.example .env   # JWT_SECRET 与本地 biu-sync-server 相同；PYTHON_BIN、DATA_DIR 按本机填
-pnpm dev
-pnpm test
+cp .env.example .env    # JWT_SECRET 填一串随机字符；DATA_DIR 改成本机可写的目录，比如 ./.data
+pnpm test               # 单测全部用假 worker，不依赖 Python
 ```
+
+### ① mock 模式：几秒出假结果
+
+```bash
+pnpm dev:mock                 # 或 ALIGN_WORKER=mock pnpm dev
+pnpm token 123456             # 签一个 mid=123456 的测试 token（想测审核员，就把它加进 .env 的 ADMIN_MIDS）
+```
+
+mock 模式不访问 B 站、不跑 Python，等 `MOCK_DELAY_MS`（默认 3 秒）后返回假时间轴：有原歌词时间就整体推后 0.3 s，纯文本就每行 3 秒顺排。
+队列、配额、轮询、提交、审核和真实模式走的是同一套代码，只有「取音频 + 对齐」两步被替换。
+
+- 结果存在 `DATA_DIR/alignments/mock/`，和真实结果分开：之后切回真实模式不会读到假数据。
+- `NODE_ENV=production` 下拒绝启动，避免假时间轴被缓存、经审核共享给所有人。
+- 拿不到 B 站相关的错误（限流、PCDN、下载失败）。要测这些文案，用 ② 或单测。
+
+### ② 完整本地：真实对齐
+
+按上面「Python 环境」装好 venv 和权重，`.env` 里 `PYTHON_BIN` 指向 venv 的 python，然后 `pnpm dev`。
+macOS 不用装 ffmpeg；Linux / Windows 需要 ffmpeg 在 PATH 里。只想调 `align.py`，不必起服务，直接跑：
+
+```bash
+venv/bin/python worker/align.py <音频> <歌词.json> /tmp/out.json /tmp/work
+```
+
+每首约 2 分钟。Python 进程峰值约 2.5 GB，开发机内存建议 8 GB 以上。
+
+### ③ 连已部署的服务
+
+客户端把对齐服务地址配到已部署的实例，token 走正常登录（客户端在同步服务 `/api/auth/exchange` 用 B 站 cookie 换取）。
+服务端代码不用在本地跑。注意：
+
+- 用别人部署的实例，会占用部署方的 CPU 和你账号的每日次数（默认 20 首 / 天）。fork 后长期开发，建议按「部署模型」自己部署一份。
+- 只有和部署方同一个 `JWT_SECRET` 签出的 token 才能用。所以 ③ 只能走正常登录，`pnpm token` 签的在那边无效。

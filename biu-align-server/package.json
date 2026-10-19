@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:mock": "tsx watch src/index.ts --mock",
+    "token": "tsx scripts/dev-token.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

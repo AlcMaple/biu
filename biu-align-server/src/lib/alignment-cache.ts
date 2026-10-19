@@ -12,10 +12,14 @@ const MEMORY_ENTRIES = 200;
 export class AlignmentCache {
   private memory = new Map<string, Alignment>();
 
-  constructor(private readonly dataDir: string) {}
+  // mock 模式用单独的命名空间：同一个 DATA_DIR 切回真实模式时，假结果不会被当成真的返回
+  constructor(
+    private readonly dataDir: string,
+    private readonly namespace = `v${ALIGNER_VERSION}`,
+  ) {}
 
   private file(key: string) {
-    return path.join(this.dataDir, "alignments", `v${ALIGNER_VERSION}`, `${key}.json`);
+    return path.join(this.dataDir, "alignments", this.namespace, `${key}.json`);
   }
 
   async get(key: string): Promise<Alignment | undefined> {

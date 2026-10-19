@@ -18,7 +18,18 @@ const num = (name: string, fallback: number) => {
   return Number.isFinite(value) ? value : fallback;
 };
 
+// mock：不访问 B 站、不跑 Python，给出假对齐结果，供本地开发调界面和流程（见 README「三种开发方式」）。
+// 生产环境开 mock 会把假时间轴写进缓存、经审核共享给所有人，所以直接拒绝启动
+// 命令行 --mock 与环境变量等价：npm script 里写 VAR=x 前缀在 Windows cmd 下不生效
+const alignWorker = process.env.ALIGN_WORKER === "mock" || process.argv.includes("--mock") ? "mock" : "python";
+if (alignWorker === "mock" && process.env.NODE_ENV === "production") {
+  console.error("[fatal] ALIGN_WORKER=mock 不能在 NODE_ENV=production 下使用");
+  process.exit(1);
+}
+
 export const config = {
+  alignWorker,
+  mockDelayMs: num("MOCK_DELAY_MS", 3000),
   port: num("PORT", 3003),
   // 与 biu-sync-server 共用同一个密钥：客户端已经在那边用 B 站 cookie 换过 token，这里只验签，不再接一套登录
   jwtSecret: required("JWT_SECRET"),

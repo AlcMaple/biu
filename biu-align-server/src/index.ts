@@ -6,16 +6,18 @@ import { AlignmentCache } from "./lib/alignment-cache.js";
 import { isAdmin } from "./lib/auth.js";
 import { downloadAudio, getVideoPage } from "./lib/bilibili.js";
 import { config } from "./lib/config.js";
+import { mockDownloadAudio, mockGetVideoPage, mockRunWorker } from "./lib/mock.js";
 import { AlignQueue } from "./lib/queue.js";
 import { SubmissionStore } from "./lib/submissions.js";
 import { runWorker } from "./lib/worker.js";
 
-const cache = new AlignmentCache(config.dataDir);
+const mock = config.alignWorker === "mock";
+const cache = new AlignmentCache(config.dataDir, mock ? "mock" : undefined);
 const queue = new AlignQueue({
   cache,
-  runWorker,
-  getVideoPage,
-  downloadAudio,
+  runWorker: mock ? mockRunWorker(config.mockDelayMs) : runWorker,
+  getVideoPage: mock ? mockGetVideoPage : getVideoPage,
+  downloadAudio: mock ? mockDownloadAudio : downloadAudio,
   workDir: config.workDir,
   queueMax: config.queueMax,
   dailyQuota: config.dailyQuota,
@@ -31,5 +33,6 @@ createApp({
   corsOrigin: config.corsOrigin,
 }).listen(config.port, "127.0.0.1", () => {
   console.log(`[biu-align-server] listening on http://127.0.0.1:${config.port}`);
+  if (mock) console.warn("[biu-align-server] mock 模式：不访问 B 站、不跑 Python，对齐结果是假的，只用于开发");
   if (!config.adminMids.size) console.warn("[biu-align-server] ADMIN_MIDS 为空，提交的歌词没有人能审核");
 });
