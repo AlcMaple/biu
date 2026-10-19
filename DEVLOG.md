@@ -22,6 +22,12 @@
 - [快捷键焦点反馈](docs/devlog/2026-快捷键焦点反馈.md)
 - [私人FM / 心动模式](docs/devlog/2026-私人FM.md)
 
+## 2026-10-19 fix: 选流时识别域名不带 mcdn 的 PCDN 节点，下载也避开 PCDN
+
+**效果**：桌面版与 Android 播放时，`*.edge.mountaintoys.cn:4483` 这类域名看不出是 PCDN、只有查询参数 `os=mcdn` / `mcdnid` 能识别的节点，不再排在候选第一位，正规 upos 源优先，PCDN 仍保留在末尾兜底。此前这类节点排第一时，要等播放出错或卡死看门狗触发后才自动换源，用户会先看到「播放卡顿，正在切换播放源…」。桌面版下载以前直接取 `baseUrl` / `cdns[0]`，现在和播放用同一套排序。Web 版不受影响：服务端代理本就只放行 upos / cn- 节点。
+
+**关键代码**：PCDN 判断与排序移到 [`shared/bilibili-stream.ts`](shared/bilibili-stream.ts)，渲染层 `src/common/utils/audio.ts` 与主进程 `electron/ipc/download/download-core.ts` 共用；只按实测样例认 `os=mcdn` 与 `mcdnid`，没见过的参数值不猜。单测见 `tests/bilibili-stream.test.ts`。
+
 ## 2026-10-15 docs: 移除文档中的无效链接
 
 **效果**：lychee 报出的 27 条错误里，16 条真实失效的内部链接已修好：CHANGELOG 三处 compare 链接补全 GitHub 前缀；优雅退出、听歌识曲、依赖管理、歌词对齐测试指南等文档里层级写错的相对路径改正；已删除的自动更新部署指南改指向「服务器首次配置」；功能索引的 PCDN 复盘补上目录。

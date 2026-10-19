@@ -8,6 +8,8 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import PQueue from "p-queue";
 
+import { collectStreamUrls } from "@shared/bilibili-stream";
+
 import type { FullMediaDownloadTask, MediaDownloadChunk } from "./types";
 
 import { UserAgent } from "../../network/user-agent";
@@ -201,9 +203,10 @@ export class DownloadCore extends EventEmitter {
     if (this.sid) {
       const getStreamUrlRes = await getAudioWebStreamUrl(this.sid);
 
-      if (getStreamUrlRes.data?.cdns?.[0]) {
+      const cdnUrl = collectStreamUrls(undefined, getStreamUrlRes.data?.cdns)[0];
+      if (cdnUrl) {
         const isFlac = getStreamUrlRes?.data?.type === 3;
-        this.audioUrl = getStreamUrlRes.data?.cdns?.[0];
+        this.audioUrl = cdnUrl;
         this.audioCodecs = isFlac ? "flac" : "aac";
         this.audioBandwidth = getStreamAudioBandwidth(getStreamUrlRes?.data?.type);
       }
@@ -216,16 +219,13 @@ export class DownloadCore extends EventEmitter {
 
       const audioList = sortAudio(dashData?.data?.dash?.audio ?? []);
       const bestVideoInfo = dashData?.data?.dash?.video?.[0];
-      const videoUrl = bestVideoInfo?.baseUrl || bestVideoInfo?.backupUrl?.[0];
+      const videoUrl = collectStreamUrls(bestVideoInfo?.baseUrl, bestVideoInfo?.backupUrl)[0];
       const flacAudio = dashData?.data?.dash?.flac?.audio;
       const dolbyAudio = dashData?.data?.dash?.dolby?.audio?.[0];
       this.audioUrl =
-        flacAudio?.baseUrl ||
-        flacAudio?.backupUrl?.[0] ||
-        dolbyAudio?.baseUrl ||
-        dolbyAudio?.backupUrl?.[0] ||
-        audioList[0]?.baseUrl ||
-        audioList[0]?.backupUrl?.[0];
+        collectStreamUrls(flacAudio?.baseUrl, flacAudio?.backupUrl)[0] ||
+        collectStreamUrls(dolbyAudio?.baseUrl, dolbyAudio?.backupUrl)[0] ||
+        collectStreamUrls(audioList[0]?.baseUrl, audioList[0]?.backupUrl)[0];
       this.audioCodecs = flacAudio?.codecs || dolbyAudio?.codecs || audioList[0]?.codecs;
       this.audioBandwidth = flacAudio?.bandwidth || dolbyAudio?.bandwidth || audioList[0]?.bandwidth;
       if (this.outputFileType === "video") {

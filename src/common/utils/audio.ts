@@ -4,6 +4,7 @@ import { log } from "@/platform";
 import { getAudioWebStreamUrl } from "@/service/audio-web-url";
 import { getPlayerPlayurl, type DashAudio } from "@/service/player-playurl";
 import { useUser } from "@/store/user";
+import { collectStreamUrls } from "@shared/bilibili-stream";
 import { getBilibiliMediaProxyExpiry, isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
 
 import { audioQualitySort } from "../constants/audio";
@@ -35,26 +36,6 @@ function sortAudio(audio: DashAudio[]) {
     return indexB - indexA;
   });
 }
-
-/**
- * PCDN/MCDN 节点（如 xy…xy.mcdn.bilivideo.cn、*.szbdyd.com）对第三方播放器限速严重，
- * 常出现播放几秒后卡死或直接返回坏数据（MediaError code 4 Format error）。
- * B 站经常把这类节点放在 baseUrl，稳定的 upos 源在 backupUrl 里。
- */
-const isPcdnUrl = (url: string) => {
-  try {
-    const { hostname } = new URL(url);
-    return hostname.endsWith(".mcdn.bilivideo.cn") || hostname.endsWith(".szbdyd.com");
-  } catch {
-    return false;
-  }
-};
-
-/** 从 baseUrl/backupUrl 收集去重后的候选地址，按“正规源优先、PCDN 兜底”排序 */
-const collectStreamUrls = (baseUrl?: string, backupUrl?: string[]) => {
-  const candidates = [...new Set([baseUrl, ...(backupUrl || [])].filter((url): url is string => Boolean(url)))];
-  return [...candidates.filter(url => !isPcdnUrl(url)), ...candidates.filter(url => isPcdnUrl(url))];
-};
 
 function selectAudioByQuality(audioList: DashAudio[], quality: AudioQuality): DashAudio | undefined {
   if (!audioList.length) return undefined;
@@ -162,10 +143,11 @@ export const getAudioUrl = async (sid: number | string, config?: { signal?: Abor
   );
 
   const isFlac = res?.data?.type === 3;
+  const audioUrlCandidates = collectStreamUrls(undefined, res?.data?.cdns);
 
   return {
-    audioUrl: res?.data?.cdns?.[0],
-    audioUrlCandidates: res?.data?.cdns || [],
+    audioUrl: audioUrlCandidates[0],
+    audioUrlCandidates,
     audioCodecs: isFlac ? "flac" : "",
     isLossless: isFlac,
   };
