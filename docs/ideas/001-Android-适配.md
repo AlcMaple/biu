@@ -70,7 +70,7 @@ Biu 在 Android 上可安装运行，核心功能（登录 / 搜索 / 播放 / �
   但 UX 不达预期（拖拽过程中 currentTime 还在前进，松手时算出来的
   offset 总是滞后 1~2 秒；视觉上拖拽态下视口冻结、活跃行不动，又跟
   播放进度脱节让人困惑）。**整体方案已撤**，下次别再走这条路；要做
-  时间轴对齐换 ASR + DTW 方向，见 `docs/lyrics/lyrics-alignment-spec.md`
+  时间轴对齐换 ASR + DTW 方向，见 `docs/ideas/002-歌词时间轴对齐.md`
 
 ### Android UI 路线
 **目标效果**：Android 端界面可用，且不额外制造一套需要长期维护的代码。
