@@ -6,7 +6,7 @@
 #   歌词.json：[{"t": 原时间秒（没有时填 0）, "text": "一行歌词"}, …]，已由 Node 侧清洗过
 #   输出.json：{"lines": [{"text", "chars", "t", "score", "repaired"}], "offset", "frameMs"}
 # 失败时向 stderr 打一行 "ALIGN_ERROR <代码> <说明>" 并以非 0 退出，Node 侧据此分类错误文案。
-import json, os, re, subprocess, sys
+import json, os, re, shutil, subprocess, sys
 import numpy as np, soundfile as sf, scipy.signal as ss, torch, torchaudio
 import torchaudio.functional as F
 from pypinyin import lazy_pinyin, Style
@@ -22,15 +22,31 @@ rows = json.load(open(lyrics_path, encoding='utf-8'))
 if not rows: fail('LYRICS_EMPTY', '歌词为空')
 
 # 离线评测时用已分离好的人声，跳过 1.5 min 的 Demucs；服务里不设这个变量
+def to_wav(src, dst):
+    # Demucs 读 m4a 要靠 ffmpeg；部署用的 Mac mini 没装 ffmpeg，而系统自带的 afconvert 能直接读 B 站的 DASH 音频。
+    # 先转成 wav，两种部署环境都能跑：有 ffmpeg 用 ffmpeg（Linux），没有就用 afconvert（macOS）
+    if shutil.which('ffmpeg'):
+        cmd = ['ffmpeg', '-v', 'error', '-y', '-i', src, '-ac', '2', '-ar', '44100', dst]
+    elif shutil.which('afconvert'):
+        cmd = ['afconvert', '-f', 'WAVE', '-d', 'LEI16@44100', src, dst]
+    else:
+        fail('SEPARATION_FAILED', '找不到 ffmpeg 或 afconvert，无法解码音频')
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(dst):
+        fail('SEPARATION_FAILED', f'音频解码失败：{(r.stderr or r.stdout).strip()[:300]}')
+
+
 vocals = os.environ.get('BIU_ALIGN_VOCALS')
 if not vocals:
+    wav_in = os.path.join(workdir, 'input.wav')
+    to_wav(audio, wav_in)
     # Apple 芯片上 Demucs 走 MPS 会报错或结果异常，固定用 CPU
-    r = subprocess.run([sys.executable, '-m', 'demucs', '-d', 'cpu', '--two-stems', 'vocals', '-o', workdir, audio],
+    r = subprocess.run([sys.executable, '-m', 'demucs', '-d', 'cpu', '--two-stems', 'vocals', '-o', workdir, wav_in],
                        capture_output=True, text=True)
     if r.returncode != 0:
         tail = (r.stderr or r.stdout).strip().splitlines()
         fail('SEPARATION_FAILED', tail[-1][:300] if tail else 'demucs 退出码非 0')
-    vocals = os.path.join(workdir, 'htdemucs', os.path.splitext(os.path.basename(audio))[0], 'vocals.wav')
+    vocals = os.path.join(workdir, 'htdemucs', 'input', 'vocals.wav')
 if not os.path.exists(vocals): fail('SEPARATION_FAILED', '没有生成人声轨')
 
 bundle = torchaudio.pipelines.MMS_FA

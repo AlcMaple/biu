@@ -1,0 +1,9 @@
+# 与开发验证时的版本一致（调研 5.2.9 ~ 5.2.15 的数据都在这套版本上测出）。
+# torchaudio 不要升到 2.9：forced_align 在 2.9 被移除
+torch==2.8.0
+torchaudio==2.8.0
+demucs==4.0.1
+pypinyin==0.55.0
+soundfile==0.13.1
+scipy==1.17.1
+numpy==2.4.2

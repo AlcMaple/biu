@@ -47,12 +47,26 @@ Demucs 分离人声 → MMS_FA 强制对齐，得到每行、每字的时间。�
 
 ## Python 环境
 
-worker 依赖：`torch`、`torchaudio`（含 MMS_FA，首次运行会下载约 1.2 GB 权重到 `~/.cache/torch`）、`demucs`（首次约 80 MB 权重）、
-`pypinyin`、`soundfile`、`scipy`、`numpy`。`PYTHON_BIN` 指向装好这些包的解释器。部署后先手动跑一次下载权重：
+依赖版本锁在 [`worker/requirements.txt`](worker/requirements.txt)（算法数据都在这套版本上测出；`torchaudio` 不能升到 2.9，`forced_align` 在 2.9 被移除）。
+建一个专用 venv，`PYTHON_BIN` 指向它：
 
 ```bash
-python worker/align.py <任意音频> <歌词.json> /tmp/out.json /tmp/work
+python3 -m venv venv
+venv/bin/python -m pip install -r worker/requirements.txt   # 国内可加 -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
+
+模型权重首次运行时自动下载到 `~/.cache/torch/hub/checkpoints/`：MMS_FA `model.pt` 约 1.2 GB，Demucs `955717e8-8726e21a.th` 约 80 MB。
+国内下载慢时，可以从已有机器把这两个文件原样拷过去。装好后跑一次 worker 做冒烟测试：
+
+```bash
+venv/bin/python worker/align.py <音频> <歌词.json> /tmp/out.json /tmp/work   # 歌词.json 格式见 align.py 顶部注释
+```
+
+**音频解码**：worker 先把音频转成 wav 再分离人声。有 `ffmpeg` 用 ffmpeg（Linux 部署需要装）；没有就用 macOS 自带的 `afconvert`，
+它能直接读 B 站 DASH 音频，所以 macOS 上不用装 ffmpeg。
+
+**进程优先级**：macOS 上用 launchd 跑时，`ProcessType` 不要设成 `Background`。系统会对后台进程大幅限 CPU，一首 2 分钟的任务会被拖长很多。
+用 `Standard` 加 `Nice 5`，既不拖慢对齐，也不挤占同机其他服务。
 
 MMS_FA 权重是 **CC-BY-NC 4.0**（非商业）。Biu 本身非商业可以用；部署方若用于商业用途需另行评估。
 
