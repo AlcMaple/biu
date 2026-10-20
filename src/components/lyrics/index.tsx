@@ -19,6 +19,7 @@ import LyricsAlignModal, { type LyricsEditMode } from "../lyrics-align-modal";
 import ReportModal from "../lyrics-align-modal/report-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import AlignBar from "./align-bar";
+import AlignStatus from "./align-status";
 import FontSizeControl from "./font-size-control";
 import { karaokeTiming } from "./karaoke";
 import KaraokeText from "./karaoke-text";
@@ -367,6 +368,7 @@ const Lyrics = ({
     <>
       <div className="group/lyrics relative flex h-full w-full items-center justify-center overflow-hidden">
         <AlignBar onSearchLyrics={onOpenSearch} onUploadLyrics={() => void handleAlignAction("upload")} />
+        <AlignStatus />
         <div
           ref={containerRef}
           className="no-scrollbar relative h-full w-full max-w-4xl overflow-y-auto"

@@ -8,10 +8,11 @@ export interface KaraokeTiming {
   end: number;
 }
 
-// 没对齐过的歌词只有行时间，按字数在行内平均摊。网易云 / LrcLib 的时间轴本来就和 B 站音频有出入，均摊是近似，
-// 但上限必须有：行后面接长间奏时，摊到下一行会让这一句慢吞吞爬十几秒，看起来比不高亮还怪。
-// 0.6 s/字大约是慢歌的咬字速度，快歌的行间隔本来就短，触不到这个上限
-export const SYNTH_MAX_MS_PER_UNIT = 600;
+// 没对齐过的歌词只有行时间，按字数从本行时间匀速摊到下一行开始，和接入对齐前桌面歌词的整行填色同一口径：
+// 填色和原歌词的行时间一一对应，下一行开始时本行正好填满。
+// 曾按 0.6 s/字封顶防长间奏前慢慢爬，结果约一半的行提前填满后整行亮着干等，看起来和原歌词对不上，已去掉。
+// 最后一行没有下一行可参照，沿用当时的 5 s
+export const SYNTH_LAST_LINE_MS = 5000;
 
 // 对齐结果只有每个字的起点；最后一个字没有下一字可参照，按这么长填满，避免拖到下一行开始才填完
 export const LAST_WORD_MAX_MS = 1200;
@@ -46,7 +47,8 @@ export function karaokeTiming(line: LyricLine, nextTime?: number): KaraokeTiming
   }
   const units = splitUnits(line.text);
   if (!units.length) return { words: [], end: line.time };
-  const per = Math.min((limit - line.time) / units.length, SYNTH_MAX_MS_PER_UNIT);
+  const span = Number.isFinite(limit) ? limit - line.time : SYNTH_LAST_LINE_MS;
+  const per = span / units.length;
   return {
     words: units.map((text, i) => ({ text, time: line.time + Math.round(i * per) })),
     end: line.time + Math.round(units.length * per),

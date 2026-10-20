@@ -4,7 +4,7 @@ import {
   karaokeTiming,
   LAST_WORD_MAX_MS,
   splitUnits,
-  SYNTH_MAX_MS_PER_UNIT,
+  SYNTH_LAST_LINE_MS,
   wordProgress,
 } from "@/components/lyrics/karaoke";
 
@@ -24,14 +24,14 @@ describe("timing for lines without per-word data", () => {
     expect(end).toBe(3000);
   });
 
-  it("caps the pace before a long interlude instead of crawling until the next line", () => {
-    const { words, end } = karaokeTiming({ time: 0, text: "一二三" }, 20_000);
-    expect(words.map(w => w.time)).toEqual([0, SYNTH_MAX_MS_PER_UNIT, 2 * SYNTH_MAX_MS_PER_UNIT]);
-    expect(end).toBe(3 * SYNTH_MAX_MS_PER_UNIT);
+  it("keeps filling until the next line even before a long interlude, like the original line timing", () => {
+    const { words, end } = karaokeTiming({ time: 0, text: "一二三" }, 21_000);
+    expect(words.map(w => w.time)).toEqual([0, 7000, 14_000]);
+    expect(end).toBe(21_000);
   });
 
-  it("uses the same cap for the last line, which has no next line", () => {
-    expect(karaokeTiming({ time: 0, text: "一二" }).end).toBe(2 * SYNTH_MAX_MS_PER_UNIT);
+  it("gives the last line, which has no next line, a fixed span", () => {
+    expect(karaokeTiming({ time: 1000, text: "一二" }).end).toBe(1000 + SYNTH_LAST_LINE_MS);
   });
 });
 
