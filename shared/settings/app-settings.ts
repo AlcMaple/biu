@@ -1,3 +1,5 @@
+import { DEFAULT_ALIGN_SERVER_URL } from "../lyrics-align";
+
 export const defaultAppSettings: AppSettings = {
   autoStart: false,
   closeWindowOption: "hide",
@@ -29,4 +31,5 @@ export const defaultAppSettings: AppSettings = {
   reportPlayHistory: true,
   localMusicDirs: [],
   volumeBoost: 100,
+  alignServerUrl: DEFAULT_ALIGN_SERVER_URL,
 };

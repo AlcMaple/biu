@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { createAcmeChallengeProxyHandler, type AcmeChallengeProxyHandler } from "./acme-challenge-proxy.js";
+import { createBiuAlignProxyHandler, type BiuAlignProxyHandler } from "./align-proxy.js";
 import { createWebAuthHandler, type WebAuthHandler } from "./auth/handler.js";
 import { createClientLogHandler, type ClientLogHandler } from "./client-log.js";
 import { createWebLyricsProxyHandler, type WebLyricsProxyHandler } from "./lyrics-proxy.js";
@@ -12,6 +13,7 @@ export const WEB_HEALTH_PATH = "/__biu_health";
 
 export interface WebApplicationHandlerOptions {
   acmeChallengeHandler?: AcmeChallengeProxyHandler;
+  alignProxyHandler?: BiuAlignProxyHandler;
   authHandler?: WebAuthHandler;
   clientIpHeader?: string;
   clientLogHandler?: ClientLogHandler;
@@ -50,6 +52,7 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
       : undefined);
   const lyricsProxyHandler = options.lyricsProxyHandler ?? createWebLyricsProxyHandler();
   const syncProxyHandler = options.syncProxyHandler ?? createBiuSyncProxyHandler({ publicOrigin });
+  const alignProxyHandler = options.alignProxyHandler ?? createBiuAlignProxyHandler({ publicOrigin });
 
   return async (request, response, next) => {
     response.setHeader("Referrer-Policy", "no-referrer");
@@ -70,6 +73,7 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
     if (await lyricsProxyHandler(request, response)) return true;
     if (await authHandler(request, response)) return true;
     if (await syncProxyHandler(request, response)) return true;
+    if (await alignProxyHandler(request, response)) return true;
     if (await proxyHandler(request, response)) return true;
 
     next?.();

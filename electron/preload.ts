@@ -24,6 +24,7 @@ const api: ElectronAPI = {
   getNeteaseLyrics: params => ipcRenderer.invoke(channel.lyrics.getNeteaseLyrics, params),
   neteaseAudioMatch: params => ipcRenderer.invoke(channel.lyrics.neteaseAudioMatch, params),
   searchLrclibLyrics: params => ipcRenderer.invoke(channel.lyrics.searchLrclib, params),
+  alignRequest: req => ipcRenderer.invoke(channel.lyrics.alignRequest, req),
   setProxySettings: proxySettings => ipcRenderer.invoke(channel.app.setProxySettings, proxySettings),
   scanLocalMusic: dirs => ipcRenderer.invoke(channel.localMusic.scan, dirs),
   deleteLocalMusicFile: filePath => ipcRenderer.invoke(channel.localMusic.deleteFile, filePath),

@@ -39,6 +39,7 @@ export const channel = {
     getNeteaseLyrics: "lyrics:netease-lyrics",
     neteaseAudioMatch: "lyrics:netease-audio-match",
     searchLrclib: "lyrics:lrclib-search",
+    alignRequest: "lyrics:align-request",
     syncWithWhisperXStart: "lyrics:sync-whisperx-start",
     syncWithWhisperXProgress: "lyrics:sync-whisperx-progress",
     syncWithWhisperXDone: "lyrics:sync-whisperx-done",

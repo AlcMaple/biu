@@ -3,6 +3,7 @@ import { Preferences } from "@capacitor/preferences";
 
 import type { Logger, Platform } from "./types";
 
+import { nativeAlignRequest } from "./align-native";
 import { isIOS } from "./detect";
 
 /**
@@ -107,6 +108,7 @@ const platform: Platform = {
   getNeteaseLyrics: async () => ({}),
   neteaseAudioMatch: async () => ({}),
   searchLrclibLyrics: async () => [],
+  alignRequest: nativeAlignRequest,
   getPlatform: () => (isIOS ? "ios" : "android"),
   setProxySettings: asyncNoop,
   updatePlaybackState: noop,

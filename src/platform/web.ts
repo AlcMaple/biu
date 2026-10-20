@@ -5,6 +5,7 @@ import {
   searchWebLrclibLyrics,
   searchWebNeteaseSongs,
 } from "@/service/web-lyrics";
+import { WEB_ALIGN_PROXY_ROOT } from "@shared/lyrics-align";
 import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
@@ -39,6 +40,29 @@ const getStorage = (): Storage | undefined => {
     return undefined;
   }
 };
+
+// 浏览器拿不到 B 站 cookie 和对齐服务 token：同源 BFF 用 Web 登录会话换 token 再转发（web-server/align-proxy.ts）
+async function webAlignRequest(req: AlignRequest): Promise<AlignResponse> {
+  try {
+    const res = await fetch(`${WEB_ALIGN_PROXY_ROOT}${req.path}`, {
+      method: req.method,
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: req.method === "POST" ? { "Content-Type": "application/json" } : undefined,
+      body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
+    });
+    try {
+      return { status: res.status, data: await res.json() };
+    } catch {
+      return {
+        status: res.status,
+        data: { error: { code: "CLIENT", message: `歌词对齐服务暂不可用（HTTP ${res.status}）` } },
+      };
+    }
+  } catch {
+    return { status: 0, data: { error: { code: "CLIENT", message: "连不上歌词对齐服务，请检查网络" } } };
+  }
+}
 
 const storageKey = (name: StoreName) => `${STORE_KEY_PREFIX}${String(name)}`;
 
@@ -202,6 +226,7 @@ const platform: Platform = {
   getNeteaseLyrics: async params => (isOfflineDemo ? {} : getWebNeteaseLyrics(params)),
   neteaseAudioMatch: async params => (isOfflineDemo ? {} : matchWebNeteaseAudio(params)),
   searchLrclibLyrics: async params => (isOfflineDemo ? [] : searchWebLrclibLyrics(params)),
+  alignRequest: webAlignRequest,
   getPlatform: getWebPlatform,
   setProxySettings: asyncNoop,
   updatePlaybackState: noop,

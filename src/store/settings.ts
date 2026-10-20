@@ -79,6 +79,7 @@ export const useSettings = create<AppSettings & SettingsActions>()(
           reportPlayHistory: state.reportPlayHistory,
           localMusicDirs: state.localMusicDirs,
           volumeBoost: state.volumeBoost,
+          alignServerUrl: state.alignServerUrl,
         };
       },
     },

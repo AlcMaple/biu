@@ -50,6 +50,8 @@ declare global {
     neteaseAudioMatch: (params: NeteaseAudioMatchParams) => Promise<NeteaseAudioMatchResponse>;
     /** 在 LrcLib 搜索歌曲/歌词 */
     searchLrclibLyrics: (params: SearchSongByLrclibParams) => Promise<SearchSongByLrclibResponse[]>;
+    /** 歌词时间轴对齐服务；只放行 shared/lyrics-align.ts 白名单里的路径，凭证留在持有它的一侧 */
+    alignRequest: (req: AlignRequest) => Promise<AlignResponse>;
     /** 获取当前应用平台 */
     getPlatform: () => AppPlatForm;
     /** 更新网络代理设置 */

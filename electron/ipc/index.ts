@@ -9,6 +9,7 @@ import { registerFontHandlers } from "./font";
 import { registerHeartbeatHandlers } from "./heartbeat";
 import { registerLocalMusicHandlers } from "./local-music";
 import { registerLyricsHandlers } from "./lyrics";
+import { registerLyricsAlignHandlers } from "./lyrics-align";
 import { registerShazamHandlers } from "./shazam";
 import { registerShortcutHandlers } from "./shortcut";
 import { registerStoreHandlers } from "./store";
@@ -24,6 +25,7 @@ export function registerIpcHandlers(props: IpcHandlerProps) {
   registerWindowHandlers(props);
   registerShortcutHandlers(props);
   registerLyricsHandlers();
+  registerLyricsAlignHandlers();
   registerLocalMusicHandlers();
   registerShazamHandlers();
   registerFancyPlayerThumbHandlers();

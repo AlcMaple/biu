@@ -36,6 +36,7 @@ const useSystemSettingsForm = () => {
     proxySettings,
     reportPlayHistory,
     volumeBoost,
+    alignServerUrl,
   } = useSettings(
     useShallow(s => ({
       fontFamily: s.fontFamily,
@@ -55,6 +56,7 @@ const useSystemSettingsForm = () => {
       proxySettings: s.proxySettings,
       reportPlayHistory: s.reportPlayHistory,
       volumeBoost: s.volumeBoost,
+      alignServerUrl: s.alignServerUrl,
     })),
   );
   const updateSettings = useSettings(s => s.update);
@@ -90,6 +92,7 @@ const useSystemSettingsForm = () => {
       },
       reportPlayHistory,
       volumeBoost,
+      alignServerUrl,
     },
   });
 

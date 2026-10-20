@@ -15,5 +15,10 @@
     "types": ["node"],
     "verbatimModuleSyntax": true
   },
-  "include": ["./**/*.ts", "../shared/bilibili-web-proxy.ts", "../shared/web-lyrics-proxy.ts"]
+  "include": [
+    "./**/*.ts",
+    "../shared/bilibili-web-proxy.ts",
+    "../shared/web-lyrics-proxy.ts",
+    "../shared/lyrics-align.ts"
+  ]
 }

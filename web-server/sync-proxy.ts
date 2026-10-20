@@ -35,7 +35,7 @@ export type BiuSyncProxyHandler = (
   next?: ProxyNext,
 ) => Promise<boolean>;
 
-class SyncProxyError extends Error {
+export class SyncProxyError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -44,7 +44,7 @@ class SyncProxyError extends Error {
   }
 }
 
-function isLoopbackHostname(hostname: string) {
+export function isLoopbackHostname(hostname: string) {
   const normalized = hostname.toLowerCase();
   return normalized === "127.0.0.1" || normalized === "::1" || normalized === "localhost";
 }
@@ -121,7 +121,7 @@ async function requestSyncService(
   }
 }
 
-class SyncTokenCache {
+export class SyncTokenCache {
   private readonly entries = new Map<string, CachedSyncToken>();
 
   constructor(

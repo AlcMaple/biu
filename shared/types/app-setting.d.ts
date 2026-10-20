@@ -44,4 +44,6 @@ interface AppSettings {
    * 因此能让「系统音量已拉满但仍很小声」的歌曲变响。
    */
   volumeBoost: number;
+  /** 歌词时间轴对齐服务地址；Web 版固定走同源转发，不读这一项 */
+  alignServerUrl: string;
 }
