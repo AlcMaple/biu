@@ -124,3 +124,11 @@ body {
     font-size: 16px;
   }
 }
+
+/* 歌词逐字填色：应用内歌词、精美播放器、桌面歌词共用同一种绿，主题统一 */
+.karaoke-fill {
+  color: #a3e635;
+  text-shadow:
+    0 0 10px rgb(163 230 53 / 55%),
+    0 1px 4px rgb(0 0 0 / 60%);
+}

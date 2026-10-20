@@ -7,16 +7,15 @@ import platform from "@/platform";
 
 import LyricsPreviewModal from "./lyrics-preview-modal";
 
-export type AdoptLyricsHandler = (lyricsText: string, tLyricsText?: string, alsoAlign?: boolean) => Promise<boolean>;
+export type AdoptLyricsHandler = (lyricsText: string, tLyricsText?: string) => Promise<boolean>;
 
 interface NeteaseTabProps {
   songs: NeteaseSong[];
   loading: boolean;
   onAdoptLyrics: AdoptLyricsHandler;
-  canAlign?: boolean;
 }
 
-const NeteaseTab = ({ songs, loading, onAdoptLyrics, canAlign }: NeteaseTabProps) => {
+const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [lyricsTitle, setLyricsTitle] = useState<string>("");
   const [lyrics, setLyrics] = useState<string>("");
@@ -72,9 +71,9 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics, canAlign }: NeteaseTabProps
   }, []);
 
   const handleAdopt = useCallback(
-    async (lyricsText: string, tLyricsText?: string, alsoAlign?: boolean) => {
+    async (lyricsText: string, tLyricsText?: string) => {
       if (!lyricsText) return;
-      const ok = await onAdoptLyrics(lyricsText, tLyricsText, alsoAlign);
+      const ok = await onAdoptLyrics(lyricsText, tLyricsText);
       if (ok) {
         setIsPreviewOpen(false);
       }
@@ -117,7 +116,6 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics, canAlign }: NeteaseTabProps
         tlyrics={tlyrics}
         loading={previewLoading}
         onAdopt={handleAdopt}
-        canAlign={canAlign}
       />
     </div>
   );

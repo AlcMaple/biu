@@ -86,7 +86,7 @@ export function createBiuAlignProxyHandler(options: BiuAlignProxyHandlerOptions 
     try {
       const session = route.auth ? await sessionResolver(request, response) : undefined;
       if (route.auth && !session) {
-        errorJson(response, 401, "请先登录 B 站，歌词对齐要用登录身份记录每日次数和提交");
+        errorJson(response, 401, "请先登录 B 站，上传歌词、报错和逐字对齐都要用登录身份");
         return true;
       }
       const body = method === "POST" ? await readProxyBody(request, MAX_ALIGN_BODY_BYTES) : Buffer.alloc(0);

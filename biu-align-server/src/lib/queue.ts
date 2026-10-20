@@ -2,20 +2,25 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-import type { AlignmentCache } from "./alignment-cache.js";
+import type { AlignmentCache, FailureCache } from "./alignment-cache.js";
 import type { downloadAudio, getVideoPage } from "./bilibili.js";
 import type { LyricLine } from "./lyrics.js";
 import type { RunWorker } from "./worker.js";
 
-import { AlignError } from "./errors.js";
+import { AlignError, type AlignErrorCode } from "./errors.js";
 import { type Alignment, buildAlignment, looksMismatched } from "./result.js";
 
 type JobState = "queued" | "running" | "done" | "failed";
+
+// auto = 客户端播到一首歌时自动发起；upload = 用户上传歌词后服务端代为对齐，供审核员预览；
+// manual = 管理员手动对齐，用来判断是算法错了还是别的原因，插到队首
+export type JobOrigin = "auto" | "upload" | "manual";
 
 interface Job {
   id: string;
   key: string;
   mid: string;
+  origin: JobOrigin;
   bvid: string;
   cid: string;
   lyricsHash: string;
@@ -41,47 +46,61 @@ export interface JobView {
 
 export interface QueueDeps {
   cache: AlignmentCache;
+  failures: FailureCache;
   runWorker: RunWorker;
   getVideoPage: typeof getVideoPage;
   downloadAudio: typeof downloadAudio;
   workDir: string;
-  queueMax: number;
-  dailyQuota: number;
-  isAdmin: (mid: string) => boolean;
+  // 对齐成功后的处理（自动对齐的结果直接对所有人生效）；出错只记日志，不影响任务本身已成功
+  onAligned?: (job: { origin: JobOrigin; bvid: string; cid: string; lyricsHash: string }) => Promise<void>;
 }
 
 const FINISHED_JOB_TTL_MS = 60 * 60_000;
 
+// 这些失败换谁来、什么时候来都一样，记下来，后面的听众不再白跑 2 min；服务器侧原因（限流、下载失败、崩溃）不记
+const STICKY_FAILURES = new Set<AlignErrorCode>(["LYRICS_MISMATCH", "AUDIO_TOO_SHORT", "VIDEO_TOO_LONG"]);
+
+const isActive = (j: Job) => j.state === "queued" || j.state === "running";
+
 // 单并发：对齐吃满 CPU（Demucs 1.5 min + MMS 40 s），两首同时跑只会都变慢，还可能把这台机上的其他服务挤掉。
-// 任务只放内存：重启后客户端查不到会得到 JOB_NOT_FOUND 并提示重新提交；已完成的结果在磁盘缓存里，不会白算。
+// 不设排队上限、不限每人每天次数：用户是来听歌的，自动对齐是为了下次再听时有逐字歌词，排得慢只是部署方多花算力。
+// 但一个人连切几十首会排进几十个任务，所以出队不是先来先到：管理员手动的最先；其余按人轮转，每人取他最近点的那首
+// （正在听的那首最有用），切歌狂人只占自己那一份，不会把别人挤到一小时后。
+// 任务只放内存：重启后客户端查不到会得到 JOB_NOT_FOUND；已完成的结果在磁盘缓存里，不会白算。
 export class AlignQueue {
   private jobs = new Map<string, Job>();
   private waiting: Job[] = [];
   private running?: Job;
-  private quota = new Map<string, { day: string; used: number }>();
+  // mid → 上次轮到他的时刻；越久没轮到越先
+  private lastServed = new Map<string, number>();
 
   constructor(private readonly deps: QueueDeps) {}
 
   async submit(input: {
     mid: string;
+    origin: JobOrigin;
     bvid: string;
     cid: string;
     lyricsHash: string;
     lines: LyricLine[];
   }): Promise<JobView> {
-    const { cache } = this.deps;
+    const { cache, failures } = this.deps;
     const key = cacheKey(input);
-    const cached = await cache.get(key);
-    if (cached) return { id: null, state: "done", alignment: cached };
+    const manual = input.origin === "manual";
 
-    const same = [...this.jobs.values()].find(j => j.key === key && (j.state === "queued" || j.state === "running"));
-    if (same) return this.view(same);
-    const busy = [...this.jobs.values()].find(
-      j => j.mid === input.mid && (j.state === "queued" || j.state === "running"),
-    );
-    if (busy) throw new AlignError("JOB_BUSY");
-    if (this.waiting.length >= this.deps.queueMax) throw new AlignError("QUEUE_FULL");
-    this.charge(input.mid);
+    // 管理员手动对齐就是为了重跑一遍看结果，跳过成功和失败两种缓存
+    if (!manual) {
+      const failed = await failures.get(key);
+      if (failed) return { id: null, state: "failed", error: new AlignError(failed.code).toJSON() };
+      const cached = await cache.get(key);
+      if (cached) return { id: null, state: "done", alignment: cached };
+    }
+
+    const same = [...this.jobs.values()].find(j => j.key === key && isActive(j));
+    if (same) {
+      if (manual && same.state === "queued") same.origin = "manual";
+      return this.view(same);
+    }
 
     const job: Job = { ...input, id: randomUUID(), key, state: "queued", createdAt: Date.now() };
     this.jobs.set(job.id, job);
@@ -96,13 +115,34 @@ export class AlignQueue {
     return this.view(job);
   }
 
+  // 按出队规则排出的完整顺序；排队的人看到的 position 和实际轮到的时刻一致
+  private order(): Job[] {
+    const manual = this.waiting.filter(j => j.origin === "manual");
+    const byMid = new Map<string, Job[]>();
+    for (const j of this.waiting) {
+      if (j.origin === "manual") continue;
+      byMid.set(j.mid, [...(byMid.get(j.mid) ?? []), j]);
+    }
+    // 每人自己的任务新的在前
+    for (const list of byMid.values()) list.sort((a, b) => b.createdAt - a.createdAt);
+    const mids = [...byMid.keys()].sort((a, b) => (this.lastServed.get(a) ?? 0) - (this.lastServed.get(b) ?? 0));
+    const rest: Job[] = [];
+    for (let round = 0; rest.length + manual.length < this.waiting.length; round++) {
+      for (const mid of mids) {
+        const j = byMid.get(mid)![round];
+        if (j) rest.push(j);
+      }
+    }
+    return [...manual, ...rest];
+  }
+
   private view(job: Job): JobView {
     return {
       id: job.id,
       state: job.state,
       ...(job.stage && job.state === "running" ? { stage: job.stage } : {}),
       ...(job.state === "queued"
-        ? { position: this.waiting.indexOf(job) + 1 }
+        ? { position: this.order().indexOf(job) + 1 }
         : job.state === "running"
           ? { position: 0 }
           : {}),
@@ -111,25 +151,12 @@ export class AlignQueue {
     };
   }
 
-  private charge(mid: string) {
-    if (this.deps.isAdmin(mid)) return;
-    const day = new Date().toLocaleDateString("sv-SE");
-    const q = this.quota.get(mid);
-    const used = q?.day === day ? q.used : 0;
-    if (used >= this.deps.dailyQuota) throw new AlignError("QUOTA_EXCEEDED");
-    this.quota.set(mid, { day, used: used + 1 });
-  }
-
-  // 服务器自己的问题（B 站限流、下载失败、崩溃）不该扣用户当天的次数；歌词对不上这类用户侧原因照扣
-  private refund(mid: string) {
-    const q = this.quota.get(mid);
-    if (q && q.used > 0) q.used--;
-  }
-
   private async pump(): Promise<void> {
     if (this.running) return;
-    const job = this.waiting.shift();
+    const job = this.order()[0];
     if (!job) return;
+    this.waiting.splice(this.waiting.indexOf(job), 1);
+    if (job.origin !== "manual") this.lastServed.set(job.mid, Date.now());
     this.running = job;
     job.state = "running";
     const dir = path.join(this.deps.workDir, job.id);
@@ -152,10 +179,15 @@ export class AlignQueue {
       await this.deps.cache.put(job.key, alignment);
       job.alignment = alignment;
       job.state = "done";
+      await this.deps.onAligned?.(job).catch(err => console.error(`[job ${job.id}] 对齐后处理失败`, err));
     } catch (err) {
       job.error = err instanceof AlignError ? err : new AlignError("ALIGN_FAILED", String(err));
       job.state = "failed";
-      if (job.error.status >= 500) this.refund(job.mid);
+      if (STICKY_FAILURES.has(job.error.code)) {
+        await this.deps.failures
+          .put(job.key, job.error.code)
+          .catch(e => console.error(`[job ${job.id}] 记录失败结果出错`, e));
+      }
       console.error(`[job ${job.id}] ${job.bvid}/${job.cid} ${job.error.code}: ${job.error.message}`);
     } finally {
       job.finishedAt = Date.now();

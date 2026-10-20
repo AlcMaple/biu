@@ -142,7 +142,7 @@ interface MusicLyrics {
   tLyrics?: string;
   /**
    * 歌词来源：manual=用户手动采用（永不被自动结果覆盖）；缺省视为 manual（兼容旧缓存）；
-   * aligned=用户采用的自动对齐结果（同样不被覆盖）；approved=审核通过、对所有人生效的版本（有新版本时自动更新）
+   * aligned=用户自己选的歌词的逐字对齐结果（同样不被覆盖）；approved=对所有人生效的版本（自动对齐 / 审核通过的上传 / 管理员发布，有新版本时自动更新）
    */
   source?: "manual" | "auto" | "aligned" | "approved";
   /** source=auto 时记录生成它的匹配算法版本，算法升级后会自动重新匹配 */
@@ -151,6 +151,8 @@ interface MusicLyrics {
   alignment?: Pick<LyricsAlignment, "lyricsHash" | "lines">;
   /** 第一次采用对齐结果前的歌词，用于「还原」 */
   preAlign?: Pick<MusicLyrics, "lyrics" | "tLyrics" | "source" | "autoVersion" | "offset">;
+  /** 用户点过「还原为对齐前的歌词」：不再自动对齐这份，直到换一份歌词 */
+  noAutoAlign?: true;
 }
 
 interface NeteaseAudioMatchParams {

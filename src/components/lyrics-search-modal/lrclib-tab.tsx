@@ -12,10 +12,9 @@ interface LrclibTabProps {
   songs: SearchSongByLrclibResponse[];
   loading: boolean;
   onAdoptLyrics: AdoptLyricsHandler;
-  canAlign?: boolean;
 }
 
-const LrclibTab = ({ songs, loading, onAdoptLyrics, canAlign }: LrclibTabProps) => {
+const LrclibTab = ({ songs, loading, onAdoptLyrics }: LrclibTabProps) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [lyricsTitle, setLyricsTitle] = useState<string>("");
   const [lyrics, setLyrics] = useState<string>("");
@@ -38,10 +37,10 @@ const LrclibTab = ({ songs, loading, onAdoptLyrics, canAlign }: LrclibTabProps) 
   }, []);
 
   const handleAdopt = useCallback(
-    async (lyricsText?: string, _tLyricsText?: string, alsoAlign?: boolean) => {
+    async (lyricsText?: string) => {
       const text = lyricsText || lyrics;
       if (!text) return;
-      const ok = await onAdoptLyrics(text, undefined, alsoAlign);
+      const ok = await onAdoptLyrics(text);
       if (ok) {
         setIsPreviewOpen(false);
       }
@@ -82,7 +81,6 @@ const LrclibTab = ({ songs, loading, onAdoptLyrics, canAlign }: LrclibTabProps) 
         title={lyricsTitle}
         lyrics={lyrics}
         onAdopt={handleAdopt}
-        canAlign={canAlign}
       />
     </div>
   );

@@ -46,6 +46,14 @@ describe("align route whitelist", () => {
     expect(matchAlignRoute("GET", "/align/jobs/../../health")).toBeUndefined();
     expect(matchAlignRoute("GET", "/admin/submissions?status=pending&x=1")).toBeUndefined();
     expect(matchAlignRoute("POST", "/me")).toBeUndefined();
+    expect(matchAlignRoute("POST", "/lyrics/reports")).toEqual({ auth: true });
+    expect(matchAlignRoute("GET", "/lyrics/reports/mine")).toEqual({ auth: true });
+    expect(matchAlignRoute("GET", "/admin/reports?status=pending")).toEqual({ auth: true });
+    expect(matchAlignRoute("POST", "/admin/reports/0b5e7f3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b/resolve")).toEqual({
+      auth: true,
+    });
+    expect(matchAlignRoute("POST", "/admin/published")).toEqual({ auth: true });
+    expect(matchAlignRoute("POST", "/admin/reports/../submissions")).toBeUndefined();
   });
 
   it("falls back to the default server for bad or plain-HTTP remote addresses", () => {
@@ -103,6 +111,19 @@ describe("adopting and restoring an alignment", () => {
     expect(after.preAlign).toBeUndefined();
     expect(after.source).toBe("manual");
     expect(after.offset).toBe(120);
+    // 用户主动还原：之后不再自动对齐这份，否则下次打开又被换回来
+    expect(after.noAutoAlign).toBe(true);
+  });
+
+  it("falls back to the pre-align lyrics with their original source when the published version is withdrawn", async () => {
+    store.data[StoreNameMap.LyricsCache] = {
+      "BV13LFNzmEHG-1": { lyrics: "[00:10.00]第一句", source: "auto", autoVersion: 3, offset: 50 },
+    };
+    await adoptAlignment("BV13LFNzmEHG-1", alignment([[10.3, "第一句"]]), "approved");
+    const restored = await restorePreAlign("BV13LFNzmEHG-1", { byUser: false });
+    expect(restored?.entry).toMatchObject({ source: "auto", autoVersion: 3, offset: 50 });
+    expect(restored?.entry.noAutoAlign).toBeUndefined();
+    expect(restored?.entry.alignment).toBeUndefined();
   });
 
   it("treats approved and auto-matched lyrics as replaceable, user choices as not", () => {

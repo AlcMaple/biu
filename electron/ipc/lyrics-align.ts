@@ -28,7 +28,7 @@ async function exchangeToken(): Promise<string> {
   if (process.env.BIU_ALIGN_TOKEN) return process.env.BIU_ALIGN_TOKEN;
   if (cachedToken) return cachedToken;
   const [sessdata] = await session.defaultSession.cookies.get({ name: "SESSDATA", domain: ".bilibili.com" });
-  if (!sessdata?.value) throw new AlignTransportError(401, "请先登录 B 站，歌词对齐要用登录身份记录每日次数和提交");
+  if (!sessdata?.value) throw new AlignTransportError(401, "请先登录 B 站，上传歌词、报错和逐字对齐都要用登录身份");
   const res = await got.post(ALIGN_TOKEN_EXCHANGE_URL, {
     json: { cookie: `SESSDATA=${sessdata.value}` },
     timeout: { request: 10_000 },

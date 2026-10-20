@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 
-// 每种失败给出用户能据此行动的文案，不做统一兜底：被 B 站限流、歌词不对、排队满了，用户该做的事完全不同，
+// 每种失败给出用户能据此行动的文案，不做统一兜底：被 B 站限流、歌词不对、服务器出错，用户该做的事完全不同，
 // 统一说「网络请求失败」会让人反复手动重试，反而把限流打得更狠（AGENTS.md「错误处理」）。
 const CATALOG = {
   BAD_REQUEST: [400, "请求参数不对"],
@@ -19,16 +19,16 @@ const CATALOG = {
   SEPARATION_FAILED: [500, "服务器分离人声时出错，已记录，请稍后再试"],
   ALIGN_FAILED: [500, "服务器对齐时出错，已记录，请稍后再试"],
   ALIGN_TIMEOUT: [504, "对齐超时，服务器可能太忙，请稍后再试"],
-  QUEUE_FULL: [503, "现在排队的歌太多了，请过几分钟再提交"],
-  QUOTA_EXCEEDED: [429, "今天的对齐次数用完了，明天再来；已经对齐过的歌不占次数"],
   RATE_LIMITED: [429, "请求太频繁了，请稍等一下"],
-  JOB_BUSY: [409, "你还有一首歌在对齐，等它完成再提交下一首"],
   JOB_NOT_FOUND: [404, "找不到这个对齐任务，可能服务器重启过，请重新提交"],
-  ALIGNMENT_NOT_READY: [409, "这份歌词还没对齐完成，先对齐、预览后再提交审核"],
+  ALIGNMENT_NOT_READY: [409, "这份歌词还没对齐完成，等对齐完再操作"],
+  ALIGNMENT_WITHDRAWN: [422, "这份歌词的时间轴被确认有误，已经下线；可以上传正确的歌词"],
   ALREADY_APPROVED: [409, "这份歌词已经是这首歌正在使用的版本"],
   SUBMISSION_NOT_FOUND: [404, "找不到这条提交"],
   SUBMISSION_NOT_PENDING: [409, "这条提交已经处理过了"],
   REJECT_REASON_REQUIRED: [400, "打回时要写原因，上传者会看到"],
+  REPORT_NOT_FOUND: [404, "找不到这条报错"],
+  REPORT_NOT_PENDING: [409, "这条报错已经处理过了"],
 } as const satisfies Record<string, readonly [number, string]>;
 
 export type AlignErrorCode = keyof typeof CATALOG;

@@ -95,26 +95,29 @@ export async function adoptAlignment(key: string, alignment: LyricsAlignment, so
     alignment: { lyricsHash: alignment.lyricsHash, lines: alignment.lines },
     preAlign,
     offset: 0,
+    noAutoAlign: undefined,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
   return { lines, tLines, hasPreAlign: Boolean(preAlign) };
 }
 
-export async function restorePreAlign(key: string) {
+// byUser：用户点「还原」，标成手动选择，否则打开时会再被生效版本覆盖、自动对齐又换回来，点了等于没点。
+// 否则是生效版本被管理员下线了，退回对齐前的样子，来源也照旧（自动匹配的还是自动匹配）
+export async function restorePreAlign(key: string, { byUser = true }: { byUser?: boolean } = {}) {
   const store = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
   const prev = store[key];
   if (!prev?.alignment || !prev.preAlign) return undefined;
-  // 还原后标成手动选择：否则打开时会再被审核通过的版本覆盖，用户点了还原等于没点
   const next: MusicLyrics = {
     ...prev,
     alignment: undefined,
     preAlign: undefined,
     lyrics: prev.preAlign?.lyrics,
     tLyrics: prev.preAlign?.tLyrics,
-    source: "manual",
-    autoVersion: undefined,
+    source: byUser ? "manual" : prev.preAlign?.source,
+    autoVersion: byUser ? undefined : prev.preAlign?.autoVersion,
+    ...(byUser ? { noAutoAlign: true as const } : {}),
     offset: prev.preAlign?.offset ?? 0,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
-  return { lines: parseLrc(next.lyrics), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
+  return { entry: next, lines: parseLrc(next.lyrics), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
 }

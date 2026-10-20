@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 
-import { Button, Input, Popover, PopoverContent, PopoverTrigger, Spinner } from "@heroui/react";
+import { Button, Spinner } from "@heroui/react";
 import { RiCloseLine, RiErrorWarningLine } from "@remixicon/react";
 
 import { lyricsCacheKey } from "@/components/lyrics/alignment";
@@ -8,8 +8,8 @@ import { useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { usePlayList } from "@/store/play-list";
 
 const progressText = (view?: AlignJobView) => {
-  if (!view || view.state === "done") return "正在提交对齐…";
-  if (view.state === "queued") return view.position ? `排队中，前面还有 ${view.position} 首` : "排队中";
+  if (!view || view.state === "done") return "正在生成逐字歌词…";
+  if (view.state === "queued") return view.position ? `逐字歌词排队中，前面还有 ${view.position} 首` : "逐字歌词排队中";
   if (view.stage === "download") return "正在获取这首歌的音频…";
   return "正在逐字对齐，大约 2 分钟";
 };
@@ -19,15 +19,18 @@ const offsetText = (sec: number) => {
   return `原歌词整体${sec > 0 ? "快" : "慢"}了 ${Math.abs(sec).toFixed(1)} 秒，已校正`;
 };
 
+interface Props {
+  // 歌词和音频对不上时，换一份歌词（选好就会自动再对齐）
+  onSearchLyrics: () => void;
+  onUploadLyrics: () => void;
+}
+
 // 浮在歌词区顶部，和桌面歌词工具条同一套玻璃样式（半透明黑底 + 细白边 + 模糊），沉浸式界面里不另起一种卡片
-const AlignBar = ({ onEditLyrics }: { onEditLyrics: () => void }) => {
-  const { target, phase, hidden, input } = useLyricsAlignSession();
+const AlignBar = ({ onSearchLyrics, onUploadLyrics }: Props) => {
+  const { target, phase, hidden } = useLyricsAlignSession();
   const currentKey = usePlayList(s => lyricsCacheKey(s.list.find(i => i.id === s.playId)));
-  const [note, setNote] = useState("");
-  const [submitOpen, setSubmitOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // 对齐中切到别的歌：任务照常跑，提示只在那首歌上显示
   if (phase.kind === "idle" || hidden || !target || currentKey !== target.cacheKey) return null;
 
   const session = useLyricsAlignSession.getState();
@@ -39,6 +42,11 @@ const AlignBar = ({ onEditLyrics }: { onEditLyrics: () => void }) => {
       setBusy(false);
     }
   };
+  const flat = (label: string, onPress: () => void) => (
+    <Button size="sm" radius="full" variant="flat" className="text-white" onPress={onPress}>
+      {label}
+    </Button>
+  );
 
   let icon: ReactNode = null;
   let title = "";
@@ -48,28 +56,21 @@ const AlignBar = ({ onEditLyrics }: { onEditLyrics: () => void }) => {
   if (phase.kind === "working") {
     icon = <Spinner size="sm" color="white" />;
     title = progressText(phase.view);
-    detail = "可以接着听歌，好了会自动换上试听";
+    detail = "管理员重跑，好了先试听";
   } else if (phase.kind === "failed") {
     icon = <RiErrorWarningLine size={18} className="text-warning shrink-0" />;
     title = phase.message;
-    // 歌词配错时原样重试只会再配错一次，还照扣当天次数，所以只给「换一份歌词」
-    actions = phase.jobId ? (
-      <Button size="sm" radius="full" variant="flat" className="text-white" onPress={session.resume}>
-        继续查询
-      </Button>
-    ) : phase.code === "LYRICS_MISMATCH" ? (
-      <Button size="sm" radius="full" variant="flat" className="text-white" onPress={onEditLyrics}>
-        换一份歌词
-      </Button>
-    ) : (
-      <Button size="sm" radius="full" variant="flat" className="text-white" onPress={() => void session.start(input)}>
-        重试
-      </Button>
-    );
+    // 歌词配错时原样重试只会再配错一次，所以只给「换一份歌词」；被下线的那份重跑也一样，只能换一份上传
+    actions = phase.jobId
+      ? flat("继续查询", session.resume)
+      : phase.code === "LYRICS_MISMATCH" || phase.code === "AUDIO_TOO_SHORT"
+        ? flat("换一份歌词", onSearchLyrics)
+        : phase.code === "ALIGNMENT_WITHDRAWN"
+          ? flat("上传我的歌词", onUploadLyrics)
+          : flat("重试", session.resume);
   } else if (phase.kind === "preview") {
-    const approved = phase.source === "approved";
-    title = approved ? "这首歌有审核通过的逐字歌词，正在试听" : "正在试听逐字歌词";
-    detail = approved ? null : offsetText(phase.alignment.offsetSec);
+    title = "正在试听这次的对齐结果";
+    detail = offsetText(phase.alignment.offsetSec);
     actions = (
       <>
         <Button
@@ -78,9 +79,9 @@ const AlignBar = ({ onEditLyrics }: { onEditLyrics: () => void }) => {
           variant="light"
           className="text-white/80"
           isDisabled={busy}
-          onPress={() => (approved ? void session.start(input, { skipApproved: true }) : session.discard())}
+          onPress={session.discard}
         >
-          {approved ? "用我的歌词对齐" : "放弃"}
+          放弃
         </Button>
         <Button size="sm" radius="full" color="primary" isLoading={busy} onPress={() => run(session.adopt)}>
           采用
@@ -88,42 +89,12 @@ const AlignBar = ({ onEditLyrics }: { onEditLyrics: () => void }) => {
       </>
     );
   } else {
-    title = "已换成逐字歌词";
-    detail = "听着准的话，可以提交给审核员，通过后所有人打开这首歌都用它";
+    title = "已换成这次的对齐结果";
+    detail = "确认没问题可以发布，替换所有人在用的版本";
     actions = (
-      <Popover placement="bottom" isOpen={submitOpen} onOpenChange={setSubmitOpen} disableAnimation>
-        <PopoverTrigger>
-          <Button size="sm" radius="full" color="primary">
-            提交审核
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-3">
-          <div className="flex w-full flex-col gap-2">
-            <Input
-              size="sm"
-              value={note}
-              onValueChange={setNote}
-              placeholder="备注（可选），比如歌词出处"
-              maxLength={200}
-            />
-            <Button
-              size="sm"
-              color="primary"
-              isLoading={busy}
-              onPress={() =>
-                run(async () => {
-                  if (await session.submit(note)) {
-                    setNote("");
-                    setSubmitOpen(false);
-                  }
-                })
-              }
-            >
-              提交
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+      <Button size="sm" radius="full" color="primary" isLoading={busy} onPress={() => run(session.publish)}>
+        发布给所有人
+      </Button>
     );
   }
 

@@ -1,6 +1,6 @@
 import platform from "@/platform";
 
-// 失败时带着服务端给的 error.message 原样抛出：限流、配额、歌词对不上，用户该做的事各不相同，不能统一成「网络请求失败」
+// 失败时带着服务端给的 error.message 原样抛出：限流、服务器出错、歌词对不上，用户该做的事各不相同，不能统一成「网络请求失败」
 export class AlignApiError extends Error {
   constructor(
     message: string,
@@ -21,15 +21,16 @@ async function call<T>(req: AlignRequest): Promise<T> {
 
 export const getAlignMe = () => call<{ mid: string; isAdmin: boolean }>({ method: "GET", path: "/me" });
 
-export const createAlignJob = (body: { bvid: string; cid: string; lyrics: string }) =>
+// manual 只对管理员生效：插到队首、跳过缓存重跑
+export const createAlignJob = (body: { bvid: string; cid: string; lyrics: string; manual?: boolean }) =>
   call<AlignJobView>({ method: "POST", path: "/align/jobs", body });
 
 export const getAlignJob = (id: string) => call<AlignJobView>({ method: "GET", path: `/align/jobs/${id}` });
 
-export const getApprovedLyrics = (bvid: string, cid: string) =>
-  call<{ alignment: LyricsAlignment | null }>({ method: "GET", path: `/lyrics/${bvid}/${cid}` });
+export const getPublishedLyrics = (bvid: string, cid: string) =>
+  call<AlignPublished>({ method: "GET", path: `/lyrics/${bvid}/${cid}` });
 
-export const submitLyrics = (body: { bvid: string; cid: string; lyrics: string; note?: string }) =>
+export const submitLyrics = (body: { bvid: string; cid: string; lyrics: string; title: string; note?: string }) =>
   call<AlignSubmissionBrief>({ method: "POST", path: "/lyrics/submissions", body });
 
 export const getMySubmissions = () =>
@@ -46,3 +47,22 @@ export const approveSubmission = (id: string) =>
 
 export const rejectSubmission = (id: string, reason: string) =>
   call<AlignSubmissionBrief>({ method: "POST", path: `/admin/submissions/${id}/reject`, body: { reason } });
+
+export const reportAlignment = (body: { bvid: string; cid: string; lyricsHash: string; note?: string }) =>
+  call<AlignReport>({ method: "POST", path: "/lyrics/reports", body });
+
+export const getMyReports = () => call<{ items: AlignReport[] }>({ method: "GET", path: "/lyrics/reports/mine" });
+
+export const getReportList = (status: AlignReportStatus = "pending") =>
+  call<{ items: AlignReport[] }>({ method: "GET", path: `/admin/reports?status=${status}` });
+
+export const getReportDetail = (id: string) => call<AlignReportDetail>({ method: "GET", path: `/admin/reports/${id}` });
+
+export const resolveReport = (id: string, body: { withdraw: boolean; reason?: string }) =>
+  call<AlignReport>({ method: "POST", path: `/admin/reports/${id}/resolve`, body });
+
+export const dismissReport = (id: string, reason: string) =>
+  call<AlignReport>({ method: "POST", path: `/admin/reports/${id}/dismiss`, body: { reason } });
+
+export const publishAlignment = (body: { bvid: string; cid: string; lyrics: string }) =>
+  call<AlignPublished>({ method: "POST", path: "/admin/published", body });

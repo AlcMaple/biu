@@ -19,6 +19,7 @@ vi.mock("@/store/play-list", () => ({
 vi.mock("@/platform", () => ({ default: { getStore: vi.fn(), setStore: vi.fn() } }));
 vi.mock("@/components/lyrics-search-modal", () => ({ default: () => null }));
 vi.mock("@/components/lyrics-align-modal", () => ({ default: () => null }));
+vi.mock("@/components/lyrics-align-modal/report-modal", () => ({ default: () => null }));
 vi.mock("@/components/icon-button", () => ({ default: () => null }));
 vi.mock("@/components/lyrics/font-size-control", () => ({ default: () => null }));
 vi.mock("@/components/lyrics/offset-control", () => ({ default: () => null }));

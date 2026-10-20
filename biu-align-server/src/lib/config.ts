@@ -44,9 +44,6 @@ export const config = {
       .map(s => s.trim())
       .filter(Boolean),
   ),
-  // 每首约 2 min CPU（Demucs 1.5 min + 对齐 40 s），一台 Mac mini 一次只跑一个任务
-  queueMax: num("QUEUE_MAX", 20),
-  dailyQuota: num("DAILY_QUOTA", 20),
   jobTimeoutMs: num("JOB_TIMEOUT_MS", 10 * 60_000),
   maxDurationSec: num("MAX_DURATION_SEC", 10 * 60),
   // 普通接口按 mid 限流；客户端每 3 s 轮询一次任务状态约 20 次/分，留足余量（同步服务曾因额度太紧整体停摆）

@@ -8,11 +8,12 @@ export const ALIGN_TOKEN_EXCHANGE_URL = "https://biu.alcmaple.cn/api/auth/exchan
 
 export const WEB_ALIGN_PROXY_ROOT = "/__biu_align";
 
-// 每 3 s 一次；服务端限流按 mid 每分钟 300 次，留足余量
+// 每 3 s 一次；服务端限流按 mid 每分钟 300 次，留足余量。只查正在播的那首，切歌即停，所以同一时刻最多一路轮询
 export const ALIGN_POLL_INTERVAL_MS = 3000;
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const STATUS = "pending|approved|rejected|withdrawn|superseded";
+const REPORT_STATUS = "pending|resolved|dismissed";
 
 // 只放行这几条：传输层都在持有用户凭证的一侧（主进程 / 原生 / BFF），白名单之外的路径一律不发，
 // 免得渲染层能借它把 token 带去任意接口
@@ -26,6 +27,12 @@ const ROUTES: { method: "GET" | "POST"; pattern: RegExp; auth: boolean }[] = [
   { method: "GET", pattern: new RegExp(`^/admin/submissions\\?status=(${STATUS})$`), auth: true },
   { method: "GET", pattern: new RegExp(`^/admin/submissions/${UUID}$`), auth: true },
   { method: "POST", pattern: new RegExp(`^/admin/submissions/${UUID}/(approve|reject)$`), auth: true },
+  { method: "POST", pattern: /^\/lyrics\/reports$/, auth: true },
+  { method: "GET", pattern: /^\/lyrics\/reports\/mine$/, auth: true },
+  { method: "GET", pattern: new RegExp(`^/admin/reports\\?status=(${REPORT_STATUS})$`), auth: true },
+  { method: "GET", pattern: new RegExp(`^/admin/reports/${UUID}$`), auth: true },
+  { method: "POST", pattern: new RegExp(`^/admin/reports/${UUID}/(resolve|dismiss)$`), auth: true },
+  { method: "POST", pattern: /^\/admin\/published$/, auth: true },
 ];
 
 export function matchAlignRoute(method: string, path: string): { auth: boolean } | undefined {

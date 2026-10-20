@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import type { LyricLine } from "./lyrics.js";
@@ -7,7 +8,7 @@ import { AlignError } from "./errors.js";
 import { listJson, readJson, writeJsonAtomic } from "./json-file.js";
 
 // pending → approved / rejected；同一人对同一投稿再次提交时，旧的 pending 变 withdrawn；
-// 新版本通过后，原来在用的那份变 superseded。只有 approved 的那份对所有人生效。
+// 新版本通过后，原来在用的那份变 superseded。生效版本（Published）也可能来自自动对齐或管理员发布，不一定对应一条提交。
 export type SubmissionStatus = "pending" | "approved" | "rejected" | "withdrawn" | "superseded";
 
 export interface Submission {
@@ -26,11 +27,17 @@ export interface Submission {
   reviewedBy?: string;
 }
 
-export interface Approved {
+// 一首歌当前对所有人生效的版本。来源：auto = 第一位听众播放时自动对齐成功；upload = 用户上传、审核通过；
+// admin = 管理员手动对齐后直接发布。文件名沿用 approved/，已部署的数据不用迁移（旧记录没有 source，按 upload 理解）
+export type PublishSource = "auto" | "upload" | "admin";
+
+export interface Published {
   bvid: string;
   cid: string;
-  submissionId: string;
   lyricsHash: string;
+  source?: PublishSource;
+  submissionId?: string;
+  by?: string;
   approvedAt: number;
 }
 
@@ -58,8 +65,50 @@ export class SubmissionStore {
     return run;
   }
 
-  getApproved(bvid: string, cid: string) {
-    return readJson<Approved>(this.approvedFile(bvid, cid));
+  getPublished(bvid: string, cid: string) {
+    return readJson<Published>(this.approvedFile(bvid, cid));
+  }
+
+  // 已有版本时不覆盖：自动对齐只填空白，不和上传 / 管理员的版本抢
+  publishIfEmpty(input: Omit<Published, "approvedAt">): Promise<boolean> {
+    return this.serial(async () => {
+      if (await this.getPublished(input.bvid, input.cid)) return false;
+      await this.writePublished(input);
+      return true;
+    });
+  }
+
+  publish(input: Omit<Published, "approvedAt">): Promise<void> {
+    return this.serial(() => this.replacePublished(input));
+  }
+
+  // 只下线指定的那份：报错提交后、处理前，这首歌可能已经换了新版本，不能误删新版本
+  unpublish(bvid: string, cid: string, lyricsHash: string): Promise<boolean> {
+    return this.serial(async () => {
+      const cur = await this.getPublished(bvid, cid);
+      if (cur?.lyricsHash !== lyricsHash) return false;
+      await this.markSuperseded(cur);
+      await rm(this.approvedFile(bvid, cid), { force: true });
+      return true;
+    });
+  }
+
+  private async markSuperseded(prev: Published | undefined) {
+    if (!prev?.submissionId) return;
+    const old = await readJson<Submission>(this.file(prev.submissionId));
+    if (old) await writeJsonAtomic(this.file(old.id), { ...old, status: "superseded" });
+  }
+
+  private writePublished(input: Omit<Published, "approvedAt">) {
+    return writeJsonAtomic(this.approvedFile(input.bvid, input.cid), {
+      ...input,
+      approvedAt: Date.now(),
+    } satisfies Published);
+  }
+
+  private async replacePublished(input: Omit<Published, "approvedAt">) {
+    await this.markSuperseded(await this.getPublished(input.bvid, input.cid));
+    await this.writePublished(input);
   }
 
   async get(id: string): Promise<Submission> {
@@ -77,7 +126,7 @@ export class SubmissionStore {
     input: Pick<Submission, "bvid" | "cid" | "mid" | "lyricsHash" | "lines" | "title" | "note">,
   ): Promise<Submission> {
     return this.serial(async () => {
-      const approved = await this.getApproved(input.bvid, input.cid);
+      const approved = await this.getPublished(input.bvid, input.cid);
       if (approved?.lyricsHash === input.lyricsHash) throw new AlignError("ALREADY_APPROVED");
       const mine = await this.list(
         s => s.mid === input.mid && s.bvid === input.bvid && s.cid === input.cid && s.status === "pending",
@@ -93,21 +142,16 @@ export class SubmissionStore {
     return this.serial(async () => {
       const sub = await this.get(id);
       if (sub.status !== "pending") throw new AlignError("SUBMISSION_NOT_PENDING");
-      const prev = await this.getApproved(sub.bvid, sub.cid);
-      if (prev) {
-        const old = await readJson<Submission>(this.file(prev.submissionId));
-        if (old) await writeJsonAtomic(this.file(old.id), { ...old, status: "superseded" });
-      }
-      const now = Date.now();
-      const done: Submission = { ...sub, status: "approved", reviewedAt: now, reviewedBy: reviewer };
-      await writeJsonAtomic(this.file(id), done);
-      await writeJsonAtomic(this.approvedFile(sub.bvid, sub.cid), {
+      await this.replacePublished({
         bvid: sub.bvid,
         cid: sub.cid,
-        submissionId: id,
         lyricsHash: sub.lyricsHash,
-        approvedAt: now,
-      } satisfies Approved);
+        source: "upload",
+        submissionId: id,
+        by: reviewer,
+      });
+      const done: Submission = { ...sub, status: "approved", reviewedAt: Date.now(), reviewedBy: reviewer };
+      await writeJsonAtomic(this.file(id), done);
       return done;
     });
   }

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { adoptAlignment, alignmentToLines, isUserChosen } from "@/components/lyrics/alignment";
+import { adoptAlignment, alignmentToLines, isUserChosen, restorePreAlign } from "@/components/lyrics/alignment";
 import { AUTO_MATCH_VERSION, autoMatchLyrics } from "@/components/lyrics/auto-match";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
-import { getApprovedLyrics } from "@/service/lyrics-align";
+import { getPublishedLyrics } from "@/service/lyrics-align";
+import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
@@ -22,14 +23,15 @@ const AUTO_MATCH_DEBOUNCE_MS = 1500;
 
 const autoTried = new Set<string>();
 
-// 查不到不影响播放：记日志后照常走本地缓存 / 自动匹配。每次打开都查，审核通过的新版本才能及时生效
-async function fetchApproved(bvid: string | undefined, cid: string) {
+// 查不到不影响播放：记日志后照常走本地缓存 / 自动匹配。每次打开都查，新发布的版本才能及时生效。
+// 查询失败返回 undefined，和「确实没有」（null）分开：查不到时不能当成已下线把本地的逐字歌词撤掉
+async function fetchPublished(bvid: string | undefined, cid: string) {
   if (!bvid) return null;
   try {
-    return (await getApprovedLyrics(bvid, cid)).alignment;
+    return (await getPublishedLyrics(bvid, cid)).alignment;
   } catch (err) {
-    log.warn("[lyrics] 查询审核通过的歌词失败", err);
-    return null;
+    log.warn("[lyrics] 查询对所有人生效的歌词失败", err);
+    return undefined;
   }
 }
 
@@ -86,25 +88,40 @@ const LyricsBroadcaster = () => {
           }
         }
 
-        // 审核通过的歌词对所有人生效，优先于自动匹配；用户自己选的（手动采用 / 采用对齐结果）不覆盖
-        if (!isLocal && !isUserChosen(cached)) {
-          const approved = await fetchApproved(playItem.bvid, String(playItem.cid));
+        // 生效版本对所有人生效，优先于自动匹配；用户自己选的（手动采用 / 自己歌词的对齐结果）不覆盖
+        let entry = cached;
+        if (!isLocal) {
+          const published = await fetchPublished(playItem.bvid, String(playItem.cid));
           if (canceled) return;
-          if (approved) {
-            if (cached?.source === "approved" && cached.alignment?.lyricsHash === approved.lyricsHash) return;
+          if (published && !isUserChosen(entry)) {
+            if (entry?.source === "approved" && entry.alignment?.lyricsHash === published.lyricsHash) return;
             const latest = (await platform.getStore(StoreNameMap.LyricsCache))?.[cacheKey];
             if (canceled || isUserChosen(latest)) return;
-            const { lines, tLines } = await adoptAlignment(cacheKey, approved, "approved");
+            const { lines, tLines } = await adoptAlignment(cacheKey, published, "approved");
             if (canceled) return;
             setLyrics(lines, tLines);
             setOffset(0);
             return;
           }
+          // 本地还挂着生效版本，服务器上却没了：被管理员确认有误下线了，退回对齐前的歌词
+          if (published === null && entry?.source === "approved" && entry.alignment) {
+            const restored = await restorePreAlign(cacheKey, { byUser: false });
+            if (canceled) return;
+            if (restored) {
+              entry = restored.entry;
+              setLyrics(restored.lines, restored.tLines);
+              setOffset(restored.offset);
+            }
+          }
+          // 有歌词、还没逐字时间：自动对齐。包括用户手动选的歌词；点过「还原」的不再自动对齐
+          if (entry && !entry.alignment && !entry.noAutoAlign && entry.lyrics) {
+            useLyricsAlignSession.getState().auto(alignInputOf(entry), { userChosen: isUserChosen(entry) });
+          }
         }
 
-        if (cached && (cached.lyrics || cached.tLyrics)) {
+        if (entry && (entry.lyrics || entry.tLyrics)) {
           // 仅「自动匹配且算法已升级」的缓存才重新匹配；手动选择的永远保留
-          staleAuto = cached.source === "auto" && (cached.autoVersion ?? 0) < AUTO_MATCH_VERSION;
+          staleAuto = entry.source === "auto" && (entry.autoVersion ?? 0) < AUTO_MATCH_VERSION;
           if (!staleAuto) return;
         }
 
@@ -135,6 +152,7 @@ const LyricsBroadcaster = () => {
             autoVersion: AUTO_MATCH_VERSION,
           },
         });
+        if (!isLocal && hit.lyrics) useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
       } catch {
         if (!canceled) setLyrics([]);
       } finally {

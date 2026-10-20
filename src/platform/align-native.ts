@@ -27,7 +27,7 @@ async function exchangeToken(): Promise<string | AlignResponse> {
   if (cachedToken) return cachedToken;
   const cookies = await CapacitorCookies.getCookies({ url: "https://www.bilibili.com" });
   const sessdata = cookies?.SESSDATA;
-  if (!sessdata) return errorResponse(401, "请先登录 B 站，歌词对齐要用登录身份记录每日次数和提交");
+  if (!sessdata) return errorResponse(401, "请先登录 B 站，上传歌词、报错和逐字对齐都要用登录身份");
   const res = await CapacitorHttp.request({
     url: ALIGN_TOKEN_EXCHANGE_URL,
     method: "POST",

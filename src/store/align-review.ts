@@ -1,10 +1,11 @@
 import { create } from "zustand";
 
 import { log } from "@/platform";
-import { getAlignMe, getReviewList } from "@/service/lyrics-align";
+import { getAlignMe, getReportList, getReviewList } from "@/service/lyrics-align";
 
 interface AlignReviewState {
   isAdmin: boolean;
+  // 待审上传 + 待处理报错
   pendingCount: number;
   refresh: () => Promise<void>;
   reset: () => void;
@@ -26,8 +27,10 @@ export const useAlignReview = create<AlignReviewState>(set => ({
         set({ isAdmin: false, pendingCount: 0 });
         return;
       }
-      const { items } = await getReviewList("pending");
-      set({ isAdmin: true, pendingCount: items.length });
+      // 身份先落下来：数量查失败（比如服务端还没升级到有报错接口）不该连审核入口一起藏掉
+      set({ isAdmin: true });
+      const [uploads, reports] = await Promise.all([getReviewList("pending"), getReportList("pending")]);
+      set({ pendingCount: uploads.items.length + reports.items.length });
     } catch (err) {
       // 服务不可用时只是暂时不显示审核入口；审核页里会把具体错误原样展示
       log.warn("[lyrics-review] 查询审核员身份 / 待审数量失败", err);

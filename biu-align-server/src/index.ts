@@ -1,34 +1,40 @@
 // Biu 歌词时间轴对齐服务入口。部署约束：
-//   - 单进程（任务队列、配额、提交写入的串行化都只在进程内有效）
+//   - 单进程（任务队列、提交和报错写入的串行化都只在进程内有效）
 //   - 只监听 127.0.0.1，由反代暴露到公网
 import { createApp } from "./app.js";
-import { AlignmentCache } from "./lib/alignment-cache.js";
-import { isAdmin } from "./lib/auth.js";
+import { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import { downloadAudio, getVideoPage } from "./lib/bilibili.js";
 import { config } from "./lib/config.js";
 import { mockDownloadAudio, mockGetVideoPage, mockRunWorker } from "./lib/mock.js";
 import { AlignQueue } from "./lib/queue.js";
+import { ReportStore } from "./lib/reports.js";
 import { SubmissionStore } from "./lib/submissions.js";
 import { runWorker } from "./lib/worker.js";
 
 const mock = config.alignWorker === "mock";
 const cache = new AlignmentCache(config.dataDir, mock ? "mock" : undefined);
+const failures = new FailureCache(config.dataDir, mock ? "mock" : undefined);
+const submissions = new SubmissionStore(config.dataDir);
+const reports = new ReportStore(config.dataDir);
 const queue = new AlignQueue({
   cache,
+  failures,
   runWorker: mock ? mockRunWorker(config.mockDelayMs) : runWorker,
   getVideoPage: mock ? mockGetVideoPage : getVideoPage,
   downloadAudio: mock ? mockDownloadAudio : downloadAudio,
   workDir: config.workDir,
-  queueMax: config.queueMax,
-  dailyQuota: config.dailyQuota,
-  isAdmin,
+  // 自动对齐成功就对所有人生效：用户是来听歌的，不会等审核；出错的由听众报错、管理员处理
+  onAligned: async ({ origin, bvid, cid, lyricsHash }) => {
+    if (origin === "auto") await submissions.publishIfEmpty({ bvid, cid, lyricsHash, source: "auto" });
+  },
 });
-const submissions = new SubmissionStore(config.dataDir);
 
 createApp({
   queue,
   cache,
+  failures,
   submissions,
+  reports,
   rateLimitPerMinute: config.rateLimitPerMinute,
   corsOrigin: config.corsOrigin,
 }).listen(config.port, "127.0.0.1", () => {

@@ -80,6 +80,20 @@ const ResizeHandle = ({
 
 const RESIZE_DIRS: ResizeDir[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
 
+// 与主进程 desktopLyricsSetBounds 的下限一致
+const MIN_WIDTH = 300;
+const MIN_HEIGHT = 80;
+
+// 字号跟窗口高度走：拖大窗口就是放大歌词，默认 160px 高时 24vh / 17vh 等于原来的 2.4rem / 1.7rem。
+// 歌词不换行，所以每行再按自己的长度封顶，长句缩到刚好放进窗口宽度、短句照样放大；
+// 按整窗统一比例封顶的话，窄窗口里短句也被压小，拉高窗口看起来像没反应
+const FULL_WIDTH = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
+// 估宽单位 em：全角字 1，其余按 800 字重的平均字宽 0.6；再乘 .lyric-main 的 0.04em 字距。左右各留 24px
+const fitFontSize = (text: string, vh: number) => {
+  const em = [...text].reduce((n, c) => n + (FULL_WIDTH.test(c) ? 1 : 0.6), 0) * 1.04;
+  return `min(${vh}vh, calc((100vw - 48px) / ${Math.max(em, 1).toFixed(2)}))`;
+};
+
 // ─── Toolbar button ───────────────────────────────────────────────────────────
 const ToolBtn = ({
   onClick,
@@ -335,15 +349,16 @@ const DesktopLyrics = () => {
         const dx = e.screenX - startX,
           dy = e.screenY - startY;
         const next = { ...init };
-        if (dir.includes("e")) next.width = init.width + dx;
-        if (dir.includes("s")) next.height = init.height + dy;
+        // 最小尺寸在这里就夹住：只交给主进程夹的话，从左 / 上边缩到底时 x / y 还在跟着鼠标走，窗口会被推着平移
+        if (dir.includes("e")) next.width = Math.max(MIN_WIDTH, init.width + dx);
+        if (dir.includes("s")) next.height = Math.max(MIN_HEIGHT, init.height + dy);
         if (dir.includes("w")) {
-          next.x = init.x + dx;
-          next.width = init.width - dx;
+          next.width = Math.max(MIN_WIDTH, init.width - dx);
+          next.x = init.x + init.width - next.width;
         }
         if (dir.includes("n")) {
-          next.y = init.y + dy;
-          next.height = init.height - dy;
+          next.height = Math.max(MIN_HEIGHT, init.height - dy);
+          next.y = init.y + init.height - next.height;
         }
         void platform.setDesktopLyricsBounds(next);
       };
@@ -434,12 +449,6 @@ const DesktopLyrics = () => {
         .lyric-main .base {
           color: rgba(255, 255, 255, 0.85);
           text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-        }
-        .lyric-main .fill {
-          color: #a3e635;
-          text-shadow:
-            0 0 10px rgba(163, 230, 53, 0.55),
-            0 1px 4px rgba(0, 0, 0, 0.6);
         }
       `}</style>
 
@@ -539,15 +548,14 @@ const DesktopLyrics = () => {
                 const offset = i - activeIndex;
                 let opacity = 0;
                 let scale = 0.8;
-                let fontSize = "1.7rem";
+                let fontVh = 17;
                 if (offset === 0) {
                   opacity = 1;
                   scale = 1;
-                  fontSize = "2.4rem";
+                  fontVh = 24;
                 } else if (offset === 1) {
                   opacity = 0.45;
                   scale = 0.85;
-                  fontSize = "1.7rem";
                 }
                 return (
                   <div
@@ -556,14 +564,9 @@ const DesktopLyrics = () => {
                     className="lyric-item"
                     style={{ opacity, transform: `scale(${scale})` }}
                   >
-                    <div className="lyric-main" style={{ fontSize }}>
+                    <div className="lyric-main" style={{ fontSize: fitFontSize(lineObj.text, fontVh) }}>
                       {i === activeIndex && activeTiming?.words.length ? (
-                        <KaraokeText
-                          timing={activeTiming}
-                          subscribe={subscribeClock}
-                          baseClassName="base"
-                          fillClassName="fill"
-                        />
+                        <KaraokeText timing={activeTiming} subscribe={subscribeClock} baseClassName="base" />
                       ) : (
                         <span className="base">{lineObj.text}</span>
                       )}

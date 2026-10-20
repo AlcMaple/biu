@@ -6,7 +6,7 @@ const LyricsSubmissions = () => (
     <div className="mb-2">
       <h1>我的提交</h1>
       <p className="text-foreground-500 mt-1 text-sm">
-        提交给审核员的逐字歌词。通过后所有人打开这首歌都会用它，被打回的会写明原因。点一行可以播放这首歌
+        你上传的歌词和报过的时间轴错误，以及管理员的处理结果。上传的歌词通过后所有人打开这首歌都会用它。点一行可以播放这首歌
       </p>
     </div>
     <SubmissionsTab />

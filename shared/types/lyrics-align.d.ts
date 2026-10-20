@@ -1,4 +1,4 @@
-// 与 biu-align-server/src/lib/result.ts、submissions.ts 的返回结构对齐
+// 与 biu-align-server/src/lib/result.ts、submissions.ts、reports.ts 的返回结构对齐
 
 interface AlignRequest {
   method: "GET" | "POST";
@@ -62,8 +62,47 @@ interface AlignSubmissionBrief {
   lineCount: number;
 }
 
+/** 对所有人生效的版本从哪来：auto = 第一位听众自动对齐；upload = 用户上传后审核通过；admin = 管理员手动发布 */
+type AlignPublishSource = "auto" | "upload" | "admin";
+
+interface AlignPublished {
+  alignment: LyricsAlignment | null;
+  source: AlignPublishSource | null;
+}
+
 interface AlignSubmissionDetail {
   submission: AlignSubmissionBrief & { lines: { t: number | null; text: string }[] };
+  /** 服务端还在对齐时为 null */
+  alignment: LyricsAlignment | null;
+  /** 对齐失败（歌词和音频对不上等）时有 */
+  failure: { code: string; message: string } | null;
+  current: LyricsAlignment | null;
+  currentSource: AlignPublishSource | null;
+}
+
+type AlignReportStatus = "pending" | "resolved" | "dismissed";
+
+interface AlignReport {
+  id: string;
+  bvid: string;
+  cid: string;
+  mid: string;
+  lyricsHash: string;
+  title: string;
+  note: string;
+  /** 报错时那份是不是对所有人生效的版本；不是说明报错人自己换过歌词 */
+  wasPublished: boolean;
+  status: AlignReportStatus;
+  reason?: string;
+  /** 处理时同时下线了那份 */
+  withdrawn?: boolean;
+  createdAt: number;
+  reviewedAt?: number;
+}
+
+interface AlignReportDetail {
+  report: AlignReport;
   alignment: LyricsAlignment | null;
   current: LyricsAlignment | null;
+  currentSource: AlignPublishSource | null;
 }

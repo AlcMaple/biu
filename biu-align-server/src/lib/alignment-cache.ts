@@ -1,5 +1,7 @@
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
+import type { AlignErrorCode } from "./errors.js";
 import type { Alignment } from "./result.js";
 
 import { readJson, writeJsonAtomic } from "./json-file.js";
@@ -43,5 +45,35 @@ export class AlignmentCache {
     this.memory.delete(key);
     this.memory.set(key, value);
     while (this.memory.size > MEMORY_ENTRIES) this.memory.delete(this.memory.keys().next().value!);
+  }
+}
+
+export interface FailureRecord {
+  code: AlignErrorCode;
+  at: number;
+}
+
+// 记住「这份歌词对这首歌就是对不上」和「被管理员下线」：前者换谁来跑都一样，后者不能被下一个听众自动对齐又顶回来。
+// 只有管理员手动发布能清掉
+export class FailureCache {
+  constructor(
+    private readonly dataDir: string,
+    private readonly namespace = `v${ALIGNER_VERSION}`,
+  ) {}
+
+  private file(key: string) {
+    return path.join(this.dataDir, "failures", this.namespace, `${key}.json`);
+  }
+
+  get(key: string) {
+    return readJson<FailureRecord>(this.file(key));
+  }
+
+  put(key: string, code: AlignErrorCode) {
+    return writeJsonAtomic(this.file(key), { code, at: Date.now() } satisfies FailureRecord);
+  }
+
+  clear(key: string) {
+    return rm(this.file(key), { force: true });
   }
 }

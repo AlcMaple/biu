@@ -8,13 +8,15 @@ import { debounce } from "es-toolkit";
 import { lyricsCacheKey, restorePreAlign } from "@/components/lyrics/alignment";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import platform from "@/platform";
-import { useLyricsAlignSession } from "@/store/lyrics-align-session";
+import { useAlignReview } from "@/store/align-review";
+import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { type LyricLine, useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
 import IconButton from "../icon-button";
-import LyricsAlignModal from "../lyrics-align-modal";
+import LyricsAlignModal, { type LyricsEditMode } from "../lyrics-align-modal";
+import ReportModal from "../lyrics-align-modal/report-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import AlignBar from "./align-bar";
 import FontSizeControl from "./font-size-control";
@@ -29,10 +31,16 @@ const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
 const DEFAULT_FONT_SIZE = 20;
 
-const ALIGN_MENU = [
-  { key: "align", label: "对齐当前歌词", description: "按这首歌的 B 站音频校准每个字的时间，约 2 分钟" },
-  { key: "edit", label: "换一份歌词再对齐", description: "粘贴或修改歌词后再对齐" },
-  { key: "restore", label: "还原为对齐前的歌词", description: "回到第一次对齐之前的歌词和偏移" },
+// 普通用户不需要点「对齐」：播放时自动对齐、好了自动换上。这里只留上传、报错和还原；
+// 手动重跑是管理员的调试手段，用来判断是算法错了还是歌词 / 音频的问题
+type AlignAction = "upload" | "report" | "restore" | "align" | "edit";
+
+const ALIGN_MENU: { key: AlignAction; label: string; description: string; admin?: true }[] = [
+  { key: "upload", label: "上传我的歌词", description: "带不带时间都行，审核通过后所有人都用它" },
+  { key: "report", label: "报错：时间轴不对", description: "逐字歌词和演唱对不上，告诉管理员" },
+  { key: "restore", label: "还原为对齐前的歌词", description: "回到逐字对齐之前的歌词和偏移，之后不再自动对齐" },
+  { key: "align", label: "重新对齐当前歌词", description: "插到队首、跳过缓存重跑，先试听再决定", admin: true },
+  { key: "edit", label: "换一份歌词再对齐", description: "粘贴或修改歌词后插队对齐", admin: true },
 ];
 
 const Lyrics = ({
@@ -205,8 +213,10 @@ const Lyrics = ({
     }
   }, [activeIndex]);
 
-  const [editorInput, setEditorInput] = useState<string | null>(null);
-  const [canRestore, setCanRestore] = useState(false);
+  const isAdmin = useAlignReview(s => s.isAdmin);
+  const [editor, setEditor] = useState<{ mode: LyricsEditMode; input: string } | null>(null);
+  const [reportHash, setReportHash] = useState<string | null>(null);
+  const [menuEntry, setMenuEntry] = useState<MusicLyrics | undefined>(undefined);
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
 
   // 控件随播放器自动收起时浮层跟着卸载，开着的状态要一起清掉，否则再显示时第一下点击只是把它“关上”
@@ -215,11 +225,11 @@ const Lyrics = ({
   }, [showControls]);
 
   const handleLyricsAdopted = useCallback(
-    (nextLyrics?: string, nextTLyrics?: string, alsoAlign?: boolean) => {
+    (nextLyrics?: string, nextTLyrics?: string) => {
       onCloseSearch();
       if (nextLyrics) {
         useLyricsState.getState().setLyrics(parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
-        if (alsoAlign) void useLyricsAlignSession.getState().start(nextLyrics, { skipApproved: true });
+        useLyricsAlignSession.getState().auto(nextLyrics, { userChosen: true, immediate: true });
       }
     },
     [onCloseSearch],
@@ -230,14 +240,15 @@ const Lyrics = ({
     return { key, entry: key ? (await platform.getStore(StoreNameMap.LyricsCache))?.[key] : undefined };
   }, []);
 
-  // 已经对齐过时用对齐前的原歌词：原歌词的时间用来给对齐失败的行划重对齐窗口，比拿对齐结果再对一遍可靠
-  const alignInputOf = (entry?: MusicLyrics) => (entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "";
-
   const handleAlignAction = useCallback(
-    async (action: string) => {
+    async (action: AlignAction) => {
       const { key, entry } = await readCacheEntry();
-      if (action === "edit") {
-        setEditorInput(alignInputOf(entry));
+      if (action === "upload" || action === "edit") {
+        setEditor({ mode: action === "upload" ? "upload" : "align", input: alignInputOf(entry) });
+        return;
+      }
+      if (action === "report") {
+        setReportHash(entry?.alignment?.lyricsHash ?? null);
         return;
       }
       if (action === "restore" && key) {
@@ -355,7 +366,7 @@ const Lyrics = ({
   return (
     <>
       <div className="group/lyrics relative flex h-full w-full items-center justify-center overflow-hidden">
-        <AlignBar onEditLyrics={() => void handleAlignAction("edit")} />
+        <AlignBar onSearchLyrics={onOpenSearch} onUploadLyrics={() => void handleAlignAction("upload")} />
         <div
           ref={containerRef}
           className="no-scrollbar relative h-full w-full max-w-4xl overflow-y-auto"
@@ -394,8 +405,9 @@ const Lyrics = ({
             {canAlign ? (
               <div className="pointer-events-auto">
                 {/* 全屏播放器是抽屉，会把焦点拉回自己身上；失焦即关的话浮层一打开就被关掉（字号 / 偏移控件同样关了这一项） */}
+                {/* 底边和按钮对齐、向上展开：按钮在歌词区右下角，居中展开时管理员的 5 项会伸出窗口底部被裁掉 */}
                 <Popover
-                  placement="left"
+                  placement="left-end"
                   showArrow={false}
                   shouldCloseOnBlur={false}
                   disableAnimation
@@ -404,16 +416,13 @@ const Lyrics = ({
                   onOpenChange={open => {
                     setAlignMenuOpen(open);
                     onControlsOpenChange?.(open);
-                    if (open)
-                      void readCacheEntry().then(({ entry }) =>
-                        setCanRestore(Boolean(entry?.alignment && entry.preAlign)),
-                      );
+                    if (open) void readCacheEntry().then(({ entry }) => setMenuEntry(entry));
                   }}
                 >
                   <PopoverTrigger>
                     <IconButton
                       type="button"
-                      aria-label="逐字对齐"
+                      aria-label="逐字歌词"
                       className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
                     >
                       <RiTimerFlashLine size={16} />
@@ -421,7 +430,12 @@ const Lyrics = ({
                   </PopoverTrigger>
                   <PopoverContent className="w-64 p-1">
                     <div className="flex w-full flex-col">
-                      {ALIGN_MENU.filter(item => item.key !== "restore" || canRestore).map(item => (
+                      {ALIGN_MENU.filter(
+                        item =>
+                          (!item.admin || isAdmin) &&
+                          (item.key !== "restore" || Boolean(menuEntry?.alignment && menuEntry.preAlign)) &&
+                          (item.key !== "report" || Boolean(menuEntry?.alignment)),
+                      ).map(item => (
                         <Button
                           key={item.key}
                           variant="light"
@@ -457,10 +471,12 @@ const Lyrics = ({
       </div>
       <LyricsSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onLyricsAdopted={handleLyricsAdopted} />
       <LyricsAlignModal
-        isOpen={editorInput !== null}
-        onOpenChange={open => !open && setEditorInput(null)}
-        initialLyrics={editorInput ?? ""}
+        mode={editor?.mode ?? "upload"}
+        isOpen={editor !== null}
+        onOpenChange={open => !open && setEditor(null)}
+        initialLyrics={editor?.input ?? ""}
       />
+      <ReportModal lyricsHash={reportHash} onClose={() => setReportHash(null)} />
     </>
   );
 };

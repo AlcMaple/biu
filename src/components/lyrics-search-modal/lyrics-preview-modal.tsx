@@ -11,10 +11,8 @@ interface LyricsPreviewModalProps {
   title?: string;
   lyrics: string;
   tlyrics?: string;
-  onAdopt: (lyricsText: string, tLyricsText?: string, alsoAlign?: boolean) => void;
+  onAdopt: (lyricsText: string, tLyricsText?: string) => void;
   loading?: boolean;
-  /** 采用后接着做逐字对齐；只对 B 站投稿有意义（服务端按投稿取音频） */
-  canAlign?: boolean;
 }
 
 const LyricsPreviewModal = ({
@@ -25,7 +23,6 @@ const LyricsPreviewModal = ({
   tlyrics,
   onAdopt,
   loading,
-  canAlign,
 }: LyricsPreviewModalProps) => {
   const [activeTab, setActiveTab] = useState<"original" | "translation">("original");
 
@@ -62,11 +59,6 @@ const LyricsPreviewModal = ({
               <Button variant="light" onPress={() => onOpenChange(false)}>
                 关闭
               </Button>
-              {canAlign ? (
-                <Button variant="flat" onPress={() => onAdopt(lyrics?.trim(), tlyrics, true)} isDisabled={loading}>
-                  采用并对齐
-                </Button>
-              ) : null}
               <Button color="primary" onPress={handleAdopt} isDisabled={loading}>
                 采用歌词
               </Button>
