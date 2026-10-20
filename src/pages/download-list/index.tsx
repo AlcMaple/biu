@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Button,
@@ -71,6 +71,14 @@ const DownloadList = () => {
   const downloadPath = useSettings(s => s.downloadPath);
   const [downloadList, setDownloadList] = useState<MediaDownloadTask[]>([]);
   const [fileType, setFileType] = useState<string>("all");
+
+  const visibleList = useMemo(
+    () =>
+      downloadList
+        .filter(item => fileType === "all" || item.outputFileType === fileType)
+        .sort((a, b) => (b.createdTime ?? 0) - (a.createdTime ?? 0)),
+    [downloadList, fileType],
+  );
 
   useEffect(() => {
     const initList = async () => {
@@ -218,10 +226,7 @@ const DownloadList = () => {
                   操作
                 </TableColumn>
               </TableHeader>
-              <TableBody
-                items={downloadList.filter(item => fileType === "all" || item.outputFileType === fileType)}
-                emptyContent={<Empty />}
-              >
+              <TableBody items={visibleList} emptyContent={<Empty />}>
                 {item => {
                   const quality = getFileQuality(item);
 
@@ -268,10 +273,8 @@ const DownloadList = () => {
           </div>
           {isMobileLayout && (
             <div className="space-y-2">
-              {downloadList.filter(item => fileType === "all" || item.outputFileType === fileType).length ? (
-                downloadList
-                  .filter(item => fileType === "all" || item.outputFileType === fileType)
-                  .map(item => <MobileDownloadItem key={item.id} item={item} quality={getFileQuality(item)} />)
+              {visibleList.length ? (
+                visibleList.map(item => <MobileDownloadItem key={item.id} item={item} quality={getFileQuality(item)} />)
               ) : (
                 <Empty className="min-h-40" />
               )}
