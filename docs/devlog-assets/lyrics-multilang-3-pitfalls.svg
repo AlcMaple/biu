@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="815" viewBox="0 0 1240 815" role="img" aria-labelledby="title">
+  <title id="title">多语言歌词对齐（3/3）：为什么不那样做，哪里容易改错</title>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+  <rect x="1" y="1" width="1238" height="813" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">多语言歌词对齐（3/3）：为什么不那样做，哪里容易改错</text>
+  <text x="34" y="66" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：外语不是把中文方案换个转写就完事。英语要换模型，「歌词对不上」要换判断依据，错位修正要换做法；中文那条路一个字都不能动。</text>
+  <g transform="translate(0,70)">
+  <rect x="24" y="16.0" width="1192" height="387.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="45.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 为什么不那样做</text>
+  <rect x="44.0" y="60.0" width="562.0" height="104.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="58.0" y="91.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">为什么英语不继续用中文那个模型</text>
+  <text x="58.0" y="114.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">中文用的模型是在朗读语音上学的，英语歌的伴唱、和声会把行首吸走。换成在歌声上学的开源</text>
+  <text x="58.0" y="131.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">模型后，11 首英语歌里错 1 秒以上的行从 26 降到 9，每首对齐从约 35 秒降到约 10 秒；</text>
+  <text x="58.0" y="148.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">人耳试听三首也都是新模型准。</text>
+  <rect x="634.0" y="60.0" width="562.0" height="104.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="648.0" y="91.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">为什么日语不能直接把汉字转成字母</text>
+  <text x="648.0" y="114.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">通用的转写工具把汉字一律按中文读，「花火」会读成 huahuo，而不是 hanabi。所以日语先</text>
+  <text x="648.0" y="131.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">按上下文查出每个词的读音，再转成字母。</text>
+  <rect x="44.0" y="178.0" width="562.0" height="87.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="58.0" y="209.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">为什么外语不用「把握低就是配错」</text>
+  <text x="58.0" y="232.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">英语的把握天生偏低。照中文的规则，23 首对得上的外语歌里有 6 首会被误判成配错，其中</text>
+  <text x="58.0" y="249.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">英语 5 首；反过来，一组配错的日语歌把握比 7 首对得上的英语歌还高。</text>
+  <rect x="634.0" y="178.0" width="562.0" height="87.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="648.0" y="209.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">为什么判断配错要用修正之前的结果</text>
+  <text x="648.0" y="232.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">错位修正本来就是把行往原歌词时间附近拉。用修正后的结果算，配错的歌也会被拉出很高的吻</text>
+  <text x="648.0" y="249.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">合度。</text>
+  <rect x="44.0" y="279.0" width="562.0" height="104.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58.0" y="310.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么修正时不要求「换位置后更有把握」</text>
+  <text x="58.0" y="333.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">Blinding Lights 第 2 行挪回去后和答案完全一致，把握却从 0.178 降到 0.171（挤错位</text>
+  <text x="58.0" y="350.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">置的只是几个短词）。要求更有把握，这类行就永远修不了。但也不能完全不看：有两行是网易</text>
+  <text x="58.0" y="367.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">云原时间本身错了，不设门槛会被「修」错。</text>
+  <rect x="634.0" y="279.0" width="562.0" height="104.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="648.0" y="310.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么还要在附近一格一格地扫</text>
+  <text x="648.0" y="333.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">Faded 中段「Another dream」连唱 4 遍，整段晚了一个轮次。在一大段音频里找，起点会</text>
+  <text x="648.0" y="350.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">被拖到前面的弱匹配上；改成每 0.1 秒放一个短窗去比，4 遍都找回来了，这首错 1 秒以上</text>
+  <text x="648.0" y="367.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">的行从 6 降到 0，其他 10 首没有变差。</text>
+  <rect x="24" y="419.0" width="1192" height="286.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="448.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 哪里容易改错</text>
+  <rect x="44.0" y="463.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58.0" y="494.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">中文那条路别动</text>
+  <text x="58.0" y="517.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">中文的转写、修正、配错规则都保持原样，4 首中文歌新旧</text>
+  <text x="58.0" y="534.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">两版每个字的时间完全一致。想给中文也加新的修正，得重</text>
+  <text x="58.0" y="551.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">新人耳确认。</text>
+  <rect x="437.3" y="463.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="451.3" y="494.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">英语模型里「看着像写错」的地方别修</text>
+  <text x="451.3" y="517.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">模型里有一处保留了原作者训练时的写法，看起来像 bug。</text>
+  <text x="451.3" y="534.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">改了模型照样能加载，但结果就不对了。</text>
+  <rect x="830.7" y="463.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="844.7" y="494.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">改了对齐算法要升版本号</text>
+  <text x="844.7" y="517.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">「歌词对不上」会被记下来、后面的人直接拿到。不升版本，</text>
+  <text x="844.7" y="534.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">以前把日语歌误判成对不上的记录会一直生效。</text>
+  <rect x="44.0" y="581.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58.0" y="612.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">部署时要预先下好英语词典</text>
+  <text x="58.0" y="635.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">把英语单词转成读音要用一个约 34 MB 的词典，第一次用</text>
+  <text x="58.0" y="652.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">时才联网下载。每首歌都是新起的进程，不预先下好，断网</text>
+  <text x="58.0" y="669.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">时英语歌全部失败。</text>
+  <rect x="437.3" y="581.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="451.3" y="612.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">英语模型文件不在代码仓库里</text>
+  <text x="451.3" y="635.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">约 69 MB，要按部署说明手动放到服务器上并核对校验值。</text>
+  <text x="451.3" y="652.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">缺了只有英语歌失败，其他语种不受影响。</text>
+  <rect x="830.7" y="581.0" width="365.3" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="844.7" y="612.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">英语长歌更吃内存</text>
+  <text x="844.7" y="635.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">英语模型整首一次算完，4 分钟的歌峰值约 3.5 GB，歌越</text>
+  <text x="844.7" y="652.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">长越高。投稿 10 分钟的时长上限要保留。</text>
+  </g>
+</svg>

@@ -7,3 +7,11 @@ pypinyin==0.55.0
 soundfile==0.13.1
 scipy==1.17.1
 numpy==2.4.2
+# 日语转写：MeCab + 词典（unidic-lite 约 250 MB）。清华源下载 unidic-lite 时出现过哈希不符，用阿里云源并核对官方 sha256
+fugashi==1.5.2
+unidic-lite==1.0.8
+# 日语 / 韩语读音转罗马字（Apache-2.0）
+uroman==1.3.1.1
+# 英语歌声模型的字母 → 音素；首次 import 会联网下载 NLTK 词典，部署时要预先下好（见 README）
+g2p_en==2.1.0
+nltk==3.9.3

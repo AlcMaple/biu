@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="958" viewBox="0 0 1240 958" role="img" aria-labelledby="title">
+  <title id="title">多语言歌词对齐（1/3）：用户会经历什么，背后在做什么</title>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+  <rect x="1" y="1" width="1238" height="956" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34" y="42" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">多语言歌词对齐（1/3）：用户会经历什么，背后在做什么</text>
+  <text x="34" y="66" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：日语、英语、韩语歌现在也会自动变成逐字歌词，和中文歌一样不用点任何按钮。以前日语歌会被判成「歌词对不上」，韩语歌提示「暂时只支持中文和拉丁字母」，英语歌能对</text>
+  <text x="34" y="85" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">上但常有整行错位。中文歌的结果一个字都没变。</text>
+  <g transform="translate(0,89)">
+  <rect x="24" y="16.0" width="1192" height="151.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="45.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 用户看到的</text>
+  <rect x="44.0" y="60.0" width="365.3" height="87.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58.0" y="91.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">1 播一首日语 / 英语 / 韩语歌</text>
+  <text x="58.0" y="114.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">歌词照常显示，每行按字数均摊填色（近似）。界面上没有</text>
+  <text x="58.0" y="131.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">多出任何东西。</text>
+  <line x1="414.3" y1="103.5" x2="432.3" y2="103.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="437.3" y="60.0" width="365.3" height="87.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="451.3" y="91.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">2 照常听</text>
+  <text x="451.3" y="114.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">不弹提示，不用点按钮。中途切歌也不影响。</text>
+  <line x1="807.7" y1="103.5" x2="825.7" y2="103.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="830.7" y="60.0" width="365.3" height="87.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="844.7" y="91.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">3 约 2 分钟后</text>
+  <text x="844.7" y="114.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">歌词换成按真实演唱时间填色：英语一个词一个词亮，日语、</text>
+  <text x="844.7" y="131.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">韩语一个字一个字亮。之后所有人打开这首歌都是这份。</text>
+  <rect x="24" y="183.0" width="1192" height="185.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="212.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 背后在做的</text>
+  <rect x="44.0" y="227.0" width="208.0" height="121.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="58.0" y="258.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">分离人声</text>
+  <text x="58.0" y="281.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">和中文一样，先把伴奏去掉，只</text>
+  <text x="58.0" y="298.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">留人声。</text>
+  <line x1="257.0" y1="287.5" x2="275.0" y2="287.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="280.0" y="227.0" width="208.0" height="121.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="294.0" y="258.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">判断语种（整首判一次）</text>
+  <text x="294.0" y="281.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">有 5 个以上假名算日语，有 5</text>
+  <text x="294.0" y="298.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">个以上韩文算韩语，有汉字算中</text>
+  <text x="294.0" y="315.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">文，只有英文字母算英语。</text>
+  <line x1="493.0" y1="287.5" x2="511.0" y2="287.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="516.0" y="227.0" width="208.0" height="121.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="530.0" y="258.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">对齐</text>
+  <text x="530.0" y="281.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">中文、日语、韩语：先把歌词转</text>
+  <text x="530.0" y="298.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">成读音字母，再用原来的对齐模</text>
+  <text x="530.0" y="315.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">型。英语：换用专门在歌声上训</text>
+  <text x="530.0" y="332.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">练的模型。</text>
+  <line x1="729.0" y1="287.5" x2="747.0" y2="287.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="752.0" y="227.0" width="208.0" height="121.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="766.0" y="258.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">修正错位的行（外语）</text>
+  <text x="766.0" y="281.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">某一行和前后几行的节奏对不上</text>
+  <text x="766.0" y="298.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">时，只在这一行该在的位置附近</text>
+  <text x="766.0" y="315.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">重新找一次。时间仍来自音频，</text>
+  <text x="766.0" y="332.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">不是照抄原歌词。</text>
+  <line x1="965.0" y1="287.5" x2="983.0" y2="287.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="988.0" y="227.0" width="208.0" height="121.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="1002.0" y="258.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">判断歌词对不对得上</text>
+  <text x="1002.0" y="281.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">外语看「有多少行落在原歌词时</text>
+  <text x="1002.0" y="298.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">间附近」，不到一半就拦下。中</text>
+  <text x="1002.0" y="315.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">文规则不变。</text>
+  <rect x="24" y="384.0" width="1192" height="303.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="413.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">③ 边界情况</text>
+  <rect x="44.0" y="428.0" width="365.3" height="121.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">歌词不是这首歌的</text>
+  <text x="58.0" y="482.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">配错的外语歌只有 6% ~ 27% 的行落在原歌词时间附近，对</text>
+  <text x="58.0" y="499.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">得上的是 80% ~ 100%，中间隔得很开。提示「歌词和这首</text>
+  <text x="58.0" y="516.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌的音频对不上，可能不是这首歌的歌词，或者是另一个版</text>
+  <text x="58.0" y="533.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">本」，并记下来，后面的听众不再白排队。</text>
+  <rect x="437.3" y="428.0" width="365.3" height="121.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="451.3" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">俄语、泰语等其他文字</text>
+  <text x="451.3" y="482.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">不对齐。自动对齐时不弹提示（用户没主动发起）；用户主</text>
+  <text x="451.3" y="499.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">动上传时提示「暂时只支持中文、日语、韩语和英语歌词，</text>
+  <text x="451.3" y="516.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">其他语言还在做」。</text>
+  <rect x="830.7" y="428.0" width="365.3" height="121.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="844.7" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">用户上传不带时间的外语歌词</text>
+  <text x="844.7" y="482.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">没有原歌词时间可比，服务端判断不了配没配错，照常对齐，</text>
+  <text x="844.7" y="499.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">交给审核员试听。审核页会写明这一点。</text>
+  <rect x="44.0" y="563.0" width="365.3" height="104.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="58.0" y="594.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">歌词里写着演唱者</text>
+  <text x="58.0" y="617.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">「(The Kid LAROI)」这类整行括号人名、「[Chorus]」</text>
+  <text x="58.0" y="634.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">段落标记会被去掉，不再被当成要唱的词去占一段音频。</text>
+  <text x="58.0" y="651.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">「(Oh, ooh-woah)」这类真唱的伴唱保留。</text>
+  <rect x="437.3" y="563.0" width="365.3" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="451.3" y="594.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">西语、法语等其他拉丁字母歌</text>
+  <text x="451.3" y="617.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">会按英语发音去对，没有测过效果。曲库里出现这类歌时再</text>
+  <text x="451.3" y="634.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">单独处理。</text>
+  <rect x="830.7" y="563.0" width="365.3" height="104.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="844.7" y="594.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">中文歌</text>
+  <text x="844.7" y="617.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">完全不变：4 首中文歌用新旧两版各跑一遍，每个字的时间</text>
+  <text x="844.7" y="634.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">完全一致。</text>
+  <rect x="24" y="703.0" width="1192" height="126.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="44.0" y="732.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">④ 常见情况</text>
+  <rect x="44.0" y="747.0" width="1152.0" height="62.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="58.0" y="776.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">测试的 23 首外语歌（英语 11、日语 9、韩语 3）全部判对，没有一首被误报「对不上」；11 组故意配错的也全部拦下。对齐后剩下的误差，主要是网易云原时间本身就错的几行，和只有一个</text>
+  <text x="58.0" y="793.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「Yeah」「Oh」的行。</text>
+  </g>
+</svg>

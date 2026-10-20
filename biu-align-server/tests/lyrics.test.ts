@@ -27,6 +27,28 @@ describe("parseLyrics", () => {
     expect(parseLyrics(raw).map(l => l.text)).toEqual(["再没资格拨通你电话", "那一串简单号码"]);
   });
 
+  it("去掉日韩文制作人员行和整行的演唱者标注，保留真唱的括号伴唱", () => {
+    const raw = [
+      "[00:00.00] 作詞 : 米津玄師",
+      "[00:01.00] 작사 : 아이유",
+      "[00:10.00](The Kid LAROI)",
+      "[00:11.00]I do the same thing I told you that I never would",
+      "[00:15.00](The Kid LAROI & Justin Bieber)",
+      "[00:16.00]Oh, ooh-woah (Oh, ooh-woah)",
+      "[00:20.00](Oh, ooh-woah)",
+      "[00:22.00](Ohhhhh Ohhh Ohhh)",
+      "[00:24.00][Chorus]",
+      "[00:25.00](Take that money)",
+    ].join("\n");
+    expect(parseLyrics(raw).map(l => l.text)).toEqual([
+      "I do the same thing I told you that I never would",
+      "Oh, ooh-woah (Oh, ooh-woah)",
+      "(Oh, ooh-woah)",
+      "(Ohhhhh Ohhh Ohhh)",
+      "(Take that money)",
+    ]);
+  });
+
   it("短前缀加冒号只在开头 / 结尾成片时删，夹在中间的是歌词", () => {
     const raw = [
       "[00:01]编曲助理：张三",

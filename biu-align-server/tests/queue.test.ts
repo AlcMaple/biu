@@ -11,9 +11,11 @@ import { AlignQueue, type JobOrigin, type QueueDeps } from "../src/lib/queue.js"
 
 const page = { bvid: "BV13LFNzmEHG", cid: "1", title: "跳楼机", part: "", durationSec: 200 };
 const goodOutput: WorkerOutput = {
+  lang: "zh",
   lines: [{ text: "你好", chars: ["你", "好"], t: [1, 1.5], score: 0.4 }],
   offset: 0,
   frameMs: 20,
+  timelineMatch: null,
 };
 
 async function setup(over: Partial<QueueDeps> = {}) {

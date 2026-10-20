@@ -28,7 +28,14 @@ interface LyricsAlignment {
   lyricsHash: string;
   video: { title: string; part?: string; durationSec: number };
   lines: AlignedLyricLine[];
-  quality: { medianScore: number; lowScoreLines: number; repairedLines: number };
+  quality: {
+    // 对齐算法 2 版起才有；之前缓存下来的只有中文
+    lang?: "zh" | "ja" | "ko" | "en";
+    medianScore: number;
+    lowScoreLines: number;
+    repairedLines: number;
+    timelineMatch?: number | null;
+  };
   offsetSec: number;
   lrc: string;
   createdAt: number;

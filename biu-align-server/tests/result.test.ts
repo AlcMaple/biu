@@ -18,6 +18,18 @@ describe("toWords", () => {
     expect(words.map(w => w.text).join("")).toBe(line.text);
   });
 
+  it("词中间的撇号留在词里，不把 I've 拆成两段", () => {
+    const line = {
+      text: "I've been, don't",
+      chars: [..."Ivebeendont"],
+      t: [1, 1.1, 1.1, 2, 2, 2, 2, 3, 3, 3, 3],
+      score: 0.3,
+    };
+    const words = toWords(line);
+    expect(words.map(w => w.text)).toEqual(["I've ", "been, ", "don't"]);
+    expect(words.map(w => w.start)).toEqual([1, 2, 3]);
+  });
+
   it("增强 LRC 行时间 + 每段时间", () => {
     expect(
       toLrc([
@@ -51,7 +63,19 @@ describe("isPcdnUrl", () => {
 
 describe("looksMismatched", () => {
   const q = (medianScore: number, repairedLines: number) => ({
-    quality: { medianScore, repairedLines, lowScoreLines: 0 },
+    quality: { lang: "zh" as const, medianScore, repairedLines, lowScoreLines: 0, timelineMatch: null },
+  });
+  const fq = (lang: "ja" | "ko" | "en", medianScore: number, repairedLines: number, timelineMatch: number | null) => ({
+    quality: { lang, medianScore, repairedLines, lowScoreLines: 0, timelineMatch },
+  });
+  it("外语按修复前行起点和原歌词时间的吻合度判（23 首对得上 / 11 组配错的实测边界）", () => {
+    // 对得上但置信度很低、重对齐很多的英语歌（Shape of You）不能被中文规则误判
+    expect(looksMismatched(fq("en", 0.119, 42, 0.89), true)).toBe(false);
+    expect(looksMismatched(fq("en", 0.146, 6, 0.8), true)).toBe(false);
+    expect(looksMismatched(fq("ja", 0.242, 22, 0.27), true)).toBe(true);
+    expect(looksMismatched(fq("ko", 0.086, 25, 0.06), true)).toBe(true);
+    // 外语纯文本歌词不判，交给人工审核
+    expect(looksMismatched(fq("en", 0.05, 0, null), false)).toBe(false);
   });
   it("按 15 首对得上 / 4 组配错的实测边界判定", () => {
     expect(looksMismatched(q(0.277, 2), true)).toBe(false);

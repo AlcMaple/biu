@@ -109,6 +109,14 @@ const SubmissionDetail = ({ id, onDone }: { id: string; onDone: () => void }) =>
           <div className="text-foreground-500 flex flex-wrap gap-x-4 text-xs">
             <span>{alignment.lines.length} 行</span>
             {alignment.quality.repairedLines ? <span>{alignment.quality.repairedLines} 行二次校准过</span> : null}
+            {/* 外语歌靠「和原歌词时间吻合多少」判断歌词配没配错；纯文本外语歌词服务端判不了，只能靠审核员试听 */}
+            {alignment.quality.lang && alignment.quality.lang !== "zh" ? (
+              <span>
+                {typeof alignment.quality.timelineMatch === "number"
+                  ? `${Math.round(alignment.quality.timelineMatch * 100)}% 的行和原歌词时间吻合`
+                  : "外语纯文本歌词，服务端判断不了配没配错，请试听确认"}
+              </span>
+            ) : null}
             {/* 带时间的原歌词才有：整体偏得多说明投稿有片头，或者歌词对应的是另一个版本。
                 纯文本上传服务端给的偏移恒为 0，照样显示会读成「和原歌词基本一致」 */}
             <span>

@@ -1,8 +1,8 @@
 # biu-align-server
 
-Biu 歌词时间轴对齐服务：客户端给出投稿（bvid + cid）和一份歌词，服务端自己去 B 站拉音频，Demucs 分离人声 → MMS_FA 强制对齐，得到每行、每字的时间。结果按「投稿 + 歌词」永久缓存，所有人共享。客户端播放时自动发起对齐，第一份对齐成功的结果直接对所有人生效，不经审核；用户上传自己的歌词、或报错「时间轴不对」，才进管理员审核。管理员也能手动对齐（插到队首、跳过缓存重跑）来判断问题出在算法还是别处。
+Biu 歌词时间轴对齐服务：客户端给出投稿（bvid + cid）和一份歌词，服务端自己去 B 站拉音频，Demucs 分离人声 → 强制对齐，得到每行、每字的时间。支持中文、日语、韩语、英语：中日韩用 MMS_FA（日语先用 MeCab 取读音），英语用在歌声上训练的音素模型。结果按「投稿 + 歌词」永久缓存，所有人共享。客户端播放时自动发起对齐，第一份对齐成功的结果直接对所有人生效，不经审核；用户上传自己的歌词、或报错「时间轴不对」，才进管理员审核。管理员也能手动对齐（插到队首、跳过缓存重跑）来判断问题出在算法还是别处。
 
-算法为什么这样做、每个参数怎么来的：[`docs/lyrics/歌词时间轴对齐-可行方案调研.md`](../docs/lyrics/歌词时间轴对齐-可行方案调研.md) 5.2.9 ~ 5.2.14；研究过程总账：[`docs/ideas/002-歌词时间轴对齐.md`](../docs/ideas/002-歌词时间轴对齐.md)。
+算法为什么这样做、每个参数怎么来的：中文见 [`docs/lyrics/歌词时间轴对齐-可行方案调研.md`](../docs/lyrics/歌词时间轴对齐-可行方案调研.md) 5.2.9 ~ 5.2.14，其他语种见 [`docs/lyrics/歌词时间轴对齐-多语言方案调研.md`](../docs/lyrics/歌词时间轴对齐-多语言方案调研.md)；研究过程总账：[`docs/ideas/002-歌词时间轴对齐.md`](../docs/ideas/002-歌词时间轴对齐.md)。
 
 ## 部署模型
 
@@ -13,7 +13,7 @@ Biu 歌词时间轴对齐服务：客户端给出投稿（bvid + cid）和一份
 ```
 
 - **单进程**：任务队列、提交和报错写入的串行化都只在进程内有效，不能开 cluster。
-- **一次只跑一个任务**：每首约 2 min CPU（Demucs 约 1.5 min + 对齐约 40 s），Python 进程峰值约 2.5 GB 内存。
+- **一次只跑一个任务**：每首约 2 min CPU（Demucs 约 1.5 min + 对齐约 40 s；英语歌对齐约 10 s），Python 进程峰值约 2.5 GB 内存，英语歌约 3.5 GB（歌声模型整首一次过，随时长增长，靠 10 分钟时长上限兜住）。
 - **不设排队上限和每日次数**：出队顺序是管理员手动的最先；其余按人轮转，每人先跑他最近点的那首，连切几十首的人只占自己那份。
 - **对不上的记下来**：歌词与音频对不上（`LYRICS_MISMATCH` 等）和被管理员下线（`ALIGNMENT_WITHDRAWN`）记在 `failures/`，后面的听众直接拿到失败、不再排队；限流、下载失败这类服务器侧原因不记。
 - **登录复用 biu-sync-server**：两边 `JWT_SECRET` 相同，客户端用 `/api/auth/exchange` 换来的 token 直接调这里。
@@ -67,7 +67,23 @@ venv/bin/python worker/align.py <音频> <歌词.json> /tmp/out.json /tmp/work  
 
 **进程优先级**：macOS 上用 launchd 跑时，`ProcessType` 不要设成 `Background`。系统会对后台进程大幅限 CPU，一首 2 分钟的任务会被拖长很多。用 `Standard` 加 `Nice 5`，既不拖慢对齐，也不挤占同机其他服务。
 
-MMS_FA 权重是 **CC-BY-NC 4.0**（非商业）。Biu 本身非商业可以用；部署方若用于商业用途需另行评估。
+**英语歌声模型的权重**不会自动下载，要手动放到 `worker/models/checkpoint_MTL`（约 69 MB，已在 `.gitignore` 里，不进仓库）。来源是 [LyricsAlignment-MTL](https://github.com/jhuang448/LyricsAlignment-MTL) 仓库 `checkpoints/checkpoint_MTL`（提交 `dde5139`），放好后核对 sha256：
+
+```bash
+mkdir -p worker/models
+curl -L -o worker/models/checkpoint_MTL https://github.com/jhuang448/LyricsAlignment-MTL/raw/dde51396875c65fd4fd4cc8f0c523fffec1002be/checkpoints/checkpoint_MTL
+shasum -a 256 worker/models/checkpoint_MTL   # 应为 826559e7e810bf8f90223d8fd5c66525c01ad4dd9cdc19d019f39f784e7ed3c1
+```
+
+也可以用环境变量 `BIU_SINGING_CHECKPOINT` 指到别的位置。缺这个文件时，只有英语歌会失败（`ALIGN_FAILED`），其他语种不受影响。
+
+**NLTK 词典要预先下好**：英语把单词转成音素用的 g2p_en，第一次 import 时会联网下载 NLTK 的 `cmudict` 和 `averaged_perceptron_tagger`（约 34 MB，存到部署用户的 `~/nltk_data`）。worker 每个任务起一个新进程，不预先下好的话每个英语任务都会去连网，断网时直接失败。装完依赖后用部署用户跑一次：
+
+```bash
+venv/bin/python -c "import g2p_en; g2p_en.G2p()('hello')"
+```
+
+MMS_FA 权重是 **CC-BY-NC 4.0**（非商业）。英语歌声模型的代码和权重是 MIT（版权声明见 `worker/singing-LICENSE`），它的训练数据 DALI 是研究用途数据集。Biu 本身非商业可以用；部署方若用于商业用途需另行评估。
 
 ## 三种开发方式
 

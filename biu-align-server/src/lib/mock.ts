@@ -23,6 +23,7 @@ export function mockRunWorker(delayMs: number): RunWorker {
     // 有原时间就沿用（整体晚 0.3 s，模拟投稿偏移）；纯文本就每行 3 s 顺排
     const starts = lines.map((l, i) => (lines.some(x => x.t > 0) ? l.t + 0.3 : 5 + i * 3));
     const out: WorkerOutput = {
+      lang: "zh",
       lines: lines.map((l, i) => {
         const chars = [...l.text].filter(c => c.trim() && !PUNCT.test(c));
         const span = Math.max(0.5, Math.min((starts[i + 1] ?? starts[i] + 3) - starts[i] - 0.3, chars.length * 0.35));
@@ -35,6 +36,7 @@ export function mockRunWorker(delayMs: number): RunWorker {
       }),
       offset: lines.some(l => l.t > 0) ? 0.3 : 0,
       frameMs: 20,
+      timelineMatch: lines.some(l => l.t > 0) ? 1 : null,
     };
     return out;
   };

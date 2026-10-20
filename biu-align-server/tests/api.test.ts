@@ -28,6 +28,7 @@ beforeAll(async () => {
     cache,
     failures,
     runWorker: async (_audio, lines) => ({
+      lang: "zh",
       lines: lines.map((l, i) => ({
         text: l.text,
         chars: [...l.text],
@@ -36,6 +37,7 @@ beforeAll(async () => {
       })),
       offset: 0,
       frameMs: 20,
+      timelineMatch: null,
     }),
     getVideoPage: async (bvid, cid) => ({ bvid, cid, title: "测试投稿", part: "P1", durationSec: 200 }),
     downloadAudio: async () => {},

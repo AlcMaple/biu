@@ -12,13 +12,33 @@ const WORD_TAG = /<\d+:\d+(?:[.:]\d+)?>/g;
 const META_TAG = /^\[[a-z]+:.*\]$/i;
 // 漏掉任何一行非演唱内容，强制对齐都会把它当成要唱的字塞进音频里，前后整段跟着错位。
 // 以下几类都在真实歌词里出现过（网易云 / LrcLib），见调研 5.2.7、5.2.11：
+// 日文、韩文的作词 / 作曲 / 编曲和英文 Lyrics / Written 也在这里：多语言调研时网易云外语歌里出现过（多语言调研 4.3）
 const CREDIT_CN =
-  /^(作词|作曲|编曲|制作人|制作|词|曲|监制|录音|混音|和声|和音|吉他|贝斯|鼓|弦乐|母带|出品|发行|统筹|策划|推广|OP|SP)\s*[:：]/i;
+  /^(作词|作曲|编曲|制作人|制作|词|曲|监制|录音|混音|和声|和音|吉他|贝斯|鼓|弦乐|母带|出品|发行|统筹|策划|推广|OP|SP|作詞|編曲|作詞・作曲|작사|작곡|편곡|Lyrics|Written)\s*[:：]/i;
 const CREDIT_EN =
   /\b(produced|producer|recorded|engineer(ed)?|mixed|mastered|mastering|arranged|conducted|coordination|vocals? recorded|programming|lyrics by|composed by|composer)\b/i;
 // 「录音室 : The Garden」「混音师 : Joe」这类短前缀加冒号（冒号前可能有空格）
 const SHORT_PREFIX_COLON = /^.{1,12}\s*[:：]/;
 const ISRC = /^ISRC\b/i;
+// 整行被括号包住的演唱者标注（STAY 的「(The Kid LAROI)」）：不删的话会被当成要唱的词去占一段音频，前后几行跟着错位，
+// 这首的行起点中位误差从 94 ms 涨到 239 ms（多语言调研 4.3）。方括号整行（[Chorus]、[Verse 1: X]）一律不唱；
+// 圆括号里每个词都首字母大写、又不全是拟声词才算人名。(Oh, ooh-woah)、(Ohhhhh Ohhh Ohhh) 这类伴唱是真唱的，要留着
+const BRACKET_LINE = /^[[【].*[\]】]$/;
+const PAREN_LINE = /^[(（](.*)[)）]$/;
+const NAME_JOINER = new Set(["&", "x", "×", "feat", "feat.", "ft.", "and", "/"]);
+const VOCABLE = /^(o+h*|a+h*|y?e+a*h*|u+h*|w?o+a*h*|la|na|ha|hey|ooh+|mm+|uh+|whoa)$/i;
+
+export function isSingerTag(text: string): boolean {
+  if (BRACKET_LINE.test(text)) return true;
+  const m = PAREN_LINE.exec(text);
+  if (!m) return false;
+  const words = m[1].split(/[\s,，]+/).filter(Boolean);
+  if (!words.length) return true;
+  const names = words.filter(w => !NAME_JOINER.has(w.toLowerCase()));
+  // 首字母不是 ASCII 的（中日韩名字）按人名算
+  if (!names.every(w => /^[^\p{ASCII}]/u.test(w) || /^[A-Z]/.test(w))) return false;
+  return !names.every(w => VOCABLE.test(w.replace(/[^\p{L}\p{N}]/gu, "") || "x"));
+}
 const TITLE_LINE = /^.+ - .+$/;
 
 export const MAX_LINES = 300;
@@ -40,7 +60,7 @@ export function parseLyrics(raw: string): LyricLine[] {
     const times = [...line.matchAll(TIME_TAG)].map(m => toSeconds(m[1], m[2], m[3]));
     const text = line.replace(TIME_TAG, "").replace(WORD_TAG, "").replace(/\s+/g, " ").trim();
     if (!text) continue;
-    if (CREDIT_CN.test(text) || CREDIT_EN.test(text) || ISRC.test(text)) continue;
+    if (CREDIT_CN.test(text) || CREDIT_EN.test(text) || ISRC.test(text) || isSingerTag(text)) continue;
     if (kept.length === 0 && TITLE_LINE.test(text) && (times.length === 0 || times[0] < 10)) continue;
     if (times.length) timed = true;
     for (const t of times.length ? times : [0]) kept.push({ t, text, colon: SHORT_PREFIX_COLON.test(text) });
