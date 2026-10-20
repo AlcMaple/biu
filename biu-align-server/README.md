@@ -77,10 +77,11 @@ shasum -a 256 worker/models/checkpoint_MTL   # 应为 826559e7e810bf8f90223d8fd5
 
 也可以用环境变量 `BIU_SINGING_CHECKPOINT` 指到别的位置。缺这个文件时，只有英语歌会失败（`ALIGN_FAILED`），其他语种不受影响。
 
-**NLTK 词典要预先下好**：英语把单词转成音素用的 g2p_en，第一次 import 时会联网下载 NLTK 的 `cmudict` 和 `averaged_perceptron_tagger`（约 34 MB，存到部署用户的 `~/nltk_data`）。worker 每个任务起一个新进程，不预先下好的话每个英语任务都会去连网，断网时直接失败。装完依赖后用部署用户跑一次：
+**NLTK 词典要预先下好**：英语把单词转成音素用的 g2p_en，第一次 import 时会联网下载 NLTK 的 `cmudict` 和 `averaged_perceptron_tagger`；新版 NLTK 还要 `averaged_perceptron_tagger_eng`，g2p_en 不会自己下，要单独下（合计约 34 MB，存到部署用户的 `~/nltk_data`）。worker 每个任务起一个新进程，不预先下好的话每个英语任务都会去连网，断网时直接失败。装完依赖后用部署用户跑一次：
 
 ```bash
-venv/bin/python -c "import g2p_en; g2p_en.G2p()('hello')"
+venv/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True)"
+venv/bin/python -c "import g2p_en; g2p_en.G2p()('hello')"   # 能打出音素就是装好了
 ```
 
 MMS_FA 权重是 **CC-BY-NC 4.0**（非商业）。英语歌声模型的代码和权重是 MIT（版权声明见 `worker/singing-LICENSE`），它的训练数据 DALI 是研究用途数据集。Biu 本身非商业可以用；部署方若用于商业用途需另行评估。
