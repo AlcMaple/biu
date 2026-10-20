@@ -42,6 +42,9 @@ async function fetchPublished(bvid: string | undefined, cid: string) {
  */
 const LyricsBroadcaster = () => {
   const playId = usePlayList(s => s.playId);
+  // 从搜索结果等入口点播时，歌曲先以无 cid 的状态切进来，cid 要等取播放地址时才补上（同一个 playId）。
+  // 只跟 playId 的话，切歌那一刻没 cid 就放弃了、之后不会再读，整首歌既不查生效版本也不自动匹配
+  const playCid = usePlayList(s => s.list.find(item => item.id === s.playId)?.cid);
   const isPlaying = usePlayList(s => s.isPlaying);
   // 只用来在进度变化时重新渲染，好让 lineElapsedMs 等派生值跟上；切行本身按帧走 useActiveLyricIndex
   usePlayProgress(s => s.currentTime);
@@ -164,7 +167,7 @@ const LyricsBroadcaster = () => {
     return () => {
       canceled = true;
     };
-  }, [playId]);
+  }, [playId, playCid]);
 
   const activeIndex = useActiveLyricIndex(lyrics, offset);
   const lastSyncRef = useRef({ elapsed: 0, at: 0, playing: false });
