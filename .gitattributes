@@ -1,2 +1,31 @@
+# 仓库和工作区一律 LF，Windows / Mac 检出结果相同：不依赖各机器的 core.autocrlf，
+# 否则 Windows 上会检出 CRLF，prettier / ESLint 改一次换行就把整个文件算成改动
+* text=auto eol=lf
+
 # git 钩子由 git 直接 spawn，Windows 上 CRLF 会导致 shebang 解析失败（Exec format error）
 /.husky/* text eol=lf
+
+# cmd.exe 按 CRLF 解析批处理，LF 会让 goto / 标签错位
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制显式标出，不交给 text=auto 猜，避免被当文本改换行而损坏
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.m4a binary
+*.wav binary
+*.jar binary
+*.exe binary
+*.keystore binary
+*.jks binary
+/electron/ffmpeg/ffmpeg-* binary

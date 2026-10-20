@@ -23,6 +23,14 @@
 - [私人FM / 心动模式](docs/devlog/2026-私人FM.md)
 - [歌词时间轴对齐](docs/devlog/2026-歌词时间轴对齐.md)
 
+## 2026-10-20 chore: 统一 Windows / Mac 的换行符为 LF
+
+**效果**：Windows 和 Mac 检出的文件一模一样，不再因为换行符不同把整个文件算成改动（此前 12 个文件在仓库里存的是 CRLF，Windows 是否检出 CRLF 取决于各机器的 `core.autocrlf`；上次提交里两个歌词搜索组件就因此整文件变动）
+
+**规则**：`.gitattributes` 规定所有文本文件仓库和工作区都是 LF，只有 `.bat` / `.cmd` 检出为 CRLF（cmd.exe 需要）；图片、字体、jar、exe、ffmpeg 显式标为二进制，不参与换行转换。prettier 的 `endOfLine` 从 `auto` 改为 `lf`，与 `.editorconfig` 一致。全部文件已是 UTF-8 无 BOM，编码无需处理
+
+**已有的 Windows 克隆**：拉取后先确认没有未提交的改动，再执行一次 `git rm -r --cached -q .` 和 `git reset --hard`，让工作区按新规则重新检出；之后 `git status` 应为空。新克隆不用做任何事
+
 ## 2026-10-19 docs: 提交规范去掉「先建分支」要求
 
 **效果**：提交规范与仓库实际做法对齐：直接在 master 上按需提交，只在用户明确要求时 commit / push；同时统一了列表项句末不加句号的写法。
