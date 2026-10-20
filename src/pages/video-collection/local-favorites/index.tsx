@@ -388,6 +388,7 @@ const LocalFavorites = () => {
             title: item.title,
             cover: item.cover,
             bvid: item.bvid,
+            cid: item.type === 2 ? item.cid : undefined,
             sid: item.type === 12 ? Number(item.rid) : undefined,
           });
           addToast({ title: "已添加下载任务", color: "success" });

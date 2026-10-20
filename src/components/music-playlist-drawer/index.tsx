@@ -60,6 +60,7 @@ const PlayListDrawer = () => {
           title: item.title,
           cover: item.cover,
           bvid: item.bvid,
+          cid: item.type === "audio" ? undefined : item.cid,
           sid: item.type === "audio" ? item.id : undefined,
         });
         addToast({
@@ -73,6 +74,7 @@ const PlayListDrawer = () => {
           title: item.title,
           cover: item.cover,
           bvid: item.bvid,
+          cid: item.cid,
         });
         addToast({
           title: "已添加下载任务",
