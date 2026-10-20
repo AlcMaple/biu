@@ -30,6 +30,7 @@ import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
 import platform, { isNativeMobile, isWeb } from "@/platform";
+import { DEFAULT_ALIGN_SERVER_URL } from "@shared/lyrics-align";
 
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
@@ -398,6 +399,32 @@ export const SystemSettingsTab = ({
             />
           </div>
         </div>
+      )}
+      {!isWeb && (
+        <>
+          <Divider />
+          <h2>歌词</h2>
+          <div className={rowCls}>
+            <div className={labelCls}>
+              <div className="text-medium font-medium">歌词对齐服务地址</div>
+              <div className="text-sm text-zinc-500">自己部署了对齐服务时改这里；留空用默认地址</div>
+            </div>
+            <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
+              <Controller
+                control={control}
+                name="alignServerUrl"
+                render={({ field }) => (
+                  <Input
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    placeholder={DEFAULT_ALIGN_SERVER_URL}
+                    aria-label="歌词对齐服务地址"
+                  />
+                )}
+              />
+            </div>
+          </div>
+        </>
       )}
       <Divider />
       <h2>搜索</h2>

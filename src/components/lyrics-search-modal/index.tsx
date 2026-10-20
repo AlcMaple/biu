@@ -18,7 +18,7 @@ const DEFAULT_LIMIT = 20;
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onLyricsAdopted?: (lyricsText?: string, tLyricsText?: string) => void;
+  onLyricsAdopted?: (lyricsText?: string, tLyricsText?: string, alsoAlign?: boolean) => void;
 }
 
 const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => {
@@ -31,6 +31,10 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   const [neteaseLoading, setNeteaseLoading] = useState(false);
   const [lrclibLoading, setLrclibLoading] = useState(false);
   const keywordRef = useRef("");
+  const canAlign = usePlayList(s => {
+    const item = s.list.find(i => i.id === s.playId);
+    return Boolean(item && item.source !== "local" && item.bvid && item.cid);
+  });
 
   const resetState = useCallback(() => {
     setKeyword("");
@@ -102,7 +106,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   }, [isOpen, activeTab, handleSubmit]);
 
   const handleAdoptLyrics = useCallback<AdoptLyricsHandler>(
-    async (lyricsText, tLyricsText) => {
+    async (lyricsText, tLyricsText, alsoAlign) => {
       if (!lyricsText && !tLyricsText) return false;
 
       const current = getPlayItem();
@@ -128,6 +132,9 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         tLyrics: tLyricsText,
         source: "manual",
         autoVersion: undefined,
+        // 换了一份歌词，旧的逐字时间轴和对齐前备份都不再对应它
+        alignment: undefined,
+        preAlign: undefined,
       };
 
       try {
@@ -135,7 +142,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         const prev = store?.[key] || {};
         const nextStore = { ...(store ?? {}), [key]: { ...prev, ...nextLyrics } };
         await platform.setStore(StoreNameMap.LyricsCache, nextStore);
-        onLyricsAdopted?.(lyricsText, tLyricsText);
+        onLyricsAdopted?.(lyricsText, tLyricsText, alsoAlign);
         return true;
       } catch {
         addToast({ title: "歌词保存失败", color: "danger" });
@@ -191,9 +198,19 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
             <Tab key="lrclib" title="LrcLib" />
           </Tabs>
           {activeTab === "netease" ? (
-            <NeteaseTab songs={neteaseSongs} loading={neteaseLoading} onAdoptLyrics={handleAdoptLyrics} />
+            <NeteaseTab
+              songs={neteaseSongs}
+              loading={neteaseLoading}
+              onAdoptLyrics={handleAdoptLyrics}
+              canAlign={canAlign}
+            />
           ) : (
-            <LrclibTab songs={lrclibSongs} loading={lrclibLoading} onAdoptLyrics={handleAdoptLyrics} />
+            <LrclibTab
+              songs={lrclibSongs}
+              loading={lrclibLoading}
+              onAdoptLyrics={handleAdoptLyrics}
+              canAlign={canAlign}
+            />
           )}
         </ModalBody>
       </ModalContent>

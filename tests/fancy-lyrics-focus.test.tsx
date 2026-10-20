@@ -9,12 +9,16 @@ vi.mock("@heroui/react", () => ({
   useDisclosure: () => ({ isOpen: false, onOpen: vi.fn(), onClose: vi.fn(), onOpenChange: vi.fn() }),
 }));
 vi.mock("@/store/play-list", () => ({
-  usePlayList: Object.assign((selector: (state: { playId: string }) => unknown) => selector({ playId: "fixture" }), {
-    getState: () => ({ getPlayItem: () => undefined }),
-  }),
+  // 暂停中的 audio：歌词按进度 store 切行（播放中才逐帧读 audio.currentTime）
+  audio: { paused: true, seeking: false, currentTime: 0 },
+  usePlayList: Object.assign(
+    (selector: (state: { playId: string; list: never[] }) => unknown) => selector({ playId: "fixture", list: [] }),
+    { getState: () => ({ getPlayItem: () => undefined }) },
+  ),
 }));
 vi.mock("@/platform", () => ({ default: { getStore: vi.fn(), setStore: vi.fn() } }));
 vi.mock("@/components/lyrics-search-modal", () => ({ default: () => null }));
+vi.mock("@/components/lyrics-align-modal", () => ({ default: () => null }));
 vi.mock("@/components/icon-button", () => ({ default: () => null }));
 vi.mock("@/components/lyrics/font-size-control", () => ({ default: () => null }));
 vi.mock("@/components/lyrics/offset-control", () => ({ default: () => null }));

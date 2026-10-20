@@ -140,10 +140,17 @@ interface MusicLyrics {
   offset?: number;
   lyrics?: string;
   tLyrics?: string;
-  /** 歌词来源：manual=用户手动采用（永不被自动结果覆盖）；缺省视为 manual（兼容旧缓存） */
-  source?: "manual" | "auto";
+  /**
+   * 歌词来源：manual=用户手动采用（永不被自动结果覆盖）；缺省视为 manual（兼容旧缓存）；
+   * aligned=用户采用的自动对齐结果（同样不被覆盖）；approved=审核通过、对所有人生效的版本（有新版本时自动更新）
+   */
+  source?: "manual" | "auto" | "aligned" | "approved";
   /** source=auto 时记录生成它的匹配算法版本，算法升级后会自动重新匹配 */
   autoVersion?: number;
+  /** 逐字时间轴（source 为 aligned / approved 时有）；lyrics 里同时存一份行级 LRC，给只认行时间的地方用 */
+  alignment?: Pick<LyricsAlignment, "lyricsHash" | "lines">;
+  /** 第一次采用对齐结果前的歌词，用于「还原」 */
+  preAlign?: Pick<MusicLyrics, "lyrics" | "tLyrics" | "source" | "autoVersion">;
 }
 
 interface NeteaseAudioMatchParams {

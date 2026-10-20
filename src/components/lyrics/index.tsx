@@ -1,21 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { addToast, useDisclosure } from "@heroui/react";
-import { RiTBoxLine } from "@remixicon/react";
+import { RiTBoxLine, RiTimerFlashLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
+import { lyricsCacheKey } from "@/components/lyrics/alignment";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import platform from "@/platform";
-import { useLyricsState } from "@/store/lyrics-state";
+import { type LyricLine, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
-import { usePlayProgress } from "@/store/play-progress";
 import { StoreNameMap } from "@shared/store";
 
 import IconButton from "../icon-button";
+import LyricsAlignModal from "../lyrics-align-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import FontSizeControl from "./font-size-control";
+import KaraokeLine from "./karaoke-line";
 import OffsetControl from "./offset-control";
+import { useActiveLyricIndex } from "./playback-clock";
 
 type PlayItem = ReturnType<ReturnType<typeof usePlayList.getState>["getPlayItem"]>;
 
@@ -39,6 +42,10 @@ const Lyrics = ({
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [centerPadding, setCenterPadding] = useState(0);
   const playId = usePlayList(s => s.playId);
+  const canAlign = usePlayList(s => {
+    const item = s.list.find(i => i.id === s.playId);
+    return Boolean(item && item.source !== "local" && item.bvid && item.cid);
+  });
   const [fontSize, setFontSize] = useState<number>(DEFAULT_FONT_SIZE);
 
   // Read lyrics state from shared store (owned by LyricsBroadcaster)
@@ -46,9 +53,6 @@ const Lyrics = ({
   const translatedLyrics = useLyricsState(s => s.translatedLyrics);
   const offset = useLyricsState(s => s.offset);
   const isLoading = useLyricsState(s => s.isLoading);
-
-  const { currentTime } = usePlayProgress();
-  const currentMs = currentTime * 1000 + offset;
 
   // Reset fontSize when track changes
   useEffect(() => {
@@ -92,13 +96,7 @@ const Lyrics = ({
     return map;
   }, [translatedLyrics]);
 
-  const activeIndex = useMemo(() => {
-    if (!lyrics.length) return -1;
-    for (let i = lyrics.length - 1; i >= 0; i -= 1) {
-      if (currentMs >= lyrics[i].time) return i;
-    }
-    return 0;
-  }, [currentMs, lyrics]);
+  const activeIndex = useActiveLyricIndex(lyrics, offset);
 
   const persistLyricsCache = useMemo(
     () =>
@@ -185,15 +183,30 @@ const Lyrics = ({
     }
   }, [activeIndex]);
 
+  const [alignInput, setAlignInput] = useState<string | null>(null);
+
   const handleLyricsAdopted = useCallback(
-    (nextLyrics?: string, nextTLyrics?: string) => {
+    (nextLyrics?: string, nextTLyrics?: string, alsoAlign?: boolean) => {
       onCloseSearch();
       if (nextLyrics) {
         useLyricsState.getState().setLyrics(parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
+        if (alsoAlign) setAlignInput(nextLyrics);
       }
     },
     [onCloseSearch],
   );
+
+  // 已经对齐过时预填对齐前的原歌词：原歌词的时间用来给对齐失败的行划重对齐窗口，比拿对齐结果再对一遍可靠
+  const openAlign = useCallback(async () => {
+    const key = lyricsCacheKey(usePlayList.getState().getPlayItem());
+    const entry = key ? (await platform.getStore(StoreNameMap.LyricsCache))?.[key] : undefined;
+    setAlignInput((entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "");
+  }, []);
+
+  // 采用后不关弹窗：下面还有「提交审核」，用户通常是先采用、听一会儿觉得准再提交
+  const handleAlignAdopted = useCallback((lines: LyricLine[], tLines: LyricLine[]) => {
+    useLyricsState.getState().setLyrics(lines, tLines);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -232,7 +245,7 @@ const Lyrics = ({
     }
   }, [activeIndex, centerPadding, stableTypography]);
 
-  const renderLine = (line: { time: number; text: string }, index: number) => {
+  const renderLine = (line: LyricLine, index: number) => {
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
     const activeWeight = stableTypography ? "font-medium" : isActive ? "font-extrabold" : "font-normal";
@@ -270,7 +283,11 @@ const Lyrics = ({
             overflowWrap: stableTypography ? "anywhere" : undefined,
           }}
         >
-          {line.text}
+          {isActive && line.words?.length ? (
+            <KaraokeLine words={line.words} endTime={lyrics[index + 1]?.time} offset={offset} />
+          ) : (
+            line.text
+          )}
         </div>
         {translation ? (
           <div
@@ -322,6 +339,18 @@ const Lyrics = ({
             <div className="pointer-events-auto">
               <OffsetControl value={offset} onChange={handleOffsetChange} onOpenChange={() => {}} />
             </div>
+            {canAlign ? (
+              <div className="pointer-events-auto">
+                <IconButton
+                  type="button"
+                  aria-label="歌词逐字对齐"
+                  onPress={openAlign}
+                  className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
+                >
+                  <RiTimerFlashLine size={16} />
+                </IconButton>
+              </div>
+            ) : null}
             <div className="pointer-events-auto">
               <IconButton
                 type="button"
@@ -335,6 +364,12 @@ const Lyrics = ({
         )}
       </div>
       <LyricsSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onLyricsAdopted={handleLyricsAdopted} />
+      <LyricsAlignModal
+        isOpen={alignInput !== null}
+        onOpenChange={open => !open && setAlignInput(null)}
+        initialLyrics={alignInput ?? ""}
+        onAdopted={handleAlignAdopted}
+      />
     </>
   );
 };

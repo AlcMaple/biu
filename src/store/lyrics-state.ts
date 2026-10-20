@@ -3,6 +3,8 @@ import { create } from "zustand";
 export type LyricLine = {
   time: number; // milliseconds
   text: string;
+  /** 逐字时间（毫秒），只有对齐过的歌词有 */
+  words?: { text: string; time: number }[];
 };
 
 interface LyricsState {
