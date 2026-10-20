@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="931" viewBox="0 0 1240 931" role="img" aria-labelledby="title desc">
+  <title id="title">歌词逐字对齐客户端（2/3）：打开一首歌用哪份歌词、边界情况、界面文案</title>
+  <desc id="desc">歌词来源优先级、边界情况和文案对照表。</desc>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+  <rect x="1" y="1" width="1238" height="929" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34.0" y="42.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">歌词逐字对齐客户端（2/3）：打开一首歌用哪份歌词、边界情况、界面文案</text>
+  <text x="34.0" y="66.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：自己选过的歌词永远不会被覆盖；没选过的，审核通过的版本优先于自动匹配。查不到审核版本不影响播放。</text>
+  <rect x="24.0" y="91.0" width="1192.0" height="153.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="120.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 打开一首歌时，按这个顺序决定用哪份歌词</text>
+  <rect x="44.0" y="137.0" width="361.3" height="87.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+  <text x="58.0" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">第一优先：你自己选的</text>
+  <text x="58.0" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">手动采用的搜索结果、采用的对齐结果、点过「还原为对齐</text>
+  <text x="58.0" y="208.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">前」的，打开时原样使用，审核通过的版本也不覆盖。</text>
+  <line x1="411.3" y1="180.5" x2="433.3" y2="180.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="439.3" y="137.0" width="361.3" height="87.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+  <text x="453.3" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">第二优先：审核通过的版本</text>
+  <text x="453.3" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">每次打开都查一次，所以新通过的版本下次打开就生效；审</text>
+  <text x="453.3" y="208.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">核员换成新版本时也会跟着更新。</text>
+  <line x1="806.7" y1="180.5" x2="828.7" y2="180.5" stroke="#8f8792" stroke-width="1.6" marker-end="url(#ah)" />
+  <rect x="834.7" y="137.0" width="361.3" height="87.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="848.7" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">第三：自动匹配</text>
+  <text x="848.7" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">原有逻辑，按标题自动找歌词；匹配算法升级后会重新匹配。</text>
+  <rect x="24.0" y="262.0" width="1192.0" height="290.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="291.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 边界情况</text>
+  <rect x="44.0" y="308.0" width="276.0" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="58.0" y="339.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">本地音乐</text>
+  <text x="58.0" y="362.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">不显示对齐按钮：服务器只能按 B 站投稿</text>
+  <text x="58.0" y="379.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">取音频。</text>
+  <rect x="336.0" y="308.0" width="276.0" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="350.0" y="339.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">没登录</text>
+  <text x="350.0" y="362.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">弹窗报「请先登录 B 站，歌词对齐要用登</text>
+  <text x="350.0" y="379.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">录身份记录每日次数和提交」；侧边栏不显</text>
+  <text x="350.0" y="396.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">示「我的提交」。</text>
+  <rect x="628.0" y="308.0" width="276.0" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="642.0" y="339.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">登录凭证过期</text>
+  <text x="642.0" y="362.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">自动重新换一次凭证再发；仍失败就提示「B</text>
+  <text x="642.0" y="379.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">站登录已失效，请重新登录后再试」，不循</text>
+  <text x="642.0" y="396.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">环。</text>
+  <rect x="920.0" y="308.0" width="276.0" height="104.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="934.0" y="339.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">查进度失败</text>
+  <text x="934.0" y="362.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">不自动重试，显示失败原因和「继续查询」</text>
+  <text x="934.0" y="379.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">按钮，用户点了才接着查同一个任务。</text>
+  <rect x="44.0" y="428.0" width="276.0" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="58.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">查审核版本失败</text>
+  <text x="58.0" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">只记日志，照常用本机缓存或自动匹配，播</text>
+  <text x="58.0" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">放不受影响。</text>
+  <rect x="336.0" y="428.0" width="276.0" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="350.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">对齐过的歌再对齐</text>
+  <text x="350.0" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">输入框预填对齐前的原歌词，不是上次的对</text>
+  <text x="350.0" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">齐结果：原歌词的时间能帮对不上的行找位</text>
+  <text x="350.0" y="516.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">置。</text>
+  <rect x="628.0" y="428.0" width="276.0" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="642.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">连续采用多次</text>
+  <text x="642.0" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「还原为对齐前」始终回到第一次对齐之前</text>
+  <text x="642.0" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">的版本，不会只退一步。</text>
+  <rect x="920.0" y="428.0" width="276.0" height="104.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="934.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">还原之后</text>
+  <text x="934.0" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">这首歌算作「你自己选的」，以后审核通过</text>
+  <text x="934.0" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">的版本也不会再覆盖它。</text>
+  <rect x="24.0" y="570.0" width="1192.0" height="343.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="599.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">③ 界面文案对照表</text>
+  <rect x="44.0" y="616.0" width="1152.0" height="277.0" rx="9" fill="#ffffff" stroke="#c3bcc6" />
+  <text x="54.0" y="635.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">文案</text>
+  <text x="468.7" y="635.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">出现在</text>
+  <text x="641.5" y="635.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">什么时候出现</text>
+  <text x="895.0" y="635.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">用户当时能做什么</text>
+  <line x1="44.0" y1="644.0" x2="1196.0" y2="644.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="663.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「排队中，前面还有 N 首」</text>
+  <text x="468.7" y="663.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗</text>
+  <text x="641.5" y="663.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">服务器正在对齐别人的歌</text>
+  <text x="895.0" y="663.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">等着，或关掉弹窗稍后再点</text>
+  <line x1="44.0" y1="673.0" x2="1196.0" y2="673.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="692.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「正在分离人声并对齐，一首大约 2 分钟…」</text>
+  <text x="468.7" y="692.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗</text>
+  <text x="641.5" y="692.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">轮到这首歌</text>
+  <text x="895.0" y="692.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">等着；关掉弹窗不影响</text>
+  <line x1="44.0" y1="702.0" x2="1196.0" y2="702.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="721.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「这首歌已有审核通过的逐字歌词」</text>
+  <text x="468.7" y="721.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗顶部</text>
+  <text x="641.5" y="721.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">这首歌已有通过的版本</text>
+  <text x="895.0" y="721.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">点「直接使用」，不必自己对齐</text>
+  <line x1="44.0" y1="731.0" x2="1196.0" y2="731.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="750.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「当前在用的是对齐后的歌词」</text>
+  <text x="468.7" y="750.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗</text>
+  <text x="641.5" y="750.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">采用过对齐结果</text>
+  <text x="895.0" y="750.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">点「还原为对齐前」</text>
+  <line x1="44.0" y1="760.0" x2="1196.0" y2="760.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="779.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「已提交审核，通过后这首歌对所有人生效」</text>
+  <text x="468.7" y="779.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">右下角提示</text>
+  <text x="641.5" y="779.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">提交成功</text>
+  <text x="895.0" y="779.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">到侧边栏「我的提交」看结果</text>
+  <line x1="44.0" y1="789.0" x2="1196.0" y2="789.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="808.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「打回原因：…」</text>
+  <text x="468.7" y="808.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">我的提交</text>
+  <text x="641.5" y="808.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">审核员打回</text>
+  <text x="895.0" y="808.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">按原因改歌词，重新对齐后再提交</text>
+  <line x1="44.0" y1="818.0" x2="1196.0" y2="818.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="837.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">「连不上歌词对齐服务（地址，原因），请检查网络或设置里的服务地</text>
+  <text x="54.0" y="854.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">址」</text>
+  <text x="468.7" y="837.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗</text>
+  <text x="641.5" y="837.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">断网，或设置里的服务地址填错（网页版</text>
+  <text x="641.5" y="854.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">没有这个设置）</text>
+  <text x="895.0" y="837.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">检查网络，或清空设置里的地址用默认值</text>
+  <line x1="44.0" y1="864.0" x2="1196.0" y2="864.0" stroke="#c3bcc6" stroke-width="0.8" />
+  <text x="54.0" y="883.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">服务器给的原因原文（限流、当日次数用完、歌词和音频对不上等）</text>
+  <text x="468.7" y="883.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">对齐弹窗</text>
+  <text x="641.5" y="883.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">见服务端日志配图（2/3）</text>
+  <text x="895.0" y="883.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">照提示做；不会被统一成「网络请求失败」</text>
+</svg>

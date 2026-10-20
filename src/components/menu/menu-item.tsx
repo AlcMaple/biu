@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { Avatar, Button, Tooltip } from "@heroui/react";
+import { Avatar, Badge, Button, Tooltip } from "@heroui/react";
 import clx from "classnames";
 import { twMerge } from "tailwind-merge";
 
@@ -23,6 +23,8 @@ export interface MenuItemProps {
   className?: string;
   onPress?: VoidFunction;
   collapsed?: boolean;
+  /** 右侧计数（如待审数量），0 或不传不显示 */
+  badge?: number;
   /** 用于 dnd-kit 等场景，把拖拽监听器绑定到可交互元素上 */
   dndProps?: ({ className?: string } & Record<string, unknown>) | undefined;
   [key: string]: unknown;
@@ -37,6 +39,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
   className,
   onPress,
   collapsed,
+  badge,
   dndProps,
 }) => {
   const location = useLocation();
@@ -101,7 +104,13 @@ const MenuItem: React.FC<MenuItemProps> = ({
           })}
           {...(dndRest as any)}
         >
-          {iconContent}
+          {badge ? (
+            <Badge content={badge > 99 ? "99+" : badge} color="danger" size="sm" shape="circle">
+              {iconContent}
+            </Badge>
+          ) : (
+            iconContent
+          )}
         </Button>
       </Tooltip>
     );
@@ -115,6 +124,13 @@ const MenuItem: React.FC<MenuItemProps> = ({
       color={isActive ? "primary" : "default"}
       onPress={handlePress}
       startContent={iconContent}
+      endContent={
+        badge ? (
+          <span className="bg-danger text-danger-foreground ml-auto min-w-5 flex-none rounded-full px-1.5 text-center text-xs leading-5">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : undefined
+      }
       className={twMerge("justify-start px-2 text-inherit", className, dndClassName)}
       {...(dndRest as any)}
     >

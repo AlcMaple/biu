@@ -5,6 +5,7 @@ import { getDefaultMenuList } from "@/common/constants/menus";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import SelectAllCheckboxGroup from "@/components/select-all-checkbox-group";
 import { isWeb } from "@/platform";
+import { useAlignReview } from "@/store/align-review";
 import { useFavoritesStore } from "@/store/favorite";
 import { useUser } from "@/store/user";
 
@@ -15,6 +16,7 @@ interface MenuSettingsProps {
 const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
   const isMobileLayout = useIsMobileLayout();
   const user = useUser(state => state.user);
+  const isReviewer = useAlignReview(state => state.isAdmin);
   const createdFavorites = useFavoritesStore(state => state.createdFavorites);
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
   const defaultMenuList = getDefaultMenuList(isWeb);
@@ -42,6 +44,7 @@ const MenuSettings: React.FC<MenuSettingsProps> = ({ control }) => {
 
                 const items = defaultMenuList
                   .filter(i => (user?.isLogin ? true : !i.needLogin))
+                  .filter(i => (i.needReviewer ? isReviewer : true))
                   .map(item => ({
                     value: item.href!,
                     label: item.title,

@@ -13,6 +13,8 @@ import Heartbeat from "./pages/heartbeat";
 import History from "./pages/history";
 import Later from "./pages/later";
 import LocalMusicPage from "./pages/local-music";
+import LyricsReview from "./pages/lyrics-review";
+import LyricsSubmissions from "./pages/lyrics-submissions";
 import MiniPlayer from "./pages/mini-player";
 import MusicRecommend from "./pages/music-recommend";
 import NotFound from "./pages/not-found";
@@ -47,6 +49,14 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "play-ranking",
         element: <PlayRanking />,
+      },
+      {
+        path: "lyrics-review",
+        element: <LyricsReview />,
+      },
+      {
+        path: "lyrics-submissions",
+        element: <LyricsSubmissions />,
       },
       {
         path: "follow",

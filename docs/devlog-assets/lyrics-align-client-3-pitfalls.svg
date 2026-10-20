@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="724" viewBox="0 0 1240 724" role="img" aria-labelledby="title desc">
+  <title id="title">歌词逐字对齐客户端（3/3）：为什么不那样做，哪里容易改错</title>
+  <desc id="desc">反直觉设计的理由、改错红线和名字相近的概念。</desc>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+  <rect x="1" y="1" width="1238" height="722" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+  <text x="34.0" y="42.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">歌词逐字对齐客户端（3/3）：为什么不那样做，哪里容易改错</text>
+  <text x="34.0" y="66.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：凭证只留在主进程 / 原生层 / Biu 服务器；失败不自动重试；逐字点亮不改变文字大小。下面每一条都是接手时最容易「顺手改掉」的地方。</text>
+  <rect x="24.0" y="91.0" width="1192.0" height="273.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="120.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 为什么不那样做</text>
+  <rect x="44.0" y="137.0" width="373.3" height="104.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58.0" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">不让界面直接请求对齐服务</text>
+  <text x="58.0" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">网页里带不上 B 站登录，还有跨域限制。改为桌面主进程、</text>
+  <text x="58.0" y="208.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">手机原生网络、网页 Biu 服务器换好凭证后转发，而且只放</text>
+  <text x="58.0" y="225.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">行固定几条接口。</text>
+  <rect x="433.3" y="137.0" width="373.3" height="104.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="447.3" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">不把音频地址发给服务器</text>
+  <text x="447.3" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">播放地址带签名、会过期，交出去等于开放代理。服务器按 </text>
+  <text x="447.3" y="208.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">BV 号自己取音频，并核对分 P 属于这个投稿。</text>
+  <rect x="822.7" y="137.0" width="373.3" height="104.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="836.7" y="168.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">不定时刷新待审数量</text>
+  <text x="836.7" y="191.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">对齐服务按账号限流，定时请求会吃掉审核员自己的额度。改</text>
+  <text x="836.7" y="208.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">为登录、切回窗口（最多每分钟一次）、进审核页、审核后刷</text>
+  <text x="836.7" y="225.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">新。</text>
+  <rect x="44.0" y="257.0" width="373.3" height="87.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="58.0" y="288.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">查进度失败不自动重试</text>
+  <text x="58.0" y="311.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">限流时自动重试只会延长惩罚，静默失败又会让用户反复手动</text>
+  <text x="58.0" y="328.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">点。把原因原样给用户，由用户决定什么时候再查。</text>
+  <rect x="433.3" y="257.0" width="373.3" height="87.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="447.3" y="288.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">逐字点亮只改亮度</text>
+  <text x="447.3" y="311.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">改字号、字重或用渐变填色会让行内文字跳动，渐变还会和歌</text>
+  <text x="447.3" y="328.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">词阴影冲突。</text>
+  <rect x="822.7" y="257.0" width="373.3" height="87.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+  <text x="836.7" y="288.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">不让整页歌词跟着每帧重画</text>
+  <text x="836.7" y="311.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">逐字点亮每秒要更新几十次，只更新当前行每个字的亮度，不</text>
+  <text x="836.7" y="328.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">重画整个歌词列表。</text>
+  <rect x="24.0" y="382.0" width="1192.0" height="153.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="411.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 改错红线</text>
+  <rect x="44.0" y="428.0" width="373.3" height="87.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="58.0" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">「还原」必须算作用户自己选的</text>
+  <text x="58.0" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">否则下次打开又被审核通过的版本覆盖，用户点了还原等于没</text>
+  <text x="58.0" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">点。</text>
+  <rect x="433.3" y="428.0" width="373.3" height="87.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="447.3" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">只保留第一次的对齐前版本</text>
+  <text x="447.3" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">连续采用时如果每次都覆盖，还原只能回到上一次对齐结果，</text>
+  <text x="447.3" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">原歌词就找不回来了。</text>
+  <rect x="822.7" y="428.0" width="373.3" height="87.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+  <text x="836.7" y="459.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">审核入口按账号判断</text>
+  <text x="836.7" y="482.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">侧边栏和设置里的开关都只给审核员；换号、退出登录都要重</text>
+  <text x="836.7" y="499.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">新查，不能沿用上一个账号的身份。</text>
+  <rect x="24.0" y="553.0" width="1192.0" height="153.0" rx="10" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="44.0" y="582.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">③ 名字相近、互不相关的概念</text>
+  <rect x="44.0" y="599.0" width="373.3" height="87.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="58.0" y="630.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">「采用」≠「提交审核」</text>
+  <text x="58.0" y="653.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">采用只改你自己这台设备；提交审核要审核员通过后才对所有</text>
+  <text x="58.0" y="670.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">人生效。可以只采用不提交，也可以采用后再提交。</text>
+  <rect x="433.3" y="599.0" width="373.3" height="87.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="447.3" y="630.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">「我的提交」≠「歌词审核」</text>
+  <text x="447.3" y="653.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">前者所有登录用户都有，只看自己交过的；后者只有审核员有，</text>
+  <text x="447.3" y="670.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">看所有人交上来待审的。</text>
+  <rect x="822.7" y="599.0" width="373.3" height="87.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+  <text x="836.7" y="630.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">「歌词对齐服务地址」≠ 云同步</text>
+  <text x="836.7" y="653.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">设置里新增的地址只管歌词对齐，自己部署了对齐服务时才改。</text>
+  <text x="836.7" y="670.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">它和云同步是两个独立服务，只共用登录凭证。</text>
+</svg>
