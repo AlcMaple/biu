@@ -1,48 +1,48 @@
-import { Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
+import { useEffect, useState } from "react";
 
-import type { LyricLine } from "@/store/lyrics-state";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea } from "@heroui/react";
 
-import { usePlayList } from "@/store/play-list";
-
-import AlignTab from "./align-tab";
+import { useLyricsAlignSession } from "@/store/lyrics-align-session";
 
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  /** 预填的歌词：从搜索结果点「自动对齐」时是那份歌词，从歌词面板进来时是当前歌词 */
   initialLyrics: string;
-  onAdopted: (lines: LyricLine[], tLines: LyricLine[]) => void;
 }
 
-const LyricsAlignModal = ({ isOpen, onOpenChange, initialLyrics, onAdopted }: Props) => {
-  const playItem = usePlayList(s => s.list.find(i => i.id === s.playId));
+// 只在要换歌词时才打开；平时「对齐当前歌词」一键开始，进度和试听都在歌词区顶部的提示条里
+const LyricsAlignModal = ({ isOpen, onOpenChange, initialLyrics }: Props) => {
+  const [text, setText] = useState(initialLyrics);
 
-  const target =
-    playItem && playItem.source !== "local" && playItem.bvid && playItem.cid
-      ? { bvid: playItem.bvid, cid: String(playItem.cid), title: playItem.pageTitle || playItem.title }
-      : null;
+  useEffect(() => {
+    if (isOpen) setText(initialLyrics);
+  }, [isOpen, initialLyrics]);
+
+  const start = () => {
+    void useLyricsAlignSession.getState().start(text, { skipApproved: true });
+    onOpenChange(false);
+  };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside" size="3xl" disableAnimation>
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside" size="2xl" disableAnimation>
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
-          歌词逐字对齐
-          {target ? <span className="text-foreground/60 text-sm font-normal">{target.title}</span> : null}
+          换一份歌词再对齐
+          <span className="text-foreground/60 text-sm font-normal">
+            带时间的 LRC 或纯文本都行，制作人员信息不用删。想从网易云 / LrcLib 挑，可以在「搜索歌词」里选「采用并对齐」
+          </span>
         </ModalHeader>
-        <ModalBody className="pb-6">
-          {target ? (
-            <AlignTab
-              key={`${target.bvid}-${target.cid}`}
-              target={target}
-              initialLyrics={initialLyrics}
-              onAdopted={onAdopted}
-            />
-          ) : (
-            <div className="text-foreground/60 py-8 text-center text-sm">
-              只有 B 站投稿能自动对齐（服务器按投稿去取音频），本地音乐暂不支持
-            </div>
-          )}
+        <ModalBody>
+          <Textarea value={text} onValueChange={setText} minRows={10} maxRows={18} aria-label="要对齐的歌词" />
         </ModalBody>
+        <ModalFooter>
+          <Button variant="light" onPress={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button color="primary" isDisabled={!text.trim()} onPress={start}>
+            开始对齐
+          </Button>
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );

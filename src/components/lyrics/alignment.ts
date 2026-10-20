@@ -53,6 +53,12 @@ const retimeTranslation = (original: LyricLine[], translated: LyricLine[], align
   return result;
 };
 
+// 试听用：不读写缓存，翻译按当前在显示的原歌词搬到对齐后的时间上
+export const previewAlignment = (alignment: LyricsAlignment, original: LyricLine[], translated: LyricLine[]) => {
+  const lines = alignmentToLines(alignment.lines);
+  return { lyrics: lines, translatedLyrics: retimeTranslation(original, translated, lines) };
+};
+
 export type AlignedSource = "aligned" | "approved";
 
 export const isUserChosen = (entry: MusicLyrics | undefined) =>
@@ -61,14 +67,21 @@ export const isUserChosen = (entry: MusicLyrics | undefined) =>
   );
 
 // 采用对齐结果：写进歌词缓存（Electron 的 electron-store / Android 的 Preferences / Web 的 IndexedDB 都走 platform.setStore）。
-// 第一次采用时把原来的歌词留进 preAlign，之后可以还原；连续采用不覆盖它，否则还原只能回到上一次对齐结果
+// 第一次采用时把原来的歌词留进 preAlign，之后可以还原；连续采用不覆盖它，否则还原只能回到上一次对齐结果。
+// 偏移一并归零：手动调的偏移是在补原歌词的时间误差，对齐后的时间已经准了，留着反而错位；原值存进 preAlign，还原时带回来
 export async function adoptAlignment(key: string, alignment: LyricsAlignment, source: AlignedSource) {
   const store = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
   const prev = store[key] ?? {};
   const preAlign =
     prev.preAlign ??
     (prev.lyrics || prev.tLyrics
-      ? { lyrics: prev.lyrics, tLyrics: prev.tLyrics, source: prev.source, autoVersion: prev.autoVersion }
+      ? {
+          lyrics: prev.lyrics,
+          tLyrics: prev.tLyrics,
+          source: prev.source,
+          autoVersion: prev.autoVersion,
+          offset: prev.offset,
+        }
       : undefined);
   const base = preAlign ?? prev;
   const lines = alignmentToLines(alignment.lines);
@@ -81,6 +94,7 @@ export async function adoptAlignment(key: string, alignment: LyricsAlignment, so
     autoVersion: undefined,
     alignment: { lyricsHash: alignment.lyricsHash, lines: alignment.lines },
     preAlign,
+    offset: 0,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
   return { lines, tLines, hasPreAlign: Boolean(preAlign) };
@@ -99,7 +113,8 @@ export async function restorePreAlign(key: string) {
     tLyrics: prev.preAlign?.tLyrics,
     source: "manual",
     autoVersion: undefined,
+    offset: prev.preAlign?.offset ?? 0,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
-  return { lines: parseLrc(next.lyrics), tLines: parseLrc(next.tLyrics) };
+  return { lines: parseLrc(next.lyrics), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
 }

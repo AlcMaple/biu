@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef } from "react";
 import clsx from "classnames";
 
 import { alignmentToLines } from "@/components/lyrics/alignment";
-import KaraokeLine from "@/components/lyrics/karaoke-line";
-import { useActiveLyricIndex } from "@/components/lyrics/playback-clock";
+import { karaokeTiming } from "@/components/lyrics/karaoke";
+import KaraokeText from "@/components/lyrics/karaoke-text";
+import { subscribePlaybackClock, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
 import { usePlayList } from "@/store/play-list";
 
 import ScrollContainer from "../scroll-container";
@@ -24,10 +25,14 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
   const tracked = useMemo(() => (isCurrent ? lines : []), [isCurrent, lines]);
   const activeIndex = useActiveLyricIndex(tracked, 0);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const activeTiming = useMemo(
+    () => (activeIndex >= 0 ? karaokeTiming(lines[activeIndex], lines[activeIndex + 1]?.time) : null),
+    [lines, activeIndex],
+  );
 
   useEffect(() => {
     const el = activeIndex >= 0 ? lineRefs.current[activeIndex] : null;
-    // 只滚列表自己：scrollIntoView 会连弹窗一起滚，用户往下找「提交审核」时被拽回来
+    // 只滚列表自己：scrollIntoView 会连整页一起滚，审核员往下找「通过 / 打回」时被拽回来
     const viewport = el?.closest<HTMLElement>("[data-overlayscrollbars-viewport]");
     if (!el || !viewport) return;
     const offset = el.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
@@ -40,7 +45,7 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
   return (
     <div className={className}>
       <div className="text-foreground/60 mb-2 text-xs">
-        {isCurrent ? "跟随当前播放逐字点亮，点击某一行可跳到该处试听" : "当前播放的不是这首，播放它之后可以跟随试听"}
+        {isCurrent ? "跟着当前播放逐字填色，点某一行可以跳过去听" : "现在播放的不是这首，先播放它才能边听边对照"}
       </div>
       <ScrollContainer className="max-h-[360px] pr-2">
         {lines.map((line, index) => (
@@ -62,14 +67,14 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
               {fmt(line.time / 1000)}
             </span>
             <span className="min-w-0 break-words">
-              {index === activeIndex && line.words?.length ? (
-                <KaraokeLine words={line.words} endTime={lines[index + 1]?.time} offset={0} />
+              {index === activeIndex && activeTiming ? (
+                <KaraokeText timing={activeTiming} subscribe={subscribePlaybackClock} baseClassName="opacity-45" />
               ) : (
                 line.text
               )}
             </span>
             {alignment.lines[index]?.repaired ? (
-              <span className="text-warning shrink-0 text-xs leading-6">局部重对齐</span>
+              <span className="text-warning shrink-0 text-xs leading-6">二次校准过</span>
             ) : null}
           </div>
         ))}

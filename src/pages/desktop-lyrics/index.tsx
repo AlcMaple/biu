@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   RiCloseLine,
@@ -12,6 +12,8 @@ import {
 
 import type { LyricLine } from "@/store/lyrics-state";
 
+import { karaokeTiming } from "@/components/lyrics/karaoke";
+import KaraokeText from "@/components/lyrics/karaoke-text";
 import platform from "@/platform";
 
 export const DESKTOP_LYRICS_CHANNEL = "biu-desktop-lyrics";
@@ -20,10 +22,7 @@ export interface DesktopLyricsMessage {
   type?: "update" | "request" | "cmd";
   lines?: LyricLine[];
   activeIndex?: number;
-  // Duration of the current line in ms (next line's time - current line's time).
-  lineDurationMs?: number;
-  // How far we are into the current line at the moment this message was sent.
-  // The window animates from this ratio using its own clock.
+  // 发消息那一刻当前行已经唱了多久（含歌词偏移）；两条消息之间窗口按自己的时钟往后推
   lineElapsedMs?: number;
   isPlaying?: boolean;
   cmd?: "prev" | "next" | "toggle";
@@ -131,9 +130,9 @@ const ToolBtn = ({
 const DesktopLyrics = () => {
   const [lines, setLines] = useState<LyricLine[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [lineDurationMs, setLineDurationMs] = useState(0);
-  const [lineElapsedMs, setLineElapsedMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // 放 ref 不放 state：每条消息都会更新，进 state 会让整个窗口跟着重渲
+  const clockRef = useRef({ elapsed: 0, at: 0, playing: false });
   const [isHovered, setIsHovered] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   // Whether the cursor is currently inside the window while locked.
@@ -154,9 +153,14 @@ const DesktopLyrics = () => {
       if (data.type === "request" || data.type === "cmd") return;
       if (Array.isArray(data.lines)) setLines(data.lines);
       if (typeof data.activeIndex === "number") setActiveIndex(data.activeIndex);
-      if (typeof data.lineDurationMs === "number") setLineDurationMs(data.lineDurationMs);
-      if (typeof data.lineElapsedMs === "number") setLineElapsedMs(data.lineElapsedMs);
       if (typeof data.isPlaying === "boolean") setIsPlaying(data.isPlaying);
+      if (typeof data.lineElapsedMs === "number") {
+        clockRef.current = {
+          elapsed: data.lineElapsedMs,
+          at: performance.now(),
+          playing: data.isPlaying ?? clockRef.current.playing,
+        };
+      }
     };
     bc.postMessage({ type: "request" });
     return () => {
@@ -226,41 +230,26 @@ const DesktopLyrics = () => {
     return () => window.removeEventListener("resize", onResize);
   }, [scrollToCurrent]);
 
-  // ── Karaoke progress driver ──────────────────────────────────────────────
-  // The progress overlay fills left-to-right by animating CSS width with a
-  // linear transition. Whenever the line (or play state) changes, we restart
-  // the transition based on `lineElapsedMs / lineDurationMs`:
-  //   • playing: snap to the elapsed ratio, then transition to 100% over the
-  //     remaining duration
-  //   • paused: snap to the elapsed ratio with no transition (progress halts)
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const active = list.querySelector<HTMLElement>(`[data-lyric-index="${activeIndex}"] .progress`);
-    if (!active) return;
-
-    const duration = Math.max(0, lineDurationMs);
-    const elapsed = Math.max(0, Math.min(lineElapsedMs, duration));
-    const ratio = duration > 0 ? elapsed / duration : 0;
-
-    active.style.transition = "none";
-    active.style.width = `${ratio * 100}%`;
-    // Force a reflow so the next transition starts from the snapped width.
-    void active.offsetWidth;
-
-    if (isPlaying && duration > 0) {
-      const remaining = duration - elapsed;
-      active.style.transition = `width ${remaining}ms linear`;
-      active.style.width = "100%";
-    }
-
-    // Reset non-current progress bars so revisiting an earlier line starts clean.
-    list.querySelectorAll<HTMLElement>(".progress").forEach(el => {
-      if (el === active) return;
-      el.style.transition = "none";
-      el.style.width = "0%";
-    });
-  }, [activeIndex, lineDurationMs, lineElapsedMs, isPlaying, lines]);
+  // ── Karaoke ───────────────────────────────────────────────────────────────
+  // 和主窗口歌词同一套逐字填色：对齐过的按逐字时间，没对齐的按行内均摊（见 components/lyrics/karaoke.ts）
+  const activeLine = activeIndex >= 0 ? lines[activeIndex] : undefined;
+  const activeTiming = useMemo(
+    () => (activeLine ? karaokeTiming(activeLine, lines[activeIndex + 1]?.time) : null),
+    [activeLine, lines, activeIndex],
+  );
+  const subscribeClock = useCallback(
+    (onTick: (ms: number) => void) => {
+      let raf = 0;
+      const loop = () => {
+        const { elapsed, at, playing } = clockRef.current;
+        if (activeLine) onTick(activeLine.time + elapsed + (playing ? performance.now() - at : 0));
+        raf = requestAnimationFrame(loop);
+      };
+      loop();
+      return () => cancelAnimationFrame(raf);
+    },
+    [activeLine],
+  );
 
   // ── Lock / unlock ─────────────────────────────────────────────────────────
   const applyIgnoreMouse = useCallback((ignore: boolean) => {
@@ -446,14 +435,7 @@ const DesktopLyrics = () => {
           color: rgba(255, 255, 255, 0.85);
           text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
         }
-        .lyric-main .progress {
-          position: absolute;
-          top: 0;
-          left: 0;
-          height: 100%;
-          overflow: hidden;
-          white-space: nowrap;
-          width: 0%;
+        .lyric-main .fill {
           color: #a3e635;
           text-shadow:
             0 0 10px rgba(163, 230, 53, 0.55),
@@ -575,8 +557,16 @@ const DesktopLyrics = () => {
                     style={{ opacity, transform: `scale(${scale})` }}
                   >
                     <div className="lyric-main" style={{ fontSize }}>
-                      <span className="base">{lineObj.text}</span>
-                      <span className="progress">{lineObj.text}</span>
+                      {i === activeIndex && activeTiming?.words.length ? (
+                        <KaraokeText
+                          timing={activeTiming}
+                          subscribe={subscribeClock}
+                          baseClassName="base"
+                          fillClassName="fill"
+                        />
+                      ) : (
+                        <span className="base">{lineObj.text}</span>
+                      )}
                     </div>
                   </div>
                 );

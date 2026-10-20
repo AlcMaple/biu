@@ -150,7 +150,7 @@ interface MusicLyrics {
   /** 逐字时间轴（source 为 aligned / approved 时有）；lyrics 里同时存一份行级 LRC，给只认行时间的地方用 */
   alignment?: Pick<LyricsAlignment, "lyricsHash" | "lines">;
   /** 第一次采用对齐结果前的歌词，用于「还原」 */
-  preAlign?: Pick<MusicLyrics, "lyrics" | "tLyrics" | "source" | "autoVersion">;
+  preAlign?: Pick<MusicLyrics, "lyrics" | "tLyrics" | "source" | "autoVersion" | "offset">;
 }
 
 interface NeteaseAudioMatchParams {

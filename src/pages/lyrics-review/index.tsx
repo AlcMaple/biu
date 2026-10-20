@@ -3,11 +3,11 @@ import ScrollContainer from "@/components/scroll-container";
 
 const LyricsReview = () => (
   <ScrollContainer pageScroll enableBackToTop className="h-full w-full px-4">
-    <div className="mb-4">
+    <div className="mb-2">
       <h1>歌词审核</h1>
-      <div className="text-foreground/60 mt-1 text-sm">
-        用户在「歌词逐字对齐」里提交的歌词。通过后对这个投稿的所有人生效；打回要写原因，上传者在「我的提交」里能看到
-      </div>
+      <p className="text-foreground-500 mt-1 text-sm">
+        大家提交的逐字歌词，先交的排在前面。播放试听后再决定：通过后对这首歌的所有人生效；打回要写原因，提交的人能看到
+      </p>
     </div>
     <ReviewTab />
   </ScrollContainer>

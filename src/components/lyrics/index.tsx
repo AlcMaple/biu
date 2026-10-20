@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { addToast, useDisclosure } from "@heroui/react";
+import { Button, Popover, PopoverContent, PopoverTrigger, addToast, useDisclosure } from "@heroui/react";
 import { RiTBoxLine, RiTimerFlashLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
-import { lyricsCacheKey } from "@/components/lyrics/alignment";
+import { lyricsCacheKey, restorePreAlign } from "@/components/lyrics/alignment";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import platform from "@/platform";
-import { type LyricLine, useLyricsState } from "@/store/lyrics-state";
+import { useLyricsAlignSession } from "@/store/lyrics-align-session";
+import { type LyricLine, useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
 import IconButton from "../icon-button";
 import LyricsAlignModal from "../lyrics-align-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
+import AlignBar from "./align-bar";
 import FontSizeControl from "./font-size-control";
-import KaraokeLine from "./karaoke-line";
+import { karaokeTiming } from "./karaoke";
+import KaraokeText from "./karaoke-text";
 import OffsetControl from "./offset-control";
-import { useActiveLyricIndex } from "./playback-clock";
+import { subscribePlaybackClock, useActiveLyricIndex } from "./playback-clock";
 
 type PlayItem = ReturnType<ReturnType<typeof usePlayList.getState>["getPlayItem"]>;
 
@@ -26,16 +29,25 @@ const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
 const DEFAULT_FONT_SIZE = 20;
 
+const ALIGN_MENU = [
+  { key: "align", label: "对齐当前歌词", description: "按这首歌的 B 站音频校准每个字的时间，约 2 分钟" },
+  { key: "edit", label: "换一份歌词再对齐", description: "粘贴或修改歌词后再对齐" },
+  { key: "restore", label: "还原为对齐前的歌词", description: "回到第一次对齐之前的歌词和偏移" },
+];
+
 const Lyrics = ({
   color,
   centered,
   showControls,
   stableTypography = false,
+  onControlsOpenChange,
 }: {
   color?: string;
   centered?: boolean;
   showControls?: boolean;
   stableTypography?: boolean;
+  // 字号 / 偏移 / 对齐的浮层渲染在播放器外层，鼠标移上去会被播放器当成离开而 3 秒后收起控件；打开时通知播放器别收
+  onControlsOpenChange?: (open: boolean) => void;
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafIdRef = useRef<number | null>(null);
@@ -49,9 +61,7 @@ const Lyrics = ({
   const [fontSize, setFontSize] = useState<number>(DEFAULT_FONT_SIZE);
 
   // Read lyrics state from shared store (owned by LyricsBroadcaster)
-  const lyrics = useLyricsState(s => s.lyrics);
-  const translatedLyrics = useLyricsState(s => s.translatedLyrics);
-  const offset = useLyricsState(s => s.offset);
+  const { lyrics, translatedLyrics, offset } = useDisplayedLyrics();
   const isLoading = useLyricsState(s => s.isLoading);
 
   // Reset fontSize when track changes
@@ -97,6 +107,18 @@ const Lyrics = ({
   }, [translatedLyrics]);
 
   const activeIndex = useActiveLyricIndex(lyrics, offset);
+
+  const activeTiming = useMemo(
+    () =>
+      activeIndex >= 0 && lyrics[activeIndex]
+        ? karaokeTiming(lyrics[activeIndex], lyrics[activeIndex + 1]?.time)
+        : null,
+    [lyrics, activeIndex],
+  );
+  const subscribeClock = useCallback(
+    (onTick: (ms: number) => void) => subscribePlaybackClock(ms => onTick(ms + offset)),
+    [offset],
+  );
 
   const persistLyricsCache = useMemo(
     () =>
@@ -183,30 +205,59 @@ const Lyrics = ({
     }
   }, [activeIndex]);
 
-  const [alignInput, setAlignInput] = useState<string | null>(null);
+  const [editorInput, setEditorInput] = useState<string | null>(null);
+  const [canRestore, setCanRestore] = useState(false);
+  const [alignMenuOpen, setAlignMenuOpen] = useState(false);
+
+  // 控件随播放器自动收起时浮层跟着卸载，开着的状态要一起清掉，否则再显示时第一下点击只是把它“关上”
+  useEffect(() => {
+    if (!showControls) setAlignMenuOpen(false);
+  }, [showControls]);
 
   const handleLyricsAdopted = useCallback(
     (nextLyrics?: string, nextTLyrics?: string, alsoAlign?: boolean) => {
       onCloseSearch();
       if (nextLyrics) {
         useLyricsState.getState().setLyrics(parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
-        if (alsoAlign) setAlignInput(nextLyrics);
+        if (alsoAlign) void useLyricsAlignSession.getState().start(nextLyrics, { skipApproved: true });
       }
     },
     [onCloseSearch],
   );
 
-  // 已经对齐过时预填对齐前的原歌词：原歌词的时间用来给对齐失败的行划重对齐窗口，比拿对齐结果再对一遍可靠
-  const openAlign = useCallback(async () => {
+  const readCacheEntry = useCallback(async () => {
     const key = lyricsCacheKey(usePlayList.getState().getPlayItem());
-    const entry = key ? (await platform.getStore(StoreNameMap.LyricsCache))?.[key] : undefined;
-    setAlignInput((entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "");
+    return { key, entry: key ? (await platform.getStore(StoreNameMap.LyricsCache))?.[key] : undefined };
   }, []);
 
-  // 采用后不关弹窗：下面还有「提交审核」，用户通常是先采用、听一会儿觉得准再提交
-  const handleAlignAdopted = useCallback((lines: LyricLine[], tLines: LyricLine[]) => {
-    useLyricsState.getState().setLyrics(lines, tLines);
-  }, []);
+  // 已经对齐过时用对齐前的原歌词：原歌词的时间用来给对齐失败的行划重对齐窗口，比拿对齐结果再对一遍可靠
+  const alignInputOf = (entry?: MusicLyrics) => (entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "";
+
+  const handleAlignAction = useCallback(
+    async (action: string) => {
+      const { key, entry } = await readCacheEntry();
+      if (action === "edit") {
+        setEditorInput(alignInputOf(entry));
+        return;
+      }
+      if (action === "restore" && key) {
+        const restored = await restorePreAlign(key);
+        if (!restored) return;
+        const state = useLyricsState.getState();
+        state.setLyrics(restored.lines, restored.tLines);
+        state.setOffset(restored.offset);
+        addToast({ title: "已还原为对齐前的歌词", color: "success" });
+        return;
+      }
+      const input = alignInputOf(entry);
+      if (!input.trim()) {
+        addToast({ title: "这首歌还没有歌词，先在「搜索歌词」里找一份", color: "warning" });
+        return;
+      }
+      void useLyricsAlignSession.getState().start(input);
+    },
+    [readCacheEntry],
+  );
 
   useEffect(() => {
     return () => {
@@ -283,8 +334,8 @@ const Lyrics = ({
             overflowWrap: stableTypography ? "anywhere" : undefined,
           }}
         >
-          {isActive && line.words?.length ? (
-            <KaraokeLine words={line.words} endTime={lyrics[index + 1]?.time} offset={offset} />
+          {isActive && activeTiming?.words.length ? (
+            <KaraokeText timing={activeTiming} subscribe={subscribeClock} baseClassName="opacity-45" />
           ) : (
             line.text
           )}
@@ -304,6 +355,7 @@ const Lyrics = ({
   return (
     <>
       <div className="group/lyrics relative flex h-full w-full items-center justify-center overflow-hidden">
+        <AlignBar onEditLyrics={() => void handleAlignAction("edit")} />
         <div
           ref={containerRef}
           className="no-scrollbar relative h-full w-full max-w-4xl overflow-y-auto"
@@ -334,21 +386,61 @@ const Lyrics = ({
         {showControls && (
           <div className="text-foreground/80 pointer-events-none absolute right-6 bottom-6 flex flex-col items-center space-y-3 text-sm transition-opacity duration-200">
             <div className="pointer-events-auto">
-              <FontSizeControl value={fontSize} onChange={handleFontSizeChange} onOpenChange={() => {}} />
+              <FontSizeControl value={fontSize} onChange={handleFontSizeChange} onOpenChange={onControlsOpenChange} />
             </div>
             <div className="pointer-events-auto">
-              <OffsetControl value={offset} onChange={handleOffsetChange} onOpenChange={() => {}} />
+              <OffsetControl value={offset} onChange={handleOffsetChange} onOpenChange={onControlsOpenChange} />
             </div>
             {canAlign ? (
               <div className="pointer-events-auto">
-                <IconButton
-                  type="button"
-                  aria-label="歌词逐字对齐"
-                  onPress={openAlign}
-                  className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
+                {/* 全屏播放器是抽屉，会把焦点拉回自己身上；失焦即关的话浮层一打开就被关掉（字号 / 偏移控件同样关了这一项） */}
+                <Popover
+                  placement="left"
+                  showArrow={false}
+                  shouldCloseOnBlur={false}
+                  disableAnimation
+                  offset={8}
+                  isOpen={alignMenuOpen && Boolean(showControls)}
+                  onOpenChange={open => {
+                    setAlignMenuOpen(open);
+                    onControlsOpenChange?.(open);
+                    if (open)
+                      void readCacheEntry().then(({ entry }) =>
+                        setCanRestore(Boolean(entry?.alignment && entry.preAlign)),
+                      );
+                  }}
                 >
-                  <RiTimerFlashLine size={16} />
-                </IconButton>
+                  <PopoverTrigger>
+                    <IconButton
+                      type="button"
+                      aria-label="逐字对齐"
+                      className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
+                    >
+                      <RiTimerFlashLine size={16} />
+                    </IconButton>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-1">
+                    <div className="flex w-full flex-col">
+                      {ALIGN_MENU.filter(item => item.key !== "restore" || canRestore).map(item => (
+                        <Button
+                          key={item.key}
+                          variant="light"
+                          className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                          onPress={() => {
+                            setAlignMenuOpen(false);
+                            onControlsOpenChange?.(false);
+                            void handleAlignAction(item.key);
+                          }}
+                        >
+                          <span className="text-sm">{item.label}</span>
+                          <span className="text-foreground-500 text-xs font-normal whitespace-normal">
+                            {item.description}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             ) : null}
             <div className="pointer-events-auto">
@@ -365,10 +457,9 @@ const Lyrics = ({
       </div>
       <LyricsSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onLyricsAdopted={handleLyricsAdopted} />
       <LyricsAlignModal
-        isOpen={alignInput !== null}
-        onOpenChange={open => !open && setAlignInput(null)}
-        initialLyrics={alignInput ?? ""}
-        onAdopted={handleAlignAdopted}
+        isOpen={editorInput !== null}
+        onOpenChange={open => !open && setEditorInput(null)}
+        initialLyrics={editorInput ?? ""}
       />
     </>
   );

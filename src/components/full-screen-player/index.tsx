@@ -74,6 +74,7 @@ const FullScreenPlayer = () => {
   const [isPageListOpen, setIsPageListOpen] = useState(false);
   const [isUiVisible, setIsUiVisible] = useState(isWeb);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLyricsControlOpen, setIsLyricsControlOpen] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
   const [controlsHeight, setControlsHeight] = useState(80);
 
@@ -132,8 +133,17 @@ const FullScreenPlayer = () => {
     }
   };
 
+  // 和设置浮层同样处理：歌词控件的浮层开着时不自动收起，并取消已经排上的收起
+  const handleLyricsControlOpenChange = (open: boolean) => {
+    setIsLyricsControlOpen(open);
+    if (open && hideUiTimeoutRef.current) {
+      window.clearTimeout(hideUiTimeoutRef.current);
+      hideUiTimeoutRef.current = null;
+    }
+  };
+
   const scheduleHideUi = (delay: number) => {
-    if (isSettingsOpen) return;
+    if (isSettingsOpen || isLyricsControlOpen) return;
     if (hideUiTimeoutRef.current) {
       window.clearTimeout(hideUiTimeoutRef.current);
     }
@@ -377,7 +387,12 @@ const FullScreenPlayer = () => {
                       !showCover ? "flex items-center justify-center" : "",
                     )}
                   >
-                    <Lyrics color={lyricsColor} centered={!showCover} showControls={isUiVisible} />
+                    <Lyrics
+                      color={lyricsColor}
+                      centered={!showCover}
+                      showControls={isUiVisible}
+                      onControlsOpenChange={handleLyricsControlOpenChange}
+                    />
                   </div>
                 )}
               </div>

@@ -64,7 +64,7 @@ const LyricsPreviewModal = ({
               </Button>
               {canAlign ? (
                 <Button variant="flat" onPress={() => onAdopt(lyrics?.trim(), tlyrics, true)} isDisabled={loading}>
-                  采用并逐字对齐
+                  采用并对齐
                 </Button>
               ) : null}
               <Button color="primary" onPress={handleAdopt} isDisabled={loading}>

@@ -13,7 +13,7 @@ vi.mock("@/store/play-list", () => ({
   audio: { paused: true, seeking: false, currentTime: 0 },
   usePlayList: Object.assign(
     (selector: (state: { playId: string; list: never[] }) => unknown) => selector({ playId: "fixture", list: [] }),
-    { getState: () => ({ getPlayItem: () => undefined }) },
+    { getState: () => ({ getPlayItem: () => undefined }), subscribe: () => () => {} },
   ),
 }));
 vi.mock("@/platform", () => ({ default: { getStore: vi.fn(), setStore: vi.fn() } }));

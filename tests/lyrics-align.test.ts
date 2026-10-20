@@ -85,7 +85,9 @@ describe("adopting and restoring an alignment", () => {
       { time: 15420, text: "second" },
     ]);
     const entry = cache()["BV13LFNzmEHG-1"];
-    expect(entry).toMatchObject({ source: "aligned", offset: 120, alignment: { lyricsHash: "h1" } });
+    // 手动偏移是在补原歌词的误差，对齐后归零；原值留给还原
+    expect(entry).toMatchObject({ source: "aligned", offset: 0, alignment: { lyricsHash: "h1" } });
+    expect(entry.preAlign).toMatchObject({ offset: 120 });
     expect(entry.preAlign?.lyrics).toContain("[00:10.00]第一句");
     expect(isUserChosen(entry)).toBe(true);
 
@@ -95,10 +97,12 @@ describe("adopting and restoring an alignment", () => {
 
     const restored = await restorePreAlign("BV13LFNzmEHG-1");
     expect(restored?.lines.map(l => l.time)).toEqual([10000, 15000]);
+    expect(restored?.offset).toBe(120);
     const after = cache()["BV13LFNzmEHG-1"];
     expect(after.alignment).toBeUndefined();
     expect(after.preAlign).toBeUndefined();
     expect(after.source).toBe("manual");
+    expect(after.offset).toBe(120);
   });
 
   it("treats approved and auto-matched lyrics as replaceable, user choices as not", () => {

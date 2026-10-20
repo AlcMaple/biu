@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { adoptAlignment, alignmentToLines, isUserChosen } from "@/components/lyrics/alignment";
 import { AUTO_MATCH_VERSION, autoMatchLyrics } from "@/components/lyrics/auto-match";
@@ -7,14 +7,13 @@ import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playbac
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
 import { getApprovedLyrics } from "@/service/lyrics-align";
-import { useLyricsState } from "@/store/lyrics-state";
+import { useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 import { StoreNameMap } from "@shared/store";
 
-// Fallback duration used for the last lyric line (or any line missing a
-// successor) so the karaoke progress has something finite to animate over.
-const TAIL_LINE_DURATION_MS = 5000;
+// 桌面歌词窗在两条消息之间按自己的时钟外推；外推和实际进度差出这么多（拖动进度条、卡顿）就补发一条校准
+const RESYNC_DRIFT_MS = 300;
 
 const DEFAULT_OFFSET = 0;
 
@@ -44,8 +43,8 @@ const LyricsBroadcaster = () => {
   const isPlaying = usePlayList(s => s.isPlaying);
   // 只用来在进度变化时重新渲染，好让 lineElapsedMs 等派生值跟上；切行本身按帧走 useActiveLyricIndex
   usePlayProgress(s => s.currentTime);
-  const lyrics = useLyricsState(s => s.lyrics);
-  const offset = useLyricsState(s => s.offset);
+  // 试听中的对齐结果也推给桌面歌词，用户能在桌面歌词上一起看效果
+  const { lyrics, offset } = useDisplayedLyrics();
 
   const bc = useMemo(() => new BroadcastChannel(DESKTOP_LYRICS_CHANNEL), []);
 
@@ -96,7 +95,9 @@ const LyricsBroadcaster = () => {
             const latest = (await platform.getStore(StoreNameMap.LyricsCache))?.[cacheKey];
             if (canceled || isUserChosen(latest)) return;
             const { lines, tLines } = await adoptAlignment(cacheKey, approved, "approved");
-            if (!canceled) setLyrics(lines, tLines);
+            if (canceled) return;
+            setLyrics(lines, tLines);
+            setOffset(0);
             return;
           }
         }
@@ -148,36 +149,27 @@ const LyricsBroadcaster = () => {
   }, [playId]);
 
   const activeIndex = useActiveLyricIndex(lyrics, offset);
-  const currentMs = readPlaybackMs() + offset;
+  const lastSyncRef = useRef({ elapsed: 0, at: 0, playing: false });
 
-  // Duration of the active lyric line — gap to the next line, or a tail
-  // fallback for the last line. Used by the desktop window to drive its
-  // karaoke progress animation.
-  const lineDurationMs = (() => {
-    if (activeIndex < 0 || activeIndex >= lyrics.length) return 0;
-    const nextLyric = lyrics[activeIndex + 1];
-    if (nextLyric) return Math.max(0, nextLyric.time - lyrics[activeIndex].time);
-    return TAIL_LINE_DURATION_MS;
-  })();
-  const lineElapsedMs = activeIndex >= 0 && lyrics[activeIndex] ? Math.max(0, currentMs - lyrics[activeIndex].time) : 0;
+  const post = useCallback(() => {
+    const line = lyrics[activeIndex];
+    const lineElapsedMs = line ? Math.max(0, readPlaybackMs() + offset - line.time) : 0;
+    lastSyncRef.current = { elapsed: lineElapsedMs, at: performance.now(), playing: isPlaying };
+    bc.postMessage({ type: "update", lines: lyrics, activeIndex, lineElapsedMs, isPlaying });
+  }, [bc, lyrics, activeIndex, offset, isPlaying]);
 
-  // Broadcast whenever the active line, play state, or loaded lyrics change.
-  // lineElapsedMs piggybacks on each broadcast (it's accurate at broadcast
-  // time; between broadcasts the window extrapolates via CSS transitions).
+  // 切行、播放 / 暂停、换歌词时推一次完整快照
+  useEffect(post, [post]);
+
+  // 每次进度更新（约 250 ms）核一次外推误差，只在跳过去的时候补发，平时不刷屏
   useEffect(() => {
-    bc.postMessage({
-      type: "update",
-      lines: lyrics,
-      activeIndex,
-      lineDurationMs,
-      lineElapsedMs,
-      isPlaying,
-    });
-    // lineElapsedMs intentionally omitted: updating it every progress tick
-    // would flood the channel. Captured at the moment the line/isPlaying
-    // changes, which is when the window needs a fresh snapshot.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bc, lyrics, activeIndex, lineDurationMs, isPlaying]);
+    const line = lyrics[activeIndex];
+    if (!line) return;
+    const { elapsed, at, playing } = lastSyncRef.current;
+    const expected = elapsed + (playing ? performance.now() - at : 0);
+    const actual = readPlaybackMs() + offset - line.time;
+    if (Math.abs(expected - actual) > RESYNC_DRIFT_MS) post();
+  });
 
   // Handle messages from desktop lyrics window
   useEffect(() => {
@@ -186,18 +178,7 @@ const LyricsBroadcaster = () => {
       // Respond to handshake requests with the full current snapshot,
       // including the fresh elapsed ms (re-read to avoid stale closure value).
       if (type === "request") {
-        const freshElapsed =
-          activeIndex >= 0 && lyrics[activeIndex]
-            ? Math.max(0, readPlaybackMs() + offset - lyrics[activeIndex].time)
-            : 0;
-        bc.postMessage({
-          type: "update",
-          lines: lyrics,
-          activeIndex,
-          lineDurationMs,
-          lineElapsedMs: freshElapsed,
-          isPlaying,
-        });
+        post();
         return;
       }
       // Handle player control commands from the desktop lyrics toolbar
@@ -210,7 +191,7 @@ const LyricsBroadcaster = () => {
     };
     bc.addEventListener("message", handleMessage);
     return () => bc.removeEventListener("message", handleMessage);
-  }, [bc, lyrics, activeIndex, lineDurationMs, offset, isPlaying]);
+  }, [bc, post]);
 
   return null;
 };

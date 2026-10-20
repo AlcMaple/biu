@@ -78,6 +78,7 @@ const FancyFullScreenPlayer = () => {
 
   const [isUiVisible, setIsUiVisible] = useState(isWeb);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLyricsControlOpen, setIsLyricsControlOpen] = useState(false);
   const [isArtistEditOpen, setIsArtistEditOpen] = useState(false);
   const [artistInput, setArtistInput] = useState("");
   const hideUiTimeoutRef = useRef<number | null>(null);
@@ -173,8 +174,17 @@ const FancyFullScreenPlayer = () => {
     }
   }, [isArtistEditOpen]);
 
+  // 和设置浮层同样处理：歌词控件的浮层开着时不自动收起，并取消已经排上的收起
+  const handleLyricsControlOpenChange = (open: boolean) => {
+    setIsLyricsControlOpen(open);
+    if (open && hideUiTimeoutRef.current) {
+      window.clearTimeout(hideUiTimeoutRef.current);
+      hideUiTimeoutRef.current = null;
+    }
+  };
+
   const scheduleHideUi = (delay: number) => {
-    if (isSettingsOpen || isArtistEditOpen) return;
+    if (isSettingsOpen || isArtistEditOpen || isLyricsControlOpen) return;
     if (hideUiTimeoutRef.current) window.clearTimeout(hideUiTimeoutRef.current);
     hideUiTimeoutRef.current = window.setTimeout(() => setIsUiVisible(false), delay);
   };
@@ -500,7 +510,13 @@ const FancyFullScreenPlayer = () => {
                     {/* 歌词 */}
                     {showLyrics && (
                       <div className="fancy-player-lyrics min-h-0 overflow-hidden">
-                        <Lyrics color="#ffffff" centered={false} showControls={isUiVisible} stableTypography />
+                        <Lyrics
+                          color="#ffffff"
+                          centered={false}
+                          showControls={isUiVisible}
+                          stableTypography
+                          onControlsOpenChange={handleLyricsControlOpenChange}
+                        />
                       </div>
                     )}
                   </div>
