@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "subject": "QQ、酷狗、AMLL 歌词渠道有限样本验证",
+  "batch_id": "2026-10-21-anonymous-three-language",
+  "tested_from": "2026-10-21T23:04:18.419281+08:00",
+  "tested_until": "2026-10-21T23:10:52.983199+08:00",
+  "timezone": "Asia/Taipei",
+  "scope": "独立探测脚本中的匿名后端 HTTP 取词与基本格式检查，不是 Biu 各端集成或实际录音同步精度测试",
+  "samples": [
+    {
+      "id": "T01",
+      "title": "晴天",
+      "artist": "周杰伦",
+      "artist_aliases": ["周杰伦", "周杰倫", "Jay Chou"]
+    },
+    {
+      "id": "T02",
+      "title": "アイドル",
+      "artist": "YOASOBI",
+      "artist_aliases": ["YOASOBI"]
+    },
+    {
+      "id": "T03",
+      "title": "Shape of You",
+      "artist": "Ed Sheeran",
+      "artist_aliases": ["Ed Sheeran", "艾德·希兰"]
+    }
+  ],
+  "source_revisions": {
+    "qq_3.3.3": "e7dff2e1e2496780702bda528362edbdaf6bbf6e",
+    "kugou_v1.6.0": "fe1838ae58ea69f84941ffa8758a34a9121bb2ea"
+  },
+  "request_summary": {
+    "platform_requests": 27,
+    "raw_responses_hash_verified": 27,
+    "automatic_retries": 0,
+    "user_account_credentials_used": false,
+    "audio_downloaded": false,
+    "persistent_service_started": false
+  },
+  "fetch_parse_results": [
+    {
+      "provider": "amll",
+      "http_status": 200,
+      "elapsed_ms": 2055.25,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "xml_parse_ok": true,
+        "paragraph_elements": 62,
+        "span_elements_with_begin_and_end": 494,
+        "timing_expression_examples": ["00:29.231", "00:29.692", "00:30.057"],
+        "role_counts": {},
+        "characters": 29077,
+        "sha256_utf8": "19a16d358de7ea13c629cecbadd68328ce889fa0a557dcaf4b8c7a4b928cc963",
+        "scope": "XML/timing structure only; not a complete TTML semantic renderer or audio-alignment accuracy test"
+      },
+      "sample_id": "T01",
+      "raw_response_sha256": "819938377945dd9fe85c40638d48b88cecc18d7f7202a742dac1519437f5259a"
+    },
+    {
+      "provider": "qq",
+      "http_status": 200,
+      "elapsed_ms": 1837.16,
+      "passed": true,
+      "business_status": 0,
+      "retcode": 0,
+      "metrics": {
+        "timestamp_count": 63,
+        "unique_timestamps": 63,
+        "max_timestamp_seconds": 262.86,
+        "characters": 1388,
+        "sha256_utf8": "8227c4d37a689f3d49aaf965f38c3187b4995753f0741e51610ae7d2861c9ed0",
+        "format": "line-timed LRC",
+        "native_word_timing_validated": false
+      },
+      "translation_present": false,
+      "sample_id": "T01",
+      "raw_response_sha256": "3062f99c2f1964ddd4dc031dd18e7d9de6f76415ad40e42fd7c11b0c86b022bf"
+    },
+    {
+      "provider": "amll",
+      "http_status": 200,
+      "elapsed_ms": 2013.19,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "xml_parse_ok": true,
+        "paragraph_elements": 78,
+        "span_elements_with_begin_and_end": 741,
+        "timing_expression_examples": ["00:00.273", "00:01.122", "00:01.301"],
+        "role_counts": {
+          "x-translation": 79,
+          "x-bg": 1
+        },
+        "characters": 47160,
+        "sha256_utf8": "1b7627ce504fd98856275f1ec01c7d6828a704667d568e07322c79b2ca7d30e9",
+        "scope": "XML/timing structure only; not a complete TTML semantic renderer or audio-alignment accuracy test"
+      },
+      "sample_id": "T02",
+      "raw_response_sha256": "a037f198e781c602c6201d1b74e9f6784b0d2ec3ee7000a58aea88d5920364d6"
+    },
+    {
+      "provider": "qq",
+      "http_status": 200,
+      "elapsed_ms": 1373.97,
+      "passed": true,
+      "business_status": 0,
+      "retcode": 0,
+      "metrics": {
+        "timestamp_count": 79,
+        "unique_timestamps": 79,
+        "max_timestamp_seconds": 192.85,
+        "characters": 1738,
+        "sha256_utf8": "9150b97a8f63ba61d42be1f64dd6fd56a2aa89eb5185d489a492b2a6377ee55d",
+        "format": "line-timed LRC",
+        "native_word_timing_validated": false
+      },
+      "translation_present": false,
+      "sample_id": "T02",
+      "raw_response_sha256": "cb04f2f1cc381a891bab95953187c9878486be48286a1c5298f8ac963c14a288"
+    },
+    {
+      "provider": "amll",
+      "http_status": 200,
+      "elapsed_ms": 3044.4,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "xml_parse_ok": true,
+        "paragraph_elements": 85,
+        "span_elements_with_begin_and_end": 741,
+        "timing_expression_examples": ["00:09.929", "00:10.076", "00:10.305"],
+        "role_counts": {
+          "x-translation": 85,
+          "x-bg": 14
+        },
+        "characters": 50674,
+        "sha256_utf8": "8014aff22a08d19631c91686478be95f05bc8e80f6a3ca5dcae36171686c5ad5",
+        "scope": "XML/timing structure only; not a complete TTML semantic renderer or audio-alignment accuracy test"
+      },
+      "sample_id": "T03",
+      "raw_response_sha256": "e8a72df30867eb5c0c748b5a4e6aea4b640fe344b715f7920d27c1597af8cf45"
+    },
+    {
+      "provider": "qq",
+      "http_status": 200,
+      "elapsed_ms": 1116.02,
+      "passed": true,
+      "business_status": 0,
+      "retcode": 0,
+      "metrics": {
+        "timestamp_count": 92,
+        "unique_timestamps": 92,
+        "max_timestamp_seconds": 228.36,
+        "characters": 4037,
+        "sha256_utf8": "8c24e8a9e695f4e34af02a33b1aa40729e2b0bc1ea78fa22757355f7636aa97a",
+        "format": "line-timed LRC",
+        "native_word_timing_validated": false
+      },
+      "translation_present": false,
+      "sample_id": "T03",
+      "raw_response_sha256": "98430063c7deb3c6bf802fc4be73655bd0392f53b7ce805ea1a8ab9e13a0cfa5"
+    },
+    {
+      "provider": "kugou",
+      "http_status": 200,
+      "elapsed_ms": 2633.02,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "magic": "krc1",
+        "decompression_ok": true,
+        "timed_lines": 63,
+        "word_timing_segments": 602,
+        "characters": 8405,
+        "max_line_end_ms": 266173,
+        "sha256_utf8": "b611f15e8503ba5be87fdc74916a57f9aa2c8fcf75da49856c4e10c77139f539",
+        "scope": "KRC decoding and word-timing structure; not current Bilibili audio synchronization accuracy"
+      },
+      "sample_id": "T01",
+      "raw_response_sha256": "183f8cebcb77bcd1b9ac63f922c933854141b8a9351881e9e0f29b51fcaf3fd6"
+    },
+    {
+      "provider": "kugou",
+      "http_status": 200,
+      "elapsed_ms": 2693.56,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "magic": "krc1",
+        "decompression_ok": true,
+        "timed_lines": 90,
+        "word_timing_segments": 593,
+        "characters": 20351,
+        "max_line_end_ms": 194429,
+        "sha256_utf8": "d03f5b445dc877c80bcf54dad293690dbe1bb4ec3fbbb34fb355e2139eb5c285",
+        "scope": "KRC decoding and word-timing structure; not current Bilibili audio synchronization accuracy"
+      },
+      "sample_id": "T02",
+      "raw_response_sha256": "2651652cb40008c733262593f2d3ea970e6c81dbeeb16243a3257d959d23c1fb"
+    },
+    {
+      "provider": "kugou",
+      "http_status": 200,
+      "elapsed_ms": 1180.64,
+      "passed": true,
+      "business_status": 200,
+      "metrics": {
+        "magic": "krc1",
+        "decompression_ok": true,
+        "timed_lines": 91,
+        "word_timing_segments": 676,
+        "characters": 19962,
+        "max_line_end_ms": 230648,
+        "sha256_utf8": "8a121e1e8f8f9a8a350410d6fd269a82a8315ec35cde589057572beef9d17d1e",
+        "scope": "KRC decoding and word-timing structure; not current Bilibili audio synchronization accuracy"
+      },
+      "sample_id": "T03",
+      "raw_response_sha256": "74971970d533e956d256cd4633fea9988503da40ddc23bb9e5028b837e0cf53d"
+    }
+  ],
+  "negative_controls": {
+    "amll_empty_search": "200 with zero items",
+    "amll_missing_id": "HTTP/body 404",
+    "qq_unmatched_query": "HTTP 200, gateway 0, business 2001: treated as upstream error, not empty success",
+    "kugou_empty_search": "HTTP 200, business 1/error_code 0 with zero items"
+  },
+  "offline_parser_checks": {
+    "corrupt_input_rejections": 4,
+    "cases": ["malformed XML", "DTD-bearing XML", "wrong KRC magic", "invalid compressed KRC payload"],
+    "plain_text_not_mislabelled_as_timed_lrc": true,
+    "scope": "仓库外探测器，不是项目测试"
+  },
+  "verification_stdout": [
+    "RAW_RESPONSE_HASHES_OK=27",
+    "LIVE_FETCH_PARSE_PASS=9/9",
+    "PROVIDER_PASSES={\"amll\": 3, \"kugou\": 3, \"qq\": 3}",
+    "NEGATIVE_CONTROLS=AMLL_EMPTY,AMLL_404,QQ_BUSINESS_2001,KUGOU_EMPTY",
+    "CORRUPT_INPUT_REJECTIONS=4/4",
+    "PLAIN_TEXT_NOT_MISLABELLED_AS_TIMED_LRC=PASS",
+    "WORKSPACE_CONTENT_CHANGES=0",
+    "GIT_STATUS=clean"
+  ],
+  "evidence_retention": {
+    "in_repository": "脱敏统计、响应 SHA-256、复查输出和公开上游版本",
+    "outside_repository": "完整请求、原始歌词响应、上游源码、探测脚本、视频及抽帧",
+    "raw_content_embedded": false,
+    "private_paths_embedded": false
+  },
+  "limitations": [
+    "每个渠道仅 3 首样本，不代表全曲库、所有地区或未来可用性",
+    "未测试 QQ 原生 QRC；普通端点的三首样本译文为空",
+    "未主动触发 429/5xx 或验证恢复行为",
+    "未完成完整 TTML 生产语义、Biu 各端集成、录音同步误差或 PV 性能测试"
+  ],
+  "related_documents": {
+    "plan": "../多源歌词与镜台PV-调研方案.md",
+    "report": "../多源歌词渠道-实测报告.md"
+  }
+}
