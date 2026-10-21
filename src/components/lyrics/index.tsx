@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Popover, PopoverContent, PopoverTrigger, addToast, useDisclosure } from "@heroui/react";
-import { RiTBoxLine, RiTimerFlashLine } from "@remixicon/react";
+import { RiEqualizerLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
 import { lyricsCacheKey, restorePreAlign } from "@/components/lyrics/alignment";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
-import platform from "@/platform";
+import platform, { isElectron } from "@/platform";
 import { useAlignReview } from "@/store/align-review";
 import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { type LyricLine, useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
-import IconButton from "../icon-button";
 import LyricsAlignModal, { type LyricsEditMode } from "../lyrics-align-modal";
 import ReportModal from "../lyrics-align-modal/report-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import AlignBar from "./align-bar";
 import AlignStatus from "./align-status";
+import DesktopLyricsButton from "./desktop-lyrics-button";
 import FontSizeControl from "./font-size-control";
 import { karaokeTiming } from "./karaoke";
 import KaraokeText from "./karaoke-text";
@@ -218,11 +218,11 @@ const Lyrics = ({
   const [editor, setEditor] = useState<{ mode: LyricsEditMode; input: string } | null>(null);
   const [reportHash, setReportHash] = useState<string | null>(null);
   const [menuEntry, setMenuEntry] = useState<MusicLyrics | undefined>(undefined);
-  const [alignMenuOpen, setAlignMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // 控件随播放器自动收起时浮层跟着卸载，开着的状态要一起清掉，否则再显示时第一下点击只是把它“关上”
   useEffect(() => {
-    if (!showControls) setAlignMenuOpen(false);
+    if (!showControls) setSettingsOpen(false);
   }, [showControls]);
 
   const handleLyricsAdopted = useCallback(
@@ -397,42 +397,59 @@ const Lyrics = ({
         </div>
 
         {showControls && (
-          <div className="text-foreground/80 pointer-events-none absolute right-6 bottom-6 flex flex-col items-center space-y-3 text-sm transition-opacity duration-200">
-            <div className="pointer-events-auto">
-              <FontSizeControl value={fontSize} onChange={handleFontSizeChange} onOpenChange={onControlsOpenChange} />
-            </div>
-            <div className="pointer-events-auto">
-              <OffsetControl value={offset} onChange={handleOffsetChange} onOpenChange={onControlsOpenChange} />
-            </div>
-            {canAlign ? (
+          <div className="pointer-events-none absolute top-4 right-6 flex items-center gap-2 transition-opacity duration-200">
+            {isElectron && (
               <div className="pointer-events-auto">
-                {/* 全屏播放器是抽屉，会把焦点拉回自己身上；失焦即关的话浮层一打开就被关掉（字号 / 偏移控件同样关了这一项） */}
-                {/* 底边和按钮对齐、向上展开：按钮在歌词区右下角，居中展开时管理员的 5 项会伸出窗口底部被裁掉 */}
-                <Popover
-                  placement="left-end"
-                  showArrow={false}
-                  shouldCloseOnBlur={false}
-                  disableAnimation
-                  offset={8}
-                  isOpen={alignMenuOpen && Boolean(showControls)}
-                  onOpenChange={open => {
-                    setAlignMenuOpen(open);
-                    onControlsOpenChange?.(open);
-                    if (open) void readCacheEntry().then(({ entry }) => setMenuEntry(entry));
-                  }}
-                >
-                  <PopoverTrigger>
-                    <IconButton
-                      type="button"
-                      aria-label="逐字歌词"
-                      className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
+                <DesktopLyricsButton />
+              </div>
+            )}
+            <div className="pointer-events-auto">
+              {/* 全屏播放器是抽屉，会把焦点拉回自己身上；失焦即关的话浮层一打开就被关掉 */}
+              <Popover
+                placement="bottom-end"
+                showArrow={false}
+                shouldCloseOnBlur={false}
+                disableAnimation
+                offset={8}
+                isOpen={settingsOpen && Boolean(showControls)}
+                onOpenChange={open => {
+                  setSettingsOpen(open);
+                  onControlsOpenChange?.(open);
+                  if (open && canAlign) void readCacheEntry().then(({ entry }) => setMenuEntry(entry));
+                }}
+              >
+                <PopoverTrigger>
+                  <Button
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    className="bg-foreground/20 text-foreground hover:bg-foreground/30 h-8 min-w-0 gap-1 px-3 text-sm whitespace-nowrap"
+                  >
+                    <RiEqualizerLine size={16} />
+                    歌词设置
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-1">
+                  <div className="flex w-full flex-col">
+                    <FontSizeControl value={fontSize} onChange={handleFontSizeChange} />
+                    <OffsetControl value={offset} onChange={handleOffsetChange} />
+                    <div className="bg-divider my-1 h-px" />
+                    <Button
+                      variant="light"
+                      className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                      onPress={() => {
+                        setSettingsOpen(false);
+                        onControlsOpenChange?.(false);
+                        onOpenSearch();
+                      }}
                     >
-                      <RiTimerFlashLine size={16} />
-                    </IconButton>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-1">
-                    <div className="flex w-full flex-col">
-                      {ALIGN_MENU.filter(
+                      <span className="text-sm">换一份歌词</span>
+                      <span className="text-foreground-500 text-xs font-normal whitespace-normal">
+                        从网易云、LrcLib 搜索并使用
+                      </span>
+                    </Button>
+                    {canAlign &&
+                      ALIGN_MENU.filter(
                         item =>
                           (!item.admin || isAdmin) &&
                           (item.key !== "restore" || Boolean(menuEntry?.alignment && menuEntry.preAlign)) &&
@@ -443,7 +460,7 @@ const Lyrics = ({
                           variant="light"
                           className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
                           onPress={() => {
-                            setAlignMenuOpen(false);
+                            setSettingsOpen(false);
                             onControlsOpenChange?.(false);
                             void handleAlignAction(item.key);
                           }}
@@ -454,19 +471,9 @@ const Lyrics = ({
                           </span>
                         </Button>
                       ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            ) : null}
-            <div className="pointer-events-auto">
-              <IconButton
-                type="button"
-                onPress={onOpenSearch}
-                className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
-              >
-                <RiTBoxLine size={16} />
-              </IconButton>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         )}

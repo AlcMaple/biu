@@ -1,75 +1,36 @@
-import { useCallback, useState } from "react";
-
-import { Popover, PopoverContent, PopoverTrigger, Slider } from "@heroui/react";
-import { RiTimeLine } from "@remixicon/react";
-
-import IconButton from "../icon-button";
+import { Slider } from "@heroui/react";
 
 interface OffsetControlProps {
   value: number;
   min?: number;
   max?: number;
   onChange: (next: number) => void;
-  onOpenChange?: (open: boolean) => void;
 }
 
 const formatLabel = (ms: number) => (ms >= 0 ? `+${ms}` : `${ms}`);
 
-const OffsetControl = ({ value, min = -5000, max = 5000, onChange, onOpenChange }: OffsetControlProps) => {
-  const [open, setOpen] = useState(false);
-  const step = 50;
-
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      setOpen(next);
-      onOpenChange?.(next);
-    },
-    [onOpenChange],
-  );
-
-  return (
-    <Popover
-      placement="right"
-      showArrow={false}
-      shouldCloseOnBlur={false}
-      disableAnimation
-      offset={8}
-      isOpen={open}
-      onOpenChange={handleOpenChange}
-    >
-      <PopoverTrigger>
-        <IconButton
-          size="sm"
-          variant="light"
-          aria-label="调整歌词偏移"
-          className="bg-foreground/20 text-foreground hover:bg-foreground/30 min-w-0 rounded-full text-xs font-semibold"
-        >
-          <RiTimeLine size={16} />
-        </IconButton>
-      </PopoverTrigger>
-      <PopoverContent className="px-3 py-2">
-        <div className="flex flex-col items-center gap-2">
-          <Slider
-            aria-label="调整歌词偏移"
-            minValue={min}
-            maxValue={max}
-            step={step}
-            value={value}
-            onChange={v => onChange(v as number)}
-            size="sm"
-            color="primary"
-            orientation="vertical"
-            className="h-32"
-            classNames={{
-              track: "w-1",
-              thumb: "after:hidden",
-            }}
-          />
-          <span className="text-foreground/60 text-[10px] font-bold whitespace-nowrap">{formatLabel(value)} ms</span>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
+const OffsetControl = ({ value, min = -5000, max = 5000, onChange }: OffsetControlProps) => (
+  <div className="flex flex-col gap-1 px-3 py-2">
+    <div className="flex items-center justify-between text-sm">
+      <span>歌词快慢</span>
+      <span className="text-foreground-500 text-xs">{formatLabel(value)} ms</span>
+    </div>
+    <Slider
+      aria-label="调整歌词快慢"
+      minValue={min}
+      maxValue={max}
+      step={50}
+      value={value}
+      onChange={v => onChange(v as number)}
+      size="sm"
+      color="primary"
+      classNames={{ thumb: "after:hidden" }}
+    />
+    <div className="text-foreground-500 flex justify-between text-xs">
+      <span>歌词提前</span>
+      <span>歌词延后</span>
+    </div>
+  </div>
+);
 
 export default OffsetControl;

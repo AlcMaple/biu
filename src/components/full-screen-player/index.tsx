@@ -19,12 +19,16 @@ import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useUser } from "@/store/user";
 
 import Empty from "../empty";
 import IconButton from "../icon-button";
+import MusicDownloadButton from "../music-download-button";
+import MusicFavButton from "../music-fav-button";
 import MusicPlayControl from "../music-play-control";
 import MusicPlayMode from "../music-play-mode";
 import MusicPlayProgress from "../music-play-progress";
+import MusicVolume from "../music-volume";
 import OpenPlaylistDrawerButton from "../open-playlist-drawer-button";
 import WindowAction from "../window-action";
 import { useGlassmorphism } from "./glassmorphism";
@@ -33,6 +37,14 @@ import PageList from "./page-list";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
 
 const appPlatform = platform.getPlatform();
+
+// 图标下面带一行小字：不熟悉电脑的用户靠字认功能，不用猜图标
+const Captioned = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="flex flex-col items-center gap-0.5">
+    {children}
+    <span className="text-xs whitespace-nowrap opacity-70 select-none">{label}</span>
+  </div>
+);
 
 const FullScreenPlayer = () => {
   const isMobileLayout = useIsMobileLayout();
@@ -68,6 +80,9 @@ const FullScreenPlayer = () => {
     })),
   );
   const playItem = list.find(item => item.id === playId);
+  const isLogin = useUser(s => Boolean(s.user?.isLogin));
+  const canFavorite = Boolean(playItem) && (playItem?.source === "local" || isLogin);
+  const canDownload = Boolean(playItem) && playItem?.source !== "local";
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1000);
   const [windowHeight, setWindowHeight] = useState(typeof window !== "undefined" ? window.innerHeight : 800);
@@ -427,10 +442,31 @@ const FullScreenPlayer = () => {
               >
                 <div className="mx-auto mb-4 flex w-full max-w-6xl flex-col items-center gap-2 px-12">
                   <MusicPlayProgress className="w-full" trackClassName="h-[6px]" />
-                  <div className="flex w-full items-center justify-center space-x-4">
-                    <MusicPlayMode />
-                    <MusicPlayControl />
-                    <OpenPlaylistDrawerButton />
+                  <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center">
+                    <div className="flex items-center justify-start space-x-4">
+                      {canFavorite && (
+                        <Captioned label="收藏">
+                          <MusicFavButton />
+                        </Captioned>
+                      )}
+                      {canDownload && (
+                        <Captioned label="下载">
+                          <MusicDownloadButton />
+                        </Captioned>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <MusicPlayMode />
+                      <MusicPlayControl />
+                    </div>
+                    <div className="flex items-center justify-end space-x-4">
+                      <Captioned label="音量">
+                        <MusicVolume />
+                      </Captioned>
+                      <Captioned label="播放列表">
+                        <OpenPlaylistDrawerButton />
+                      </Captioned>
+                    </div>
                   </div>
                 </div>
               </div>
