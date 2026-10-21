@@ -81,7 +81,7 @@ const getLocalItemMenus = (isBiliItem: boolean) => [
   { key: "remove", label: "取消收藏", icon: <RiStarOffLine size={18} /> },
   { key: "play-next", label: "下一首播放", icon: <RiPlayCircleLine size={18} /> },
   { key: "add-to-playlist", label: "添加到播放列表", icon: <RiPlayListAddLine size={18} /> },
-  { key: "download-audio", label: "下载音频", icon: <RiFileMusicLine size={18} />, hidden: !isBiliItem },
+  { key: "download-audio", label: "下载音乐", icon: <RiFileMusicLine size={18} />, hidden: !isBiliItem },
   { key: "rename", label: "重命名", icon: <RiPencilLine size={18} /> },
   { key: "bililink", label: "在 B 站打开", icon: <RiExternalLinkLine size={18} />, hidden: !isBiliItem },
 ];

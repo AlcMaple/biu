@@ -22,7 +22,7 @@ const MoreMenu: React.FC<MoreMenuProps> = ({ onAddToNext, onDownloadAudio, onDow
           添加到下一首播放
         </DropdownItem>
         <DropdownItem key="download-audio" startContent={<RiFileMusicLine size={18} />} onPress={onDownloadAudio}>
-          下载音频
+          下载音乐
         </DropdownItem>
         <DropdownItem key="download-video" startContent={<RiFileVideoLine size={18} />} onPress={onDownloadVideo}>
           下载视频

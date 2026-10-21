@@ -102,7 +102,7 @@ const MusicDownloadButton = () => {
         size="sm"
         variant="light"
         className="hover:text-primary"
-        aria-label="下载音频"
+        aria-label="下载音乐"
         onPress={downloadAudio}
       >
         <RiDownload2Fill size={18} />
@@ -128,10 +128,10 @@ const MusicDownloadButton = () => {
       <ListboxItem
         className="rounded-medium"
         key="audio"
-        textValue="下载音频"
+        textValue="下载音乐"
         startContent={<RiFileMusicLine size={16} />}
       >
-        下载音频
+        下载音乐
       </ListboxItem>
       <ListboxItem
         className="rounded-medium"

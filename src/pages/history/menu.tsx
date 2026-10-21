@@ -40,7 +40,7 @@ export const getContextMenus = ({ business, isFav }: { business: string; isFav?:
     {
       icon: <RiFileMusicLine size={18} />,
       key: "download-audio",
-      label: "下载音频",
+      label: "下载音乐",
       hidden: !canPlay,
     },
     {

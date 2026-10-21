@@ -10,7 +10,7 @@ export const getMenus = ({ isLogin, isLocal }: { isLogin: boolean; isLocal: bool
     },
     {
       key: "download-audio",
-      label: "下载音频",
+      label: "下载音乐",
       icon: <RiFileMusicLine size={18} />,
       hidden: isLocal,
     },
