@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useState } from "react";
 
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Tab, Tabs } from "@heroui/react";
@@ -7,8 +6,11 @@ import ScrollContainer from "../scroll-container";
 
 interface LyricsPreviewModalProps {
   isOpen: boolean;
-  onOpenChange: Dispatch<SetStateAction<boolean>>;
+  onOpenChange: (open: boolean) => void;
   title?: string;
+  /** 来源 / 时间轴类型等说明，或取词失败的原因 */
+  meta?: string;
+  metaTone?: "default" | "danger";
   lyrics: string;
   tlyrics?: string;
   onAdopt: (lyricsText: string, tLyricsText?: string) => void;
@@ -19,6 +21,8 @@ const LyricsPreviewModal = ({
   isOpen,
   onOpenChange,
   title,
+  meta,
+  metaTone = "default",
   lyrics,
   tlyrics,
   onAdopt,
@@ -39,6 +43,13 @@ const LyricsPreviewModal = ({
       <ModalContent>
         <ModalHeader>{title || "歌词预览"}</ModalHeader>
         <ModalBody className="px-0">
+          {meta && (
+            <p
+              className={`px-4 text-xs whitespace-pre-line ${metaTone === "danger" ? "text-danger" : "text-foreground/60"}`}
+            >
+              {meta}
+            </p>
+          )}
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={key => setActiveTab(key as "original" | "translation")}
@@ -49,7 +60,13 @@ const LyricsPreviewModal = ({
           </Tabs>
           <ScrollContainer className="px-4">
             <pre className="text-foreground/90 max-h-[420px] text-sm leading-relaxed break-words whitespace-pre-wrap">
-              {activeTab === "original" ? lyrics || "暂无歌词" : tlyrics || "暂无歌词"}
+              {loading && !lyrics
+                ? metaTone === "danger"
+                  ? ""
+                  : "加载中…"
+                : activeTab === "original"
+                  ? lyrics || "暂无歌词"
+                  : tlyrics || "暂无歌词"}
             </pre>
           </ScrollContainer>
         </ModalBody>

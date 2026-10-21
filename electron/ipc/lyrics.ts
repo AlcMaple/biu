@@ -1,5 +1,8 @@
 import { ipcMain } from "electron";
 
+import { createProviderClient } from "@shared/lyrics-provider-guard";
+import { type ProviderLyricsGetParams, type ProviderLyricsSearchParams } from "@shared/lyrics-providers";
+
 import { getLyricsByLrclib, type SeachSongByLrclibParams } from "./api/lrclib-lyric";
 import {
   getLyricsByNetease,
@@ -17,6 +20,9 @@ import {
   type WhisperXSyncParams,
 } from "./api/whisperx-sync";
 import { channel } from "./channel";
+import { providerTransport } from "./provider-transport";
+
+const providerClient = createProviderClient();
 
 export function registerLyricsHandlers() {
   ipcMain.handle(channel.lyrics.searchNeteaseSongs, async (_, params: SearchSongByNeteaseParams) => {
@@ -37,6 +43,14 @@ export function registerLyricsHandlers() {
 
   ipcMain.handle(channel.lyrics.searchLrclib, async (_, params: SeachSongByLrclibParams) => {
     return getLyricsByLrclib(params);
+  });
+
+  ipcMain.handle(channel.lyrics.searchProvider, async (_, params: ProviderLyricsSearchParams) => {
+    return providerClient.search(providerTransport, params);
+  });
+
+  ipcMain.handle(channel.lyrics.getProvider, async (_, params: ProviderLyricsGetParams) => {
+    return providerClient.get(providerTransport, params);
   });
 
   ipcMain.handle(channel.lyrics.checkWhisperXDeps, async () => checkWhisperXDeps());

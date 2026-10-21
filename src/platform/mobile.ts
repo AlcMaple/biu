@@ -5,6 +5,7 @@ import type { Logger, Platform } from "./types";
 
 import { nativeAlignRequest } from "./align-native";
 import { isIOS } from "./detect";
+import { nativeGetProviderLyrics, nativeSearchProviderLyrics } from "./lyrics-native";
 
 /**
  * B 站 cookie 域。所有读写都对准这个域，与 Electron 端
@@ -108,6 +109,8 @@ const platform: Platform = {
   getNeteaseLyrics: async () => ({}),
   neteaseAudioMatch: async () => ({}),
   searchLrclibLyrics: async () => [],
+  searchProviderLyrics: nativeSearchProviderLyrics,
+  getProviderLyrics: nativeGetProviderLyrics,
   alignRequest: nativeAlignRequest,
   getPlatform: () => (isIOS ? "ios" : "android"),
   setProxySettings: asyncNoop,

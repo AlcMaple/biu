@@ -226,10 +226,10 @@ const Lyrics = ({
   }, [showControls]);
 
   const handleLyricsAdopted = useCallback(
-    (nextLyrics?: string, nextTLyrics?: string) => {
+    (nextLyrics?: string, nextTLyrics?: string, lines?: LyricLine[]) => {
       onCloseSearch();
       if (nextLyrics) {
-        useLyricsState.getState().setLyrics(parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
+        useLyricsState.getState().setLyrics(lines ?? parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
         useLyricsAlignSession.getState().auto(nextLyrics, { userChosen: true, immediate: true });
       }
     },
@@ -445,7 +445,7 @@ const Lyrics = ({
                     >
                       <span className="text-sm">换一份歌词</span>
                       <span className="text-foreground-500 text-xs font-normal whitespace-normal">
-                        从网易云、LrcLib 搜索并使用
+                        从网易云、LrcLib、QQ、酷狗、AMLL 搜索并使用
                       </span>
                     </Button>
                     {canAlign &&

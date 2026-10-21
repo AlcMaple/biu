@@ -153,6 +153,28 @@ interface MusicLyrics {
   preAlign?: Pick<MusicLyrics, "lyrics" | "tLyrics" | "source" | "autoVersion" | "offset">;
   /** 用户点过「还原为对齐前的歌词」：不再自动对齐这份，直到换一份歌词 */
   noAutoAlign?: true;
+  /** 歌词从哪个平台采用来的；与 source（采用方式）、alignment（按当前录音对齐）各管各的 */
+  origin?: LyricsOrigin;
+  /** 平台自带的逐字时间轴（原唱录音），不等于对齐到当前 B 站录音；lyrics 与采用时不一致就作废 */
+  nativeTiming?: NativeLyricsTiming;
+}
+
+interface LyricsOrigin {
+  provider: import("../lyrics-format").LyricsProvider;
+  /** 平台内的歌词 / 歌曲 ID，用于溯源，不用来取词 */
+  sourceId: string;
+  title: string;
+  artists: string[];
+  author?: string;
+  format: import("../lyrics-format").LyricsSourceFormat;
+  timing: "line" | "word";
+  adoptedAt: number;
+}
+
+interface NativeLyricsTiming {
+  /** 采用时写进 lyrics 的行级 LRC，读的时候对不上说明歌词已被换掉 */
+  lyrics: string;
+  lines: { startMs: number; endMs: number; words: { startMs: number; endMs: number; text: string }[] }[];
 }
 
 interface NeteaseAudioMatchParams {

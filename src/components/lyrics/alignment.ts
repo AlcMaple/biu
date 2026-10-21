@@ -1,6 +1,7 @@
 import type { LyricLine } from "@/store/lyrics-state";
 
 import { parseLrc } from "@/components/lyrics/parse-lrc";
+import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import platform from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
@@ -119,5 +120,5 @@ export async function restorePreAlign(key: string, { byUser = true }: { byUser?:
     offset: prev.preAlign?.offset ?? 0,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
-  return { entry: next, lines: parseLrc(next.lyrics), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
+  return { entry: next, lines: linesOfEntry(next), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
 }

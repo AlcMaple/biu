@@ -22,7 +22,9 @@ const AlignStatus = () => {
   const isTarget = Boolean(target && target.cacheKey === currentKey);
   if (!lyrics.length || (isTarget && phase.kind !== "idle" && !hidden)) return null;
 
-  const aligned = lyrics.some(line => line.words?.length);
+  const aligned = lyrics.some(line => line.words?.length && !line.nativeWords);
+  // 平台逐字是原唱录音的时间，翻唱 / 现场 / 剪辑版会错开，不能显示成「已对齐」
+  const native = !aligned && lyrics.some(line => line.nativeWords);
   const working = isTarget && phase.kind === "working";
 
   let dot = "bg-white/40";
@@ -33,6 +35,9 @@ const AlignStatus = () => {
   } else if (working) {
     const extra = queueText(phase.view);
     label = extra ? `对齐中 · ${extra}` : "对齐中";
+  } else if (native) {
+    dot = "bg-[#e5b94e]";
+    label = "未对齐 · 逐字按歌词平台的原唱时间";
   }
 
   return (

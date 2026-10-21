@@ -5,4 +5,6 @@ export const WEB_LYRICS_PROXY_PATHS = {
   neteaseAudioMatch: `${WEB_LYRICS_PROXY_ROOT}/netease/audio-match`,
   neteaseLyrics: `${WEB_LYRICS_PROXY_ROOT}/netease/lyrics`,
   neteaseSearch: `${WEB_LYRICS_PROXY_ROOT}/netease/search`,
+  providerSearch: `${WEB_LYRICS_PROXY_ROOT}/provider/search`,
+  providerGet: `${WEB_LYRICS_PROXY_ROOT}/provider/get`,
 } as const;

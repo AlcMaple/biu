@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { createProviderClient, type ProviderClient } from "../shared/lyrics-provider-guard.js";
+import { ProviderTransportError, type ProviderTransport } from "../shared/lyrics-providers.js";
 import { WEB_LYRICS_PROXY_PATHS, WEB_LYRICS_PROXY_ROOT } from "../shared/web-lyrics-proxy.js";
 import {
   isCrossSiteRequest,
@@ -22,12 +24,13 @@ const UPSTREAM_HEADERS = {
   "User-Agent": "Biu-Web-Lyrics-BFF/1.0",
 } as const;
 
-type LyricsRoute = {
-  target: URL;
-};
+type LyricsRoute =
+  | { target: URL }
+  | { provider: (client: ProviderClient, transport: ProviderTransport) => Promise<unknown> };
 
 export interface WebLyricsProxyHandlerOptions {
   fetch?: typeof fetch;
+  providerClient?: ProviderClient;
   logger?: ProxyLogger;
   publicOrigin?: string;
   timeoutMs?: number;
@@ -116,6 +119,30 @@ function matchLyricsRoute(url: URL): LyricsRoute | undefined {
     return { target };
   }
 
+  // QQ / 酷狗 / AMLL 的请求在 BFF 里按固定模板组装，浏览器只能传歌名、歌手和平台 ID
+  if (url.pathname === WEB_LYRICS_PROXY_PATHS.providerSearch) {
+    assertAllowedQuery(url, new Set(["provider", "title", "artist"]));
+    const params = {
+      provider: readTextQuery(url, "provider", true) as never,
+      title: readTextQuery(url, "title", true)!,
+      artist: readTextQuery(url, "artist", false),
+    };
+    return { provider: (client, transport) => client.search(transport, params) };
+  }
+
+  if (url.pathname === WEB_LYRICS_PROXY_PATHS.providerGet) {
+    assertAllowedQuery(url, new Set(["provider", "id", "durationMs", "title", "artist"]));
+    const durationMs = readIntegerQuery(url, "durationMs", 0, 0, 24 * 3_600_000);
+    const params = {
+      provider: readTextQuery(url, "provider", true) as never,
+      id: readTextQuery(url, "id", true)!,
+      durationMs: durationMs || undefined,
+      title: readTextQuery(url, "title", false),
+      artist: readTextQuery(url, "artist", false),
+    };
+    return { provider: (client, transport) => client.get(transport, params) };
+  }
+
   if (url.pathname === WEB_LYRICS_PROXY_PATHS.lrclibSearch) {
     assertAllowedQuery(url, new Set(["q", "track_name", "artist_name", "album_name"]));
     const target = new URL("/api/search", LRCLIB_ORIGIN);
@@ -168,6 +195,9 @@ export function createWebLyricsProxyHandler(options: WebLyricsProxyHandlerOption
   const logger = options.logger ?? console;
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
+  // 缓存、冷却与每分钟预算全站共用：所有浏览器经同一个服务器出口 IP 访问歌词平台
+  const providerClient = options.providerClient ?? createProviderClient();
+
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://biu.local");
     if (!hasLyricsRoot(url.pathname)) {
@@ -217,6 +247,42 @@ export function createWebLyricsProxyHandler(options: WebLyricsProxyHandlerOption
     };
     request.once("aborted", abortUpstream);
     response.once("close", abortOnPrematureClose);
+
+    if ("provider" in route) {
+      const transport: ProviderTransport = async upstreamRequest => {
+        try {
+          const upstream = await fetchUpstream(upstreamRequest.url, {
+            body: upstreamRequest.body,
+            headers: { "Accept-Encoding": "identity", ...upstreamRequest.headers },
+            method: upstreamRequest.method,
+            redirect: "error",
+            signal: controller.signal,
+          });
+          return {
+            status: upstream.status,
+            text: await readResponseBody(upstream, MAX_RESPONSE_BYTES),
+            retryAfter: upstream.headers.get("retry-after") ?? undefined,
+          };
+        } catch {
+          if (timedOut) throw new ProviderTransportError("timeout");
+          throw new ProviderTransportError("network");
+        }
+      };
+      try {
+        const result = await route.provider(providerClient, transport);
+        if (!response.writableEnded && !response.destroyed && !clientAborted) sendProxyJson(response, 200, result);
+      } catch (error) {
+        if (!response.writableEnded && !response.destroyed && !clientAborted) {
+          logger.warn("[web-lyrics] provider request failed", error);
+          sendProxyJson(response, 502, { code: -502, message: "歌词服务暂不可用" });
+        }
+      } finally {
+        clearTimeout(timeout);
+        request.off("aborted", abortUpstream);
+        response.off("close", abortOnPrematureClose);
+      }
+      return true;
+    }
 
     try {
       const upstream = await fetchUpstream(route.target, {

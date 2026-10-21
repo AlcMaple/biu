@@ -5,6 +5,8 @@ export type LyricLine = {
   text: string;
   /** 逐字时间（毫秒），只有对齐过的歌词有 */
   words?: { text: string; time: number }[];
+  /** words 来自歌词平台的原唱时间轴，不是按当前录音对齐出来的 */
+  nativeWords?: true;
 };
 
 type LyricsPreview = { lyrics: LyricLine[]; translatedLyrics: LyricLine[] };

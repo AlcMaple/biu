@@ -2,63 +2,109 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
+import type { LyricLine } from "@/store/lyrics-state";
+import type { LyricsProvider } from "@shared/lyrics-format";
+import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
+
 import { extractSongInfo } from "@/components/lyrics/auto-match";
+import { PROVIDER_LABELS, describeProviderError, linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
 import type { AdoptLyricsHandler } from "./netease-tab";
+import type { AdoptProviderLyricsHandler } from "./provider-tab";
 
 import LrclibTab from "./lrclib-tab";
 import NeteaseTab from "./netease-tab";
+import ProviderTab from "./provider-tab";
 
 const NETEASE_TYPE_SONG = 1;
 const DEFAULT_LIMIT = 20;
 
+type SearchTab = "netease" | "lrclib" | LyricsProvider;
+
+const PROVIDER_TABS: LyricsProvider[] = ["qq", "kugou", "amll"];
+
+const isProviderTab = (tab: SearchTab): tab is LyricsProvider => tab !== "netease" && tab !== "lrclib";
+
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onLyricsAdopted?: (lyricsText?: string, tLyricsText?: string) => void;
+  onLyricsAdopted?: (lyricsText?: string, tLyricsText?: string, lines?: LyricLine[]) => void;
 }
 
 const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => {
   const playId = usePlayList(state => state.playId);
   const getPlayItem = usePlayList(state => state.getPlayItem);
   const [keyword, setKeyword] = useState("");
-  const [activeTab, setActiveTab] = useState<"netease" | "lrclib">("netease");
+  const [activeTab, setActiveTab] = useState<SearchTab>("netease");
   const [neteaseSongs, setNeteaseSongs] = useState<NeteaseSong[]>([]);
   const [lrclibSongs, setLrclibSongs] = useState<SearchSongByLrclibResponse[]>([]);
   const [neteaseLoading, setNeteaseLoading] = useState(false);
   const [lrclibLoading, setLrclibLoading] = useState(false);
+  const [providerCandidates, setProviderCandidates] = useState<ProviderLyricsCandidate[]>([]);
+  const [providerLoading, setProviderLoading] = useState(false);
+  const [providerError, setProviderError] = useState<string>();
   const keywordRef = useRef("");
+  // 换来源 / 再搜 / 切歌都换一代，慢的旧结果回来时直接丢掉
+  const searchRef = useRef(0);
+
+  const clearResults = useCallback(() => {
+    searchRef.current += 1;
+    setNeteaseSongs([]);
+    setLrclibSongs([]);
+    setProviderCandidates([]);
+    setProviderError(undefined);
+    setNeteaseLoading(false);
+    setLrclibLoading(false);
+    setProviderLoading(false);
+  }, []);
 
   const resetState = useCallback(() => {
     setKeyword("");
     setActiveTab("netease");
-    setNeteaseSongs([]);
-    setLrclibSongs([]);
-    setNeteaseLoading(false);
-    setLrclibLoading(false);
-  }, []);
+    clearResults();
+  }, [clearResults]);
 
   useEffect(() => {
     if (!isOpen) return;
     const playItem = getPlayItem();
     if (playItem) {
       setKeyword(extractSongInfo(playItem.pageTitle || playItem.title).title);
-      setNeteaseSongs([]);
-      setLrclibSongs([]);
+      clearResults();
     }
-  }, [playId, isOpen, getPlayItem]);
+  }, [playId, isOpen, getPlayItem, clearResults]);
 
   useEffect(() => {
     keywordRef.current = keyword;
   }, [keyword]);
 
   const handleSubmit = useCallback(
-    async (tab: "netease" | "lrclib" = activeTab) => {
+    async (tab: SearchTab = activeTab) => {
       const query = keywordRef.current.trim();
       if (query === "") return;
+      const search = ++searchRef.current;
+
+      if (isProviderTab(tab)) {
+        setNeteaseLoading(false);
+        setLrclibLoading(false);
+        setProviderError(undefined);
+        setProviderLoading(true);
+        try {
+          const res = await platform.searchProviderLyrics({ provider: tab, title: query });
+          if (search !== searchRef.current) return;
+          setProviderCandidates(res.ok ? res.data : []);
+          setProviderError(res.ok ? undefined : describeProviderError(res.error));
+        } catch (err) {
+          if (search !== searchRef.current) return;
+          setProviderCandidates([]);
+          setProviderError(`${PROVIDER_LABELS[tab]}搜索失败：${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+          if (search === searchRef.current) setProviderLoading(false);
+        }
+        return;
+      }
 
       if (tab === "netease") {
         setLrclibLoading(false);
@@ -71,6 +117,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
             offset: 0,
           });
 
+          if (search !== searchRef.current) return;
           setNeteaseSongs(res?.result?.songs ?? []);
         } catch {
           setNeteaseSongs([]);
@@ -83,6 +130,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         try {
           setLrclibLoading(true);
           const res = await platform.searchLrclibLyrics({ q: query });
+          if (search !== searchRef.current) return;
           setLrclibSongs(res ?? []);
         } catch {
           setLrclibSongs([]);
@@ -101,8 +149,12 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
     }
   }, [isOpen, activeTab, handleSubmit]);
 
-  const handleAdoptLyrics = useCallback<AdoptLyricsHandler>(
-    async (lyricsText, tLyricsText) => {
+  const saveLyrics = useCallback(
+    async (
+      lyricsText: string | undefined,
+      tLyricsText: string | undefined,
+      extra: Pick<MusicLyrics, "origin" | "nativeTiming">,
+    ) => {
       if (!lyricsText && !tLyricsText) return false;
 
       const current = getPlayItem();
@@ -133,6 +185,9 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         preAlign: undefined,
         // 主动换了一份歌词，之前点「还原」留下的「别再自动对齐」不再适用
         noAutoAlign: undefined,
+        // 网易云 / LrcLib 采用时显式清掉，免得上一份平台歌词的来源和逐字时间挂在新歌词上
+        origin: extra.origin,
+        nativeTiming: extra.nativeTiming,
       };
 
       try {
@@ -140,7 +195,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         const prev = store?.[key] || {};
         const nextStore = { ...(store ?? {}), [key]: { ...prev, ...nextLyrics } };
         await platform.setStore(StoreNameMap.LyricsCache, nextStore);
-        onLyricsAdopted?.(lyricsText, tLyricsText);
+        onLyricsAdopted?.(lyricsText, tLyricsText, linesOfEntry(nextLyrics));
         return true;
       } catch {
         addToast({ title: "歌词保存失败", color: "danger" });
@@ -148,6 +203,17 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
       }
     },
     [getPlayItem, onLyricsAdopted],
+  );
+
+  const handleAdoptLyrics = useCallback<AdoptLyricsHandler>(
+    (lyricsText, tLyricsText) => saveLyrics(lyricsText, tLyricsText, { origin: undefined, nativeTiming: undefined }),
+    [saveLyrics],
+  );
+
+  const handleAdoptProviderLyrics = useCallback<AdoptProviderLyricsHandler>(
+    adoption =>
+      saveLyrics(adoption.lyrics, adoption.tLyrics, { origin: adoption.origin, nativeTiming: adoption.nativeTiming }),
+    [saveLyrics],
   );
 
   const handleOpenChange = useCallback(
@@ -181,12 +247,8 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={key => {
-              const nextTab = key as "netease" | "lrclib";
-              setActiveTab(nextTab);
-              setNeteaseLoading(false);
-              setLrclibLoading(false);
-              setNeteaseSongs([]);
-              setLrclibSongs([]);
+              setActiveTab(key as SearchTab);
+              clearResults();
             }}
             classNames={{
               panel: "py-0",
@@ -194,11 +256,22 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           >
             <Tab key="netease" title="网易云" />
             <Tab key="lrclib" title="LrcLib" />
+            {PROVIDER_TABS.map(provider => (
+              <Tab key={provider} title={PROVIDER_LABELS[provider]} />
+            ))}
           </Tabs>
           {activeTab === "netease" ? (
             <NeteaseTab songs={neteaseSongs} loading={neteaseLoading} onAdoptLyrics={handleAdoptLyrics} />
-          ) : (
+          ) : activeTab === "lrclib" ? (
             <LrclibTab songs={lrclibSongs} loading={lrclibLoading} onAdoptLyrics={handleAdoptLyrics} />
+          ) : (
+            <ProviderTab
+              provider={activeTab}
+              candidates={providerCandidates}
+              loading={providerLoading}
+              error={providerError}
+              onAdopt={handleAdoptProviderLyrics}
+            />
           )}
         </ModalBody>
       </ModalContent>

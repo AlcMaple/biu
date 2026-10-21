@@ -22,6 +22,7 @@
 - [快捷键焦点反馈](docs/devlog/2026-快捷键焦点反馈.md)
 - [私人FM / 心动模式](docs/devlog/2026-私人FM.md)
 - [歌词时间轴对齐](docs/devlog/2026-歌词时间轴对齐.md)
+- [多源歌词](docs/devlog/2026-多源歌词.md)
 
 ## 2026-10-20 fix(download): 下载某一分 P 时不再把整个合集全下下来
 

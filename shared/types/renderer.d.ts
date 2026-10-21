@@ -50,6 +50,14 @@ declare global {
     neteaseAudioMatch: (params: NeteaseAudioMatchParams) => Promise<NeteaseAudioMatchResponse>;
     /** 在 LrcLib 搜索歌曲/歌词 */
     searchLrclibLyrics: (params: SearchSongByLrclibParams) => Promise<SearchSongByLrclibResponse[]>;
+    /** QQ / 酷狗 / AMLL 搜歌；失败以 ok:false 带回错误类型，不抛、不重试 */
+    searchProviderLyrics: (
+      params: import("../lyrics-providers").ProviderLyricsSearchParams,
+    ) => Promise<import("../lyrics-providers").ProviderResult<import("../lyrics-providers").ProviderLyricsCandidate[]>>;
+    /** QQ / 酷狗 / AMLL 取词，返回规范化后的原唱时间轴 */
+    getProviderLyrics: (
+      params: import("../lyrics-providers").ProviderLyricsGetParams,
+    ) => Promise<import("../lyrics-providers").ProviderResult<import("../lyrics-providers").ProviderLyricsDocument>>;
     /** 歌词时间轴对齐服务；只放行 shared/lyrics-align.ts 白名单里的路径，凭证留在持有它的一侧 */
     alignRequest: (req: AlignRequest) => Promise<AlignResponse>;
     /** 获取当前应用平台 */

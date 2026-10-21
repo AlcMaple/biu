@@ -4,6 +4,7 @@ import { adoptAlignment, alignmentToLines, isUserChosen, restorePreAlign } from 
 import { AUTO_MATCH_VERSION, autoMatchLyrics } from "@/components/lyrics/auto-match";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
+import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
 import { getPublishedLyrics } from "@/service/lyrics-align";
@@ -87,7 +88,7 @@ const LyricsBroadcaster = () => {
           if (cached.alignment) {
             setLyrics(alignmentToLines(cached.alignment.lines), parseLrc(cached.tLyrics));
           } else if (cached.lyrics || cached.tLyrics) {
-            setLyrics(parseLrc(cached.lyrics), parseLrc(cached.tLyrics));
+            setLyrics(linesOfEntry(cached), parseLrc(cached.tLyrics));
           }
         }
 

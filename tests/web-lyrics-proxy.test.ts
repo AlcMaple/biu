@@ -126,6 +126,43 @@ describe("Web 歌词 BFF", () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
+  it("QQ / 酷狗 / AMLL 走固定模板，只接受歌名、歌手和平台 ID", async () => {
+    const fetchUpstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ status: 200, data: { items: [] } })));
+    const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, publicOrigin: ORIGIN });
+
+    const ok = createResponse();
+    await handler(
+      createRequest(`${WEB_LYRICS_PROXY_PATHS.providerSearch}?provider=amll&title=%E6%99%B4%E5%A4%A9`),
+      ok.response,
+    );
+    expect(String(fetchUpstream.mock.calls[0]?.[0])).toBe(
+      "https://api.amll.dev/v1/lyrics/search?musicName=%E6%99%B4%E5%A4%A9&pageSize=20",
+    );
+    expect(fetchUpstream.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
+    expect(JSON.parse(ok.state.body)).toEqual({ ok: true, data: [] });
+
+    const invalid = createResponse();
+    await handler(
+      createRequest(`${WEB_LYRICS_PROXY_PATHS.providerGet}?provider=amll&id=1&url=https://evil.example`),
+      invalid.response,
+    );
+    expect(invalid.state.status).toBe(400);
+    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+  });
+
+  it("渠道限流原样带回错误类型，不重试", async () => {
+    const fetchUpstream = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429 }));
+    const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, publicOrigin: ORIGIN });
+    const { response, state } = createResponse();
+
+    await handler(createRequest(`${WEB_LYRICS_PROXY_PATHS.providerGet}?provider=qq&id=0039MnYb0qxYhV`), response);
+
+    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(state.body)).toMatchObject({ ok: false, error: { kind: "rate_limited", provider: "qq" } });
+  });
+
   it("上游失败时返回可识别的 BFF 错误", async () => {
     const fetchUpstream = vi.fn<typeof fetch>().mockResolvedValue(new Response("upstream failure", { status: 503 }));
     const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, publicOrigin: ORIGIN });

@@ -57,6 +57,17 @@ it("tells line-estimated lyrics apart from aligned ones", async () => {
   expect(text()).toContain("已对齐");
 });
 
+it("歌词平台自带的逐字时间不显示成「已对齐」", async () => {
+  await act(async () => root.render(<AlignStatus />));
+  await act(async () =>
+    useLyricsState
+      .getState()
+      .setLyrics([{ time: 0, text: "话总", words: [{ text: "话", time: 0 }], nativeWords: true }]),
+  );
+  expect(text()).toContain("原唱时间");
+  expect(text()).not.toContain("已对齐");
+});
+
 it("shows the hidden automatic job with its queue position", async () => {
   await act(async () => root.render(<AlignStatus />));
   await act(async () =>

@@ -1,9 +1,11 @@
 import { isOfflineDemo } from "@/common/offline-demo";
 import {
   getWebNeteaseLyrics,
+  getWebProviderLyrics,
   matchWebNeteaseAudio,
   searchWebLrclibLyrics,
   searchWebNeteaseSongs,
+  searchWebProviderLyrics,
 } from "@/service/web-lyrics";
 import { WEB_ALIGN_PROXY_ROOT } from "@shared/lyrics-align";
 import { StoreNameMap } from "@shared/store";
@@ -17,6 +19,7 @@ const WEB_STORE_DATABASE = isOfflineDemo ? "biu-demo-web-store" : "biu-web-store
 const WEB_STORE_OBJECT_STORE = "stores";
 
 // 歌单、同步基线与滚动备份会随用户数据增长；localStorage 的同步配额不适合承载它们。
+// 歌词缓存存了逐字对齐结果和平台逐字时间轴，一首约 20 KB，几百首就会撑爆 5 MB 配额、之后静默写不进去。
 // 轻量设置保留 localStorage，以避免扩大迁移面。
 const highCapacityStores = new Set<StoreName>([
   StoreNameMap.LocalFavorites,
@@ -25,6 +28,7 @@ const highCapacityStores = new Set<StoreName>([
   StoreNameMap.PlaylistSyncMeta,
   StoreNameMap.PlaylistSyncBackups,
   StoreNameMap.PlayCounts,
+  StoreNameMap.LyricsCache,
 ]);
 
 let databasePromise: Promise<IDBDatabase | undefined> | undefined;
@@ -226,6 +230,11 @@ const platform: Platform = {
   getNeteaseLyrics: async params => (isOfflineDemo ? {} : getWebNeteaseLyrics(params)),
   neteaseAudioMatch: async params => (isOfflineDemo ? {} : matchWebNeteaseAudio(params)),
   searchLrclibLyrics: async params => (isOfflineDemo ? [] : searchWebLrclibLyrics(params)),
+  searchProviderLyrics: async params => (isOfflineDemo ? { ok: true, data: [] } : searchWebProviderLyrics(params)),
+  getProviderLyrics: async params =>
+    isOfflineDemo
+      ? { ok: false, error: { kind: "unsupported_platform", provider: params.provider, message: "离线演示不支持取词" } }
+      : getWebProviderLyrics(params),
   alignRequest: webAlignRequest,
   getPlatform: getWebPlatform,
   setProxySettings: asyncNoop,
