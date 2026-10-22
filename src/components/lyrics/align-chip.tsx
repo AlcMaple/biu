@@ -52,11 +52,6 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
   const currentKey = usePlayList(s => lyricsCacheKey(s.list.find(i => i.id === s.playId)));
   const isMobileLayout = useIsMobileLayout();
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  const changeOpen = (next: boolean) => {
-    setOpen(next);
-    onOpenChange?.(next);
-  };
 
   const isTarget = Boolean(target && target.cacheKey === currentKey);
   const active = isTarget && phase.kind !== "idle";
@@ -118,16 +113,9 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
       caution: true,
       title: "没能逐字对齐",
       body: phase.message,
-      actions: (
-        <>
-          {act("关闭", () => {
-            // 关闭后标签回到「未对齐」，面板要一起收起；否则同一个面板原地变成「逐字为估算」，像是点关闭把状态改了
-            changeOpen(false);
-            session.dismiss();
-          })}
-          {next}
-        </>
-      ),
+      // 失败是这首歌当前歌词的事实，标签一直保留到重试成功或换了歌词；
+      // 没有「关闭」按钮，否则点完标签就退回「未对齐 · 估算」，同一件事前后说法不一
+      actions: next,
     };
   } else if (active && phase.kind === "preview") {
     view = {
@@ -179,7 +167,7 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
   }
 
   return (
-    <Popover placement="bottom-end" isOpen={open} onOpenChange={changeOpen}>
+    <Popover placement="bottom-end" onOpenChange={onOpenChange}>
       <PopoverTrigger>
         <Button
           size="sm"
