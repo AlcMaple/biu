@@ -128,7 +128,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "changelogen": "^0.6.2",
     "chokidar": "^4.0.3",
-    "electron": "38.6.0",
+    "electron": "44.9.3",
     "electron-builder": "26.0.12",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.2",

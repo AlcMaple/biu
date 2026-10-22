@@ -24,6 +24,14 @@
 - [歌词时间轴对齐](docs/devlog/2026-歌词时间轴对齐.md)
 - [多源歌词](docs/devlog/2026-多源歌词.md)
 
+## 2026-10-22 build: 桌面版升级 Electron 44
+
+**效果**：Node 2026 年 10 月安全更新（含 Brotli 解码越界写导致远程代码执行等 4 个高危漏洞）发布后，开发与部署用的 Node 从 22.17.1 升到修复版 22.23.4；桌面版从已停止维护、不会再收到补丁的 Electron 38 升到仍在维护的 44.9.3（内置 Node 24.22.0、Chrome 152）。Electron 44 目前内置的 Node 还不是本轮修复版，等 44.x 发出合入修复的小版本后要再跟一次
+
+**行为变化**：本项目没用到 39～44 移除或改动的 API（渲染进程 clipboard、`clearStorageData` 的 quotas、`net.request` 等）；cookie 过期自动续期依赖的 `expired` 原因未变。macOS 系统声音识曲需要的系统音频录制权限说明，Electron 44 自带的 Info.plist 已经包含，打包配置无需改动
+
+**安装注意**：pnpm 不会把 `.npmrc` 里的 `electron_mirror` 传给 Electron 的下载脚本，国内网络下 `pnpm install` 会卡在从 GitHub 下载 Electron；需显式设置环境变量 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`
+
 ## 2026-10-20 fix(download): 下载某一分 P 时不再把整个合集全下下来
 
 **效果**：在播放列表、本地歌单里下载一首多 P 视频里的某一集，只下载这一集；此前会把合集的所有分 P 都排进下载队列。B 站收藏夹里的条目本身没有「收藏的是哪一 P」的信息，仍按整个视频处理（多 P 会逐集下载）
