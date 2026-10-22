@@ -59,6 +59,12 @@ export interface AutoLyricsResult {
 const providerCooldownUntil = new Map<LyricsProvider, number>();
 const providerSentAt = new Map<LyricsProvider, number[]>();
 
+// 五个渠道都完整查过且都没有，才算「确实没有」：被取消、限流冷却、预算用完、任何一步出错都不算，
+// 否则一次网络抖动就会被当成这首歌没歌词、让所有用户几天内都不再查
+export interface AutoMatchOutcome {
+  exhausted: boolean;
+}
+
 const providerAvailable = (provider: LyricsProvider) => {
   const now = Date.now();
   if ((providerCooldownUntil.get(provider) ?? 0) > now) return false;
@@ -369,16 +375,16 @@ const fromProvider = async (
   themeTitle: string,
   isCanceled: IsCanceled,
   duration: number,
-): Promise<AutoLyricsResult | null> => {
+): Promise<AutoLyricsResult | "incomplete" | null> => {
   const pool = new Map<string, { candidate: ProviderLyricsCandidate; score: number }>();
   for (const [i, title] of candidates.slice(0, PROVIDER_MAX_SEARCHES).entries()) {
     if (i > 0) await sleep(REQUEST_GAP_MS);
-    if (isCanceled() || !providerAvailable(provider)) return null;
+    if (isCanceled() || !providerAvailable(provider)) return "incomplete";
     markProviderSent(provider);
     const res = await platform.searchProviderLyrics({ provider, title });
     if (!res.ok) {
       stopProvider(provider, res.error);
-      return null;
+      return "incomplete";
     }
     for (const hit of pickProvider(res.data, title, rawNorm, themeTitle, duration)) {
       const prev = pool.get(hit.candidate.id);
@@ -389,7 +395,7 @@ const fromProvider = async (
   const ranked = [...pool.values()].toSorted((x, y) => x.score - y.score).slice(0, PROVIDER_MAX_LYRICS_TRIES);
   for (const { candidate } of ranked) {
     await sleep(REQUEST_GAP_MS);
-    if (isCanceled() || !providerAvailable(provider)) return null;
+    if (isCanceled() || !providerAvailable(provider)) return "incomplete";
     // 酷狗取词是两次串行请求，按两次计预算
     markProviderSent(provider);
     if (provider === "kugou") markProviderSent(provider);
@@ -403,7 +409,7 @@ const fromProvider = async (
     if (!res.ok) {
       if (res.error.kind === "not_found") continue;
       stopProvider(provider, res.error);
-      return null;
+      return "incomplete";
     }
     const adoption = buildProviderAdoption(res.data, candidate);
     const lines = parseLrc(adoption.lyrics);
@@ -422,8 +428,12 @@ export const autoMatchLyrics = (
   rawTitle: string,
   duration?: number,
   isCanceled: IsCanceled = () => false,
+  outcome?: AutoMatchOutcome,
 ): Promise<AutoLyricsResult | null> =>
   enqueue(async () => {
+    if (outcome) outcome.exhausted = false;
+    // 视频时长未知时 LrcLib 与三个渠道都不敢采用，查不全
+    let exhausted = Boolean(duration);
     const candidates = extractTitleCandidates(rawTitle);
     if (!candidates.length || isCanceled()) return null;
     const rawNorm = normalize(rawTitle);
@@ -433,6 +443,7 @@ export const autoMatchLyrics = (
       if (hit) return hit;
     } catch {
       // 网易云失败则继续走 LrcLib
+      exhausted = false;
     }
     if (isCanceled()) return null;
     await sleep(REQUEST_GAP_MS);
@@ -441,19 +452,26 @@ export const autoMatchLyrics = (
       if (hit) return hit;
     } catch {
       // LrcLib 失败则继续走 QQ / 酷狗 / AMLL
+      exhausted = false;
     }
     // 视频时长未知时不敢自动采用，与 LrcLib 一致
     if (!duration) return null;
     for (const provider of FALLBACK_PROVIDERS) {
       if (isCanceled()) return null;
-      if (!providerAvailable(provider)) continue;
+      if (!providerAvailable(provider)) {
+        exhausted = false;
+        continue;
+      }
       await sleep(REQUEST_GAP_MS);
       try {
         const hit = await fromProvider(provider, candidates, rawNorm, themeTitle, isCanceled, duration);
-        if (hit) return hit;
+        if (hit === "incomplete") exhausted = false;
+        else if (hit) return hit;
       } catch (error) {
         console.warn(`[auto-match] ${PROVIDER_LABELS[provider]}异常`, error);
+        exhausted = false;
       }
     }
+    if (outcome) outcome.exhausted = exhausted && !isCanceled();
     return null;
   });

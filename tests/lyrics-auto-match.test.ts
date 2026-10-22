@@ -348,3 +348,43 @@ describe("QQ / 酷狗 / AMLL 兜底", () => {
     expect(mocks.getProviderLyrics).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("是否「确实没有」的判断（outcome.exhausted）", () => {
+  const run = async (duration?: number) => {
+    const outcome = { exhausted: true };
+    const pending = autoMatchLyrics("周杰伦 - 晴天", duration, () => false, outcome);
+    await vi.runAllTimersAsync();
+    expect(await pending).toBeNull();
+    return outcome.exhausted;
+  };
+
+  beforeEach(() => {
+    mocks.searchNeteaseSongs.mockResolvedValue({ result: { songs: [] } });
+    mocks.searchLrclibLyrics.mockResolvedValue([]);
+  });
+
+  it("五个渠道都完整查过且都没有才算", async () => {
+    expect(await run(180)).toBe(true);
+  });
+
+  it("视频时长未知时不算", async () => {
+    expect(await run()).toBe(false);
+  });
+
+  it("网易云或 LrcLib 抛错时不算", async () => {
+    mocks.searchNeteaseSongs.mockRejectedValue(new Error("network"));
+    expect(await run(180)).toBe(false);
+    mocks.searchNeteaseSongs.mockResolvedValue({ result: { songs: [] } });
+    mocks.searchLrclibLyrics.mockRejectedValue(new Error("network"));
+    expect(await run(180)).toBe(false);
+  });
+
+  it("某个新渠道限流或出错时不算", async () => {
+    mocks.searchProviderLyrics.mockImplementation(async p =>
+      p.provider === "kugou"
+        ? { ok: false, error: { kind: "rate_limited", provider: "kugou", message: "x", retryAfterMs: 60_000 } }
+        : { ok: true, data: [] },
+    );
+    expect(await run(180)).toBe(false);
+  });
+});

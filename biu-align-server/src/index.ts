@@ -7,6 +7,7 @@ import { downloadAudio, getVideoPage } from "./lib/bilibili.js";
 import { config } from "./lib/config.js";
 import { mockDownloadAudio, mockGetVideoPage, mockRunWorker } from "./lib/mock.js";
 import { AlignQueue } from "./lib/queue.js";
+import { RecognizedStore } from "./lib/recognized.js";
 import { ReportStore } from "./lib/reports.js";
 import { SubmissionStore } from "./lib/submissions.js";
 import { runWorker } from "./lib/worker.js";
@@ -16,6 +17,7 @@ const cache = new AlignmentCache(config.dataDir, mock ? "mock" : undefined);
 const failures = new FailureCache(config.dataDir, mock ? "mock" : undefined);
 const submissions = new SubmissionStore(config.dataDir);
 const reports = new ReportStore(config.dataDir);
+const recognized = new RecognizedStore(config.dataDir);
 const queue = new AlignQueue({
   cache,
   failures,
@@ -35,6 +37,7 @@ createApp({
   failures,
   submissions,
   reports,
+  recognized,
   rateLimitPerMinute: config.rateLimitPerMinute,
   corsOrigin: config.corsOrigin,
 }).listen(config.port, "127.0.0.1", () => {

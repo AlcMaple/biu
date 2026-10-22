@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { AlignmentCache, FailureCache } from "../src/lib/alignment-cache.js";
 import { AlignQueue } from "../src/lib/queue.js";
+import { RecognizedStore } from "../src/lib/recognized.js";
 import { ReportStore } from "../src/lib/reports.js";
 import { SubmissionStore } from "../src/lib/submissions.js";
 
@@ -52,6 +53,7 @@ beforeAll(async () => {
     failures,
     submissions,
     reports: new ReportStore(dir),
+    recognized: new RecognizedStore(dir),
     rateLimitPerMinute: 1000,
   }).listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
@@ -228,5 +230,84 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
       (await call("POST", "/lyrics/reports", "3", { bvid: BV, cid: 9, lyricsHash: "0123456789abcdef" })).json.error
         .code,
     ).toBe("ALIGNMENT_NOT_READY");
+  });
+});
+
+describe("识别结果：登录用户写，所有人读", () => {
+  const BV2 = "BV1xx411c7mD";
+  const LRC = "[00:01.00]第一行\n[00:02.00]第二行\n[00:03.00]第三行";
+
+  it("没有记录时返回空，匿名可读", async () => {
+    const r = await call("GET", `/lyrics/${BV2}/1/recognized`);
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ recognized: null, missingUntil: null, v: null });
+  });
+
+  it("匿名不能写；歌词不足 3 行带时间、来源不对都拒绝", async () => {
+    expect(
+      (await call("POST", "/lyrics/recognized", undefined, { bvid: BV2, cid: 1, v: 3, lyrics: LRC, from: "qq" }))
+        .status,
+    ).toBe(401);
+    const short = await call("POST", "/lyrics/recognized", "1", {
+      bvid: BV2,
+      cid: 1,
+      v: 3,
+      lyrics: "[00:01.00]一行",
+      from: "qq",
+    });
+    expect(short.status).toBe(422);
+    const plain = await call("POST", "/lyrics/recognized", "1", {
+      bvid: BV2,
+      cid: 1,
+      v: 3,
+      lyrics: "甲\n乙\n丙",
+      from: "qq",
+    });
+    expect(plain.status).toBe(422);
+    const from = await call("POST", "/lyrics/recognized", "1", { bvid: BV2, cid: 1, v: 3, lyrics: LRC, from: "x" });
+    expect(from.status).toBe(400);
+  });
+
+  it("同版本先到先得，匿名读到的只有歌词字段；更高版本可以覆盖", async () => {
+    const first = await call("POST", "/lyrics/recognized", "1", { bvid: BV2, cid: 1, v: 3, lyrics: LRC, from: "qq" });
+    expect(first.json).toEqual({ stored: true });
+    const second = await call("POST", "/lyrics/recognized", "2", {
+      bvid: BV2,
+      cid: 1,
+      v: 3,
+      lyrics: LRC.replace("第一行", "别的"),
+      from: "kugou",
+    });
+    expect(second.json).toEqual({ stored: false });
+    const read = await call("GET", `/lyrics/${BV2}/1/recognized`);
+    expect(read.json).toEqual({ recognized: { lyrics: LRC, tLyrics: null, from: "qq" }, missingUntil: null, v: 3 });
+
+    const upgraded = await call("POST", "/lyrics/recognized", "2", {
+      bvid: BV2,
+      cid: 1,
+      v: 4,
+      lyrics: LRC,
+      from: "kugou",
+    });
+    expect(upgraded.json).toEqual({ stored: true });
+    expect((await call("GET", `/lyrics/${BV2}/1/recognized`)).json.recognized.from).toBe("kugou");
+  });
+
+  it("「查无歌词」不会盖掉已有歌词；有效期内同版本不重复写", async () => {
+    const BV3 = "BV1GJ411x7h7";
+    const miss = await call("POST", "/lyrics/recognized", "1", { bvid: BV3, cid: 1, v: 3, missing: true });
+    expect(miss.json).toEqual({ stored: true });
+    const read = await call("GET", `/lyrics/${BV3}/1/recognized`);
+    expect(read.json.missingUntil).toBeGreaterThan(Date.now());
+    expect((await call("POST", "/lyrics/recognized", "2", { bvid: BV3, cid: 1, v: 3, missing: true })).json).toEqual({
+      stored: false,
+    });
+
+    // 之后有人识别出了歌词，标记被歌词取代；再来「查无」不能盖回去
+    await call("POST", "/lyrics/recognized", "2", { bvid: BV3, cid: 1, v: 3, lyrics: LRC, from: "lrclib" });
+    expect((await call("GET", `/lyrics/${BV3}/1/recognized`)).json.missingUntil).toBeNull();
+    expect((await call("POST", "/lyrics/recognized", "1", { bvid: BV3, cid: 1, v: 9, missing: true })).json).toEqual({
+      stored: false,
+    });
   });
 });

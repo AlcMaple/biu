@@ -77,6 +77,13 @@ interface AlignPublished {
   source: AlignPublishSource | null;
 }
 
+// 客户端自动识别出的歌词（未对齐），或五个渠道都查过确实没有的标记；v 是自动匹配算法版本
+interface AlignRecognized {
+  recognized: { lyrics: string; tLyrics: string | null; from: "netease" | "lrclib" | "qq" | "kugou" | "amll" } | null;
+  missingUntil: number | null;
+  v: number | null;
+}
+
 interface AlignSubmissionDetail {
   submission: AlignSubmissionBrief & { lines: { t: number | null; text: string }[] };
   /** 服务端还在对齐时为 null */

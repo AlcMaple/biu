@@ -3,13 +3,15 @@ import rateLimit from "express-rate-limit";
 
 import type { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import type { AlignQueue } from "./lib/queue.js";
+import type { RecognizedStore } from "./lib/recognized.js";
 import type { Report, ReportStore } from "./lib/reports.js";
 import type { SubmissionStore, Submission } from "./lib/submissions.js";
 
 import { type AuthedRequest, isAdmin, requireAdmin, requireAuth } from "./lib/auth.js";
 import { AlignError } from "./lib/errors.js";
-import { lyricsHash, parseLyrics, parseTarget } from "./lib/lyrics.js";
+import { lyricsHash, MAX_CHARS, parseLyrics, parseTarget } from "./lib/lyrics.js";
 import { cacheKey } from "./lib/queue.js";
+import { RECOGNIZED_FROM, type RecognizedFrom, type RecognizedInput } from "./lib/recognized.js";
 
 export interface RouteDeps {
   queue: AlignQueue;
@@ -17,6 +19,7 @@ export interface RouteDeps {
   failures: FailureCache;
   submissions: SubmissionStore;
   reports: ReportStore;
+  recognized: RecognizedStore;
   rateLimitPerMinute: number;
 }
 
@@ -37,7 +40,7 @@ const parseHash = (value: unknown) => {
 };
 
 export function createRouter(deps: RouteDeps): Router {
-  const { queue, cache, failures, submissions, reports } = deps;
+  const { queue, cache, failures, submissions, reports, recognized } = deps;
   const router = Router();
   const limiter = rateLimit({
     windowMs: 60_000,
@@ -150,6 +153,46 @@ export function createRouter(deps: RouteDeps): Router {
     requireAuth,
     limiter,
     wrap(async (req, res) => res.json({ items: await reports.list(r => r.mid === req.mid) })),
+  );
+
+  // 客户端自动识别出的歌词（未对齐）或「查无歌词」标记：谁都能读，只有登录用户能写，写入不改写已有的同版本结果。
+  // 识别在客户端做（各用户自己的出口 IP 请求歌词平台），服务端只存，不替大家去请求
+  router.post(
+    "/lyrics/recognized",
+    requireAuth,
+    limiter,
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
+      const v = req.body?.v;
+      if (!Number.isInteger(v) || v < 1 || v > 1000) throw new AlignError("BAD_REQUEST", "v 不对");
+      const base = { bvid, cid, v: v as number, by: req.mid! };
+      let input: RecognizedInput;
+      if (req.body?.missing === true) {
+        input = { ...base, missing: true };
+      } else {
+        const lyrics = req.body?.lyrics;
+        const from = req.body?.from as RecognizedFrom;
+        if (typeof lyrics !== "string" || lyrics.length > MAX_CHARS) throw new AlignError("LYRICS_TOO_LONG");
+        if (!RECOGNIZED_FROM.includes(from)) throw new AlignError("BAD_REQUEST", "from 不对");
+        const tLyrics = req.body?.tLyrics;
+        if (tLyrics !== undefined && (typeof tLyrics !== "string" || tLyrics.length > MAX_CHARS)) {
+          throw new AlignError("BAD_REQUEST", "tLyrics 不对");
+        }
+        // 至少 3 行带时间的歌词才算识别成功，与客户端自动采用的门槛一致
+        const timed = parseLyrics(lyrics).filter(line => line.t > 0);
+        if (timed.length < 3) throw new AlignError("LYRICS_EMPTY");
+        input = { ...base, lyrics, tLyrics: tLyrics || undefined, from };
+      }
+      res.json({ stored: await recognized.put(input) });
+    }),
+  );
+
+  router.get(
+    "/lyrics/:bvid/:cid/recognized",
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.params.bvid, req.params.cid);
+      res.json(await recognized.get(bvid, cid));
+    }),
   );
 
   // 必须注册在 /lyrics/submissions/mine、/lyrics/reports/mine 之后，否则会被当成 bvid/cid 吃掉。

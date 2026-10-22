@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { adoptAlignment, alignmentToLines, isUserChosen, restorePreAlign } from "@/components/lyrics/alignment";
-import { AUTO_MATCH_VERSION, autoMatchLyrics } from "@/components/lyrics/auto-match";
+import {
+  AUTO_MATCH_VERSION,
+  autoMatchLyrics,
+  type AutoLyricsResult,
+  type AutoMatchOutcome,
+} from "@/components/lyrics/auto-match";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
 import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
-import { getPublishedLyrics } from "@/service/lyrics-align";
+import { isNativeMobile } from "@/platform/detect";
+import { getPublishedLyrics, getRecognizedLyrics, putRecognizedLyrics } from "@/service/lyrics-align";
 import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
@@ -33,6 +39,26 @@ async function fetchPublished(bvid: string | undefined, cid: string) {
   } catch (err) {
     log.warn("[lyrics] 查询对所有人生效的歌词失败", err);
     return undefined;
+  }
+}
+
+// 别的用户（含别的设备）已经识别过的歌词，或「五个渠道都查过确实没有」的标记。查不到只记日志、照常自己匹配
+async function fetchRecognized(bvid: string | undefined, cid: string) {
+  if (!bvid) return undefined;
+  try {
+    return await getRecognizedLyrics(bvid, cid);
+  } catch (err) {
+    log.warn("[lyrics] 查询已识别的歌词失败", err);
+    return undefined;
+  }
+}
+
+// 只有登录用户写得进去；失败不重试，下一首歌再说
+async function reportRecognized(body: Parameters<typeof putRecognizedLyrics>[0]) {
+  try {
+    await putRecognizedLyrics(body);
+  } catch (err) {
+    log.warn("[lyrics] 上报识别结果失败", err);
   }
 }
 
@@ -138,8 +164,28 @@ const LyricsBroadcaster = () => {
         // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- 取消由 canceled 标志处理
         await new Promise(resolve => setTimeout(resolve, AUTO_MATCH_DEBOUNCE_MS));
         if (canceled) return;
-        const hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled);
+        const bvid = playItem.bvid;
+        const shared = isLocal ? undefined : await fetchRecognized(bvid, String(playItem.cid));
         if (canceled) return;
+        // 版本低于当前算法的服务端结果不用，自己重新匹配后会覆盖它
+        const fresh = (shared?.v ?? 0) >= AUTO_MATCH_VERSION;
+        let hit: AutoLyricsResult | null = null;
+        let fromServer = false;
+        if (shared?.recognized && fresh) {
+          hit = { ...shared.recognized, tLyrics: shared.recognized.tLyrics ?? undefined };
+          fromServer = true;
+        } else if (shared?.missingUntil && fresh) {
+          if (!staleAuto) autoMissed.add(cacheKey);
+          return;
+        } else {
+          const outcome: AutoMatchOutcome = { exhausted: false };
+          hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled, outcome);
+          if (canceled) return;
+          // 手机端的网易云 / LrcLib 还是空实现，「没查到」不能代表别的平台也没有
+          if (!hit && outcome.exhausted && !staleAuto && !isLocal && bvid && !isNativeMobile) {
+            void reportRecognized({ bvid, cid: String(playItem.cid), v: AUTO_MATCH_VERSION, missing: true });
+          }
+        }
         if (!hit) {
           autoMissed.add(cacheKey);
           return;
@@ -160,6 +206,16 @@ const LyricsBroadcaster = () => {
         };
         setLyrics(linesOfEntry(entryOfHit), parseLrc(hit.tLyrics));
         await platform.setStore(StoreNameMap.LyricsCache, { ...latest, [cacheKey]: entryOfHit });
+        if (!fromServer && !isLocal && bvid) {
+          void reportRecognized({
+            bvid,
+            cid: String(playItem.cid),
+            v: AUTO_MATCH_VERSION,
+            lyrics: hit.lyrics,
+            tLyrics: hit.tLyrics,
+            from: hit.from,
+          });
+        }
         if (!canceled && !isLocal && hit.lyrics) {
           useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
         }

@@ -20,8 +20,17 @@ const mocks = vi.hoisted(() => ({
   getStore: vi.fn<() => Promise<Record<string, MusicLyrics>>>(),
   setStore: vi.fn<(name: string, value: Record<string, MusicLyrics>) => Promise<void>>(),
   getPublishedLyrics: vi.fn(async () => ({ alignment: null, source: null })),
+  getRecognizedLyrics: vi.fn<() => Promise<AlignRecognized>>(),
+  putRecognizedLyrics: vi.fn(async () => ({ stored: true })),
   autoMatchLyrics:
-    vi.fn<(title: string, duration?: number, isCanceled?: () => boolean) => Promise<AutoLyricsResult | null>>(),
+    vi.fn<
+      (
+        title: string,
+        duration?: number,
+        isCanceled?: () => boolean,
+        outcome?: { exhausted: boolean },
+      ) => Promise<AutoLyricsResult | null>
+    >(),
   autoAlign: vi.fn(),
   searchNeteaseSongs: vi.fn<(params: SearchSongByNeteaseParams) => Promise<SearchSongByNeteaseResponse>>(),
   getNeteaseLyrics: vi.fn<(params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>>(),
@@ -56,7 +65,11 @@ vi.mock("@/platform", () => ({
   },
   log: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
-vi.mock("@/service/lyrics-align", () => ({ getPublishedLyrics: mocks.getPublishedLyrics }));
+vi.mock("@/service/lyrics-align", () => ({
+  getPublishedLyrics: mocks.getPublishedLyrics,
+  getRecognizedLyrics: mocks.getRecognizedLyrics,
+  putRecognizedLyrics: mocks.putRecognizedLyrics,
+}));
 vi.mock("@/components/lyrics/auto-match", async importOriginal => ({
   ...(await importOriginal<typeof import("@/components/lyrics/auto-match")>()),
   autoMatchLyrics: mocks.autoMatchLyrics,
@@ -131,6 +144,8 @@ beforeEach(() => {
   });
   mocks.autoMatchLyrics.mockResolvedValue(null);
   mocks.getPublishedLyrics.mockResolvedValue({ alignment: null, source: null });
+  mocks.getRecognizedLyrics.mockResolvedValue({ recognized: null, missingUntil: null, v: null });
+  mocks.putRecognizedLyrics.mockClear();
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -159,7 +174,7 @@ it("loads lyrics once the current track's cid is filled in after the switch", as
   await act(async () => vi.advanceTimersByTimeAsync(2000));
 
   expect(mocks.getPublishedLyrics).toHaveBeenCalledWith("BV1za41197Y9", "813345505");
-  expect(mocks.autoMatchLyrics).toHaveBeenCalledWith("背对背拥抱", 236, expect.any(Function));
+  expect(mocks.autoMatchLyrics).toHaveBeenCalledWith("背对背拥抱", 236, expect.any(Function), expect.anything());
 });
 
 it("matches and broadcasts lyrics with no lyrics panel mounted", async () => {
@@ -174,6 +189,88 @@ it("matches and broadcasts lyrics with no lyrics panel mounted", async () => {
     expect.objectContaining({ type: "update", lines: useLyricsState.getState().lyrics, activeIndex: 0 }),
   );
   expect(cache[cacheKey(item)]).toMatchObject({ lyrics: hit.lyrics, source: "auto" });
+});
+
+const login = hit;
+it("uses lyrics already recognized by someone else, without matching or re-reporting", async () => {
+  mocks.getRecognizedLyrics.mockResolvedValue({
+    recognized: { lyrics: hit.lyrics, tLyrics: null, from: "qq" },
+    missingUntil: null,
+    v: AUTO_MATCH_VERSION,
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = track();
+  await select(item);
+  await advance();
+
+  expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
+  expect(mocks.putRecognizedLyrics).not.toHaveBeenCalled();
+  expect(cache[cacheKey(item)]).toMatchObject({ lyrics: hit.lyrics, source: "auto", autoVersion: AUTO_MATCH_VERSION });
+  expect(mocks.autoAlign).toHaveBeenCalled();
+});
+
+it("ignores recognized lyrics from an older matching version and matches again", async () => {
+  mocks.getRecognizedLyrics.mockResolvedValue({
+    recognized: { lyrics: "[00:00.00]旧", tLyrics: null, from: "qq" },
+    missingUntil: null,
+    v: AUTO_MATCH_VERSION - 1,
+  });
+  mocks.autoMatchLyrics.mockResolvedValue(login);
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select(track());
+  await advance();
+
+  expect(mocks.autoMatchLyrics).toHaveBeenCalledTimes(1);
+  expect(mocks.putRecognizedLyrics).toHaveBeenCalledWith(
+    expect.objectContaining({ v: AUTO_MATCH_VERSION, lyrics: hit.lyrics, from: "netease" }),
+  );
+});
+
+it("skips matching when the server says no channel has this song", async () => {
+  mocks.getRecognizedLyrics.mockResolvedValue({
+    recognized: null,
+    missingUntil: Date.now() + 60_000,
+    v: AUTO_MATCH_VERSION,
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select(track());
+  await advance();
+
+  expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
+  expect(useLyricsState.getState().lyrics).toEqual([]);
+});
+
+it("reports a miss only when every channel was fully searched", async () => {
+  mocks.autoMatchLyrics.mockImplementation(async (_t, _d, _c, outcome) => {
+    if (outcome) outcome.exhausted = true;
+    return null;
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = track();
+  await select(item);
+  await advance();
+  expect(mocks.putRecognizedLyrics).toHaveBeenCalledExactlyOnceWith({
+    bvid: item.bvid,
+    cid: item.cid,
+    v: AUTO_MATCH_VERSION,
+    missing: true,
+  });
+
+  mocks.putRecognizedLyrics.mockClear();
+  mocks.autoMatchLyrics.mockResolvedValue(null);
+  await select(track());
+  await advance();
+  expect(mocks.putRecognizedLyrics).not.toHaveBeenCalled();
+});
+
+it("still matches locally when the server lookup fails", async () => {
+  mocks.getRecognizedLyrics.mockRejectedValue(new Error("down"));
+  mocks.autoMatchLyrics.mockResolvedValue(hit);
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = track();
+  await select(item);
+  await advance();
+  expect(cache[cacheKey(item)]).toMatchObject({ lyrics: hit.lyrics });
 });
 
 it("sends the current snapshot when the desktop lyrics window reopens", async () => {
@@ -223,7 +320,7 @@ it("does not send matching requests for tracks skipped during the debounce", asy
   await advance(1000);
   expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
   await advance(600);
-  expect(mocks.autoMatchLyrics).toHaveBeenCalledExactlyOnceWith(b.title, 180, expect.any(Function));
+  expect(mocks.autoMatchLyrics).toHaveBeenCalledExactlyOnceWith(b.title, 180, expect.any(Function), expect.anything());
 });
 
 it("matches again when returning to a track whose in-flight match was canceled", async () => {

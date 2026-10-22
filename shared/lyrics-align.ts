@@ -22,6 +22,8 @@ const ROUTES: { method: "GET" | "POST"; pattern: RegExp; auth: boolean }[] = [
   { method: "POST", pattern: /^\/align\/jobs$/, auth: true },
   { method: "GET", pattern: new RegExp(`^/align/jobs/${UUID}$`), auth: true },
   { method: "GET", pattern: /^\/lyrics\/BV[0-9A-Za-z]{10}\/\d{1,15}$/, auth: false },
+  { method: "GET", pattern: /^\/lyrics\/BV[0-9A-Za-z]{10}\/\d{1,15}\/recognized$/, auth: false },
+  { method: "POST", pattern: /^\/lyrics\/recognized$/, auth: true },
   { method: "POST", pattern: /^\/lyrics\/submissions$/, auth: true },
   { method: "GET", pattern: /^\/lyrics\/submissions\/mine$/, auth: true },
   { method: "GET", pattern: new RegExp(`^/admin/submissions\\?status=(${STATUS})$`), auth: true },

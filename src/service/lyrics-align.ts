@@ -30,6 +30,15 @@ export const getAlignJob = (id: string) => call<AlignJobView>({ method: "GET", p
 export const getPublishedLyrics = (bvid: string, cid: string) =>
   call<AlignPublished>({ method: "GET", path: `/lyrics/${bvid}/${cid}` });
 
+export const getRecognizedLyrics = (bvid: string, cid: string) =>
+  call<AlignRecognized>({ method: "GET", path: `/lyrics/${bvid}/${cid}/recognized` });
+
+export const putRecognizedLyrics = (
+  body:
+    | { bvid: string; cid: string; v: number; lyrics: string; tLyrics?: string; from: string }
+    | { bvid: string; cid: string; v: number; missing: true },
+) => call<{ stored: boolean }>({ method: "POST", path: "/lyrics/recognized", body });
+
 export const submitLyrics = (body: { bvid: string; cid: string; lyrics: string; title: string; note?: string }) =>
   call<AlignSubmissionBrief>({ method: "POST", path: "/lyrics/submissions", body });
 
