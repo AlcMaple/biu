@@ -485,7 +485,7 @@ curl --max-time 15 -sS -o /dev/null -w 'http=%{http_code} verify=%{ssl_verify_re
 
 ### 6.1 可选：歌词对齐服务
 
-`biu-align-server` 是独立的常驻服务（说明与接口见 [biu-align-server/README.md](../../biu-align-server/README.md)）：客户端提交 bvid + cid 和歌词，服务端自己取音频、分离人声、强制对齐，结果按投稿与歌词缓存。不部署它，客户端仍可使用其他歌词来源，只是没有自动对齐。
+`biu-align-server` 是独立的常驻服务（开发与部署命令见 [biu-align-server/README.md](../../biu-align-server/README.md)）：客户端提交 bvid + cid 和歌词，服务端自己取音频、分离人声、强制对齐，结果按投稿与歌词缓存。不部署它，客户端仍可使用其他歌词来源，只是没有自动对齐。
 
 部署原则（具体主机、端口、路径一律放私有配置）：
 

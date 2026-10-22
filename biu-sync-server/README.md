@@ -74,7 +74,8 @@ Bearer <token>`。返回当前快照：
 ## 本地开发
 
 ```bash
-pnpm install
+pnpm install        # 在仓库根目录执行一次即可，三个服务共用根目录依赖
+cd biu-sync-server
 cp .env.example .env
 # 填 JWT_SECRET（随便一串随机字符串，例如 openssl rand -hex 32）
 pnpm dev
@@ -88,7 +89,10 @@ pnpm test        # 跑合并逻辑单测
 ## 生产部署
 
 ```bash
-pnpm build        # → dist/index.js
+# 仓库根目录；--ignore-scripts 跳过客户端的 Electron 下载
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm --filter biu-sync-server build        # → biu-sync-server/dist/index.js
+cd biu-sync-server
 pm2 start ecosystem.config.cjs
 pm2 install pm2-logrotate    # 必须装，否则 pm2 日志无限增长吃磁盘
 ```

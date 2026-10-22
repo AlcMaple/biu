@@ -22,7 +22,10 @@
 > - 🌐 **Web 版**：浏览器 / 手机端可用，含 iOS 分段流式播放与锁屏续播适配
 > - 🎤 **歌词增强**：网易云 / LrcLib 歌词搜索与采用、桌面歌词
 > - 🎵 **听歌识曲**（Shazam）与 **私人 FM / 心动模式**
-> - ☁️ **同步服务**：`biu-sync-server`、`biu-lyrics-server`
+> - ☁️ **云同步服务**（可选）：[`biu-sync-server`](./biu-sync-server/README.md)，歌单与听歌排行跨设备同步
+> - 🎯 **歌词对齐服务**（可选）：[`biu-align-server`](./biu-align-server/README.md)，自动生成逐字歌词时间轴；需要 Python 和约 1.3 GB 模型
+>
+> 两个服务端都不影响客户端和 Web 版的基本使用，不部署时对应功能不可用；依赖在仓库根目录 `pnpm install` 时一并安装。
 >
 > 原作者 [wood3n](https://github.com/wood3n) 及上游贡献者的版权与许可证（PolyForm Noncommercial 1.0.0）保持不变。需要原版桌面应用请前往[上游仓库](https://github.com/wood3n/biu)。
 
