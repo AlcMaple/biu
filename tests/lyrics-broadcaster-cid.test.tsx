@@ -326,6 +326,21 @@ it("preserves manual lyrics adopted while automatic matching is in flight", asyn
   expect(mocks.setStore).not.toHaveBeenCalled();
 });
 
+it("keeps manually adopted lyrics even when the server has a published version", async () => {
+  const item = track();
+  cache[cacheKey(item)] = { lyrics: "[00:00.00]手动选择", source: "manual" };
+  mocks.getPublishedLyrics.mockResolvedValue({
+    alignment: { lyricsHash: "h", lines: [{ time: 0, text: "生效版本", words: [] }] },
+    source: "approved",
+  } as never);
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select(item);
+  await advance();
+
+  expect(useLyricsState.getState().lyrics[0].text).toBe("手动选择");
+  expect(mocks.setStore).not.toHaveBeenCalled();
+});
+
 it.each(["manual", "aligned", undefined] as const)(
   "preserves existing user-chosen lyrics (%s) on matcher upgrades",
   async source => {
