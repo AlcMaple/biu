@@ -3,8 +3,8 @@ import platform from "@/platform";
 import { parseLrc } from "./parse-lrc";
 import { foldVariants } from "./variant-fold";
 
-/** 自动匹配算法版本：改动标题提取/打分逻辑后 +1，旧的自动缓存会被重新匹配（手动选择的不受影响）。案例见 docs/lyrics/自动匹配歌词-错误案例.md */
-export const AUTO_MATCH_VERSION = 2;
+// 改动提取或打分后升级，只重匹配自动缓存；手动采用的歌词保留。案例见 docs/lyrics/自动匹配歌词-错误案例.md。
+export const AUTO_MATCH_VERSION = 3;
 
 const NETEASE_TYPE_SONG = 1;
 /** 视频时长与曲库时长允许的最大差距（秒）：翻唱/搬运常有前后奏差异，过严会漏，过松会配错歌 */
@@ -26,8 +26,10 @@ const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
   queue = run.catch(() => undefined);
   return run;
 };
-/** 歌名过短（如「谜」）时，同名歌极多，必须有歌手证据才敢采用 */
+// 短歌名的同名歧义多，一字歌名仍只接受歌手证据。
 const SHORT_TITLE_LEN = 2;
+// 明确主题歌语境只能补足两字歌名的证据，时差要求比一般匹配更严（秒）。
+const THEME_DURATION_DIFF = 2;
 /** 命中此分数以下视为足够可信，不再继续试下一个候选 */
 const CONFIDENT_SCORE = -3;
 
@@ -40,8 +42,11 @@ export interface AutoLyricsResult {
 const BRACKET_PAIRS = /【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g;
 const BOOK_QUOTE = /《([^》]+)》/;
 const CORNER_QUOTE = /[「『]([^」』]+)[」』]/;
-/** 「」紧跟在 OP/ED/插曲 等标记后，里面基本就是歌名：超时空辉夜姬 ED「ray 超かぐや姫！Version」/ 歌手 */
-const SONG_MARK_BEFORE_CORNER = /(?:OP|ED|OST|IN|插曲|主题曲|片头曲|片尾曲|角色歌)\d*\s*[「『]/i;
+// 无引号时只认大写标记，避免把 Ed Sheeran 或 In The End 当成主题歌说明。
+const SONG_MARK =
+  /(?:\b(?:OP|ED|OST)\d*(?![a-zA-Z])(?:\s*主题[曲歌])?|插曲|主题[曲歌]|片头[曲歌]|片尾[曲歌]|角色歌)\s*[:：]?\s*/;
+const SONG_MARK_BEFORE_CORNER =
+  /(?:\b(?:OP|ED|OST|IN)\d*(?![a-z])(?:\s*主题[曲歌])?|插曲|主题[曲歌]|片头[曲歌]|片尾[曲歌]|角色歌)\s*[:：]?\s*[「『]([^」』]+)[」』]/i;
 const ARTIST_LIST = /[、,，&＆]/;
 const SEPARATORS = /\s*[-－—–]\s*|\s*\/\s*|\s+covered?\s+by\s+|\s*cover\s*[:：]?\s+|\s+feat\.?\s+/i;
 /** 标题里的非歌名噪声词；遇到新的噪声往这里补 */
@@ -50,24 +55,32 @@ const NOISE_WORDS =
 
 const normalize = (s: string) => foldVariants(s.normalize("NFKC").toLowerCase()).replace(/[\s\p{P}\p{S}]/gu, "");
 
-/**
- * 从视频标题生成「歌名候选」，按可信度排序，之后逐个搜索、统一打分，由曲库结果（歌名+歌手+时长）来裁决。
- * 不在这里赌一个答案：「」里可能是歌名（UNISON…「オリオンをなぞる」），也可能是歌词（韦礼安-如果可以「如果可以我想和你回到那天相遇」）。
- */
+const cleanTitle = (s: string) =>
+  s
+    .replace(NOISE_WORDS, " ")
+    .replace(/\s+YH\s*$/i, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractThemeTitle = (rawTitle: string) => {
+  const corner = rawTitle.match(SONG_MARK_BEFORE_CORNER)?.[1];
+  if (corner) return cleanTitle(corner);
+  const stripped = rawTitle.replace(BRACKET_PAIRS, " ").replace(/《[^》]*》/g, " ");
+  const mark = SONG_MARK.exec(stripped);
+  if (!mark) return "";
+  return cleanTitle(stripped.slice(mark.index + mark[0].length).split(SEPARATORS)[0]);
+};
+
+// 「」可能是歌名，也可能是歌词摘句；保留多个候选，由曲库的歌名、歌手和时长裁决。
 export const extractTitleCandidates = (rawTitle: string): string[] => {
   const out: string[] = [];
   const push = (s?: string) => {
-    const t = s
-      ?.replace(NOISE_WORDS, " ")
-      .replace(/\s+YH\s*$/i, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const t = s ? cleanTitle(s) : "";
     if (t && !out.includes(t)) out.push(t);
   };
 
+  push(extractThemeTitle(rawTitle));
   push(rawTitle.match(BOOK_QUOTE)?.[1]);
-  const cornerText = rawTitle.match(CORNER_QUOTE)?.[1];
-  if (cornerText && SONG_MARK_BEFORE_CORNER.test(rawTitle)) push(cornerText);
 
   const stripped = rawTitle
     .replace(/\s*covered?\s+by\s+.*$/i, " ")
@@ -120,8 +133,44 @@ interface Scored {
   score: number;
 }
 
-const pickNetease = (songs: NeteaseSong[], title: string, rawNorm: string, duration?: number): Scored[] => {
-  const shortTitle = normalize(title).length <= SHORT_TITLE_LEN;
+interface MatchTrack {
+  name: string;
+  artists: string[];
+  duration?: number;
+}
+
+const closeThemeDuration = (trackDuration?: number, duration?: number) =>
+  !!duration &&
+  !!trackDuration &&
+  duration > 0 &&
+  trackDuration > 0 &&
+  Math.abs(trackDuration - duration) <= THEME_DURATION_DIFF;
+
+const hasUniqueThemeArtist = (tracks: MatchTrack[], themeTitle: string, duration?: number) => {
+  if (themeTitle.length !== SHORT_TITLE_LEN) return false;
+  const matching = tracks.filter(t => normalize(t.name) === themeTitle && closeThemeDuration(t.duration, duration));
+  const artists = matching.map(t => t.artists.map(normalize).filter(Boolean).toSorted().join("/"));
+  return artists.length > 0 && artists.every(Boolean) && new Set(artists).size === 1;
+};
+
+const pickNetease = (
+  songs: NeteaseSong[],
+  title: string,
+  rawNorm: string,
+  themeTitle: string,
+  duration?: number,
+): Scored[] => {
+  const themeAllowed =
+    normalize(title) === themeTitle &&
+    hasUniqueThemeArtist(
+      songs.map(song => ({
+        name: song.name ?? "",
+        artists: (song.artists ?? []).map(a => a.name ?? ""),
+        duration: song.duration ? song.duration / 1000 : undefined,
+      })),
+      themeTitle,
+      duration,
+    );
   const scored: Scored[] = [];
   for (const song of songs) {
     if (!song.id || !song.name) continue;
@@ -131,7 +180,12 @@ const pickNetease = (songs: NeteaseSong[], title: string, rawNorm: string, durat
       (song.artists ?? []).map(a => a.name ?? ""),
       rawNorm,
     );
-    if (shortTitle && !artistHit) continue;
+    const shortTitle =
+      normalize(title).length <= SHORT_TITLE_LEN ||
+      (themeTitle.length === SHORT_TITLE_LEN && normalize(song.name) === themeTitle);
+    const themeHit =
+      themeAllowed && normalize(song.name) === themeTitle && closeThemeDuration((song.duration ?? 0) / 1000, duration);
+    if (shortTitle && !artistHit && !themeHit) continue;
     let score = 0;
     if (duration && song.duration) {
       const diff = Math.abs(song.duration / 1000 - duration);
@@ -145,7 +199,13 @@ const pickNetease = (songs: NeteaseSong[], title: string, rawNorm: string, durat
   return scored;
 };
 
-const fromNetease = async (candidates: string[], rawNorm: string, isCanceled: IsCanceled, duration?: number) => {
+const fromNetease = async (
+  candidates: string[],
+  rawNorm: string,
+  themeTitle: string,
+  isCanceled: IsCanceled,
+  duration?: number,
+) => {
   const pool = new Map<number, Scored>();
   for (const [i, title] of candidates.entries()) {
     if (i > 0) await sleep(REQUEST_GAP_MS);
@@ -156,7 +216,7 @@ const fromNetease = async (candidates: string[], rawNorm: string, isCanceled: Is
       limit: SEARCH_LIMIT,
       offset: 0,
     });
-    for (const hit of pickNetease(res?.result?.songs ?? [], title, rawNorm, duration)) {
+    for (const hit of pickNetease(res?.result?.songs ?? [], title, rawNorm, themeTitle, duration)) {
       const prev = pool.get(hit.song.id!);
       if (!prev || hit.score < prev.score) pool.set(hit.song.id!, hit);
     }
@@ -175,20 +235,38 @@ const fromNetease = async (candidates: string[], rawNorm: string, isCanceled: Is
   return null;
 };
 
-const fromLrclib = async (candidates: string[], rawNorm: string, isCanceled: IsCanceled, duration?: number) => {
+const fromLrclib = async (
+  candidates: string[],
+  rawNorm: string,
+  themeTitle: string,
+  isCanceled: IsCanceled,
+  duration?: number,
+) => {
   // lrclib 的 duration 单位为秒；视频时长未知时不敢自动采用
   if (!duration) return null;
   for (const [i, title] of candidates.entries()) {
     if (i > 0) await sleep(REQUEST_GAP_MS);
     if (isCanceled()) return null;
     const list = (await platform.searchLrclibLyrics({ q: title })) ?? [];
-    const shortTitle = normalize(title).length <= SHORT_TITLE_LEN;
+    const themeAllowed =
+      normalize(title) === themeTitle &&
+      hasUniqueThemeArtist(
+        list.map(x => ({ name: x.trackName || x.name || "", artists: [x.artistName ?? ""], duration: x.duration })),
+        themeTitle,
+        duration,
+      );
     let best: { text: string; diff: number } | null = null;
     for (const x of list) {
-      if (!x.syncedLyrics || !x.duration || !titleMatches(x.trackName || x.name || "", title)) continue;
-      if (shortTitle && !hasArtistEvidence([x.artistName ?? ""], rawNorm)) continue;
+      const name = x.trackName || x.name || "";
+      if (!x.syncedLyrics || !x.duration || x.instrumental || !titleMatches(name, title)) continue;
+      const shortTitle =
+        normalize(title).length <= SHORT_TITLE_LEN ||
+        (themeTitle.length === SHORT_TITLE_LEN && normalize(name) === themeTitle);
+      const themeHit = themeAllowed && normalize(name) === themeTitle && closeThemeDuration(x.duration, duration);
+      if (shortTitle && !hasArtistEvidence([x.artistName ?? ""], rawNorm) && !themeHit) continue;
       const diff = Math.abs(x.duration - duration);
       if (diff > MAX_DURATION_DIFF) continue;
+      if (parseLrc(x.syncedLyrics).length < 3) continue;
       if (!best || diff < best.diff) best = { text: x.syncedLyrics, diff };
     }
     if (best) return { lyrics: best.text, from: "lrclib" as const };
@@ -196,10 +274,7 @@ const fromLrclib = async (candidates: string[], rawNorm: string, isCanceled: IsC
   return null;
 };
 
-/**
- * 按视频标题自动匹配歌词：生成多个歌名候选 → 在网易云搜索 → 用「歌名 + 歌手(是否出现在标题里) + 时长」统一打分选最优；失败再试 LrcLib。
- * 宁缺毋滥：歌名不符、时长差超过阈值、短歌名无歌手证据，一律不采用。
- */
+// 短歌名通常需要歌手证据；明确主题歌的两字歌名，仅在精确同名、时差极小且无不同歌手歧义时补足证据。
 export const autoMatchLyrics = (
   rawTitle: string,
   duration?: number,
@@ -209,8 +284,9 @@ export const autoMatchLyrics = (
     const candidates = extractTitleCandidates(rawTitle);
     if (!candidates.length || isCanceled()) return null;
     const rawNorm = normalize(rawTitle);
+    const themeTitle = normalize(extractThemeTitle(rawTitle));
     try {
-      const hit = await fromNetease(candidates, rawNorm, isCanceled, duration);
+      const hit = await fromNetease(candidates, rawNorm, themeTitle, isCanceled, duration);
       if (hit) return hit;
     } catch {
       // 网易云失败则继续走 LrcLib
@@ -218,7 +294,7 @@ export const autoMatchLyrics = (
     if (isCanceled()) return null;
     await sleep(REQUEST_GAP_MS);
     try {
-      return await fromLrclib(candidates, rawNorm, isCanceled, duration);
+      return await fromLrclib(candidates, rawNorm, themeTitle, isCanceled, duration);
     } catch {
       return null;
     }

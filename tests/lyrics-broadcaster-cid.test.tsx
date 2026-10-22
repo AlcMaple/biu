@@ -6,6 +6,8 @@ import { create, type StoreApi, type UseBoundStore } from "zustand";
 
 import type { AutoLyricsResult } from "@/components/lyrics/auto-match";
 
+import searches from "./fixtures/lyrics-auto-match-search.json";
+
 interface Item {
   id: string;
   bvid?: string;
@@ -21,6 +23,9 @@ const mocks = vi.hoisted(() => ({
   autoMatchLyrics:
     vi.fn<(title: string, duration?: number, isCanceled?: () => boolean) => Promise<AutoLyricsResult | null>>(),
   autoAlign: vi.fn(),
+  searchNeteaseSongs: vi.fn<(params: SearchSongByNeteaseParams) => Promise<SearchSongByNeteaseResponse>>(),
+  getNeteaseLyrics: vi.fn<(params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>>(),
+  searchLrclibLyrics: vi.fn(async () => []),
 }));
 
 interface PlayListState {
@@ -42,17 +47,27 @@ vi.mock("@/store/play-list", () => {
   return { audio: { paused: true, seeking: false, currentTime: 0 }, usePlayList: usePlayListMock.store };
 });
 vi.mock("@/platform", () => ({
-  default: { getStore: mocks.getStore, setStore: mocks.setStore },
+  default: {
+    getStore: mocks.getStore,
+    setStore: mocks.setStore,
+    searchNeteaseSongs: mocks.searchNeteaseSongs,
+    getNeteaseLyrics: mocks.getNeteaseLyrics,
+    searchLrclibLyrics: mocks.searchLrclibLyrics,
+  },
   log: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/service/lyrics-align", () => ({ getPublishedLyrics: mocks.getPublishedLyrics }));
-vi.mock("@/components/lyrics/auto-match", () => ({ AUTO_MATCH_VERSION: 2, autoMatchLyrics: mocks.autoMatchLyrics }));
+vi.mock("@/components/lyrics/auto-match", async importOriginal => ({
+  ...(await importOriginal<typeof import("@/components/lyrics/auto-match")>()),
+  autoMatchLyrics: mocks.autoMatchLyrics,
+}));
 vi.mock("@/store/lyrics-align-session", () => ({
   alignInputOf: (entry?: MusicLyrics) => entry?.lyrics ?? "",
   useLyricsAlignSession: { getState: () => ({ auto: mocks.autoAlign }) },
 }));
 vi.mock("@/pages/desktop-lyrics", () => ({ DESKTOP_LYRICS_CHANNEL: "test-desktop-lyrics" }));
 
+import { AUTO_MATCH_VERSION } from "@/components/lyrics/auto-match";
 import LyricsBroadcaster from "@/components/lyrics/broadcaster";
 import { useLyricsState } from "@/store/lyrics-state";
 
@@ -310,3 +325,50 @@ it("preserves manual lyrics adopted while automatic matching is in flight", asyn
   expect(useLyricsState.getState().lyrics[0].text).toBe("手动选择");
   expect(mocks.setStore).not.toHaveBeenCalled();
 });
+
+it.each(["manual", "aligned", undefined] as const)(
+  "preserves existing user-chosen lyrics (%s) on matcher upgrades",
+  async source => {
+    const item = track();
+    cache[cacheKey(item)] = { lyrics: "[00:00.00]用户选择", source, autoVersion: 1 };
+    await act(async () => root.render(<LyricsBroadcaster />));
+    await select(item);
+    await advance();
+    expect(useLyricsState.getState().lyrics[0].text).toBe("用户选择");
+    expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
+    expect(mocks.setStore).not.toHaveBeenCalled();
+  },
+);
+
+it.each([
+  ["邪神酱 / 神保町哀歌 完整版 （CV： 铃木爱奈 ）", 607, 1439125412],
+  ["冰之城墙 ED主题歌 逆様", 172, 3367822213],
+] as const)(
+  "runs real matching through the broadcaster, cache and desktop broadcast: %s",
+  async (title, duration, id) => {
+    const real = await vi.importActual<typeof import("@/components/lyrics/auto-match")>(
+      "@/components/lyrics/auto-match",
+    );
+    mocks.autoMatchLyrics.mockImplementation(real.autoMatchLyrics);
+    const results: Record<string, NeteaseSong[]> = searches;
+    mocks.searchNeteaseSongs.mockImplementation(async ({ s }) => ({ result: { songs: results[s] ?? [] } }));
+    mocks.getNeteaseLyrics.mockResolvedValue({ lrc: { lyric: hit.lyrics } });
+    const item = { ...track(), title, duration };
+    cache[cacheKey(item)] = { lyrics: "[00:00.00]旧自动缓存", source: "auto", autoVersion: AUTO_MATCH_VERSION - 1 };
+    await act(async () => root.render(<LyricsBroadcaster />));
+    await select(item);
+    await advance(10000);
+
+    expect(mocks.getNeteaseLyrics).toHaveBeenCalledExactlyOnceWith({ id });
+    expect(cache[cacheKey(item)]).toMatchObject({
+      lyrics: hit.lyrics,
+      source: "auto",
+      autoVersion: AUTO_MATCH_VERSION,
+    });
+    expect(useLyricsState.getState().lyrics[0].text).toBe("当前歌曲");
+    expect(TestChannel.current.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ lines: useLyricsState.getState().lyrics }),
+    );
+    expect(mocks.autoAlign).toHaveBeenLastCalledWith(hit.lyrics, { userChosen: false });
+  },
+);
