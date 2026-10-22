@@ -14,6 +14,7 @@ import AudioWaveform from "@/components/audio-waveform";
 import FancyFullScreenPlayer from "@/components/fancy-full-screen-player";
 import Image from "@/components/image";
 import Lyrics from "@/components/lyrics";
+import { AlignChipSlotContext } from "@/components/lyrics/align-chip-slot";
 import platform, { isElectron, isWeb } from "@/platform";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { useModalStore } from "@/store/modal";
@@ -87,6 +88,7 @@ const FullScreenPlayer = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1000);
   const [windowHeight, setWindowHeight] = useState(typeof window !== "undefined" ? window.innerHeight : 800);
   const [isPageListOpen, setIsPageListOpen] = useState(false);
+  const [chipSlot, setChipSlot] = useState<HTMLElement | null>(null);
   const [isUiVisible, setIsUiVisible] = useState(isWeb);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLyricsControlOpen, setIsLyricsControlOpen] = useState(false);
@@ -233,275 +235,278 @@ const FullScreenPlayer = () => {
   const waveformBarCount = Math.max(48, Math.min(128, Math.round(waveformWidth / 7.5)));
 
   return (
-    <Drawer
-      isOpen={isOpen}
-      onClose={close}
-      placement="bottom"
-      size="full"
-      radius="none"
-      isDismissable={false}
-      hideCloseButton
-    >
-      <DrawerContent
-        className={clsx("bg-background text-foreground relative h-full overflow-hidden", {
-          dark: showBlurredBackground || appTheme === "dark",
-          light: !showBlurredBackground && appTheme === "light",
-        })}
-        style={{
-          ...themeVars,
-          cursor: isUiVisible ? "auto" : "none",
-        }}
+    <AlignChipSlotContext.Provider value={chipSlot}>
+      <Drawer
+        isOpen={isOpen}
+        onClose={close}
+        placement="bottom"
+        size="full"
+        radius="none"
+        isDismissable={false}
+        hideCloseButton
       >
-        {onClose =>
-          !isOpen ? (
-            <Empty />
-          ) : (
-            <DrawerBody
-              className="group/player relative flex flex-row gap-0 overflow-hidden bg-transparent p-0"
-              onMouseEnter={isWeb ? undefined : handleMouseEnter}
-              onMouseLeave={isWeb ? undefined : handleMouseLeave}
-              onMouseMove={
-                isWeb
-                  ? undefined
-                  : () => {
-                      if (!isUiVisible) {
-                        setIsUiVisible(true);
-                      }
-                      scheduleHideUi(3000);
-                    }
-              }
-            >
-              {!showBlurredBackground && (
-                <div aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor: backgroundColor }} />
-              )}
-              {showBlurredBackground && (
-                <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      opacity: activeBgLayer === "a" ? 1 : 0,
-                      transition: `opacity ${effectsProfile.transitionMs}ms ease`,
-                      willChange: "opacity",
-                    }}
-                  >
-                    {bgLayerA.coverSrc && (
-                      <div
-                        className="absolute inset-0 scale-[1.15] bg-cover bg-center"
-                        style={{
-                          backgroundImage: `url(${bgLayerA.coverSrc})`,
-                          filter: `blur(${effectsProfile.blurPx}px)`,
-                          opacity: 0.92,
-                          willChange: "transform, filter, opacity",
-                          transition: `filter ${effectsProfile.transitionMs}ms ease, opacity ${effectsProfile.transitionMs}ms ease`,
-                        }}
-                      />
-                    )}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: bgLayerA.gradientBackground,
-                        willChange: "opacity",
-                      }}
-                    />
-                  </div>
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      opacity: activeBgLayer === "b" ? 1 : 0,
-                      transition: `opacity ${effectsProfile.transitionMs}ms ease`,
-                      willChange: "opacity",
-                    }}
-                  >
-                    {bgLayerB.coverSrc && (
-                      <div
-                        className="absolute inset-0 scale-[1.15] bg-cover bg-center"
-                        style={{
-                          backgroundImage: `url(${bgLayerB.coverSrc})`,
-                          filter: `blur(${effectsProfile.blurPx}px)`,
-                          opacity: 0.92,
-                          willChange: "transform, filter, opacity",
-                          transition: `filter ${effectsProfile.transitionMs}ms ease, opacity ${effectsProfile.transitionMs}ms ease`,
-                        }}
-                      />
-                    )}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: bgLayerB.gradientBackground,
-                        willChange: "opacity",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div
-                className={`absolute top-0 right-0 z-20 flex w-full justify-between px-6 py-4 transition-opacity duration-200 ${isUiVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
-              >
-                <div className="window-no-drag top-0 right-0 left-0 flex w-full max-w-2/5 items-center space-x-2">
-                  <IconButton title="关闭弹窗" onPress={onClose} className="">
-                    <RiArrowDownSLine size={28} />
-                  </IconButton>
-                  <h2 className="truncate text-xl select-none">{playItem.pageTitle || playItem.title}</h2>
-                  <Popover
-                    isOpen={isSettingsOpen && isUiVisible}
-                    onOpenChange={open => {
-                      setIsSettingsOpen(open);
-                      if (open) {
-                        if (hideUiTimeoutRef.current) {
-                          window.clearTimeout(hideUiTimeoutRef.current);
-                          hideUiTimeoutRef.current = null;
+        <DrawerContent
+          className={clsx("bg-background text-foreground relative h-full overflow-hidden", {
+            dark: showBlurredBackground || appTheme === "dark",
+            light: !showBlurredBackground && appTheme === "light",
+          })}
+          style={{
+            ...themeVars,
+            cursor: isUiVisible ? "auto" : "none",
+          }}
+        >
+          {onClose =>
+            !isOpen ? (
+              <Empty />
+            ) : (
+              <DrawerBody
+                className="group/player relative flex flex-row gap-0 overflow-hidden bg-transparent p-0"
+                onMouseEnter={isWeb ? undefined : handleMouseEnter}
+                onMouseLeave={isWeb ? undefined : handleMouseLeave}
+                onMouseMove={
+                  isWeb
+                    ? undefined
+                    : () => {
+                        if (!isUiVisible) {
+                          setIsUiVisible(true);
                         }
-                        setIsUiVisible(true);
+                        scheduleHideUi(3000);
                       }
-                    }}
-                    placement="bottom-start"
-                  >
-                    <PopoverTrigger>
-                      <IconButton title="设置" tooltip="设置">
-                        <RiSettings3Line size={22} />
-                      </IconButton>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-4">
-                      <FullScreenPlayerSettingsPanel isUiVisible={isUiVisible} />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="window-no-drag top-0 right-0">
-                  {isElectron && (appPlatform === "linux" || appPlatform === "windows") ? <WindowAction /> : null}
-                </div>
-              </div>
-
-              <div className="flex h-full w-full items-center justify-center">
-                {showCover && (
-                  <div
-                    className={clsx(
-                      "flex h-full w-full items-center px-12",
-                      showLyrics ? "justify-end" : "justify-center",
-                    )}
-                  >
-                    <Image
-                      src={coverSrc}
-                      width={coverWidth}
-                      height={coverHeight}
-                      emptyPlaceholder={<RiMusic2Line size="40%" className="text-default-400" />}
-                      className="rounded-xl transition-shadow ease-out select-none"
-                      style={{
-                        boxShadow: coverSrc
-                          ? `0 28px 90px -35px rgb(var(--glow-rgb) / 0.55), 0 10px 32px -18px rgb(0 0 0 / 0.55)`
-                          : undefined,
-                        transition: `box-shadow ${effectsProfile.transitionMs}ms ease`,
-                      }}
-                    />
-                  </div>
-                )}
-
-                {showLyrics && (
-                  <div
-                    className={clsx(
-                      "h-full w-full overflow-hidden px-12 py-24",
-                      !showCover ? "flex items-center justify-center" : "",
-                    )}
-                  >
-                    <Lyrics
-                      color={lyricsColor}
-                      centered={!showCover}
-                      showControls={isUiVisible}
-                      onControlsOpenChange={handleLyricsControlOpenChange}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {showSpectrum && (
-                <div
-                  className="pointer-events-none absolute inset-x-0 z-30 flex w-full justify-center"
-                  style={{
-                    bottom: isUiVisible ? controlsHeight + 12 : 24,
-                    transition: "bottom 300ms ease",
-                  }}
-                >
-                  <div className="mx-auto flex w-full max-w-6xl justify-center px-12">
-                    <AudioWaveform
-                      width={waveformWidth}
-                      height={40}
-                      barCount={waveformBarCount}
-                      barColor={spectrumColor || "currentColor"}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div
-                ref={controlsRef}
-                className={clsx(
-                  "absolute inset-x-0 bottom-0 z-40 transform transition-transform duration-300 ease-out",
-                  isUiVisible
-                    ? "pointer-events-auto translate-y-0 opacity-100"
-                    : "pointer-events-none translate-y-full opacity-0",
-                )}
+                }
               >
-                <div className="mx-auto mb-4 flex w-full max-w-6xl flex-col items-center gap-2 px-12">
-                  <MusicPlayProgress className="w-full" trackClassName="h-[6px]" />
-                  <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center">
-                    <div className="flex items-center justify-start space-x-4">
-                      {canFavorite && (
-                        <Captioned label="收藏">
-                          <MusicFavButton />
-                        </Captioned>
+                {!showBlurredBackground && (
+                  <div aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor: backgroundColor }} />
+                )}
+                {showBlurredBackground && (
+                  <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        opacity: activeBgLayer === "a" ? 1 : 0,
+                        transition: `opacity ${effectsProfile.transitionMs}ms ease`,
+                        willChange: "opacity",
+                      }}
+                    >
+                      {bgLayerA.coverSrc && (
+                        <div
+                          className="absolute inset-0 scale-[1.15] bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${bgLayerA.coverSrc})`,
+                            filter: `blur(${effectsProfile.blurPx}px)`,
+                            opacity: 0.92,
+                            willChange: "transform, filter, opacity",
+                            transition: `filter ${effectsProfile.transitionMs}ms ease, opacity ${effectsProfile.transitionMs}ms ease`,
+                          }}
+                        />
                       )}
-                      {canDownload && (
-                        <Captioned label="下载">
-                          <MusicDownloadButton />
-                        </Captioned>
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: bgLayerA.gradientBackground,
+                          willChange: "opacity",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        opacity: activeBgLayer === "b" ? 1 : 0,
+                        transition: `opacity ${effectsProfile.transitionMs}ms ease`,
+                        willChange: "opacity",
+                      }}
+                    >
+                      {bgLayerB.coverSrc && (
+                        <div
+                          className="absolute inset-0 scale-[1.15] bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${bgLayerB.coverSrc})`,
+                            filter: `blur(${effectsProfile.blurPx}px)`,
+                            opacity: 0.92,
+                            willChange: "transform, filter, opacity",
+                            transition: `filter ${effectsProfile.transitionMs}ms ease, opacity ${effectsProfile.transitionMs}ms ease`,
+                          }}
+                        />
                       )}
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: bgLayerB.gradientBackground,
+                          willChange: "opacity",
+                        }}
+                      />
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <MusicPlayMode />
-                      <MusicPlayControl />
+                  </div>
+                )}
+                <div
+                  className={`absolute top-0 right-0 z-20 flex w-full justify-between px-6 py-4 transition-opacity duration-200 ${isUiVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                >
+                  <div className="window-no-drag top-0 right-0 left-0 flex w-full max-w-2/5 items-center space-x-2">
+                    <IconButton title="关闭弹窗" onPress={onClose} className="">
+                      <RiArrowDownSLine size={28} />
+                    </IconButton>
+                    <h2 className="truncate text-xl select-none">{playItem.pageTitle || playItem.title}</h2>
+                    <Popover
+                      isOpen={isSettingsOpen && isUiVisible}
+                      onOpenChange={open => {
+                        setIsSettingsOpen(open);
+                        if (open) {
+                          if (hideUiTimeoutRef.current) {
+                            window.clearTimeout(hideUiTimeoutRef.current);
+                            hideUiTimeoutRef.current = null;
+                          }
+                          setIsUiVisible(true);
+                        }
+                      }}
+                      placement="bottom-start"
+                    >
+                      <PopoverTrigger>
+                        <IconButton title="设置" tooltip="设置">
+                          <RiSettings3Line size={22} />
+                        </IconButton>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-4">
+                        <FullScreenPlayerSettingsPanel isUiVisible={isUiVisible} />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="window-no-drag top-0 right-0 flex items-center gap-2">
+                    <div ref={setChipSlot} className="flex items-center" />
+                    {isElectron && (appPlatform === "linux" || appPlatform === "windows") ? <WindowAction /> : null}
+                  </div>
+                </div>
+
+                <div className="flex h-full w-full items-center justify-center">
+                  {showCover && (
+                    <div
+                      className={clsx(
+                        "flex h-full w-full items-center px-12",
+                        showLyrics ? "justify-end" : "justify-center",
+                      )}
+                    >
+                      <Image
+                        src={coverSrc}
+                        width={coverWidth}
+                        height={coverHeight}
+                        emptyPlaceholder={<RiMusic2Line size="40%" className="text-default-400" />}
+                        className="rounded-xl transition-shadow ease-out select-none"
+                        style={{
+                          boxShadow: coverSrc
+                            ? `0 28px 90px -35px rgb(var(--glow-rgb) / 0.55), 0 10px 32px -18px rgb(0 0 0 / 0.55)`
+                            : undefined,
+                          transition: `box-shadow ${effectsProfile.transitionMs}ms ease`,
+                        }}
+                      />
                     </div>
-                    <div className="flex items-center justify-end space-x-4">
-                      <Captioned label="音量">
-                        <MusicVolume />
-                      </Captioned>
-                      <Captioned label="播放列表">
-                        <OpenPlaylistDrawerButton />
-                      </Captioned>
+                  )}
+
+                  {showLyrics && (
+                    <div
+                      className={clsx(
+                        "h-full w-full overflow-hidden px-12 py-24",
+                        !showCover ? "flex items-center justify-center" : "",
+                      )}
+                    >
+                      <Lyrics
+                        color={lyricsColor}
+                        centered={!showCover}
+                        showControls={isUiVisible}
+                        onControlsOpenChange={handleLyricsControlOpenChange}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {showSpectrum && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-30 flex w-full justify-center"
+                    style={{
+                      bottom: isUiVisible ? controlsHeight + 12 : 24,
+                      transition: "bottom 300ms ease",
+                    }}
+                  >
+                    <div className="mx-auto flex w-full max-w-6xl justify-center px-12">
+                      <AudioWaveform
+                        width={waveformWidth}
+                        height={40}
+                        barCount={waveformBarCount}
+                        barColor={spectrumColor || "currentColor"}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  ref={controlsRef}
+                  className={clsx(
+                    "absolute inset-x-0 bottom-0 z-40 transform transition-transform duration-300 ease-out",
+                    isUiVisible
+                      ? "pointer-events-auto translate-y-0 opacity-100"
+                      : "pointer-events-none translate-y-full opacity-0",
+                  )}
+                >
+                  <div className="mx-auto mb-4 flex w-full max-w-6xl flex-col items-center gap-2 px-12">
+                    <MusicPlayProgress className="w-full" trackClassName="h-[6px]" />
+                    <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center">
+                      <div className="flex items-center justify-start space-x-4">
+                        {canFavorite && (
+                          <Captioned label="收藏">
+                            <MusicFavButton />
+                          </Captioned>
+                        )}
+                        {canDownload && (
+                          <Captioned label="下载">
+                            <MusicDownloadButton />
+                          </Captioned>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <MusicPlayMode />
+                        <MusicPlayControl />
+                      </div>
+                      <div className="flex items-center justify-end space-x-4">
+                        <Captioned label="音量">
+                          <MusicVolume />
+                        </Captioned>
+                        <Captioned label="播放列表">
+                          <OpenPlaylistDrawerButton />
+                        </Captioned>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {isUiVisible && playItem.hasMultiPart && !isPageListOpen && (
-                <div className="absolute top-1/2 right-0 z-20 -translate-y-1/2">
-                  <IconButton
-                    className="h-24 w-6 min-w-0 rounded-l-xl rounded-r-none bg-white/10 px-0 backdrop-blur-md transition-colors hover:bg-white/20"
-                    onPress={() => setIsPageListOpen(!isPageListOpen)}
-                    tooltip="显示分集列表"
-                    tooltipProps={{
-                      placement: "left",
-                    }}
-                  >
-                    <RiArrowLeftSLine size={24} className="text-white/80" />
-                  </IconButton>
-                </div>
-              )}
+                {isUiVisible && playItem.hasMultiPart && !isPageListOpen && (
+                  <div className="absolute top-1/2 right-0 z-20 -translate-y-1/2">
+                    <IconButton
+                      className="h-24 w-6 min-w-0 rounded-l-xl rounded-r-none bg-white/10 px-0 backdrop-blur-md transition-colors hover:bg-white/20"
+                      onPress={() => setIsPageListOpen(!isPageListOpen)}
+                      tooltip="显示分集列表"
+                      tooltipProps={{
+                        placement: "left",
+                      }}
+                    >
+                      <RiArrowLeftSLine size={24} className="text-white/80" />
+                    </IconButton>
+                  </div>
+                )}
 
-              <PageList
-                ref={pageListRef}
-                className={`absolute top-1/2 right-0 z-30 -translate-y-1/2 rounded-r-none transition-all duration-300 ease-out ${
-                  isPageListOpen ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-full opacity-0"
-                }`}
-                style={{
-                  width: 280,
-                  height: "min(60vh, 420px)",
-                }}
-                onClose={() => setIsPageListOpen(false)}
-              />
-            </DrawerBody>
-          )
-        }
-      </DrawerContent>
-    </Drawer>
+                <PageList
+                  ref={pageListRef}
+                  className={`absolute top-1/2 right-0 z-30 -translate-y-1/2 rounded-r-none transition-all duration-300 ease-out ${
+                    isPageListOpen ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-full opacity-0"
+                  }`}
+                  style={{
+                    width: 280,
+                    height: "min(60vh, 420px)",
+                  }}
+                  onClose={() => setIsPageListOpen(false)}
+                />
+              </DrawerBody>
+            )
+          }
+        </DrawerContent>
+      </Drawer>
+    </AlignChipSlotContext.Provider>
   );
 };
 
