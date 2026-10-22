@@ -16,6 +16,8 @@ interface FavoriteListProps {
   hasMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
+  scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
+  highlightIndex?: number | null;
   getScrollElement: () => HTMLElement | null;
   isCreatedBySelf: boolean;
   onMenuAction: (key: string, item: FavMedia) => void;
@@ -27,6 +29,8 @@ const FavoriteList: React.FC<FavoriteListProps> = ({
   hasMore,
   loading,
   onLoadMore,
+  scrollToIndexRef,
+  highlightIndex,
   getScrollElement,
   isCreatedBySelf,
   onMenuAction,
@@ -43,6 +47,8 @@ const FavoriteList: React.FC<FavoriteListProps> = ({
         hasMore={hasMore}
         loading={loading}
         onLoadMore={onLoadMore}
+        scrollToIndexRef={scrollToIndexRef}
+        highlightIndex={highlightIndex}
         getScrollElement={getScrollElement}
         rowHeight={isCompact ? 36 : 64}
         renderItem={(item, index) => {

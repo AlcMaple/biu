@@ -5,7 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSize } from "ahooks";
 import { twMerge } from "tailwind-merge";
 
-import { isDocumentScroller, scrollerObservers } from "@/common/utils/scroll-element";
+import { isDocumentScroller, scrollerObservers, scrollerViewportTop } from "@/common/utils/scroll-element";
 import Empty from "@/components/empty";
 
 export interface VirtualGridPageListProps<T> {
@@ -18,6 +18,8 @@ export interface VirtualGridPageListProps<T> {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loading: boolean;
+  scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
+  highlightIndex?: number | null;
 }
 
 const ROW_GAP = 16;
@@ -32,6 +34,8 @@ const VirtualGridPageList = <T,>({
   onLoadMore,
   hasMore,
   loading,
+  scrollToIndexRef,
+  highlightIndex,
 }: VirtualGridPageListProps<T>) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -79,6 +83,23 @@ const VirtualGridPageList = <T,>({
     estimateSize: () => rowHeight + ROW_GAP,
     overscan: 5,
   });
+
+  // 行高固定，直接按位置算；这里没有 scrollMargin，所以要自己加上列表相对滚动容器的偏移
+  useEffect(() => {
+    if (!scrollToIndexRef) return;
+    scrollToIndexRef.current = index => {
+      const scrollEl = getRootRef.current();
+      const wrapper = wrapperRef.current;
+      if (!scrollEl || !wrapper) return;
+      const listTop = wrapper.getBoundingClientRect().top - scrollerViewportTop(scrollEl) + scrollEl.scrollTop;
+      const viewportHeight = isDocumentScroller(scrollEl) ? window.innerHeight : scrollEl.clientHeight;
+      const rowTop = listTop + Math.floor(index / columns) * (rowHeight + ROW_GAP);
+      scrollEl.scrollTo({ top: Math.max(0, rowTop - (viewportHeight - rowHeight) / 2), behavior: "smooth" });
+    };
+    return () => {
+      scrollToIndexRef.current = null;
+    };
+  }, [scrollToIndexRef, columns, rowHeight]);
 
   // 统一更新所有 ref，减少 useEffect 数量
   useEffect(() => {
@@ -197,7 +218,17 @@ const VirtualGridPageList = <T,>({
                   typeof itemKey === "function"
                     ? itemKey(item)
                     : ((item[itemKey as keyof T] as React.Key) ?? realIndex);
-                return <React.Fragment key={key}>{renderItem(item, realIndex)}</React.Fragment>;
+                return (
+                  <div
+                    key={key}
+                    className={twMerge(
+                      "min-w-0 rounded-xl ring-2 ring-transparent transition-shadow duration-500",
+                      highlightIndex === realIndex && "ring-primary",
+                    )}
+                  >
+                    {renderItem(item, realIndex)}
+                  </div>
+                );
               })}
             </div>
           );

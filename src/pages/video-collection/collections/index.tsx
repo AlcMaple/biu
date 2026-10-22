@@ -5,6 +5,8 @@ import { addToast } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
+import { useRowFlash } from "@/common/hooks/use-row-flash";
+import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { resolvePlayCount } from "@/common/utils/number";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
@@ -13,7 +15,7 @@ import { postFavSeasonUnfav } from "@/service/fav-season-unfav";
 import { getUserVideoArchivesList, type Media } from "@/service/user-video-archives-list";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
-import { usePlayList } from "@/store/play-list";
+import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 import { useUser } from "@/store/user";
 
@@ -38,6 +40,8 @@ const VideoCollections = () => {
   const [order, setOrder] = useState("pubtime");
 
   const scrollRef = useRef<ScrollRefObject>(null);
+  const scrollToIndexRef = useRef<((index: number) => void) | null>(null);
+  const { flashIndex, flash } = useRowFlash();
 
   const { data, loading } = useRequest(
     async () => {
@@ -234,6 +238,24 @@ const VideoCollections = () => {
     }
   };
 
+  const handleLocate = () => {
+    const playItem = usePlayList.getState().getPlayItem();
+    const isCurrent = (item: Media) => isSame(playItem, { type: "mv", bvid: item.bvid });
+    const result = resolveLocateIndex({
+      playItem,
+      allItems: data?.medias ?? [],
+      shownItems: filteredMedias,
+      isCurrent,
+      folderLabel: "合集",
+    });
+    if ("message" in result) {
+      addToast({ title: result.message, color: "warning" });
+      return;
+    }
+    scrollToIndexRef.current?.(result.index);
+    flash(result.index);
+  };
+
   const isCreatedBySelf = data?.info?.upper?.mid === user?.mid;
 
   const getScrollElement = useCallback(() => {
@@ -268,6 +290,7 @@ const VideoCollections = () => {
         onToggleFavorite={toggleFavorite}
         onPlayAll={onPlayAll}
         onAddToPlayList={addToPlayList}
+        onLocate={handleLocate}
       />
 
       {displayMode === "card" ? (
@@ -276,6 +299,8 @@ const VideoCollections = () => {
           data={filteredMedias}
           loading={loading}
           getScrollElement={getScrollElement}
+          scrollToIndexRef={scrollToIndexRef}
+          highlightIndex={flashIndex}
           onMenuAction={handleMenuAction}
         />
       ) : (
@@ -284,6 +309,8 @@ const VideoCollections = () => {
           data={filteredMedias}
           loading={loading}
           getScrollElement={getScrollElement}
+          scrollToIndexRef={scrollToIndexRef}
+          highlightIndex={flashIndex}
           onMenuAction={handleMenuAction}
         />
       )}

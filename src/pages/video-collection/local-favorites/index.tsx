@@ -26,6 +26,7 @@ import {
   RiPencilLine,
   RiPlayCircleLine,
   RiPlayFill,
+  RiFocus3Line,
   RiPlayListAddLine,
   RiStarLine,
   RiStarOffLine,
@@ -33,12 +34,14 @@ import {
 
 import { CollectionType } from "@/common/constants/collection";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { useRowFlash } from "@/common/hooks/use-row-flash";
 import {
   detectInvalidLocalFavItems,
   getLocalFolderLatestCover,
   isLocalSourceItem,
   toLocalFavoriteModalData,
 } from "@/common/utils/fav";
+import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { formatMillisecond, parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -54,7 +57,7 @@ import { useFavoritesStore } from "@/store/favorite";
 import { useHeartbeat } from "@/store/heartbeat";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
-import { usePlayList } from "@/store/play-list";
+import { isSame, usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
 import { getItemTagIdsFromMap, useTagStore } from "@/store/tags";
 
@@ -92,6 +95,8 @@ const LocalFavorites = () => {
   const navigate = useNavigate();
 
   const scrollRef = useRef<ScrollRefObject>(null);
+  const scrollToIndexRef = useRef<((index: number) => void) | null>(null);
+  const { flashIndex, flash } = useRowFlash();
 
   const [keyword, setKeyword] = useState("");
   const [sortKey, setSortKey] = useState<MusicListSortKey>("time");
@@ -158,6 +163,33 @@ const LocalFavorites = () => {
       return sign * diff;
     });
   }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags, showInvalidOnly]);
+
+  const handleLocate = useCallback(() => {
+    const playItem = usePlayList.getState().getPlayItem();
+    const isCurrent = (item: LocalFavItem) =>
+      isSame(playItem, {
+        type: item.type === 2 ? "mv" : "audio",
+        bvid: item.type === 2 ? item.bvid : undefined,
+        sid: isLocalSourceItem(item) ? undefined : item.type === 12 ? Number(item.rid) : undefined,
+        source: isLocalSourceItem(item) ? "local" : item.source,
+        id: isLocalSourceItem(item) ? String(item.rid) : undefined,
+      }) &&
+      // 与行高亮一致：有 cid 时精确到分集
+      (item.type !== 2 || !item.cid || !playItem?.cid || item.cid === playItem.cid);
+    const result = resolveLocateIndex({
+      playItem,
+      allItems: rawItems,
+      shownItems: items,
+      isCurrent,
+      folderLabel: "歌单",
+    });
+    if ("message" in result) {
+      addToast({ title: result.message, color: "warning" });
+      return;
+    }
+    scrollToIndexRef.current?.(result.index);
+    flash(result.index);
+  }, [flash, items, rawItems]);
 
   const invalidCount = useMemo(() => rawItems.filter(item => item.invalid).length, [rawItems]);
 
@@ -510,6 +542,9 @@ const LocalFavorites = () => {
               <RiPlayListAddLine size={18} />
             </IconButton>
           )}
+          <IconButton size="md" variant="flat" tooltip="定位当前播放" onPress={handleLocate}>
+            <RiFocus3Line size={18} />
+          </IconButton>
           <Dropdown
             disableAnimation
             placement="bottom-start"
@@ -559,6 +594,8 @@ const LocalFavorites = () => {
             items={items}
             hasMore={false}
             loading={false}
+            scrollToIndexRef={scrollToIndexRef}
+            highlightIndex={flashIndex}
             rowHeight={isCompact ? 36 : 64}
             getScrollElement={() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null}
             renderItem={(item, index) => (

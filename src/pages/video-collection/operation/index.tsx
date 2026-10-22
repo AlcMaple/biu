@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { RiPlayFill, RiPlayListAddLine } from "@remixicon/react";
+import { RiFocus3Line, RiPlayFill, RiPlayListAddLine } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
@@ -15,6 +15,7 @@ interface Props extends FavToggleProps, SearchProps, MenuProps {
   loading?: boolean;
   onPlayAll: () => void;
   onAddToPlayList: () => void;
+  onLocate?: () => void;
   /** 右侧搜索/排序前的附加控件（如标签筛选入口） */
   tagFilter?: ReactNode;
 }
@@ -33,6 +34,7 @@ const Operations = ({
   onToggleFavorite,
   onPlayAll,
   onAddToPlayList,
+  onLocate,
   onClearInvalid,
   tagFilter,
 }: Props) => {
@@ -52,6 +54,11 @@ const Operations = ({
         {!isMobileLayout && (
           <IconButton size="md" variant="flat" tooltip="添加到播放列表" onPress={onAddToPlayList}>
             <RiPlayListAddLine size={18} />
+          </IconButton>
+        )}
+        {onLocate && (
+          <IconButton size="md" variant="flat" tooltip="定位当前播放" onPress={onLocate}>
+            <RiFocus3Line size={18} />
           </IconButton>
         )}
         {!loading && type !== CollectionType.VideoSeries && isCreatedBySelf !== true && (

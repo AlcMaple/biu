@@ -20,10 +20,20 @@ export interface SeriesListProps {
   loading: boolean;
   className?: string;
   getScrollElement: () => HTMLElement | null;
+  scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
+  highlightIndex?: number | null;
   onMenuAction: (key: string, item: Media) => void;
 }
 
-const SeriesList = ({ data, loading, className, getScrollElement, onMenuAction }: SeriesListProps) => {
+const SeriesList = ({
+  data,
+  loading,
+  className,
+  getScrollElement,
+  scrollToIndexRef,
+  highlightIndex,
+  onMenuAction,
+}: SeriesListProps) => {
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
 
@@ -54,6 +64,8 @@ const SeriesList = ({ data, loading, className, getScrollElement, onMenuAction }
         items={data}
         rowHeight={isCompact ? 36 : 64}
         getScrollElement={getScrollElement}
+        scrollToIndexRef={scrollToIndexRef}
+        highlightIndex={highlightIndex}
         hasMore={false}
         loading={loading}
         renderItem={(item, index) => {

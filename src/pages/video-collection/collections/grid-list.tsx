@@ -17,10 +17,20 @@ export interface SeriesGridListProps {
   loading?: boolean;
   className?: string;
   getScrollElement: () => HTMLElement | null;
+  scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
+  highlightIndex?: number | null;
   onMenuAction: (key: string, item: Media) => void;
 }
 
-const SeriesGridList = ({ data, loading, className, getScrollElement, onMenuAction }: SeriesGridListProps) => {
+const SeriesGridList = ({
+  data,
+  loading,
+  className,
+  getScrollElement,
+  scrollToIndexRef,
+  highlightIndex,
+  onMenuAction,
+}: SeriesGridListProps) => {
   const renderGridItem = useCallback(
     (item: Media) => {
       return (
@@ -65,6 +75,8 @@ const SeriesGridList = ({ data, loading, className, getScrollElement, onMenuActi
       itemKey="bvid"
       renderItem={renderGridItem}
       getScrollElement={getScrollElement}
+      scrollToIndexRef={scrollToIndexRef}
+      highlightIndex={highlightIndex}
       className={className}
       hasMore={false}
       loading={false}

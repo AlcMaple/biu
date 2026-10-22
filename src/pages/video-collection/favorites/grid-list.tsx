@@ -13,6 +13,8 @@ interface FavoriteGridListProps {
   hasMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
+  scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
+  highlightIndex?: number | null;
   getScrollElement: () => HTMLElement | null;
   isCreatedBySelf: boolean;
   onMenuAction: (key: string, item: FavMedia) => void;
@@ -24,6 +26,8 @@ const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
   hasMore,
   loading,
   onLoadMore,
+  scrollToIndexRef,
+  highlightIndex,
   getScrollElement,
   isCreatedBySelf,
   onMenuAction,
@@ -66,6 +70,8 @@ const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
       renderItem={renderGridItem}
       getScrollElement={getScrollElement}
       onLoadMore={onLoadMore}
+      scrollToIndexRef={scrollToIndexRef}
+      highlightIndex={highlightIndex}
     />
   );
 };

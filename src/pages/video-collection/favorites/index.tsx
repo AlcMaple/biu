@@ -5,8 +5,10 @@ import { addToast, useDisclosure } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
+import { useRowFlash } from "@/common/hooks/use-row-flash";
 import { fillFavMediaPlayCount, getAllFavMedia } from "@/common/utils/fav";
 import { favPageKey, forgetFavFolder, readFavPage, writeFavPage } from "@/common/utils/fav-page-cache";
+import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { resolvePlayCount } from "@/common/utils/number";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
@@ -53,24 +55,36 @@ const Favorites = () => {
 
   const [keyword, setKeyword] = useState<string>("");
   const [order, setOrder] = useState("mtime");
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMoreState] = useState(false);
+  // locate 要在 await 之后读到最新值，state 此刻还没刷新
+  const hasMoreRef = useRef(false);
+  const setHasMore = useCallback((value: boolean) => {
+    hasMoreRef.current = value;
+    setHasMoreState(value);
+  }, []);
   const [listLoading, setListLoading] = useState(false);
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
 
   const itemTags = useTagStore(s => s.itemTags);
 
-  const filteredItems = useMemo(() => {
-    if (!activeTagIds.length) return items;
-    return items.filter(item => {
-      const tags = getItemTagIdsFromMap(itemTags, {
-        rid: item.id,
-        type: item.type,
-        source: "online",
-        bvid: item.type === 2 ? item.bvid : undefined,
+  const filterByActiveTags = useCallback(
+    (list: FavMedia[]) => {
+      if (!activeTagIds.length) return list;
+      return list.filter(item => {
+        const tags = getItemTagIdsFromMap(useTagStore.getState().itemTags, {
+          rid: item.id,
+          type: item.type,
+          source: "online",
+          bvid: item.type === 2 ? item.bvid : undefined,
+        });
+        return activeTagIds.some(tid => tags.includes(tid));
       });
-      return activeTagIds.some(tid => tags.includes(tid));
-    });
-  }, [items, activeTagIds, itemTags]);
+    },
+    [activeTagIds],
+  );
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- itemTags 变化要触发重算
+  const filteredItems = useMemo(() => filterByActiveTags(items), [items, filterByActiveTags, itemTags]);
 
   // 当前收藏夹（已加载部分）内实际用到的标签（标签筛选只针对歌单内部）
   const availableTagIds = useMemo(() => {
@@ -89,6 +103,8 @@ const Favorites = () => {
 
   const pageRef = useRef(1);
   const scrollRef = useRef<ScrollRefObject>(null);
+  const scrollToIndexRef = useRef<((index: number) => void) | null>(null);
+  const { flashIndex, flash } = useRowFlash();
 
   const { isOpen: isEditOpen, onOpen: onEditOpen, onOpenChange: onEditChange } = useDisclosure();
 
@@ -187,7 +203,7 @@ const Favorites = () => {
         console.warn("[favorites] 后台刷新收藏夹失败", error);
       }
     },
-    [fetchFilledPage, setItems],
+    [fetchFilledPage, setHasMore, setItems],
   );
 
   const loadPage = useCallback(
@@ -239,7 +255,7 @@ const Favorites = () => {
         setListLoading(false);
       }
     },
-    [appendItems, favFolderId, fetchFilledPage, keyword, order, revalidateFirstPage, setItems],
+    [appendItems, favFolderId, fetchFilledPage, keyword, order, revalidateFirstPage, setHasMore, setItems],
   );
 
   // 初次或收藏夹变化时加载数据
@@ -255,12 +271,64 @@ const Favorites = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearItems, favFolderId]);
 
-  const handleLoadMore = useCallback(() => {
-    if (!listLoading && hasMore) {
+  // 滚动触底和「定位当前播放」都会翻页，共用同一个进行中的请求，避免同一页被取两次
+  const loadMoreTaskRef = useRef<Promise<void> | null>(null);
+  const loadNextPage = useCallback(() => {
+    if (!loadMoreTaskRef.current) {
       pageRef.current += 1;
-      loadPage(pageRef.current);
+      loadMoreTaskRef.current = loadPage(pageRef.current).finally(() => {
+        loadMoreTaskRef.current = null;
+      });
     }
-  }, [listLoading, hasMore, loadPage]);
+    return loadMoreTaskRef.current;
+  }, [loadPage]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!listLoading && hasMore) void loadNextPage();
+  }, [listLoading, hasMore, loadNextPage]);
+
+  const locateCurrent = useCallback(async () => {
+    const playItem = usePlayList.getState().getPlayItem();
+    const isCurrent = (item: FavMedia) =>
+      isSame(playItem, {
+        type: item.type === 2 ? "mv" : "audio",
+        bvid: item.bvid,
+        sid: item.type === 12 ? item.id : undefined,
+      });
+
+    // 收藏夹按页懒加载，当前播放的歌可能还在后面几页，翻到找到为止
+    const query = currentQueryRef.current;
+    while (
+      playItem &&
+      !useFavFolderItemsStore.getState().items.some(isCurrent) &&
+      hasMoreRef.current &&
+      currentQueryRef.current === query
+    ) {
+      await loadNextPage();
+    }
+
+    const all = useFavFolderItemsStore.getState().items;
+    const result = resolveLocateIndex({
+      playItem,
+      allItems: all,
+      shownItems: filterByActiveTags(all),
+      isCurrent,
+      folderLabel: "收藏夹",
+    });
+    if ("message" in result) {
+      // 搜索是服务端过滤的，「不在已加载列表」此时多半是被搜索挡掉了
+      const notInResult = keyword && playItem && !all.some(isCurrent);
+      addToast({
+        title: notInResult ? "当前播放的歌曲不在搜索结果中，清除搜索后再试" : result.message,
+        color: "warning",
+      });
+      return;
+    }
+    // 等新页渲染进虚拟列表后再滚，否则目标行高度还没撑出来
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    scrollToIndexRef.current?.(result.index);
+    flash(result.index);
+  }, [filterByActiveTags, flash, keyword, loadNextPage]);
 
   const handleRemoveItem = useCallback(
     (id: number) => {
@@ -600,6 +668,7 @@ const Favorites = () => {
         onToggleFavorite={toggleFavorite}
         onPlayAll={onPlayAll}
         onAddToPlayList={addAllMedia}
+        onLocate={locateCurrent}
         onClearInvalid={clearInvalid}
         tagFilter={
           <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
@@ -613,6 +682,8 @@ const Favorites = () => {
           loading={listLoading}
           getScrollElement={() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null}
           onLoadMore={handleLoadMore}
+          scrollToIndexRef={scrollToIndexRef}
+          highlightIndex={flashIndex}
           isCreatedBySelf={isCreatedBySelf}
           onMenuAction={handleMenuAction}
           onItemPress={handleItemPress}

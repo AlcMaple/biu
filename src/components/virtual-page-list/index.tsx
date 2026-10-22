@@ -1,7 +1,16 @@
-import { type ReactNode, useRef, useLayoutEffect, useCallback, useEffect, useState } from "react";
+import {
+  type MutableRefObject,
+  type ReactNode,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import { Spinner } from "@heroui/react";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import clx from "classnames";
 
 import {
   observeScrollerOffset,
@@ -21,6 +30,10 @@ export interface VirtualListProps<T> {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loading: boolean;
+  /** 父级通过它把某一行滚到视口中央（虚拟滚动下目标行可能还没渲染） */
+  scrollToIndexRef?: MutableRefObject<((index: number) => void) | null>;
+  /** 需要短暂高亮的行 */
+  highlightIndex?: number | null;
 }
 
 export default function VirtualList<T>({
@@ -32,6 +45,8 @@ export default function VirtualList<T>({
   onLoadMore,
   hasMore = false,
   loading,
+  scrollToIndexRef,
+  highlightIndex,
 }: VirtualListProps<T>) {
   const scrollElRef = useRef<HTMLElement | null>(null);
   const loadLockRef = useRef(false);
@@ -83,6 +98,14 @@ export default function VirtualList<T>({
       });
     },
   });
+
+  useEffect(() => {
+    if (!scrollToIndexRef) return;
+    scrollToIndexRef.current = index => rowVirtualizer.scrollToIndex(index, { align: "center" });
+    return () => {
+      scrollToIndexRef.current = null;
+    };
+  }, [scrollToIndexRef, rowVirtualizer]);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
@@ -168,6 +191,10 @@ export default function VirtualList<T>({
         return (
           <div
             key={v.key}
+            className={clx(
+              "rounded-lg ring-2 transition-shadow duration-500",
+              highlightIndex === index ? "ring-primary" : "ring-transparent",
+            )}
             style={{
               position: "absolute",
               top: 0,
