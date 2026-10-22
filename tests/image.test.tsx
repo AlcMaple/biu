@@ -65,6 +65,14 @@ describe("Image", () => {
       container.querySelector("img")?.dispatchEvent(new Event("error"));
     });
 
+    // 首次失败先原地重试，不立刻显示占位
+    expect(onError).not.toHaveBeenCalled();
+    expect(container.querySelector("img")).not.toBeNull();
+
+    await act(async () => {
+      container.querySelector("img")?.dispatchEvent(new Event("error"));
+    });
+
     expect(onError).toHaveBeenCalledTimes(1);
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector('[data-testid="placeholder"]')).toBeInTheDocument();

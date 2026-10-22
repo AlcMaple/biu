@@ -176,15 +176,22 @@ const getMVData = async (bvid: string, existing?: PlayData, signal?: AbortSignal
     const res = await getPlayerPagelist({ bvid }, { signal });
     const pages = res?.data || [];
     const aid = existing.aid || tryBv2av(bvid);
+    const hasMultiPart = pages.length > 1;
     return pages.map(page => ({
       ...existing,
       aid: aid ? String(aid) : undefined,
       id: idGenerator(),
       cid: String(page.cid),
-      hasMultiPart: pages.length > 1,
+      hasMultiPart,
       pageIndex: page.page,
-      pageTitle: pages.length > 1 ? page.part : existing.pageTitle || existing.title,
-      pageCover: formatUrlProtocol(page.first_frame || existing.pageCover || existing.cover),
+      pageTitle: hasMultiPart ? page.part : existing.pageTitle || existing.title,
+      // 单 P 视频的 first_frame 只是视频截帧，队列里的封面列表里早已加载成功；
+      // 优先用它，别换成一张可能加载不出来（播放栏、全屏页整块白）的截帧地址
+      pageCover: formatUrlProtocol(
+        hasMultiPart
+          ? page.first_frame || existing.pageCover || existing.cover
+          : existing.cover || existing.pageCover || page.first_frame,
+      ),
       totalPage: pages.length,
       duration: page.duration,
     }));
