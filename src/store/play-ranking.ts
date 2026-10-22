@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { isTestAccount } from "@/common/constants/test-account";
 import { isOfflineDemo } from "@/common/offline-demo";
 import platform, { log } from "@/platform";
 import { fetchCloudRanking, pushRankingEvents } from "@/service/sync/client";
@@ -131,7 +132,8 @@ export async function syncPlayRanking(remoteVersion?: number, resume = false): P
       let state = await platform.rankingLocal({ kind: "read" });
       if (!isCurrent()) return;
       showLocal(state, mid);
-      if (!mid) return;
+      // 测试账号没有云端会话，不归入未登录记录，也不发同步请求
+      if (!mid || isTestAccount(useUser.getState().user)) return;
       if (Object.keys(state.unassigned).length) {
         // 旧记录和未登录期间的播放没有账号归属；登录即归入当前账号，不再要求手动确认。
         state = await platform.rankingLocal({ kind: "import", mid });

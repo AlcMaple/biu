@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { createTestUser, isTestAccount } from "@/common/constants/test-account";
 import platform, { isWeb } from "@/platform";
 import { platformReady } from "@/platform/ready";
 import { getUserInfo, type UserInfo } from "@/service/user-info";
@@ -12,6 +13,7 @@ interface UserState {
 
 interface Action {
   updateUser: () => Promise<void>;
+  loginAsTestAccount: () => void;
   clear: () => void;
 }
 
@@ -29,14 +31,20 @@ const updateBrowserMonitoringUser = (user: UserInfo | null) => {
 
 export const useUser = create<UserState & Action>()(
   persist(
-    set => ({
+    (set, get) => ({
       user: null,
       updateUser: async () => {
+        // 测试账号没有 B 站登录态，启动时的刷新会把它当成未登录清掉
+        if (isTestAccount(get().user)) return;
         const res = await getUserInfo();
         const user = res.code === 0 && res.data?.isLogin ? res.data : null;
 
         set(() => ({ user }));
         updateBrowserMonitoringUser(user);
+      },
+      loginAsTestAccount: () => {
+        const user = createTestUser();
+        set(() => ({ user }));
       },
       clear: () => {
         set(() => ({

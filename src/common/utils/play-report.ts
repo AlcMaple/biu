@@ -1,5 +1,6 @@
 import moment from "moment";
 
+import { isTestAccount } from "@/common/constants/test-account";
 import { log } from "@/platform";
 import { isWeb } from "@/platform/detect";
 import { postClickInterfaceClickWebH5 } from "@/service/click-interface-click-web-h5";
@@ -59,7 +60,7 @@ const generateSessionId = () => {
 const checkReportingEnabled = () => {
   const { reportPlayHistory } = useSettings.getState();
   const isAnonymousWeb = isWeb && !useUser.getState().user?.mid;
-  if (!reportPlayHistory || isAnonymousWeb) {
+  if (!reportPlayHistory || isAnonymousWeb || isTestAccount(useUser.getState().user)) {
     currentSession = null;
     return false;
   }

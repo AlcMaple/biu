@@ -21,6 +21,7 @@ import {
 } from "@remixicon/react";
 import { twMerge } from "tailwind-merge";
 
+import { isTestAccount, isTestAccountEnabled } from "@/common/constants/test-account";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import platform, { isWeb, log } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
@@ -42,6 +43,7 @@ interface UserCardProps {
 const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const user = useUser(s => s.user);
   const clearUser = useUser(s => s.clear);
+  const loginAsTestAccount = useUser(s => s.loginAsTestAccount);
   const clearToken = useToken(s => s.clear);
   const navigate = useNavigate();
   const updateSettings = useSettings(s => s.update);
@@ -54,7 +56,9 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const logout = async () => {
     try {
       let loggedOut = false;
-      if (isWeb) {
+      if (isTestAccount(useUser.getState().user)) {
+        loggedOut = true;
+      } else if (isWeb) {
         const response = await logoutWebAuthSession();
         loggedOut = response.code === 0;
       } else {
@@ -105,6 +109,13 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
       startContent: <RiLoginCircleLine size={18} />,
       hidden: user?.isLogin,
       onPress: openLoginModal,
+    },
+    {
+      key: "test-login",
+      label: "测试账号登录",
+      startContent: <RiLoginCircleLine size={18} />,
+      hidden: !isTestAccountEnabled || user?.isLogin,
+      onPress: loginAsTestAccount,
     },
     {
       key: "profile",
