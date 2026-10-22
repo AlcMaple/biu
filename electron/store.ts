@@ -2,6 +2,7 @@ import { app } from "electron";
 import Store from "electron-store";
 import path from "node:path";
 
+import { PLAY_RANKING_LOCAL_KEY, type RankingLocalState } from "@shared/play-ranking";
 import { defaultAppSettings } from "@shared/settings/app-settings";
 import { defaultShortcutSettings } from "@shared/settings/shortcut-settings";
 import { StoreNameMap } from "@shared/store";
@@ -50,6 +51,11 @@ export const playCountsStore = new Store<PlayCountsData>({
   name: StoreNameMap.PlayCounts,
   cwd: getUserDataPath(),
   defaults: {},
+});
+
+export const playRankingSyncStore = new Store<RankingLocalState>({
+  name: PLAY_RANKING_LOCAL_KEY,
+  cwd: getUserDataPath(),
 });
 
 export const windowStateStore = new Store<{

@@ -14,6 +14,9 @@ declare global {
   }
 
   interface ElectronAPI {
+    rankingLocal: (
+      action: import("../play-ranking").RankingLocalAction,
+    ) => Promise<import("../play-ranking").RankingLocalState>;
     /** 获取指定name的存储值 */
     getStore: <N extends StoreName>(name: N) => Promise<StoreDataMap[N] | undefined>;
     /** 设置指定name的存储值 */

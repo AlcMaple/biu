@@ -2,6 +2,7 @@ import { isOfflineDemo } from "@/common/offline-demo";
 import { log } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
+import { resetPlayRankingSession, syncPlayRanking } from "@/store/play-ranking";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
@@ -165,7 +166,10 @@ export function initLocalPlaylistSync(): void {
 
   // 外部触发（被通知 / 登录 / 回到前台）一律立即同步，不走防抖——防抖是为了合并
   // 用户的连续操作，这些场景没有后续变更要合并，多等一个窗口纯属增加跨设备延迟。
-  const syncAllNow = () => allControllers.forEach(controller => controller.syncNow());
+  const syncAllNow = () => {
+    allControllers.forEach(controller => controller.syncNow());
+    void syncPlayRanking();
+  };
 
   let watchedMid: number | undefined;
   let watchGeneration = 0;
@@ -182,6 +186,7 @@ export function initLocalPlaylistSync(): void {
     const generation = ++watchGeneration;
     void startWatchLoop(
       versions => {
+        if (versions["play-counts"] !== undefined) void syncPlayRanking(versions["play-counts"]);
         for (const controller of allControllers) {
           const remoteVersion = versions[controller.storeName];
           if (remoteVersion === undefined) continue;
@@ -206,9 +211,12 @@ export function initLocalPlaylistSync(): void {
   useUser.subscribe((state, prev) => {
     if (state.user?.mid === prev.user?.mid) return;
     invalidateSyncToken();
+    resetPlayRankingSession();
     ensureWatch();
     if (state.user?.mid) syncAllNow();
+    else void syncPlayRanking();
   });
   ensureWatch();
   if (useUser.getState().user?.mid) syncAllNow();
+  else void syncPlayRanking();
 }

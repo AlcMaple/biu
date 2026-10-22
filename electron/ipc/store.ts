@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import log from "electron-log";
 
+import { updateRankingLocal, type RankingLocalAction } from "@shared/play-ranking";
 import { StoreNameMap } from "@shared/store";
 
 import {
@@ -12,6 +13,7 @@ import {
   localFavoritesStore,
   lyricsCacheStore,
   playCountsStore,
+  playRankingSyncStore,
   playlistSyncBackupsStore,
   playlistSyncMetaStore,
   shortcutKeyStore,
@@ -54,6 +56,18 @@ async function setStoreWithRetry(name: string, store: { set: (value: any) => voi
 }
 
 export function registerStoreHandlers() {
+  let rankingQueue: Promise<unknown> = Promise.resolve();
+  ipcMain.handle(channel.store.rankingLocal, (_event, action: RankingLocalAction) => {
+    const run = rankingQueue.then(async () => {
+      const saved = playRankingSyncStore.store;
+      const state = updateRankingLocal(Object.keys(saved).length ? saved : undefined, playCountsStore.store, action);
+      await setStoreWithRetry("play-ranking-sync", playRankingSyncStore, state);
+      return state;
+    });
+    // 写入失败必须传播给调用方；排队链仍可接受下一次人工触发。
+    rankingQueue = run.catch(() => undefined);
+    return run;
+  });
   ipcMain.handle(channel.store.get, async (_, name: StoreName) => {
     if (name === StoreNameMap.AppSettings) {
       return appSettingsStore.store;

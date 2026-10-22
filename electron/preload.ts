@@ -8,6 +8,7 @@ let playerToggleHandler: ((_: Electron.IpcRendererEvent) => void) | null = null;
 
 const api: ElectronAPI = {
   getStore: name => ipcRenderer.invoke(channel.store.get, name),
+  rankingLocal: action => ipcRenderer.invoke(channel.store.rankingLocal, action),
   setStore: (name, value: any) => ipcRenderer.invoke(channel.store.set, name, value),
   clearStore: name => ipcRenderer.invoke(channel.store.clear, name),
   selectDirectory: (title?: string) => ipcRenderer.invoke(channel.dialog.selectDirectory, title),

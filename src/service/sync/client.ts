@@ -1,3 +1,5 @@
+import type { CloudRanking, RankingEvent } from "@shared/play-ranking";
+
 import platform, { log } from "@/platform";
 import { isWeb } from "@/platform/detect";
 
@@ -19,6 +21,7 @@ interface WebSyncSessionResponse {
 let cached: CachedToken | null = null;
 /** 避免同一时刻多个 store 并发触发同步时，重复发起多次换 token 请求 */
 let exchangeInFlight: Promise<CachedToken | null> | null = null;
+let tokenGeneration = 0;
 
 async function exchangeToken(): Promise<CachedToken | null> {
   if (isWeb) {
@@ -51,17 +54,43 @@ async function exchangeToken(): Promise<CachedToken | null> {
 
 async function getToken(): Promise<CachedToken | null> {
   if (cached) return cached;
+  const generation = tokenGeneration;
   if (!exchangeInFlight) {
-    exchangeInFlight = exchangeToken().finally(() => {
-      exchangeInFlight = null;
+    const request = exchangeToken().finally(() => {
+      if (exchangeInFlight === request) exchangeInFlight = null;
     });
+    exchangeInFlight = request;
   }
-  cached = await exchangeInFlight;
+  const result = await exchangeInFlight;
+  if (generation !== tokenGeneration) return null;
+  cached = result;
   return cached;
 }
 
 export function invalidateSyncToken() {
+  tokenGeneration += 1;
+  exchangeInFlight = null;
   cached = null;
+}
+
+export async function fetchCloudRanking(expectedMid: string): Promise<CloudRanking | null> {
+  return withAuthRetry(token => {
+    if (token.mid !== expectedMid) throw new Error("账号已变化，请重新同步排行");
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.get<CloudRanking>("/play-ranking", { headers });
+  });
+}
+
+export async function pushRankingEvents(
+  expectedMid: string,
+  deviceId: string,
+  events: RankingEvent[],
+): Promise<CloudRanking | null> {
+  return withAuthRetry(token => {
+    if (token.mid !== expectedMid) throw new Error("账号已变化，原账号记录已保留");
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.post<CloudRanking>("/play-ranking", { expectedMid, deviceId, events }, { headers });
+  });
 }
 
 /** 401 时重新换一次 token 再试一次，仍失败就放弃（不做无限重试） */

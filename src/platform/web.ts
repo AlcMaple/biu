@@ -8,6 +8,12 @@ import {
   searchWebProviderLyrics,
 } from "@/service/web-lyrics";
 import { WEB_ALIGN_PROXY_ROOT } from "@shared/lyrics-align";
+import {
+  PLAY_RANKING_LOCAL_KEY,
+  updateRankingLocal,
+  type RankingLocalAction,
+  type RankingLocalState,
+} from "@shared/play-ranking";
 import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
@@ -201,7 +207,36 @@ const getWebPlatform = (): AppPlatForm => {
   return "linux";
 };
 
+async function rankingLocal(action: RankingLocalAction): Promise<RankingLocalState> {
+  const database = await openDatabase();
+  if (!database) throw new Error("浏览器存储暂不可用，听歌记录尚未保存");
+  return new Promise((resolve, reject) => {
+    // 一个读写事务完成读改写，两个网页同时播放时也不会覆盖彼此的待同步记录。
+    const transaction = database.transaction(WEB_STORE_OBJECT_STORE, "readwrite");
+    const store = transaction.objectStore(WEB_STORE_OBJECT_STORE);
+    const key = `${STORE_KEY_PREFIX}${PLAY_RANKING_LOCAL_KEY}`;
+    const current = store.get(key);
+    const legacy = store.get(storageKey(StoreNameMap.PlayCounts));
+    let result: RankingLocalState;
+    let cause: unknown;
+    legacy.onsuccess = () => {
+      try {
+        const old = legacy.result === undefined ? readLegacyStore(StoreNameMap.PlayCounts) : legacy.result;
+        result = updateRankingLocal(current.result, old ?? undefined, action);
+        store.put(result, key);
+      } catch (err) {
+        cause = err;
+        transaction.abort();
+      }
+    };
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = () => reject(cause ?? transaction.error);
+    transaction.onabort = () => reject(cause ?? transaction.error ?? new Error("听歌记录存储被中断"));
+  });
+}
+
 const platform: Platform = {
+  rankingLocal,
   getStore: webGetStore,
   setStore: webSetStore,
   clearStore: webClearStore,

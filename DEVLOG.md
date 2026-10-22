@@ -16,6 +16,7 @@
 - [移动端](docs/devlog/2026-移动端.md)
 - [Web 版](docs/devlog/2026-Web版.md)
 - [播放时长与本地收藏](docs/devlog/2026-播放时长与本地收藏.md)
+- [听歌排行](docs/devlog/2026-听歌排行.md)
 - [开发工具与性能](docs/devlog/2026-开发工具与性能.md)
 - [本地歌单收藏](docs/devlog/2026-本地歌单收藏.md)
 - [本地歌单云同步](docs/devlog/2026-本地歌单云同步.md)

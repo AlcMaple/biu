@@ -49,6 +49,28 @@ describe("native mobile platform adapter", () => {
     else Reflect.set(globalThis, "Capacitor", originalCapacitor);
   });
 
+  it("serializes durable ranking writes and retains pending records after a module restart", async () => {
+    const data = new Map<string, string>();
+    mocks.getPreference.mockImplementation(async ({ key }) => ({ value: data.get(key) ?? null }));
+    mocks.setPreference.mockImplementation(async ({ key, value }) => {
+      data.set(key, value);
+    });
+    let { default: platform } = await import("@/platform/mobile");
+    const record = { key: "online:BV1234567890:12", title: "测试歌曲", totalCount: 1, recentPlays: [Date.now()] };
+    await Promise.all(Array.from({ length: 10 }, () => platform.rankingLocal({ kind: "record", mid: "42", record })));
+    vi.resetModules();
+    ({ default: platform } = await import("@/platform/mobile"));
+    const saved = await platform.rankingLocal({ kind: "read" });
+    expect(saved.accounts["42"].pending.map(event => event.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it("propagates ranking storage failures instead of confirming unsaved plays", async () => {
+    mocks.getPreference.mockResolvedValue({ value: null });
+    mocks.setPreference.mockRejectedValue(new Error("storage failed"));
+    const { default: platform } = await import("@/platform/mobile");
+    await expect(platform.rankingLocal({ kind: "read" })).rejects.toThrow("storage failed");
+  });
+
   it("uses Capacitor Preferences and reports the iOS platform", async () => {
     mocks.getPreference.mockResolvedValue({ value: '{"theme":"dark"}' });
     const { default: platform } = await import("@/platform/mobile");

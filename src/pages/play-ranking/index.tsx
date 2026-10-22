@@ -4,7 +4,8 @@ import { Spinner, Tab, Tabs } from "@heroui/react";
 
 import Empty from "@/components/empty";
 import ScrollContainer from "@/components/scroll-container";
-import { getPlayRanking, type PlayRankingItem } from "@/store/play-ranking";
+import { rankingItems, syncPlayRanking, usePlayRankingState } from "@/store/play-ranking";
+import { useUser } from "@/store/user";
 
 import PlayRankingItemRow from "./item";
 
@@ -12,33 +13,52 @@ type Period = "week" | "all";
 
 const PlayRanking = () => {
   const [period, setPeriod] = useState<Period>("week");
-  const [loading, setLoading] = useState(true);
-  const [list, setList] = useState<PlayRankingItem[]>([]);
+  const mid = useUser(state => (state.user?.mid ? String(state.user.mid) : null));
+  const state = usePlayRankingState();
+  const sameAccount = state.mid === mid;
+  const list = sameAccount ? rankingItems(state.records, period) : [];
+  const loading = state.loading || !sameAccount;
+  const pending = sameAccount ? state.pending : 0;
+  const error = sameAccount ? state.error : undefined;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    getPlayRanking(period).then(data => {
-      if (cancelled) return;
-      setList(data);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [period]);
+    void syncPlayRanking(undefined, true);
+  }, [mid]);
 
   return (
     <ScrollContainer pageScroll enableBackToTop className="h-full w-full px-4">
       <div className="mb-2">
         <h1>我的听歌排行</h1>
+        <div className="text-foreground-500 mt-2 flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
+          <span>
+            {!mid
+              ? "未登录 · 仅本机记录"
+              : error
+                ? state.updatedAt === undefined
+                  ? "同步失败 · 尚未读取云端排行"
+                  : "同步失败 · 显示上次云端结果"
+                : pending
+                  ? `云端排行 · ${pending} 次待同步`
+                  : loading
+                    ? "正在同步云端排行"
+                    : state.updatedAt === undefined
+                      ? "尚未读取云端排行"
+                      : "云端排行 · 已同步"}
+          </span>
+          {error && pending > 0 && <span>{pending} 次待同步</span>}
+        </div>
+        {error && (
+          <p role="alert" className="text-danger mt-2 text-sm">
+            {error}
+          </p>
+        )}
         <Tabs selectedKey={period} onSelectionChange={key => setPeriod(key as Period)} size="sm" className="mt-2">
           <Tab key="week" title="最近一周" />
           <Tab key="all" title="所有时间" />
         </Tabs>
       </div>
 
-      {loading && (
+      {loading && list.length === 0 && (
         <div className="flex h-[40vh] items-center justify-center">
           <Spinner size="lg" label="统计中..." />
         </div>
@@ -46,7 +66,7 @@ const PlayRanking = () => {
 
       {!loading && list.length === 0 && <Empty title="暂无听歌记录" className="h-[40vh]" />}
 
-      {!loading && list.length > 0 && (
+      {list.length > 0 && (
         <div className="flex flex-col gap-0.5 pb-4">
           {list.map((item, index) => (
             <PlayRankingItemRow key={item.key} rank={index + 1} item={item} />

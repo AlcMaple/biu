@@ -1,5 +1,6 @@
 export const channel = {
   store: {
+    rankingLocal: "store:ranking-local",
     getSettings: "settings:get",
     setSettings: "settings:set",
     clearSettings: "settings:clear",

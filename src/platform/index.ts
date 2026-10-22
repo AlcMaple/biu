@@ -4,9 +4,11 @@ import { isElectron, isNativeMobile } from "./detect";
 import electronPlatform, { log as electronLog } from "./electron";
 import electronHttp from "./http-electron";
 import mobilePlatform, { log as mobileLog } from "./mobile";
+import { markPlatformReady } from "./ready";
 import webPlatform, { log as webLog } from "./web";
 
 const platform: Platform = isElectron ? electronPlatform : isNativeMobile ? mobilePlatform : webPlatform;
+markPlatformReady(platform);
 const log: Logger = isElectron ? electronLog : isNativeMobile ? mobileLog : webLog;
 
 // 只有 Capacitor 原生移动端使用 native HTTP；Electron 和普通 Web 都走浏览器 axios。

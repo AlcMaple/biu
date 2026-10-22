@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import platform, { isWeb } from "@/platform";
+import { platformReady } from "@/platform/ready";
 import { getUserInfo, type UserInfo } from "@/service/user-info";
 import { StoreNameMap } from "@shared/store";
 
@@ -49,7 +50,8 @@ export const useUser = create<UserState & Action>()(
       partialize: state => state.user,
       storage: {
         getItem: async () => {
-          const store = await platform.getStore(StoreNameMap.UserLoginInfo);
+          const readyPlatform = await platformReady;
+          const store = await readyPlatform.getStore(StoreNameMap.UserLoginInfo);
 
           return {
             state: store,

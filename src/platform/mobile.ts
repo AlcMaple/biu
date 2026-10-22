@@ -1,6 +1,14 @@
 import { CapacitorCookies } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
 
+import {
+  PLAY_RANKING_LOCAL_KEY,
+  updateRankingLocal,
+  type RankingLocalAction,
+  type RankingLocalState,
+} from "@shared/play-ranking";
+import { StoreNameMap } from "@shared/store";
+
 import type { Logger, Platform } from "./types";
 
 import { nativeAlignRequest } from "./align-native";
@@ -26,6 +34,24 @@ const unsubscribe = () => noop;
  * 歌词缓存 —— 之前因为 noop 全部用不了。
  */
 const STORE_KEY_PREFIX = "biu:";
+
+let rankingQueue: Promise<unknown> = Promise.resolve();
+function rankingLocal(action: RankingLocalAction): Promise<RankingLocalState> {
+  const run = rankingQueue.then(async () => {
+    const key = `${STORE_KEY_PREFIX}${PLAY_RANKING_LOCAL_KEY}`;
+    const { value } = await Preferences.get({ key });
+    const legacy = value ? undefined : await Preferences.get({ key: `${STORE_KEY_PREFIX}${StoreNameMap.PlayCounts}` });
+    const next = updateRankingLocal(
+      value ? (JSON.parse(value) as RankingLocalState) : undefined,
+      legacy?.value ? (JSON.parse(legacy.value) as PlayCountsData) : undefined,
+      action,
+    );
+    await Preferences.set({ key, value: JSON.stringify(next) });
+    return next;
+  });
+  rankingQueue = run.catch(() => undefined);
+  return run;
+}
 
 async function mobileGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
   try {
@@ -56,6 +82,7 @@ async function mobileClearStore(name: StoreName): Promise<void> {
 }
 
 const platform: Platform = {
+  rankingLocal,
   getStore: mobileGetStore,
   setStore: mobileSetStore,
   clearStore: mobileClearStore,
