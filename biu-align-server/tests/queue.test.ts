@@ -62,9 +62,9 @@ describe("AlignQueue", () => {
     expect(queue.get(b.id!)).toMatchObject({ state: "queued", position: 1 });
 
     release.shift()!();
-    await flush();
+    // 完成要落盘，固定等 20 ms 在机器忙时会偶发不够
+    await vi.waitFor(() => expect(runWorker).toHaveBeenCalledTimes(2));
     expect(queue.get(a.id!).state).toBe("done");
-    expect(runWorker).toHaveBeenCalledTimes(2);
 
     const cached = await queue.submit(job("3", "h1"));
     expect(cached).toMatchObject({ id: null, state: "done" });
