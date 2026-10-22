@@ -36,6 +36,7 @@ import { useGlassmorphism } from "./glassmorphism";
 import MobileFullScreenPlayer from "./mobile";
 import PageList from "./page-list";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
+import { useLoadableCover } from "./use-loadable-cover";
 
 const appPlatform = platform.getPlatform();
 
@@ -173,7 +174,7 @@ const FullScreenPlayer = () => {
     scheduleHideUi(3000);
   };
 
-  const coverSrc = playItem?.pageCover || playItem?.cover;
+  const coverSrc = useLoadableCover([playItem?.pageCover, playItem?.cover]);
   const { effectsProfile, bgLayerA, bgLayerB, activeBgLayer, cssVars } = useGlassmorphism(
     coverSrc,
     primaryColor,

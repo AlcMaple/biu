@@ -24,6 +24,7 @@ import { useSettings } from "@/store/settings";
 
 import { useGlassmorphism } from "./glassmorphism";
 import FullScreenPlayerSettingsPanel from "./settings-panel";
+import { useLoadableCover } from "./use-loadable-cover";
 
 const MobileFullScreenPlayer = () => {
   const [chipSlot, setChipSlot] = useState<HTMLElement | null>(null);
@@ -47,7 +48,7 @@ const MobileFullScreenPlayer = () => {
     })),
   );
   const playItem = list.find(item => item.id === playId);
-  const coverSrc = playItem?.pageCover || playItem?.cover;
+  const coverSrc = useLoadableCover([playItem?.pageCover, playItem?.cover]);
 
   const { effectsProfile, bgLayerA, bgLayerB, activeBgLayer, cssVars } = useGlassmorphism(
     coverSrc,
