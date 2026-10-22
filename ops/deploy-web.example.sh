@@ -63,14 +63,17 @@ fi
   cd "$release_root"
   NODE_ENV=production BIU_WEB_HOST=127.0.0.1 BIU_WEB_PORT="$test_port" \
   BIU_WEB_PUBLIC_ORIGIN="$public_origin" BIU_SYNC_INTERNAL_ORIGIN="$sync_origin" \
-  "$web_node" dist/server/web-server/index.js
+  exec "$web_node" dist/server/web-server/index.js
 ) >"$release_root/logs/web-test.log" 2>&1 &
 tp=$!
+# set -e 下任一检查失败都会直接退出、跳过下面的 kill，试运行进程会脱离 SSH 会话一直占着端口，下次发布被拦
+trap 'kill "$tp" 2>/dev/null || true' EXIT
 sleep 3
 kill -0 "$tp" || { echo "试运行进程已退出："; tail -n 30 "$release_root/logs/web-test.log"; exit 1; }
 curl -fsS "http://127.0.0.1:$test_port$health" | grep -q '"status":"ok"'
 curl -fsS -G "http://127.0.0.1:$test_port/__biu_lyrics/lrclib/search" --data-urlencode q=spiral | grep -q '"syncedLyrics"'
 kill "$tp"; wait "$tp" 2>/dev/null || true
+trap - EXIT
 echo "试运行通过"
 
 cp "$agent_file" "$agent_file.bak-$release_stamp"
