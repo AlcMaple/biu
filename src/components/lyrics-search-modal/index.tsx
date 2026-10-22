@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
+import { Button, Chip, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
 import type { LyricLine } from "@/store/lyrics-state";
 import type { LyricsProvider } from "@shared/lyrics-format";
 import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
 
-import { extractSongInfo } from "@/components/lyrics/auto-match";
+import { extractSongInfo, extractTitleCandidates } from "@/components/lyrics/auto-match";
 import { PROVIDER_LABELS, describeProviderError, linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
@@ -47,6 +47,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   const [providerLoading, setProviderLoading] = useState(false);
   const [providerError, setProviderError] = useState<string>();
   const keywordRef = useRef("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   // 换来源 / 再搜 / 切歌都换一代，慢的旧结果回来时直接丢掉
   const searchRef = useRef(0);
 
@@ -71,7 +72,12 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
     if (!isOpen) return;
     const playItem = getPlayItem();
     if (playItem) {
-      setKeyword(extractSongInfo(playItem.pageTitle || playItem.title).title);
+      const rawTitle = (playItem.pageTitle || playItem.title).trim();
+      setKeyword(extractSongInfo(rawTitle).title);
+      // 自动提取的歌名有时会选错；把其他候选、UP 主和完整原标题摆出来，点一下就搜，不用退出去查歌名
+      setSuggestions(
+        [...new Set([...extractTitleCandidates(rawTitle), playItem.ownerName?.trim() ?? "", rawTitle])].filter(Boolean),
+      );
       clearResults();
     }
   }, [playId, isOpen, getPlayItem, clearResults]);
@@ -244,6 +250,29 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
               搜索
             </Button>
           </div>
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-default-500 text-xs">试试：</span>
+              {suggestions.map(text => (
+                <Chip
+                  key={text}
+                  as="button"
+                  type="button"
+                  size="sm"
+                  variant="flat"
+                  className="max-w-[22rem] cursor-pointer"
+                  classNames={{ content: "truncate" }}
+                  onClick={() => {
+                    keywordRef.current = text;
+                    setKeyword(text);
+                    void handleSubmit(activeTab);
+                  }}
+                >
+                  {text}
+                </Chip>
+              ))}
+            </div>
+          )}
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={key => {

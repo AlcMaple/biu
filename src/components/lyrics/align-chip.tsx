@@ -52,6 +52,11 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
   const currentKey = usePlayList(s => lyricsCacheKey(s.list.find(i => i.id === s.playId)));
   const isMobileLayout = useIsMobileLayout();
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    onOpenChange?.(next);
+  };
 
   const isTarget = Boolean(target && target.cacheKey === currentKey);
   const active = isTarget && phase.kind !== "idle";
@@ -115,7 +120,11 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
       body: phase.message,
       actions: (
         <>
-          {act("关闭", session.dismiss)}
+          {act("关闭", () => {
+            // 关闭后标签回到「未对齐」，面板要一起收起；否则同一个面板原地变成「逐字为估算」，像是点关闭把状态改了
+            changeOpen(false);
+            session.dismiss();
+          })}
           {next}
         </>
       ),
@@ -170,7 +179,7 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
   }
 
   return (
-    <Popover placement="bottom-end" onOpenChange={onOpenChange}>
+    <Popover placement="bottom-end" isOpen={open} onOpenChange={changeOpen}>
       <PopoverTrigger>
         <Button
           size="sm"
