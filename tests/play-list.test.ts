@@ -653,6 +653,24 @@ describe("play-list store", () => {
     });
   });
 
+  test("当前歌没有封面时，地址就绪后回查并补上封面", async () => {
+    const s = usePlayList.getState();
+    await s.init();
+    const { getWebInterfaceView } = await import("@/service/web-interface-view");
+    vi.mocked(getWebInterfaceView).mockImplementationOnce(
+      async () => ({ code: 0, data: { pic: "https://i0.hdslb.com/bfs/archive/late.jpg" } }) as any,
+    );
+
+    usePlayList.setState({
+      list: [{ id: "no-cover", type: "mv", bvid: "BV_nocover", cid: "1", title: "无封面" }],
+      playId: "no-cover",
+    });
+
+    await vi.waitFor(() => {
+      expect(usePlayList.getState().list[0].cover).toBe("https://i0.hdslb.com/bfs/archive/late.jpg");
+    });
+  });
+
   test("取不到播放地址但稿件未失效（如临时网络故障）时不会误删", async () => {
     const s = usePlayList.getState();
     await s.init();

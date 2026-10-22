@@ -2467,6 +2467,40 @@ async function prefetchAudioSource(targetPlayId: string) {
   }
 }
 
+// 队列项可能没带封面（来源接口不返回）；切歌时的 pagelist 回查也只复用队列里已有的封面，
+// 缺了就永远缺，全屏播放器停在占位图，要退出重进才恢复（同样因为重进后重新拿了一遍数据）。
+// 当前歌缺封面时回查一次 view 补上；同一首只试一次，失败不自动重试，等下次切到它再说。
+const coverLookupTried = new Set<string>();
+usePlayList.subscribe(state => {
+  const current = state.list.find(item => item.id === state.playId);
+  if (!current || current.type !== "mv" || current.source === "local" || !current.bvid) return;
+  // 等地址解析成功再补：失效稿件的检测也走 view，别和它抢同一个请求
+  if (current.cover || current.pageCover || !current.audioUrl) return;
+  const bvid = current.bvid;
+  if (coverLookupTried.has(bvid)) return;
+  coverLookupTried.add(bvid);
+  void (async () => {
+    try {
+      const pic = formatUrlProtocol((await getWebInterfaceView({ bvid }))?.data?.pic);
+      if (!pic) return;
+      usePlayList.setState(draft => {
+        for (const item of draft.list) {
+          if (item.bvid === bvid && !item.cover && !item.pageCover) item.cover = pic;
+        }
+      });
+      const playing = usePlayList.getState().getPlayItem();
+      if (playing?.bvid === bvid) {
+        updateMediaSession({ title: playing.pageTitle || playing.title, artist: playing.ownerName, cover: pic });
+      }
+    } catch (error) {
+      log.warn("补全封面失败", { bvid, error: String(error) });
+    }
+  })();
+});
+usePlayList.subscribe((state, prevState) => {
+  if (state.playId !== prevState.playId) coverLookupTried.clear();
+});
+
 // 切换歌曲时，更新当前播放的歌曲信息
 usePlayList.subscribe(createPlayRankingTracker(recordPlayCount));
 usePlayList.subscribe(async (state, prevState) => {
