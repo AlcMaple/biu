@@ -67,7 +67,7 @@ log("============================================");
 
 // ---- [1/6] 前置工具 ----
 section("[1/6] 检查 Node / Git / pnpm...");
-if (!has("node")) die("未找到 node，请先安装 Node.js 22.17.1");
+if (!has("node")) die("未找到 node，请先安装 Node.js 22.23.4");
 if (!has("git")) die("未找到 git");
 if (!has("pnpm")) {
   log("    未检测到 pnpm，通过 corepack 启用...");

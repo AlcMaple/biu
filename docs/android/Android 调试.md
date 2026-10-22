@@ -18,7 +18,7 @@ APK 构建脚本会主动删除残留的 `BIU_DEV_URL`，所以 debug / release 
 
 当前工程约束：
 
-- Node.js 22.17.1，pnpm 10.24.0，JDK 21。
+- Node.js 22.23.4，pnpm 10.24.0，JDK 21。
 - Android compile / target API 36，最低 API 24。
 - Gradle 8.14.3，Android Gradle Plugin 8.13。
 - Apple Silicon 优先使用 `arm64-v8a` 系统镜像；Intel Mac 使用 `x86_64`。
