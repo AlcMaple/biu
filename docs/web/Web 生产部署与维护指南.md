@@ -162,12 +162,14 @@ set +a
 ```text
 浏览器 → 公网 HTTPS 反代 → 私有 Web 隧道 → Web BFF → 本机 sync 服务 → 同步数据
 桌面端 → 既有同步 API 反代 → 私有 sync 隧道 ────────────────┘
+桌面端 → 对齐 API 反代 → 私有对齐隧道 → 歌词对齐服务（可选，§6.1）
 ```
 
 | 组件 | 职责 | 不能做的事 |
 | --- | --- | --- |
 | Web BFF | 登录、B 站 API/媒体 Range 代理、固定歌词上游代理、Web 同步桥接 | 不能改为静态站；不能把 Cookie、JWT 或上游签名 URL 交给浏览器 |
 | sync 服务 | `favorites`、`fav-items`、`tags` 的条目级合并、历史与通知 | 必须单实例；不能用多进程/cluster 并发写同一数据目录 |
+| 歌词对齐服务（可选） | 仅当部署方想提供歌词时间轴自动对齐时才需要；独立服务，登录复用 sync 的令牌，见 §6.1 | 不能并入 Web BFF；不能开多进程；不接受任意 URL |
 | 浏览器 IndexedDB | 缓存、同步基线、离线辅助 | 不是跨端权威数据源 |
 | 公网反代 | TLS、Host 原样传递、Range 透传、到私有隧道的转发 | 不能暴露终端、SSH、数据目录或备份目录 |
 
@@ -307,6 +309,7 @@ lsof -a -p "$test_pid" -nP -iTCP:"$test_port" -sTCP:LISTEN
 agent_file="$BIU_WEB_AGENT_FILE"
 cp "$agent_file" "$agent_file.bak-$release_stamp"
 # 清理历史追加的入口参数；前提是此服务只使用 Node + 入口两个参数。
+# 不要逐项 plutil -replace ProgramArguments.N：数组下标已存在时是插入而非替换，参数会越积越多。
 plutil -replace ProgramArguments -json '[]' "$agent_file"
 plutil -insert ProgramArguments.0 -string "$BIU_WEB_NODE" "$agent_file"
 plutil -insert ProgramArguments.1 -string "$release_root/dist/server/web-server/index.js" "$agent_file"
@@ -480,11 +483,34 @@ curl --max-time 15 -sS -o /dev/null -w 'http=%{http_code} verify=%{ssl_verify_re
 
 数据异常时：停止新写入、保留现场、做副本、比较版本与历史。不要手改 JSON、删除墓碑、全量上传空快照或用浏览器缓存覆盖服务器数据。
 
+### 6.1 可选：歌词对齐服务
+
+`biu-align-server` 是独立的常驻服务（说明与接口见 [biu-align-server/README.md](../../biu-align-server/README.md)）：客户端提交 bvid + cid 和歌词，服务端自己取音频、分离人声、强制对齐，结果按投稿与歌词缓存。不部署它，客户端仍可使用其他歌词来源，只是没有自动对齐。
+
+部署原则（具体主机、端口、路径一律放私有配置）：
+
+- 与 Web、sync **各自独立**的 LaunchAgent（或 systemd 单元）和各自的隧道；发布 Web 时不重启它，升级它时不碰 Web 与 sync。
+- 只监听本机回环地址，前面由反代转发到私有隧道；单进程、一次只跑一个任务，不能开 cluster。
+- `JWT_SECRET` 必须与 sync 相同，`ADMIN_MIDS`（审核员 UID）、数据目录、工作目录、Python 解释器都写在仓库外、权限 `600` 的 `.env`；各 release 里的 `.env` 用软链指向它，不写进仓库和文档。
+- Python 环境单独建虚拟环境并安装 `worker/requirements.txt`；模型权重、词典等运行期资源放在 release 之外或随 release 一起拷贝，升级时逐项核对，缺失会让对应语种的任务全部失败。
+- 进程优先级保持标准级别；设为后台级别会被系统限制 CPU，单首对齐耗时显著变长。
+- 需要足够内存：单任务峰值数 GB，机器要为它留出余量。
+
+升级顺序：本地 `pnpm test && pnpm build` → 打包 `dist/`、`worker/`、`package.json`、`pnpm-lock.yaml`（清掉 `__pycache__`）→ 两端比对 SHA-256 → 新 release 目录安装生产依赖 → 备份服务定义后改入口与工作目录 → 卸载并**等服务消失**再加载 → 健康检查。回滚是把服务定义指回上一个 release 并重复卸载/加载；数据目录在 release 之外，不随之变化。
+
+两条红线：
+
+1. **客户端改了对齐接口时，服务端必须同时升级。** 客户端先发版会让依赖新接口的页面整页加载失败、自动对齐不生效。
+2. 需要清缓存时，在卸载服务**之后**、加载之前删文件；先删文件后停进程，运行中的进程会把内存里那份写回去。
+
+排障：服务日志里每个失败任务一行（任务号、投稿、错误码、原因），worker 崩溃时附 stderr 尾部。公网 502 按「反代 → 隧道 → 本机监听」的顺序查，判法同 Web 隧道。
+
 ## 7. 事故与回滚
 
 | 现象 | 首先检查 | 禁止操作 |
 | --- | --- | --- |
 | 公网 `502` | Web 本机健康检查、服务状态、Web 隧道、反代 | 先改 DNS、重签证书或重启 sync |
+| 歌词对齐 `502` 或整页加载失败 | 对齐服务本机健康检查、对齐隧道、客户端与服务端版本是否匹配 | 重启 sync 或 Web、手改对齐数据目录 |
 | 桌面同步失败 | sync 本机健康检查、sync 隧道、既有同步 API | 新建第二份数据目录或从 Web release 找数据 |
 | Web 登录后歌单不同步 | 登录状态、同步桥接、通知通道、源码一致性 | 导出 Cookie/JWT 到前端、覆盖服务器 JSON |
 | 证书续期失败 | 先确认域名归哪套签发体系、再看对应 ACME 日志与续期任务状态 | 删除旧证书、暴露终端/SSH、部署测试证书 |
