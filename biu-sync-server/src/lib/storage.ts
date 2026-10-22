@@ -125,6 +125,7 @@ export async function mutateEnvelope(
   return withMutex(`${mid}:${store}`, async () => {
     const current = await readEnvelope(mid, store);
     const next = mutate(current);
+    if (next === current) return current;
     // 覆盖前先存历史：历史保存失败绝不能阻断正常同步，但要留日志
     await saveHistory(mid, store, current).catch(err =>
       console.error(`[storage] history save failed mid=${mid} store=${store}`, err),
@@ -136,10 +137,12 @@ export async function mutateEnvelope(
   });
 }
 
-/** 三个 store 的当前版本号，供长轮询比对（只读 version 字段，但文件本来就整份读，无额外成本） */
+// 排行复用既有通知通道，但不进入歌单的覆盖 / 删除合并接口。
 export async function getVersions(mid: string): Promise<Record<string, number>> {
   const entries = await Promise.all(
-    STORE_NAMES.map(async store => [store, (await readEnvelope(mid, store)).version] as const),
+    [...STORE_NAMES, "play-counts" as const].map(
+      async store => [store, (await readEnvelope(mid, store)).version] as const,
+    ),
   );
   return Object.fromEntries(entries);
 }

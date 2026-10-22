@@ -2,6 +2,7 @@ import { type NextFunction, type Request, type Response, Router } from "express"
 
 import { waitForChange } from "../lib/events.js";
 import { applyOps, type SyncOp } from "../lib/merge.js";
+import { mergeRankingBatch, parseRankingBatch, rankingSnapshot, RankingRequestError } from "../lib/play-ranking.js";
 import { syncRateLimiter } from "../lib/rate-limit.js";
 import { type AuthedRequest, requireAuth } from "../lib/require-auth.js";
 import { getEnvelope, getVersions, mutateEnvelope } from "../lib/storage.js";
@@ -50,6 +51,31 @@ export function createSyncRouter(): Router {
   // 真正要防的是同步接口被异常客户端刷爆，所以限流只加在 /sync 上。
   router.get("/watch", noStore, watchHandler);
   router.use(syncRateLimiter);
+
+  router.get("/play-ranking", async (req: AuthedRequest, res) => {
+    try {
+      res.json(rankingSnapshot(await getEnvelope(req.mid!, "play-counts"), req.mid!));
+    } catch (err) {
+      console.error("[ranking] read failed", err);
+      res.status(500).json({ error: "听歌排行读取失败，请稍后手动同步" });
+    }
+  });
+
+  router.post("/play-ranking", async (req: AuthedRequest, res) => {
+    try {
+      const now = Date.now();
+      const batch = parseRankingBatch(req.body, req.mid!, now);
+      const envelope = await mutateEnvelope(req.mid!, "play-counts", current => mergeRankingBatch(current, batch, now));
+      res.json(rankingSnapshot(envelope, req.mid!, batch.deviceId));
+    } catch (err) {
+      if (err instanceof RankingRequestError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        console.error("[ranking] write failed", err);
+        res.status(500).json({ error: "听歌记录保存失败，本机待同步记录已保留" });
+      }
+    }
+  });
 
   /**
    * 长轮询：客户端带上自己已知的各 store 版本号，服务端在版本发生变化时立刻返回，

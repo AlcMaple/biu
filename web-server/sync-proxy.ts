@@ -211,6 +211,7 @@ async function relaySyncResponse(
 function allowedSyncRoute(url: URL) {
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/session`) return { kind: "session" as const };
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/watch`) return { kind: "watch" as const };
+  if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/play-ranking`) return { kind: "ranking" as const };
 
   const prefix = `${BIU_SYNC_PROXY_ROOT}/sync/`;
   if (!url.pathname.startsWith(prefix)) return undefined;
@@ -237,7 +238,7 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
 
     const method = request.method ?? "GET";
-    const allowedMethods = route.kind === "sync" ? new Set(["GET", "POST"]) : new Set(["GET"]);
+    const allowedMethods = ["sync", "ranking"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
     if (!allowedMethods.has(method)) {
       response.setHeader("Allow", [...allowedMethods].join(", "));
       jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
@@ -247,7 +248,7 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
       jsonResponse(response, 403, { code: -403, message: "跨站同步请求被拒绝" });
       return true;
     }
-    if ((route.kind === "session" || route.kind === "sync") && url.search) {
+    if (route.kind !== "watch" && url.search) {
       jsonResponse(response, 400, { code: -400, message: "同步请求参数不合法" });
       return true;
     }
@@ -278,7 +279,12 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
       }
 
       const body = method === "POST" ? await readProxyBody(request, MAX_SYNC_BODY_BYTES) : Buffer.alloc(0);
-      const pathname = route.kind === "watch" ? "/api/watch" : `/api/sync/${route.store}`;
+      const pathname =
+        route.kind === "watch"
+          ? "/api/watch"
+          : route.kind === "ranking"
+            ? "/api/play-ranking"
+            : `/api/sync/${route.store}`;
       const target = pathFor(origin, pathname, route.kind === "watch" ? url.search : "");
       let upstream = await requestSyncService(target, {
         body,
