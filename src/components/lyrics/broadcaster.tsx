@@ -22,7 +22,7 @@ const DEFAULT_OFFSET = 0;
 /** 切歌后等待多久才开始自动匹配歌词 */
 const AUTO_MATCH_DEBOUNCE_MS = 1500;
 
-const autoTried = new Set<string>();
+const autoMissed = new Set<string>();
 
 // 查不到不影响播放：记日志后照常走本地缓存 / 自动匹配。每次打开都查，新发布的版本才能及时生效。
 // 查询失败返回 undefined，和「确实没有」（null）分开：查不到时不能当成已下线把本地的逐字歌词撤掉
@@ -132,15 +132,18 @@ const LyricsBroadcaster = () => {
         if (canceled) return;
         if (!staleAuto) setLyrics([]);
 
-        // 无缓存：按标题 + 时长自动匹配歌词；每首歌每次会话只尝试一次，命中后写入缓存
-        if (autoTried.has(cacheKey)) return;
+        // 成功靠缓存复用，只记正常完成的空结果；取消也算已尝试的话，切回来会整首没歌词
+        if (autoMissed.has(cacheKey)) return;
         // 防抖：快速连切歌时，停留不足该时长的歌不发起任何请求（effect 清理会置 canceled）
         // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- 取消由 canceled 标志处理
         await new Promise(resolve => setTimeout(resolve, AUTO_MATCH_DEBOUNCE_MS));
         if (canceled) return;
-        autoTried.add(cacheKey);
         const hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled);
-        if (canceled || !hit) return;
+        if (canceled) return;
+        if (!hit) {
+          autoMissed.add(cacheKey);
+          return;
+        }
         const latest = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
         // 匹配期间用户可能已手动采用歌词，自动结果不得覆盖
         const now = latest[cacheKey];
@@ -156,7 +159,9 @@ const LyricsBroadcaster = () => {
             autoVersion: AUTO_MATCH_VERSION,
           },
         });
-        if (!isLocal && hit.lyrics) useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
+        if (!canceled && !isLocal && hit.lyrics) {
+          useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
+        }
       } catch {
         if (!canceled) setLyrics([]);
       } finally {
