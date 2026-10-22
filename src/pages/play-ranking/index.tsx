@@ -18,7 +18,6 @@ const PlayRanking = () => {
   const sameAccount = state.mid === mid;
   const list = sameAccount ? rankingItems(state.records, period) : [];
   const loading = state.loading || !sameAccount;
-  const pending = sameAccount ? state.pending : 0;
   const error = sameAccount ? state.error : undefined;
 
   useEffect(() => {
@@ -29,24 +28,6 @@ const PlayRanking = () => {
     <ScrollContainer pageScroll enableBackToTop className="h-full w-full px-4">
       <div className="mb-2">
         <h1>我的听歌排行</h1>
-        <div className="text-foreground-500 mt-2 flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
-          <span>
-            {!mid
-              ? "未登录 · 仅本机记录"
-              : error
-                ? state.updatedAt === undefined
-                  ? "同步失败 · 尚未读取云端排行"
-                  : "同步失败 · 显示上次云端结果"
-                : pending
-                  ? `云端排行 · ${pending} 次待同步`
-                  : loading
-                    ? "正在同步云端排行"
-                    : state.updatedAt === undefined
-                      ? "尚未读取云端排行"
-                      : "云端排行 · 已同步"}
-          </span>
-          {error && pending > 0 && <span>{pending} 次待同步</span>}
-        </div>
         {error && (
           <p role="alert" className="text-danger mt-2 text-sm">
             {error}

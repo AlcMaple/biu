@@ -67,6 +67,7 @@ export const DefaultMenuList: DefaultMenuItem[] = [
   {
     title: "听歌排行",
     href: "/play-ranking",
+    needLogin: true,
     icon: RiTrophyLine,
     activeIcon: RiTrophyFill,
   },
