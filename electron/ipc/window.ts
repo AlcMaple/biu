@@ -93,8 +93,11 @@ export function registerWindowHandlers({ getMainWindow }) {
       return false;
     } else {
       createDesktopLyricsWindow(() => {
-        // 窗口被用户从内部关闭时通知主窗口
-        getMainWindow()?.webContents.send(channel.window.desktopLyricsVisibilityChanged, false);
+        // 窗口被用户从内部关闭时通知主窗口；退出应用时主窗口可能先于歌词窗销毁，
+        // 此时 mainWindow 引用还没置空，直接 send 会抛 "Object has been destroyed"
+        const mainWindow = getMainWindow();
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send(channel.window.desktopLyricsVisibilityChanged, false);
       });
       return true;
     }
