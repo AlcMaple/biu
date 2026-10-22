@@ -148,17 +148,18 @@ const LyricsBroadcaster = () => {
         // 匹配期间用户可能已手动采用歌词，自动结果不得覆盖
         const now = latest[cacheKey];
         if (canceled || (now?.source !== "auto" && (now?.lyrics || now?.tLyrics))) return;
-        setLyrics(parseLrc(hit.lyrics), parseLrc(hit.tLyrics));
-        await platform.setStore(StoreNameMap.LyricsCache, {
-          ...latest,
-          [cacheKey]: {
-            ...(latest[cacheKey] || {}),
-            lyrics: hit.lyrics,
-            tLyrics: hit.tLyrics,
-            source: "auto",
-            autoVersion: AUTO_MATCH_VERSION,
-          },
-        });
+        // 来源信息随歌词一起换：网易云 / LrcLib 命中要清掉上一份歌词遗留的平台来源与逐字时间
+        const entryOfHit = {
+          ...(latest[cacheKey] || {}),
+          lyrics: hit.lyrics,
+          tLyrics: hit.tLyrics,
+          source: "auto" as const,
+          autoVersion: AUTO_MATCH_VERSION,
+          origin: hit.origin,
+          nativeTiming: hit.nativeTiming,
+        };
+        setLyrics(linesOfEntry(entryOfHit), parseLrc(hit.tLyrics));
+        await platform.setStore(StoreNameMap.LyricsCache, { ...latest, [cacheKey]: entryOfHit });
         if (!canceled && !isLocal && hit.lyrics) {
           useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
         }

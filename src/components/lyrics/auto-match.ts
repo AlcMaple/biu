@@ -1,6 +1,10 @@
+import type { LyricsProvider } from "@shared/lyrics-format";
+import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
+
 import platform from "@/platform";
 
 import { parseLrc } from "./parse-lrc";
+import { buildProviderAdoption, PROVIDER_LABELS } from "./provider-lyrics";
 import { foldVariants } from "./variant-fold";
 
 // 改动提取或打分后升级，只重匹配自动缓存；手动采用的歌词保留。案例见 docs/lyrics/自动匹配歌词-错误案例.md。
@@ -14,6 +18,16 @@ const MAX_CANDIDATES = 4;
 const MAX_LYRICS_TRIES = 3;
 /** 同一首歌的相邻两次外部请求之间的最小间隔（毫秒），避免触发上游限流 */
 const REQUEST_GAP_MS = 700;
+// QQ / 酷狗 / AMLL 只在网易云、LrcLib 都没命中时兜底，顺序即优先级：QQ、酷狗有时长可校验，AMLL 没有，放最后
+const FALLBACK_PROVIDERS: readonly LyricsProvider[] = ["qq", "kugou", "amll"];
+const PROVIDER_MAX_SEARCHES = 2;
+const PROVIDER_MAX_LYRICS_TRIES = 2;
+// 渠道的每分钟 30 次预算（Web BFF 上是所有用户共用）要留一半给用户手动搜索，自动匹配最多占这个数
+const AUTO_PROVIDER_REQUESTS_PER_MINUTE = 12;
+const PROVIDER_WINDOW_MS = 60_000;
+const DEFAULT_PROVIDER_COOLDOWN_MS = 60_000;
+// 没有曲库时长的候选（AMLL）靠歌词末行兜底：末行不该晚于视频结束，也不该只占视频的一小段
+const MIN_LAST_LINE_RATIO = 0.5;
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
@@ -36,8 +50,24 @@ const CONFIDENT_SCORE = -3;
 export interface AutoLyricsResult {
   lyrics: string;
   tLyrics?: string;
-  from: "netease" | "lrclib";
+  from: "netease" | "lrclib" | LyricsProvider;
+  origin?: LyricsOrigin;
+  nativeTiming?: NativeLyricsTiming;
 }
+
+// 渠道冷却与自动预算只在渲染端记：真正的限流闸在各端的 provider client 里，这里是让自动匹配比手动搜索更早收手
+const providerCooldownUntil = new Map<LyricsProvider, number>();
+const providerSentAt = new Map<LyricsProvider, number[]>();
+
+const providerAvailable = (provider: LyricsProvider) => {
+  const now = Date.now();
+  if ((providerCooldownUntil.get(provider) ?? 0) > now) return false;
+  const recent = (providerSentAt.get(provider) ?? []).filter(t => t > now - PROVIDER_WINDOW_MS);
+  providerSentAt.set(provider, recent);
+  return recent.length < AUTO_PROVIDER_REQUESTS_PER_MINUTE;
+};
+
+const markProviderSent = (provider: LyricsProvider) => providerSentAt.get(provider)?.push(Date.now());
 
 const BRACKET_PAIRS = /【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g;
 const BOOK_QUOTE = /《([^》]+)》/;
@@ -274,6 +304,119 @@ const fromLrclib = async (
   return null;
 };
 
+interface ProviderFailure {
+  kind: string;
+  retryAfterMs?: number;
+}
+
+// 限流 / 服务异常之后这个渠道本轮不再碰；其他错误只放弃当前这次，不重试。都留一条日志，免得「没匹配到」看不出原因
+const stopProvider = (provider: LyricsProvider, error: ProviderFailure) => {
+  console.warn(`[auto-match] ${PROVIDER_LABELS[provider]}跳过：${error.kind}`);
+  if (error.kind === "rate_limited" || error.kind === "upstream") {
+    providerCooldownUntil.set(provider, Date.now() + (error.retryAfterMs ?? DEFAULT_PROVIDER_COOLDOWN_MS));
+  }
+};
+
+const pickProvider = (
+  list: ProviderLyricsCandidate[],
+  title: string,
+  rawNorm: string,
+  themeTitle: string,
+  duration: number,
+) => {
+  const themeAllowed =
+    normalize(title) === themeTitle &&
+    hasUniqueThemeArtist(
+      list.map(c => ({
+        name: c.title,
+        artists: c.artists,
+        duration: c.durationMs ? c.durationMs / 1000 : undefined,
+      })),
+      themeTitle,
+      duration,
+    );
+  const scored: { candidate: ProviderLyricsCandidate; score: number }[] = [];
+  for (const candidate of list) {
+    if (!candidate.title || !titleMatches(candidate.title, title)) continue;
+    const artistHit = hasArtistEvidence(candidate.artists, rawNorm);
+    const trackDuration = candidate.durationMs ? candidate.durationMs / 1000 : undefined;
+    const shortTitle =
+      normalize(title).length <= SHORT_TITLE_LEN ||
+      (themeTitle.length === SHORT_TITLE_LEN && normalize(candidate.title) === themeTitle);
+    const themeHit =
+      themeAllowed && normalize(candidate.title) === themeTitle && closeThemeDuration(trackDuration, duration);
+    if (shortTitle && !artistHit && !themeHit) continue;
+    let score = 0;
+    if (trackDuration) {
+      const diff = Math.abs(trackDuration - duration);
+      if (diff > MAX_DURATION_DIFF) continue;
+      score += diff;
+    } else if (!artistHit) {
+      // 没有时长可校验时，同名歌太多，只接受视频标题里出现了歌手的
+      continue;
+    }
+    if (normalize(candidate.title) === normalize(title)) score -= 3;
+    if (artistHit) score -= 6;
+    scored.push({ candidate, score });
+  }
+  return scored;
+};
+
+const fromProvider = async (
+  provider: LyricsProvider,
+  candidates: string[],
+  rawNorm: string,
+  themeTitle: string,
+  isCanceled: IsCanceled,
+  duration: number,
+): Promise<AutoLyricsResult | null> => {
+  const pool = new Map<string, { candidate: ProviderLyricsCandidate; score: number }>();
+  for (const [i, title] of candidates.slice(0, PROVIDER_MAX_SEARCHES).entries()) {
+    if (i > 0) await sleep(REQUEST_GAP_MS);
+    if (isCanceled() || !providerAvailable(provider)) return null;
+    markProviderSent(provider);
+    const res = await platform.searchProviderLyrics({ provider, title });
+    if (!res.ok) {
+      stopProvider(provider, res.error);
+      return null;
+    }
+    for (const hit of pickProvider(res.data, title, rawNorm, themeTitle, duration)) {
+      const prev = pool.get(hit.candidate.id);
+      if (!prev || hit.score < prev.score) pool.set(hit.candidate.id, hit);
+    }
+    if ([...pool.values()].some(h => h.score <= CONFIDENT_SCORE)) break;
+  }
+  const ranked = [...pool.values()].toSorted((x, y) => x.score - y.score).slice(0, PROVIDER_MAX_LYRICS_TRIES);
+  for (const { candidate } of ranked) {
+    await sleep(REQUEST_GAP_MS);
+    if (isCanceled() || !providerAvailable(provider)) return null;
+    // 酷狗取词是两次串行请求，按两次计预算
+    markProviderSent(provider);
+    if (provider === "kugou") markProviderSent(provider);
+    const res = await platform.getProviderLyrics({
+      provider,
+      id: candidate.id,
+      durationMs: candidate.durationMs,
+      title: candidate.title,
+      artist: candidate.artists.join("、"),
+    });
+    if (!res.ok) {
+      if (res.error.kind === "not_found") continue;
+      stopProvider(provider, res.error);
+      return null;
+    }
+    const adoption = buildProviderAdoption(res.data, candidate);
+    const lines = parseLrc(adoption.lyrics);
+    if (lines.length < 3) continue;
+    if (!candidate.durationMs) {
+      const lastSec = lines[lines.length - 1].time / 1000;
+      if (lastSec > duration + MAX_DURATION_DIFF || lastSec < duration * MIN_LAST_LINE_RATIO) continue;
+    }
+    return { ...adoption, from: provider };
+  }
+  return null;
+};
+
 // 短歌名通常需要歌手证据；明确主题歌的两字歌名，仅在精确同名、时差极小且无不同歌手歧义时补足证据。
 export const autoMatchLyrics = (
   rawTitle: string,
@@ -294,8 +437,23 @@ export const autoMatchLyrics = (
     if (isCanceled()) return null;
     await sleep(REQUEST_GAP_MS);
     try {
-      return await fromLrclib(candidates, rawNorm, themeTitle, isCanceled, duration);
+      const hit = await fromLrclib(candidates, rawNorm, themeTitle, isCanceled, duration);
+      if (hit) return hit;
     } catch {
-      return null;
+      // LrcLib 失败则继续走 QQ / 酷狗 / AMLL
     }
+    // 视频时长未知时不敢自动采用，与 LrcLib 一致
+    if (!duration) return null;
+    for (const provider of FALLBACK_PROVIDERS) {
+      if (isCanceled()) return null;
+      if (!providerAvailable(provider)) continue;
+      await sleep(REQUEST_GAP_MS);
+      try {
+        const hit = await fromProvider(provider, candidates, rawNorm, themeTitle, isCanceled, duration);
+        if (hit) return hit;
+      } catch (error) {
+        console.warn(`[auto-match] ${PROVIDER_LABELS[provider]}异常`, error);
+      }
+    }
+    return null;
   });

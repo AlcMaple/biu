@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type {
+  ProviderLyricsCandidate,
+  ProviderLyricsDocument,
+  ProviderLyricsGetParams,
+  ProviderLyricsSearchParams,
+  ProviderResult,
+} from "@shared/lyrics-providers";
+
 import { autoMatchLyrics, extractSongInfo, extractTitleCandidates } from "@/components/lyrics/auto-match";
+import { parseLrcText } from "@shared/lyrics-format";
 
 import searches from "./fixtures/lyrics-auto-match-search.json";
 
@@ -8,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   searchNeteaseSongs: vi.fn<(params: SearchSongByNeteaseParams) => Promise<SearchSongByNeteaseResponse>>(),
   getNeteaseLyrics: vi.fn<(params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>>(),
   searchLrclibLyrics: vi.fn<(params: SearchSongByLrclibParams) => Promise<SearchSongByLrclibResponse[]>>(),
+  searchProviderLyrics:
+    vi.fn<(params: ProviderLyricsSearchParams) => Promise<ProviderResult<ProviderLyricsCandidate[]>>>(),
+  getProviderLyrics: vi.fn<(params: ProviderLyricsGetParams) => Promise<ProviderResult<ProviderLyricsDocument>>>(),
 }));
 vi.mock("@/platform", () => ({ default: mocks }));
 
@@ -18,8 +30,18 @@ const jinbocho = "邪神酱 / 神保町哀歌 完整版 （CV： 铃木爱奈 �
 const sakasama = "冰之城墙 ED主题歌 逆様";
 const oldCase = "超时空辉夜姬 ED「ray 超かぐや姫！Version」/ 夏吉优子、早见沙织";
 
+// 渠道冷却与自动预算是模块级状态，每个用例把时钟推到一小时后，让上一个用例留下的状态过期
+let clock = Date.parse("2026-10-23T00:00:00Z");
+
 beforeEach(() => {
   vi.useFakeTimers();
+  clock += 3_600_000;
+  vi.setSystemTime(clock);
+  mocks.searchProviderLyrics.mockResolvedValue({ ok: true, data: [] });
+  mocks.getProviderLyrics.mockResolvedValue({
+    ok: false,
+    error: { kind: "not_found", provider: "qq", message: "没有这份歌词" },
+  });
   mocks.searchNeteaseSongs.mockImplementation(async ({ s }) => ({ code: 200, result: { songs: results[s] ?? [] } }));
   mocks.getNeteaseLyrics.mockImplementation(async ({ id }) => ({
     lrc: { lyric: [3437238190, 3353527135].includes(id) ? "" : lyrics(id) },
@@ -220,5 +242,109 @@ describe("LrcLib 兜底使用相同的短歌名限制", () => {
   it.each(["", "[00:00.00]纯音乐，请欣赏", "没有时间戳的文本"])("不采用空或无有效正文的歌词 %s", async text => {
     mocks.searchLrclibLyrics.mockResolvedValue([{ ...song, syncedLyrics: text }]);
     expect(await match(sakasama, 172)).toBeNull();
+  });
+});
+
+describe("QQ / 酷狗 / AMLL 兜底", () => {
+  const body = "[00:01.00]第一行\n[00:02.00]第二行\n[00:170.00]末行".replace("00:170.00", "02:50.00");
+  const doc = (provider: "qq" | "kugou" | "amll", text = body): ProviderLyricsDocument => ({
+    provider,
+    sourceId: "s1",
+    lyrics: parseLrcText(text),
+  });
+  const cand = (
+    provider: "qq" | "kugou" | "amll",
+    extra: Partial<ProviderLyricsCandidate> = {},
+  ): ProviderLyricsCandidate => ({
+    provider,
+    id: `${provider}-1`,
+    title: "晴天",
+    artists: ["周杰伦"],
+    durationMs: 180000,
+    ...extra,
+  });
+  const only = (provider: string, candidate: ProviderLyricsCandidate) => {
+    mocks.searchProviderLyrics.mockImplementation(async p => ({
+      ok: true,
+      data: p.provider === provider ? [candidate] : [],
+    }));
+    mocks.getProviderLyrics.mockImplementation(async p => ({ ok: true, data: doc(p.provider) }));
+  };
+
+  beforeEach(() => {
+    mocks.searchNeteaseSongs.mockResolvedValue({ result: { songs: [] } });
+    mocks.searchLrclibLyrics.mockResolvedValue([]);
+  });
+
+  it("网易云、LrcLib 都没命中时按 QQ → 酷狗 → AMLL 顺序兜底，命中即停", async () => {
+    only("kugou", cand("kugou"));
+    const hit = await match("周杰伦 - 晴天", 180);
+    expect(hit).toMatchObject({ from: "kugou", origin: { provider: "kugou" } });
+    expect([...new Set(mocks.searchProviderLyrics.mock.calls.map(([p]) => p.provider))]).toEqual(["qq", "kugou"]);
+  });
+
+  it("网易云命中时完全不碰这三个渠道", async () => {
+    mocks.searchNeteaseSongs.mockResolvedValue({
+      result: { songs: [{ id: 1, name: "七里香", duration: 180000 }] },
+    });
+    expect(await match("七里香", 180)).toMatchObject({ from: "netease" });
+    expect(mocks.searchProviderLyrics).not.toHaveBeenCalled();
+  });
+
+  it("视频时长未知时不兜底", async () => {
+    only("qq", cand("qq"));
+    expect(await match("周杰伦 - 晴天")).toBeNull();
+    expect(mocks.searchProviderLyrics).not.toHaveBeenCalled();
+  });
+
+  it("时长差超过 12 秒的候选不采用", async () => {
+    only("qq", cand("qq", { durationMs: 200000 }));
+    expect(await match("周杰伦 - 晴天", 180)).toBeNull();
+  });
+
+  it("AMLL 没有曲库时长：标题里要有歌手，且歌词末行要落在视频时长内", async () => {
+    only("amll", cand("amll", { durationMs: undefined }));
+    expect(await match("周杰伦 - 晴天", 180)).toMatchObject({ from: "amll" });
+    expect(await match("晴天", 180)).toBeNull();
+    // 末行 02:50 相对 100 秒的视频太晚
+    expect(await match("周杰伦 - 晴天", 100)).toBeNull();
+  });
+
+  it("限流后该渠道本轮不再请求，其他渠道照常兜底", async () => {
+    mocks.searchProviderLyrics.mockImplementation(async p =>
+      p.provider === "qq"
+        ? { ok: false, error: { kind: "rate_limited", provider: "qq", message: "x", retryAfterMs: 90_000 } }
+        : { ok: true, data: p.provider === "amll" ? [cand("amll")] : [] },
+    );
+    mocks.getProviderLyrics.mockImplementation(async p => ({ ok: true, data: doc(p.provider) }));
+    expect(await match("周杰伦 - 晴天", 180)).toMatchObject({ from: "amll" });
+    const qqCalls = () => mocks.searchProviderLyrics.mock.calls.filter(([p]) => p.provider === "qq").length;
+    expect(qqCalls()).toBe(1);
+    await match("周杰伦 - 晴天", 180);
+    expect(qqCalls()).toBe(1);
+  });
+
+  it("自动匹配每渠道每分钟最多占 12 次请求", async () => {
+    const sentAt: number[] = [];
+    mocks.searchProviderLyrics.mockImplementation(async p => {
+      if (p.provider === "qq") sentAt.push(Date.now());
+      return { ok: true, data: [] };
+    });
+    for (let i = 0; i < 20; i++) await match(`周杰伦 - 歌${i}`, 180);
+    expect(sentAt.length).toBeGreaterThan(12);
+    for (const t of sentAt) expect(sentAt.filter(x => x <= t && x > t - 60_000).length).toBeLessThanOrEqual(12);
+  });
+
+  it("取词返回无有效正文时换下一个候选", async () => {
+    mocks.searchProviderLyrics.mockImplementation(async p => ({
+      ok: true,
+      data: p.provider === "qq" ? [cand("qq", { id: "a" }), cand("qq", { id: "b", durationMs: 181000 })] : [],
+    }));
+    mocks.getProviderLyrics.mockImplementation(async p => ({
+      ok: true,
+      data: doc("qq", p.id === "a" ? "[00:01.00]纯音乐" : body),
+    }));
+    expect(await match("周杰伦 - 晴天", 180)).toMatchObject({ from: "qq" });
+    expect(mocks.getProviderLyrics).toHaveBeenCalledTimes(2);
   });
 });
