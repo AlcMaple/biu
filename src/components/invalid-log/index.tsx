@@ -43,12 +43,7 @@ const InvalidLogModal = ({ folderId, isOpen, onClose, onManualSearch }: Props) =
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside">
       <ModalContent>
-        <ModalHeader className="flex-col items-start gap-1">
-          失效记录
-          <span className="text-foreground-500 text-xs font-normal">
-            打开歌单时会自动为失效视频寻找同名视频，歌名和时长都对得上才会替换
-          </span>
-        </ModalHeader>
+        <ModalHeader className="flex-col items-start gap-1">失效记录</ModalHeader>
         <ModalBody className="pb-6">
           {!logs.length && (
             <div className="text-foreground-500 py-10 text-center text-sm">这个歌单暂时没有失效记录</div>
