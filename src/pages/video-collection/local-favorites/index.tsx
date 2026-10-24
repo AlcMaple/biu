@@ -28,6 +28,7 @@ import {
   RiPlayFill,
   RiFocus3Line,
   RiPlayListAddLine,
+  RiSearchLine,
   RiStarLine,
   RiStarOffLine,
 } from "@remixicon/react";
@@ -42,10 +43,13 @@ import {
   toLocalFavoriteModalData,
 } from "@/common/utils/fav";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
+import { autoReplaceFolder, seedDebugInvalidLogs } from "@/common/utils/replace-invalid";
 import { formatMillisecond, parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
 import IconButton from "@/components/icon-button";
+import InvalidLogModal from "@/components/invalid-log";
+import ManualSearchModal from "@/components/invalid-log/manual-search";
 import MusicListItem from "@/components/music-list-item";
 import MusicListHeader, { type MusicListSortKey } from "@/components/music-list-item/header";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
@@ -79,7 +83,8 @@ const getLocalItemTagTarget = (item: LocalFavItem) => ({
   cid: item.cid,
 });
 
-const getLocalItemMenus = (isBiliItem: boolean) => [
+const getLocalItemMenus = (isBiliItem: boolean, invalid?: boolean) => [
+  { key: "find-replacement", label: "搜索替代视频", icon: <RiSearchLine size={18} />, hidden: !invalid },
   { key: "favorite", label: "移动", icon: <RiStarLine size={18} /> },
   { key: "remove", label: "取消收藏", icon: <RiStarOffLine size={18} /> },
   { key: "play-next", label: "下一首播放", icon: <RiPlayCircleLine size={18} /> },
@@ -102,7 +107,8 @@ const LocalFavorites = () => {
   const [sortKey, setSortKey] = useState<MusicListSortKey>("time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
-  const [showInvalidOnly, setShowInvalidOnly] = useState(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
+  const [manualTarget, setManualTarget] = useState<LocalFavItem | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<LocalFavItem | null>(null);
   const { isOpen: isRenameOpen, onOpen: onRenameOpen, onClose: onRenameClose } = useDisclosure();
@@ -139,9 +145,6 @@ const LocalFavorites = () => {
         return activeTagIds.some(tid => tags.includes(tid));
       });
     }
-    if (showInvalidOnly) {
-      result = result.filter(i => i.invalid);
-    }
     const sign = sortDir === "asc" ? 1 : -1;
     return [...result].sort((a, b) => {
       let diff = 0;
@@ -162,7 +165,7 @@ const LocalFavorites = () => {
       }
       return sign * diff;
     });
-  }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags, showInvalidOnly]);
+  }, [rawItems, keyword, sortKey, sortDir, activeTagIds, itemTags]);
 
   const handleLocate = useCallback(() => {
     const playItem = usePlayList.getState().getPlayItem();
@@ -191,7 +194,7 @@ const LocalFavorites = () => {
     flash(result.index);
   }, [flash, items, rawItems]);
 
-  const invalidCount = useMemo(() => rawItems.filter(item => item.invalid).length, [rawItems]);
+  const logCount = useLocalFavItemsStore(s => s.replaceLogs?.[folderId]?.length ?? 0);
 
   // 当前歌单内实际用到的标签（标签筛选只针对歌单内部）
   const availableTagIds = useMemo(() => {
@@ -206,7 +209,7 @@ const LocalFavorites = () => {
     setSortKey("time");
     setSortDir("desc");
     setActiveTagIds([]);
-    setShowInvalidOnly(false);
+    setIsLogOpen(false);
   }, [folderIdStr]);
 
   // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量和时长
@@ -228,6 +231,7 @@ const LocalFavorites = () => {
         updatePlayCounts(folderId, playByRid);
         // 旧版播放栏收藏入口没有把时长写入本地歌单，这里用同一批 infos 数据补全
         updateDurations(folderId, durationByRid);
+        return autoReplaceFolder(folderId);
       })
       .catch(() => invalidCheckedFolders.delete(folderId));
   }, [folderId, updateInvalidFlags, updatePlayCounts, updateDurations]);
@@ -297,7 +301,7 @@ const LocalFavorites = () => {
   const handleItemPress = useCallback(
     (item: LocalFavItem) => {
       if (item.invalid) {
-        addToast({ title: "该内容已失效，无法播放", color: "warning" });
+        setIsLogOpen(true);
         return;
       }
       const playItem = itemToPlayItem(item);
@@ -409,6 +413,9 @@ const LocalFavorites = () => {
             addToast({ title: "已添加到播放列表", color: "success" });
           }
           break;
+        case "find-replacement":
+          setManualTarget(item);
+          break;
         case "rename":
           setRenameTarget(item);
           setRenameValue(item.title);
@@ -458,16 +465,36 @@ const LocalFavorites = () => {
     onRenameClose();
   }, [renameValue, renameTarget, renameItem, folderId, itemToPlayItem, onRenameClose]);
 
-  const toggleInvalid = () => setShowInvalidOnly(value => !value);
+  const openLog = () => setIsLogOpen(true);
+  // 仅开发环境：生成已替换 / 待处理 / 搜索出错三种失效记录，并让之后的搜索走模拟数据，不请求 B 站
+  const handleSimulateInvalid = useCallback(() => {
+    const source = rawItems.find(i => i.type === 2 && !i.invalid && !isLocalSourceItem(i));
+    if (!source) {
+      addToast({ title: "歌单里没有可用来模拟的在线视频", color: "warning" });
+      return;
+    }
+    seedDebugInvalidLogs(folderId, source);
+    setIsLogOpen(true);
+  }, [folderId, rawItems]);
+
   const dropdownMenuItems = [
     {
+      key: "simulate-invalid",
+      label: "【调试】生成失效记录演示数据",
+      hidden: !import.meta.env.DEV,
+      startContent: <RiErrorWarningLine size={18} />,
+      className: undefined as string | undefined,
+      color: undefined as "danger" | undefined,
+      onPress: handleSimulateInvalid,
+    },
+    {
       key: "filter-invalid",
-      label: showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`,
+      label: `失效记录 (${logCount})`,
       hidden: !isMobileLayout,
       startContent: <RiErrorWarningLine size={18} />,
       className: undefined as string | undefined,
       color: undefined as "danger" | undefined,
-      onPress: toggleInvalid,
+      onPress: openLog,
     },
     {
       key: "clear-invalid",
@@ -497,14 +524,8 @@ const LocalFavorites = () => {
   ].filter(m => !(m.key === "delete" && folder?.isDefault));
 
   const invalidButton = (
-    <Button
-      variant="flat"
-      color={showInvalidOnly ? "danger" : "default"}
-      startContent={<RiErrorWarningLine size={16} />}
-      onPress={toggleInvalid}
-      className="shrink-0"
-    >
-      {showInvalidOnly ? "显示全部内容" : `失效内容 (${invalidCount})`}
+    <Button variant="flat" startContent={<RiErrorWarningLine size={16} />} onPress={openLog} className="shrink-0">
+      {`失效记录 (${logCount})`}
     </Button>
   );
   const tagFilter = (
@@ -616,7 +637,7 @@ const LocalFavorites = () => {
                 duration={item.duration}
                 pubTime={formatMillisecond(item.fav_time)}
                 invalid={item.invalid}
-                menus={getLocalItemMenus(!isLocalSourceItem(item))}
+                menus={getLocalItemMenus(!isLocalSourceItem(item), item.invalid)}
                 onMenuAction={key => handleMenuAction(key, item)}
                 onPress={() => handleItemPress(item)}
               />
@@ -629,11 +650,16 @@ const LocalFavorites = () => {
           </div>
         )}
         {items.length === 0 && rawItems.length > 0 && (
-          <div className="py-16 text-center text-sm text-zinc-400">
-            {showInvalidOnly ? "没有已标记为失效的内容" : "没有符合搜索条件的内容"}
-          </div>
+          <div className="py-16 text-center text-sm text-zinc-400">没有符合搜索条件的内容</div>
         )}
       </div>
+      <InvalidLogModal
+        folderId={folderId}
+        isOpen={isLogOpen}
+        onClose={() => setIsLogOpen(false)}
+        onManualSearch={entry => setManualTarget(entry.original)}
+      />
+      <ManualSearchModal folderId={folderId} target={manualTarget} onClose={() => setManualTarget(null)} />
       <Modal isOpen={isRenameOpen} onClose={onRenameClose} size="sm">
         <ModalContent>
           <ModalHeader className="flex items-center gap-2">

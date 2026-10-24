@@ -40,9 +40,27 @@ export interface LocalFavItem {
   invalid?: boolean;
 }
 
+/** 失效视频的处理记录：自动替换的结果、没找到可信候选的待处理项、搜索出错的项 */
+export interface ReplaceLog {
+  /** 原失效项的 rid，同时是记录在歌单内的唯一键 */
+  id: string;
+  status: "replaced" | "pending" | "error";
+  /** 失效项的原样快照，撤销或候选耗尽时据此还原 */
+  original: LocalFavItem;
+  /** status=replaced 时歌单里当前顶替它的视频 */
+  current?: { rid: string | number; bvid?: string; title: string };
+  /** 已经看过的候选 bvid，「换一个」不会重复给出 */
+  tried: string[];
+  time: number;
+  mode: "auto" | "manual";
+  reason?: string;
+}
+
 interface State {
   /** folderId -> items */
   folderItems: Record<number, LocalFavItem[]>;
+  /** folderId -> 失效处理记录 */
+  replaceLogs: Record<number, ReplaceLog[]>;
 }
 
 interface Action {
@@ -57,6 +75,15 @@ interface Action {
   mergeFolder: (fromId: number, toId: number) => void;
   /** 跨所有收藏夹按 rid 设置自定义歌手 */
   setCustomArtistByRid: (rid: string | number, artist: string | undefined) => void;
+  /**
+   * 用 next 替换原项并保留原位置、收藏时间和自定义歌手；
+   * 收藏夹里已有 next 时不重复插入，只移除旧项。next.invalid 不传即清除失效标记（撤销时传 true 还原）。
+   */
+  replaceItem: (folderId: number, oldRid: string | number, next: Omit<LocalFavItem, "fav_time">) => void;
+  upsertReplaceLog: (folderId: number, log: ReplaceLog) => void;
+  removeReplaceLog: (folderId: number, id: string) => void;
+  /** 清掉对应视频已不在歌单里、或失效项已恢复有效的记录 */
+  pruneReplaceLogs: (folderId: number) => void;
   /**
    * 按检测结果刷新失效标记：checkedRids 中的项，命中 invalidRids 则标记失效，
    * 否则清除标记（资源恢复有效时摘掉旧标记）；未检测到的项保持原状。
@@ -80,6 +107,7 @@ export const useLocalFavItemsStore = create<State & Action>()(
   persist(
     (set, get) => ({
       folderItems: {},
+      replaceLogs: {},
       addItem: (folderId, item) =>
         set(state => {
           const current = state.folderItems[folderId] ?? [];
@@ -136,6 +164,46 @@ export const useLocalFavItemsStore = create<State & Action>()(
           const next = { ...state.folderItems, [toId]: merged };
           delete next[fromId];
           return { folderItems: next };
+        }),
+      replaceItem: (folderId, oldRid, next) =>
+        set(state => {
+          const current = state.folderItems[folderId] ?? [];
+          const index = current.findIndex(i => String(i.rid) === String(oldRid));
+          if (index === -1) return {};
+          const duplicated = current.some((i, idx) => idx !== index && String(i.rid) === String(next.rid));
+          if (duplicated) {
+            return { folderItems: { ...state.folderItems, [folderId]: current.filter((_, idx) => idx !== index) } };
+          }
+          const old = current[index];
+          const updated = [...current];
+          updated[index] = { ...next, fav_time: old.fav_time, customArtist: old.customArtist, invalid: next.invalid };
+          return { folderItems: { ...state.folderItems, [folderId]: updated } };
+        }),
+      upsertReplaceLog: (folderId, log) =>
+        set(state => {
+          const current = state.replaceLogs?.[folderId] ?? [];
+          const rest = current.filter(l => l.id !== log.id);
+          return { replaceLogs: { ...state.replaceLogs, [folderId]: [log, ...rest] } };
+        }),
+      removeReplaceLog: (folderId, id) =>
+        set(state => ({
+          replaceLogs: {
+            ...state.replaceLogs,
+            [folderId]: (state.replaceLogs?.[folderId] ?? []).filter(l => l.id !== id),
+          },
+        })),
+      pruneReplaceLogs: folderId =>
+        set(state => {
+          const logs = state.replaceLogs?.[folderId];
+          if (!logs?.length) return {};
+          const items = state.folderItems[folderId] ?? [];
+          const kept = logs.filter(log => {
+            if (log.status === "replaced") return items.some(i => String(i.rid) === String(log.current?.rid));
+            const origin = items.find(i => String(i.rid) === log.id);
+            return Boolean(origin?.invalid);
+          });
+          if (kept.length === logs.length) return {};
+          return { replaceLogs: { ...state.replaceLogs, [folderId]: kept } };
         }),
       updateInvalidFlags: (folderId, invalidRids, checkedRids) =>
         set(state => {
@@ -242,7 +310,7 @@ export const useLocalFavItemsStore = create<State & Action>()(
           await platform.clearStore(StoreNameMap.LocalFavItems);
         },
       },
-      partialize: state => ({ folderItems: state.folderItems }),
+      partialize: state => ({ folderItems: state.folderItems, replaceLogs: state.replaceLogs }),
     },
   ),
 );

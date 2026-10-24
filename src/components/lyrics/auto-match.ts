@@ -149,6 +149,12 @@ export const extractSongInfo = (rawTitle: string) => ({
   title: extractTitleCandidates(rawTitle)[0] ?? rawTitle.trim(),
 });
 
+/** 视频标题是否含有该歌名（忽略大小写、标点、繁简） */
+export const titleIncludesSong = (videoTitle: string, songName: string) => {
+  const song = normalize(songName);
+  return song.length > 0 && normalize(videoTitle).includes(song);
+};
+
 const titleMatches = (songName: string, title: string) => {
   const a = normalize(songName);
   const b = normalize(title);
