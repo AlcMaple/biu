@@ -174,6 +174,25 @@ describe("Web 歌词 BFF", () => {
     expect(JSON.parse(state.body)).toEqual({ code: -502, message: "歌词服务暂不可用" });
   });
 
+  it("上游失败时日志带上游域名、状态码和 cf-ray", async () => {
+    const fetchUpstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("bad gateway", { status: 502, headers: { "cf-ray": "8f1e2d3c4b5a6978-HKG" } }));
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, logger, publicOrigin: ORIGIN });
+    const { response, state } = createResponse();
+
+    await handler(createRequest(`${WEB_LYRICS_PROXY_PATHS.lrclibSearch}?q=spiral`), response);
+
+    expect(state.status).toBe(502);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[web-lyrics] upstream request failed",
+      "lrclib.net",
+      "status=502 cf-ray=8f1e2d3c4b5a6978-HKG",
+      "歌词服务暂不可用",
+    );
+  });
+
   it("上游超时时返回 504，而不是让浏览器一直等待", async () => {
     const fetchUpstream = vi.fn<typeof fetch>().mockImplementation(
       (_input, init) =>

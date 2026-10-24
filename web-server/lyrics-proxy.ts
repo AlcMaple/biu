@@ -284,14 +284,20 @@ export function createWebLyricsProxyHandler(options: WebLyricsProxyHandlerOption
       return true;
     }
 
+    const { target } = route;
+    // 只记 502 文案时分不清是哪家上游、对方回了什么，偶发故障无从排查
+    let upstreamDetail = "-";
     try {
-      const upstream = await fetchUpstream(route.target, {
-        headers: upstreamHeaders(route.target),
+      const upstream = await fetchUpstream(target, {
+        headers: upstreamHeaders(target),
         method: "GET",
         redirect: "error",
         signal: controller.signal,
       });
-      if (!upstream.ok) throw new ProxyRequestError("歌词服务暂不可用", 502);
+      if (!upstream.ok) {
+        upstreamDetail = `status=${upstream.status} cf-ray=${upstream.headers.get("cf-ray") ?? "-"}`;
+        throw new ProxyRequestError("歌词服务暂不可用", 502);
+      }
 
       const body = await readResponseBody(upstream, MAX_RESPONSE_BYTES);
       let payload: unknown;
@@ -304,15 +310,15 @@ export function createWebLyricsProxyHandler(options: WebLyricsProxyHandlerOption
     } catch (error) {
       if (response.writableEnded || response.destroyed || clientAborted) return true;
       if (timedOut) {
-        logger.warn("[web-lyrics] upstream request timed out");
+        logger.warn("[web-lyrics] upstream request timed out", target.host);
         sendProxyJson(response, 504, { code: -504, message: "歌词服务响应超时" });
         return true;
       }
       if (error instanceof ProxyRequestError) {
-        logger.warn("[web-lyrics] upstream request failed", error.message);
+        logger.warn("[web-lyrics] upstream request failed", target.host, upstreamDetail, error.message);
         sendProxyJson(response, error.status, { code: -error.status, message: error.message });
       } else {
-        logger.warn("[web-lyrics] upstream request failed", error);
+        logger.warn("[web-lyrics] upstream request failed", target.host, error);
         sendProxyJson(response, 502, { code: -502, message: "歌词服务暂不可用" });
       }
     } finally {
