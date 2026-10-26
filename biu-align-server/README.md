@@ -117,6 +117,8 @@ python3 -c "import json;d=json.load(open('/tmp/out.json'));print(d['lang'], len(
 
 ## 部署（Linux + systemd）
 
+> **填词歌画面识别只在 macOS 上可用**：它用系统自带的文字识别，部署前在 macOS 上执行 `pnpm --filter biu-align-server build:ocr` 编出 `worker/bin/ocr` 并随 release 一起拷贝；Python 环境需要已列在 `worker/requirements.txt` 里的 pypinyin。Linux 部署时这项功能直接报「不支持」，其余功能不受影响。
+
 机器：2 核、内存 ≥ 8 GB、磁盘 ≥ 5 GB、能访问 B 站，装好 Node 22+、pnpm、Python 3.10+、ffmpeg。升级与回滚见 [Web 生产部署与维护指南 §6.1](../docs/web/Web%20生产部署与维护指南.md)。
 
 **1. 代码与依赖**（`--ignore-scripts` 跳过客户端的 Electron 下载）

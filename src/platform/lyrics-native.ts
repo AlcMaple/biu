@@ -1,5 +1,6 @@
 import { CapacitorHttp } from "@capacitor/core";
 
+import { fetchAiSubtitle } from "@shared/bilibili-subtitle";
 import { createProviderClient } from "@shared/lyrics-provider-guard";
 import { ProviderTransportError, type ProviderTransport } from "@shared/lyrics-providers";
 
@@ -41,3 +42,5 @@ export const nativeSearchProviderLyrics: Platform["searchProviderLyrics"] = para
   client.search(nativeTransport, params);
 
 export const nativeGetProviderLyrics: Platform["getProviderLyrics"] = params => client.get(nativeTransport, params);
+
+export const nativeGetAiSubtitle: Platform["getAiSubtitle"] = url => fetchAiSubtitle(nativeTransport, url);

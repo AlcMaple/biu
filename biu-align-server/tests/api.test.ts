@@ -11,6 +11,7 @@ import { AlignmentCache, FailureCache } from "../src/lib/alignment-cache.js";
 import { AlignQueue } from "../src/lib/queue.js";
 import { RecognizedStore } from "../src/lib/recognized.js";
 import { ReportStore } from "../src/lib/reports.js";
+import { ScreenQueue } from "../src/lib/screen-queue.js";
 import { SubmissionStore } from "../src/lib/submissions.js";
 
 const BV = "BV13LFNzmEHG";
@@ -47,13 +48,26 @@ beforeAll(async () => {
       if (origin === "auto") await submissions.publishIfEmpty({ bvid, cid, lyricsHash, source: "auto" });
     },
   });
+  const recognized = new RecognizedStore(dir);
+  const screen = new ScreenQueue({
+    recognized,
+    runScreen: async (_video, subtitle) => ({
+      from: "screen",
+      lines: subtitle.map(l => ({ t: l.from, text: l.content })),
+      confident: true,
+    }),
+    getVideoPage: async (bvid, cid) => ({ bvid, cid, title: "测试投稿", part: "P1", durationSec: 200 }),
+    downloadVideo: async () => {},
+    workDir: path.join(dir, "work"),
+  });
   const server = createApp({
     queue,
     cache,
     failures,
     submissions,
     reports: new ReportStore(dir),
-    recognized: new RecognizedStore(dir),
+    recognized,
+    screen,
     rateLimitPerMinute: 1000,
   }).listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
@@ -308,6 +322,57 @@ describe("识别结果：登录用户写，所有人读", () => {
     expect((await call("GET", `/lyrics/${BV3}/1/recognized`)).json.missingUntil).toBeNull();
     expect((await call("POST", "/lyrics/recognized", "1", { bvid: BV3, cid: 1, v: 9, missing: true })).json).toEqual({
       stored: false,
+    });
+  });
+
+  describe("填词歌画面识别", () => {
+    const BV3 = "BV1At411L7cr";
+    const SUB = [
+      { from: 1, to: 2, content: "第一句" },
+      { from: 3, to: 4, content: "第二句" },
+      { from: 5, to: 6, content: "第三句" },
+    ];
+
+    it("要登录；字幕格式不对直接拒，不排队", async () => {
+      expect(
+        (await call("POST", "/lyrics/screen-jobs", undefined, { bvid: BV3, cid: 1, v: 4, subtitle: SUB })).status,
+      ).toBe(401);
+      const bad = await call("POST", "/lyrics/screen-jobs", "1", {
+        bvid: BV3,
+        cid: 1,
+        v: 4,
+        subtitle: [{ content: "x" }],
+      });
+      expect(bad.status).toBe(400);
+      const noV = await call("POST", "/lyrics/screen-jobs", "1", { bvid: BV3, cid: 1, subtitle: SUB });
+      expect(noV.status).toBe(400);
+    });
+
+    it("跑完写进已识别歌词，带来源和吻合度；再提交直接 done 不排队", async () => {
+      const r = await call("POST", "/lyrics/screen-jobs", "1", { bvid: BV3, cid: 1, v: 4, subtitle: SUB });
+      expect(r.status).toBe(202);
+      for (let i = 0; i < 50; i++) {
+        const s = await call("GET", `/lyrics/screen-jobs/${r.json.id}`, "1");
+        if (s.json.state === "done") break;
+        await new Promise(res => setTimeout(res, 10));
+      }
+      const rec = await call("GET", `/lyrics/${BV3}/1/recognized`);
+      expect(rec.json).toMatchObject({ v: 4, recognized: { from: "screen", confident: true } });
+      expect(rec.json.recognized.lyrics).toBe("[00:01.00]第一句\n[00:03.00]第二句\n[00:05.00]第三句");
+      const again = await call("POST", "/lyrics/screen-jobs", "2", { bvid: BV3, cid: 1, v: 4, subtitle: SUB });
+      expect(again).toMatchObject({ status: 200, json: { id: null, state: "done" } });
+    });
+
+    it("客户端不能冒充服务端来源上报", async () => {
+      const LRC3 = "[00:01.00]一\n[00:02.00]二\n[00:03.00]三";
+      const r = await call("POST", "/lyrics/recognized", "1", {
+        bvid: BV3,
+        cid: 2,
+        v: 4,
+        lyrics: LRC3,
+        from: "screen",
+      });
+      expect(r.status).toBe(400);
     });
   });
 });

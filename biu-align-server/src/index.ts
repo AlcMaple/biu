@@ -3,12 +3,14 @@
 //   - 只监听 127.0.0.1，由反代暴露到公网
 import { createApp } from "./app.js";
 import { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
-import { downloadAudio, getVideoPage } from "./lib/bilibili.js";
+import { downloadAudio, downloadVideo, getVideoPage } from "./lib/bilibili.js";
 import { config } from "./lib/config.js";
-import { mockDownloadAudio, mockGetVideoPage, mockRunWorker } from "./lib/mock.js";
+import { mockDownloadAudio, mockDownloadVideo, mockGetVideoPage, mockRunScreen, mockRunWorker } from "./lib/mock.js";
 import { AlignQueue } from "./lib/queue.js";
 import { RecognizedStore } from "./lib/recognized.js";
 import { ReportStore } from "./lib/reports.js";
+import { ScreenQueue } from "./lib/screen-queue.js";
+import { runScreen } from "./lib/screen-worker.js";
 import { SubmissionStore } from "./lib/submissions.js";
 import { runWorker } from "./lib/worker.js";
 
@@ -30,6 +32,13 @@ const queue = new AlignQueue({
     if (origin === "auto") await submissions.publishIfEmpty({ bvid, cid, lyricsHash, source: "auto" });
   },
 });
+const screen = new ScreenQueue({
+  recognized,
+  runScreen: mock ? mockRunScreen(config.mockDelayMs) : runScreen,
+  getVideoPage: mock ? mockGetVideoPage : getVideoPage,
+  downloadVideo: mock ? mockDownloadVideo : downloadVideo,
+  workDir: config.workDir,
+});
 
 createApp({
   queue,
@@ -38,6 +47,7 @@ createApp({
   submissions,
   reports,
   recognized,
+  screen,
   rateLimitPerMinute: config.rateLimitPerMinute,
   corsOrigin: config.corsOrigin,
 }).listen(config.port, "127.0.0.1", () => {

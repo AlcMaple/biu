@@ -1,3 +1,4 @@
+import type { AiSubtitleResult } from "@shared/bilibili-subtitle";
 import type {
   ProviderLyricsCandidate,
   ProviderLyricsDocument,
@@ -35,4 +36,8 @@ export function searchWebProviderLyrics(
 
 export function getWebProviderLyrics(params: ProviderLyricsGetParams): Promise<ProviderResult<ProviderLyricsDocument>> {
   return axiosInstance.get(WEB_LYRICS_PROXY_PATHS.providerGet, { params });
+}
+
+export function getWebAiSubtitle(url: string): Promise<AiSubtitleResult> {
+  return axiosInstance.get(WEB_LYRICS_PROXY_PATHS.aiSubtitle, { params: { url } });
 }

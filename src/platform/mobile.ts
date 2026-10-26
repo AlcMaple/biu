@@ -13,7 +13,7 @@ import type { Logger, Platform } from "./types";
 
 import { nativeAlignRequest } from "./align-native";
 import { isIOS } from "./detect";
-import { nativeGetProviderLyrics, nativeSearchProviderLyrics } from "./lyrics-native";
+import { nativeGetAiSubtitle, nativeGetProviderLyrics, nativeSearchProviderLyrics } from "./lyrics-native";
 
 /**
  * B 站 cookie 域。所有读写都对准这个域，与 Electron 端
@@ -138,6 +138,7 @@ const platform: Platform = {
   searchLrclibLyrics: async () => [],
   searchProviderLyrics: nativeSearchProviderLyrics,
   getProviderLyrics: nativeGetProviderLyrics,
+  getAiSubtitle: nativeGetAiSubtitle,
   alignRequest: nativeAlignRequest,
   getPlatform: () => (isIOS ? "ios" : "android"),
   setProxySettings: asyncNoop,

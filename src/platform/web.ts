@@ -6,6 +6,7 @@ import {
   searchWebLrclibLyrics,
   searchWebNeteaseSongs,
   searchWebProviderLyrics,
+  getWebAiSubtitle,
 } from "@/service/web-lyrics";
 import { WEB_ALIGN_PROXY_ROOT } from "@shared/lyrics-align";
 import {
@@ -270,6 +271,7 @@ const platform: Platform = {
     isOfflineDemo
       ? { ok: false, error: { kind: "unsupported_platform", provider: params.provider, message: "离线演示不支持取词" } }
       : getWebProviderLyrics(params),
+  getAiSubtitle: async url => (isOfflineDemo ? { ok: false, reason: "network" } : getWebAiSubtitle(url)),
   alignRequest: webAlignRequest,
   getPlatform: getWebPlatform,
   setProxySettings: asyncNoop,

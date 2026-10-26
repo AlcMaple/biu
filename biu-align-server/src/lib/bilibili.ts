@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import { config } from "./config.js";
-import { AlignError } from "./errors.js";
+import { AlignError, type AlignErrorCode } from "./errors.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
@@ -105,37 +105,47 @@ export async function getVideoPage(bvid: string, cid: string): Promise<VideoPage
   return { bvid, cid, title: view.title, part: page.part, durationSec: page.duration };
 }
 
-interface PlayUrlData {
-  dash?: {
-    audio?: { bandwidth: number; baseUrl?: string; base_url?: string; backupUrl?: string[]; backup_url?: string[] }[];
-  };
+interface DashStream {
+  id: number;
+  bandwidth: number;
+  codecid?: number;
+  baseUrl?: string;
+  base_url?: string;
+  backupUrl?: string[];
+  backup_url?: string[];
 }
 
-// 只取非 PCDN 的地址；全是 PCDN 时直接报错，不退而求其次（卡死比明确失败更糟，见 AGENTS.md「网络请求」）
-export async function downloadAudio(page: VideoPage, dest: string): Promise<void> {
-  const data = await biliGet<PlayUrlData>(
-    `https://api.bilibili.com/x/player/playurl?bvid=${page.bvid}&cid=${page.cid}&fnval=16&fnver=0`,
-  );
-  const audios = [...(data.dash?.audio ?? [])].sort((a, b) => a.bandwidth - b.bandwidth);
-  if (!audios.length) throw new AlignError("AUDIO_DOWNLOAD_FAILED", "playurl 没有音频流");
-  // 对齐只需要人声能听清，最低码率（约 64 kbps）足够，省部署方带宽
-  const a = audios[0];
-  const urls = [
-    ...new Set([a.baseUrl ?? a.base_url, ...(a.backupUrl ?? a.backup_url ?? [])].filter(Boolean) as string[]),
-  ];
+interface PlayUrlData {
+  dash?: { audio?: DashStream[]; video?: DashStream[] };
+}
+
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+const streamUrls = (s: DashStream) => [
+  ...new Set([s.baseUrl ?? s.base_url, ...(s.backupUrl ?? s.backup_url ?? [])].filter(Boolean) as string[]),
+];
+
+// 只取非 PCDN 的地址；全是 PCDN 时直接报错，不退而求其次（卡死比明确失败更糟，见 AGENTS.md「网络请求」）。
+// 不跟随重定向：签名地址只在这里用，跳到别处就是不认识的地址
+async function downloadFirstGood(
+  urls: string[],
+  dest: string,
+  maxBytes: number,
+  codes: { pcdnOnly: AlignErrorCode; failed: AlignErrorCode },
+): Promise<void> {
   const good = urls.filter(u => !isPcdnUrl(u));
-  if (!good.length) throw new AlignError("AUDIO_PCDN_ONLY");
+  if (!good.length) throw new AlignError(codes.pcdnOnly);
   let lastError: unknown;
   for (const url of good) {
     try {
       const res = await fetch(url, {
         headers: { "User-Agent": UA, Referer: "https://www.bilibili.com" },
         redirect: "error",
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(180_000),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const length = Number(res.headers.get("content-length") ?? 0);
-      if (length > MAX_AUDIO_BYTES) throw new AlignError("VIDEO_TOO_LONG", `音频 ${length} 字节`);
+      if (length > maxBytes) throw new AlignError("VIDEO_TOO_LONG", `${length} 字节`);
       await pipeline(Readable.fromWeb(res.body as never), createWriteStream(dest));
       return;
     } catch (err) {
@@ -143,5 +153,38 @@ export async function downloadAudio(page: VideoPage, dest: string): Promise<void
       lastError = err;
     }
   }
-  throw new AlignError("AUDIO_DOWNLOAD_FAILED", `所有非 PCDN 地址都失败：${String(lastError)}`);
+  throw new AlignError(codes.failed, `所有非 PCDN 地址都失败：${String(lastError)}`);
+}
+
+export async function downloadAudio(page: VideoPage, dest: string): Promise<void> {
+  const data = await biliGet<PlayUrlData>(
+    `https://api.bilibili.com/x/player/playurl?bvid=${page.bvid}&cid=${page.cid}&fnval=16&fnver=0`,
+  );
+  const audios = [...(data.dash?.audio ?? [])].sort((a, b) => a.bandwidth - b.bandwidth);
+  if (!audios.length) throw new AlignError("AUDIO_DOWNLOAD_FAILED", "playurl 没有音频流");
+  // 对齐只需要人声能听清，最低码率（约 64 kbps）足够，省部署方带宽
+  await downloadFirstGood(streamUrls(audios[0]), dest, MAX_AUDIO_BYTES, {
+    pcdnOnly: "AUDIO_PCDN_ONLY",
+    failed: "AUDIO_DOWNLOAD_FAILED",
+  });
+}
+
+// 480p 是匿名能拿到的最高档，也是识别画面字幕的实测够用档：换 1080p 对认不准的书法字体没有改善。
+// 只要 AVC / HEVC：AVFoundation 直接读 DASH 分段（.m4s 当 .mp4 读，不用 ffmpeg），AV1 在不带硬解的 Mac 上读不了
+const VIDEO_QN = 32;
+const READABLE_CODECS = new Set([7, 12]);
+
+export async function downloadVideo(page: VideoPage, dest: string): Promise<void> {
+  const data = await biliGet<PlayUrlData>(
+    `https://api.bilibili.com/x/player/playurl?bvid=${page.bvid}&cid=${page.cid}&qn=${VIDEO_QN}&fnval=16&fnver=0`,
+  );
+  const videos = (data.dash?.video ?? [])
+    .filter(v => v.id <= VIDEO_QN && READABLE_CODECS.has(v.codecid ?? 0))
+    // 清晰度高的优先；同档 AVC 优先（解码最省）
+    .sort((a, b) => b.id - a.id || (a.codecid === 7 ? -1 : 1) - (b.codecid === 7 ? -1 : 1));
+  if (!videos.length) throw new AlignError("VIDEO_DOWNLOAD_FAILED", "playurl 没有可读的视频流");
+  await downloadFirstGood(streamUrls(videos[0]), dest, MAX_VIDEO_BYTES, {
+    pcdnOnly: "VIDEO_PCDN_ONLY",
+    failed: "VIDEO_DOWNLOAD_FAILED",
+  });
 }

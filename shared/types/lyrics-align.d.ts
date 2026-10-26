@@ -52,6 +52,15 @@ interface AlignJobView {
   error?: { code: string; message: string };
 }
 
+// 结果不随任务返回：done 之后去「已识别歌词」读
+interface ScreenJobView {
+  id: string | null;
+  state: AlignJobState;
+  stage?: "download" | "recognize";
+  position?: number;
+  error?: { code: string; message: string };
+}
+
 type AlignSubmissionStatus = "pending" | "approved" | "rejected" | "withdrawn" | "superseded";
 
 interface AlignSubmissionBrief {
@@ -79,7 +88,14 @@ interface AlignPublished {
 
 // 客户端自动识别出的歌词（未对齐），或五个渠道都查过确实没有的标记；v 是自动匹配算法版本
 interface AlignRecognized {
-  recognized: { lyrics: string; tLyrics: string | null; from: "netease" | "lrclib" | "qq" | "kugou" | "amll" } | null;
+  recognized: {
+    lyrics: string;
+    tLyrics: string | null;
+    // screen = 识别自视频画面（用 AI 字幕校对过），subtitle = B 站 AI 字幕原文；这两种只由服务端的画面识别任务写入
+    from: "netease" | "lrclib" | "qq" | "kugou" | "amll" | "screen" | "subtitle";
+    /** 只有 screen 有：画面文字和字幕读音吻合度够高；false 时提示「可能有错字」 */
+    confident?: boolean;
+  } | null;
   missingUntil: number | null;
   v: number | null;
 }

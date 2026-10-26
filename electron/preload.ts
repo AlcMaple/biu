@@ -27,6 +27,7 @@ const api: ElectronAPI = {
   searchLrclibLyrics: params => ipcRenderer.invoke(channel.lyrics.searchLrclib, params),
   searchProviderLyrics: params => ipcRenderer.invoke(channel.lyrics.searchProvider, params),
   getProviderLyrics: params => ipcRenderer.invoke(channel.lyrics.getProvider, params),
+  getAiSubtitle: url => ipcRenderer.invoke(channel.lyrics.aiSubtitle, url),
   alignRequest: req => ipcRenderer.invoke(channel.lyrics.alignRequest, req),
   setProxySettings: proxySettings => ipcRenderer.invoke(channel.app.setProxySettings, proxySettings),
   scanLocalMusic: dirs => ipcRenderer.invoke(channel.localMusic.scan, dirs),

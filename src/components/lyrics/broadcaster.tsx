@@ -10,6 +10,7 @@ import {
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
 import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
+import { looksLikeTianci, recognizeFromScreen, screenOriginOf } from "@/components/lyrics/tianci";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
 import { isNativeMobile } from "@/platform/detect";
@@ -85,7 +86,7 @@ const LyricsBroadcaster = () => {
   // Load lyrics whenever the track changes
   useEffect(() => {
     let canceled = false;
-    const { setLyrics, setOffset, setIsLoading, reset } = useLyricsState.getState();
+    const { setLyrics, setOffset, setIsLoading, setScreenOrigin, reset } = useLyricsState.getState();
 
     reset();
 
@@ -111,6 +112,7 @@ const LyricsBroadcaster = () => {
         const cached = store && typeof store === "object" ? store[cacheKey] : undefined;
         if (cached) {
           setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
+          setScreenOrigin(cached.screenOrigin ?? null);
           if (cached.alignment) {
             setLyrics(alignmentToLines(cached.alignment.lines), parseLrc(cached.tLyrics));
           } else if (cached.lyrics || cached.tLyrics) {
@@ -131,6 +133,7 @@ const LyricsBroadcaster = () => {
             if (canceled) return;
             setLyrics(lines, tLines);
             setOffset(0);
+            setScreenOrigin(latest?.screenOrigin ?? null);
             return;
           }
           // 本地还挂着生效版本，服务器上却没了：被管理员确认有误下线了，退回对齐前的歌词
@@ -165,25 +168,46 @@ const LyricsBroadcaster = () => {
         await new Promise(resolve => setTimeout(resolve, AUTO_MATCH_DEBOUNCE_MS));
         if (canceled) return;
         const bvid = playItem.bvid;
+        const title = playItem.pageTitle || playItem.title;
+        const tianci = !isLocal && looksLikeTianci(title);
+        // 缓存里是旧算法按标题配上的歌词，填词歌多半是原曲的，识别期间不显示
+        if (tianci && staleAuto) setLyrics([]);
         const shared = isLocal ? undefined : await fetchRecognized(bvid, String(playItem.cid));
         if (canceled) return;
         // 版本低于当前算法的服务端结果不用，自己重新匹配后会覆盖它
         const fresh = (shared?.v ?? 0) >= AUTO_MATCH_VERSION;
-        let hit: AutoLyricsResult | null = null;
+        let hit: Omit<AutoLyricsResult, "from"> | null = null;
+        let from: AutoLyricsResult["from"] | undefined;
+        let screenOrigin: ScreenOrigin | undefined;
         let fromServer = false;
         if (shared?.recognized && fresh) {
-          hit = { ...shared.recognized, tLyrics: shared.recognized.tLyrics ?? undefined };
+          const rec = shared.recognized;
+          hit = { lyrics: rec.lyrics, tLyrics: rec.tLyrics ?? undefined };
+          if (rec.from === "screen" || rec.from === "subtitle") {
+            const kind = rec.from === "subtitle" ? "subtitle" : rec.confident ? "screen" : "screen-unsure";
+            screenOrigin = screenOriginOf(kind, rec.lyrics);
+          }
           fromServer = true;
         } else if (shared?.missingUntil && fresh) {
           if (!staleAuto) autoMissed.add(cacheKey);
           return;
         } else {
           const outcome: AutoMatchOutcome = { exhausted: false };
-          hit = await autoMatchLyrics(playItem.pageTitle || playItem.title, playItem.duration, () => canceled, outcome);
+          const matched = tianci ? null : await autoMatchLyrics(title, playItem.duration, () => canceled, outcome);
           if (canceled) return;
+          hit = matched;
+          from = matched?.from;
           // 手机端的网易云 / LrcLib 还是空实现，「没查到」不能代表别的平台也没有
-          if (!hit && outcome.exhausted && !staleAuto && !isLocal && bvid && !isNativeMobile) {
-            void reportRecognized({ bvid, cid: String(playItem.cid), v: AUTO_MATCH_VERSION, missing: true });
+          const exhausted = outcome.exhausted && !isNativeMobile;
+          // 按标题搜不到（或是填词歌），从视频画面识别；识别任务自己会在服务端记「查无歌词」
+          if (!hit && !isLocal && bvid && (tianci || exhausted)) {
+            const screen = await recognizeFromScreen(bvid, String(playItem.cid), AUTO_MATCH_VERSION, () => canceled);
+            if (canceled) return;
+            if (screen) {
+              hit = { lyrics: screen.lyrics };
+              screenOrigin = screenOriginOf(screen.kind, screen.lyrics);
+              fromServer = true;
+            }
           }
         }
         if (!hit) {
@@ -203,23 +227,26 @@ const LyricsBroadcaster = () => {
           autoVersion: AUTO_MATCH_VERSION,
           origin: hit.origin,
           nativeTiming: hit.nativeTiming,
+          screenOrigin,
         };
         setLyrics(linesOfEntry(entryOfHit), parseLrc(hit.tLyrics));
+        setScreenOrigin(screenOrigin ?? null);
         await platform.setStore(StoreNameMap.LyricsCache, { ...latest, [cacheKey]: entryOfHit });
-        if (!fromServer && !isLocal && bvid) {
+        if (!fromServer && !isLocal && bvid && from) {
           void reportRecognized({
             bvid,
             cid: String(playItem.cid),
             v: AUTO_MATCH_VERSION,
             lyrics: hit.lyrics,
             tLyrics: hit.tLyrics,
-            from: hit.from,
+            from,
           });
         }
         if (!canceled && !isLocal && hit.lyrics) {
           useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
         }
-      } catch {
+      } catch (err) {
+        log.warn("[lyrics] 加载歌词出错", err);
         if (!canceled) setLyrics([]);
       } finally {
         if (!canceled) setIsLoading(false);

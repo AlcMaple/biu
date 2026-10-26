@@ -39,6 +39,15 @@ export const putRecognizedLyrics = (
     | { bvid: string; cid: string; v: number; missing: true },
 ) => call<{ stored: boolean }>({ method: "POST", path: "/lyrics/recognized", body });
 
+export const createScreenJob = (body: {
+  bvid: string;
+  cid: string;
+  v: number;
+  subtitle: { from: number; to: number; content: string }[];
+}) => call<ScreenJobView>({ method: "POST", path: "/lyrics/screen-jobs", body });
+
+export const getScreenJob = (id: string) => call<ScreenJobView>({ method: "GET", path: `/lyrics/screen-jobs/${id}` });
+
 export const submitLyrics = (body: { bvid: string; cid: string; lyrics: string; title: string; note?: string }) =>
   call<AlignSubmissionBrief>({ method: "POST", path: "/lyrics/submissions", body });
 

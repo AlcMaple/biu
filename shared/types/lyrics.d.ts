@@ -155,8 +155,16 @@ interface MusicLyrics {
   noAutoAlign?: true;
   /** 歌词从哪个平台采用来的；与 source（采用方式）、alignment（按当前录音对齐）各管各的 */
   origin?: LyricsOrigin;
+  /** 歌词识别自视频画面 / 来自 B 站 AI 字幕（填词歌）；text 是当时的歌词文字，换了歌词就不再算数 */
+  screenOrigin?: ScreenOrigin;
   /** 平台自带的逐字时间轴（原唱录音），不等于对齐到当前 B 站录音；lyrics 与采用时不一致就作废 */
   nativeTiming?: NativeLyricsTiming;
+}
+
+interface ScreenOrigin {
+  /** screen = 画面歌词且和字幕读音吻合；screen-unsure = 画面歌词但吻合度低（书法字体等）；subtitle = AI 字幕原文 */
+  kind: "screen" | "screen-unsure" | "subtitle";
+  text: string;
 }
 
 interface LyricsOrigin {

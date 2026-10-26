@@ -194,6 +194,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
         // 网易云 / LrcLib 采用时显式清掉，免得上一份平台歌词的来源和逐字时间挂在新歌词上
         origin: extra.origin,
         nativeTiming: extra.nativeTiming,
+        screenOrigin: undefined,
       };
 
       try {

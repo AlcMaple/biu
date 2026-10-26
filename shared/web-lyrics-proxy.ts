@@ -7,4 +7,5 @@ export const WEB_LYRICS_PROXY_PATHS = {
   neteaseSearch: `${WEB_LYRICS_PROXY_ROOT}/netease/search`,
   providerSearch: `${WEB_LYRICS_PROXY_ROOT}/provider/search`,
   providerGet: `${WEB_LYRICS_PROXY_ROOT}/provider/get`,
+  aiSubtitle: `${WEB_LYRICS_PROXY_ROOT}/bilibili/ai-subtitle`,
 } as const;

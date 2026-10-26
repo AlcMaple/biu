@@ -5,6 +5,8 @@ import type { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import type { AlignQueue } from "./lib/queue.js";
 import type { RecognizedStore } from "./lib/recognized.js";
 import type { Report, ReportStore } from "./lib/reports.js";
+import type { ScreenQueue } from "./lib/screen-queue.js";
+import type { SubtitleLine } from "./lib/screen-worker.js";
 import type { SubmissionStore, Submission } from "./lib/submissions.js";
 
 import { type AuthedRequest, isAdmin, requireAdmin, requireAuth } from "./lib/auth.js";
@@ -20,6 +22,7 @@ export interface RouteDeps {
   submissions: SubmissionStore;
   reports: ReportStore;
   recognized: RecognizedStore;
+  screen: ScreenQueue;
   rateLimitPerMinute: number;
 }
 
@@ -39,8 +42,27 @@ const parseHash = (value: unknown) => {
   return value;
 };
 
+const MAX_SUBTITLE_LINES = 1000;
+
+// 客户端只传字幕内容，不传字幕地址：地址带签名，不能出现在请求里（AGENTS.md「网络请求」）
+const parseSubtitle = (value: unknown): SubtitleLine[] => {
+  if (!Array.isArray(value) || value.length > MAX_SUBTITLE_LINES) throw new AlignError("BAD_REQUEST", "subtitle 不对");
+  let chars = 0;
+  const lines = value.map(item => {
+    const { from, to, content } = (item ?? {}) as Record<string, unknown>;
+    if (typeof from !== "number" || typeof to !== "number" || !Number.isFinite(from) || !Number.isFinite(to)) {
+      throw new AlignError("BAD_REQUEST", "subtitle 时间不对");
+    }
+    if (typeof content !== "string" || content.length > 200) throw new AlignError("BAD_REQUEST", "subtitle 内容不对");
+    chars += content.length;
+    return { from, to, content };
+  });
+  if (chars > MAX_CHARS) throw new AlignError("LYRICS_TOO_LONG");
+  return lines;
+};
+
 export function createRouter(deps: RouteDeps): Router {
-  const { queue, cache, failures, submissions, reports, recognized } = deps;
+  const { queue, cache, failures, submissions, reports, recognized, screen } = deps;
   const router = Router();
   const limiter = rateLimit({
     windowMs: 60_000,
@@ -173,7 +195,7 @@ export function createRouter(deps: RouteDeps): Router {
         const lyrics = req.body?.lyrics;
         const from = req.body?.from as RecognizedFrom;
         if (typeof lyrics !== "string" || lyrics.length > MAX_CHARS) throw new AlignError("LYRICS_TOO_LONG");
-        if (!RECOGNIZED_FROM.includes(from)) throw new AlignError("BAD_REQUEST", "from 不对");
+        if (!(RECOGNIZED_FROM as readonly string[]).includes(from)) throw new AlignError("BAD_REQUEST", "from 不对");
         const tLyrics = req.body?.tLyrics;
         if (tLyrics !== undefined && (typeof tLyrics !== "string" || tLyrics.length > MAX_CHARS)) {
           throw new AlignError("BAD_REQUEST", "tLyrics 不对");
@@ -187,6 +209,34 @@ export function createRouter(deps: RouteDeps): Router {
     }),
   );
 
+  // 填词歌：从视频画面识别歌词，用客户端拉到的 B 站 AI 字幕校对；结果写进「已识别歌词」，所有人共享。
+  // 字幕内容服务端无法独立核实（它没有登录态），信任等级和客户端上报识别歌词相同：只收登录用户、记录提交者
+  router.post(
+    "/lyrics/screen-jobs",
+    requireAuth,
+    limiter,
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
+      const v = req.body?.v;
+      if (!Number.isInteger(v) || v < 1 || v > 1000) throw new AlignError("BAD_REQUEST", "v 不对");
+      const view = await screen.submit({
+        mid: req.mid!,
+        bvid,
+        cid,
+        v: v as number,
+        subtitle: parseSubtitle(req.body?.subtitle),
+      });
+      res.status(view.id ? 202 : 200).json(view);
+    }),
+  );
+
+  router.get(
+    "/lyrics/screen-jobs/:id",
+    requireAuth,
+    limiter,
+    wrap(async (req, res) => res.json(screen.get(String(req.params.id)))),
+  );
+
   router.get(
     "/lyrics/:bvid/:cid/recognized",
     wrap(async (req, res) => {
@@ -195,7 +245,7 @@ export function createRouter(deps: RouteDeps): Router {
     }),
   );
 
-  // 必须注册在 /lyrics/submissions/mine、/lyrics/reports/mine 之后，否则会被当成 bvid/cid 吃掉。
+  // 必须注册在 /lyrics/submissions/mine、/lyrics/reports/mine、/lyrics/screen-jobs/:id 之后，否则会被当成 bvid/cid 吃掉。
   // 对所有人生效的版本；没有时返回 null 而不是 404，客户端每次打开歌都会查，404 会刷满错误日志
   router.get(
     "/lyrics/:bvid/:cid",

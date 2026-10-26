@@ -61,6 +61,8 @@ declare global {
     getProviderLyrics: (
       params: import("../lyrics-providers").ProviderLyricsGetParams,
     ) => Promise<import("../lyrics-providers").ProviderResult<import("../lyrics-providers").ProviderLyricsDocument>>;
+    /** 读 B 站 AI 字幕文件（地址来自 x/player/wbi/v2）；只放行 AI 字幕 CDN，失败以 ok:false 带回原因，不抛、不重试 */
+    getAiSubtitle: (url: string) => Promise<import("../bilibili-subtitle").AiSubtitleResult>;
     /** 歌词时间轴对齐服务；只放行 shared/lyrics-align.ts 白名单里的路径，凭证留在持有它的一侧 */
     alignRequest: (req: AlignRequest) => Promise<AlignResponse>;
     /** 获取当前应用平台 */

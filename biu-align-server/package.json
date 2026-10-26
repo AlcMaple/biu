@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "dev:mock": "tsx watch src/index.ts --mock",
-    "token": "tsx scripts/dev-token.ts"
+    "token": "tsx scripts/dev-token.ts",
+    "build:ocr": "mkdir -p worker/bin && swiftc -O worker/ocr.swift -o worker/bin/ocr"
   },
   "dependencies": {
     "cors": "^2.8.5",

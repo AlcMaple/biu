@@ -152,6 +152,33 @@ describe("Web 歌词 BFF", () => {
     expect(fetchUpstream).toHaveBeenCalledTimes(1);
   });
 
+  it("AI 字幕只转发字幕 CDN 上的字幕文件，不带 Cookie", async () => {
+    const fetchUpstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ body: [{ from: 1, to: 2, content: "你好" }] })));
+    const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, publicOrigin: ORIGIN });
+    const raw = "//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/1?auth_key=1-a-0-b";
+    const ok = createResponse();
+    await handler(
+      createRequest(`${WEB_LYRICS_PROXY_PATHS.aiSubtitle}?url=${encodeURIComponent(raw)}`, { cookie: "SESSDATA=x" }),
+      ok.response,
+    );
+    expect(String(fetchUpstream.mock.calls[0]?.[0])).toBe(
+      "https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/1?auth_key=1-a-0-b",
+    );
+    expect(fetchUpstream.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
+    expect(fetchUpstream.mock.calls[0]?.[1]?.headers).not.toHaveProperty("Cookie");
+    expect(JSON.parse(ok.state.body)).toEqual({ ok: true, lines: [{ from: 1, to: 2, content: "你好" }] });
+
+    const evil = createResponse();
+    await handler(
+      createRequest(`${WEB_LYRICS_PROXY_PATHS.aiSubtitle}?url=${encodeURIComponent("https://evil.example/x")}`),
+      evil.response,
+    );
+    expect(evil.state.status).toBe(400);
+    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+  });
+
   it("渠道限流原样带回错误类型，不重试", async () => {
     const fetchUpstream = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 429 }));
     const handler = createWebLyricsProxyHandler({ fetch: fetchUpstream, publicOrigin: ORIGIN });

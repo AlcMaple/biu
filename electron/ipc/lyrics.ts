@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 
+import { fetchAiSubtitle } from "@shared/bilibili-subtitle";
 import { createProviderClient } from "@shared/lyrics-provider-guard";
 import { type ProviderLyricsGetParams, type ProviderLyricsSearchParams } from "@shared/lyrics-providers";
 
@@ -52,6 +53,8 @@ export function registerLyricsHandlers() {
   ipcMain.handle(channel.lyrics.getProvider, async (_, params: ProviderLyricsGetParams) => {
     return providerClient.get(providerTransport, params);
   });
+
+  ipcMain.handle(channel.lyrics.aiSubtitle, async (_, url: string) => fetchAiSubtitle(providerTransport, url));
 
   ipcMain.handle(channel.lyrics.checkWhisperXDeps, async () => checkWhisperXDeps());
   ipcMain.handle(channel.lyrics.installWhisperXDeps, async () => installWhisperXDeps());

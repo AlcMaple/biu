@@ -8,7 +8,8 @@ import { buildProviderAdoption, PROVIDER_LABELS } from "./provider-lyrics";
 import { foldVariants } from "./variant-fold";
 
 // 改动提取或打分后升级，只重匹配自动缓存；手动采用的歌词保留。案例见 docs/lyrics/自动匹配歌词-错误案例.md。
-export const AUTO_MATCH_VERSION = 3;
+// 4：标题像填词歌的不再按标题搜（会配上原曲歌词），改从视频画面识别；旧版本按原曲配错的共享结果随之作废
+export const AUTO_MATCH_VERSION = 4;
 
 const NETEASE_TYPE_SONG = 1;
 /** 视频时长与曲库时长允许的最大差距（秒）：翻唱/搬运常有前后奏差异，过严会漏，过松会配错歌 */

@@ -7,8 +7,9 @@ import { motion } from "framer-motion";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { lyricsCacheKey } from "@/components/lyrics/alignment";
+import { matchesScreenOrigin } from "@/components/lyrics/tianci";
 import { useLyricsAlignSession } from "@/store/lyrics-align-session";
-import { useDisplayedLyrics } from "@/store/lyrics-state";
+import { useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 
 const DOT_GREEN = "#1ed760";
@@ -17,6 +18,13 @@ const DOT_AMBER = "#e5b94e";
 const offsetText = (sec: number) => {
   if (Math.abs(sec) < 0.3) return null;
   return `原歌词整体${sec > 0 ? "快" : "慢"}了 ${Math.abs(sec).toFixed(1)} 秒，已校正`;
+};
+
+// 填词歌的歌词来源：画面识别 / AI 字幕都可能有错字，用户该知道这份歌词是怎么来的
+const SCREEN_SOURCE: Record<ScreenOrigin["kind"], { hint: string; text: string }> = {
+  screen: { hint: "来自视频画面", text: "歌词来自 UP 主打在视频画面上的字幕。" },
+  "screen-unsure": { hint: "可能有错字", text: "歌词识别自视频画面，特殊字体处可能认错字。" },
+  subtitle: { hint: "可能有错字", text: "歌词来自 B 站 AI 字幕，可能有同音错字。" },
 };
 
 interface Props {
@@ -51,6 +59,7 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
   const { target, mode, phase } = useLyricsAlignSession();
   const currentKey = usePlayList(s => lyricsCacheKey(s.list.find(i => i.id === s.playId)));
   const isMobileLayout = useIsMobileLayout();
+  const screenOrigin = useLyricsState(s => s.screenOrigin);
   const [busy, setBusy] = useState(false);
 
   const isTarget = Boolean(target && target.cacheKey === currentKey);
@@ -166,6 +175,10 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
           };
   }
 
+  const source = matchesScreenOrigin(lyrics, screenOrigin) ? SCREEN_SOURCE[screenOrigin!.kind] : null;
+  // 来源提示只换掉空闲态的补充说明（「估算」等）；排队、对齐中、失败时标签要说的是进度
+  if (source && !active) view.hint = source.hint;
+
   return (
     <Popover placement="bottom-end" onOpenChange={onOpenChange}>
       <PopoverTrigger>
@@ -197,6 +210,12 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
       <PopoverContent className="w-64 items-stretch gap-1 p-3.5">
         <div className="text-small font-medium">{view.title}</div>
         <p className="text-tiny text-default-500 leading-relaxed">{view.body}</p>
+        {source ? (
+          <p className="text-tiny text-default-500 leading-relaxed">
+            <span className="text-default-700">歌词来源：</span>
+            {source.text}
+          </p>
+        ) : null}
         {view.actions ? <div className="mt-2 flex justify-end gap-2">{view.actions}</div> : null}
       </PopoverContent>
     </Popover>

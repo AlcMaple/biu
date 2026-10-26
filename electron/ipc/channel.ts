@@ -42,6 +42,7 @@ export const channel = {
     searchLrclib: "lyrics:lrclib-search",
     searchProvider: "lyrics:provider-search",
     getProvider: "lyrics:provider-get",
+    aiSubtitle: "lyrics:ai-subtitle",
     alignRequest: "lyrics:align-request",
     syncWithWhisperXStart: "lyrics:sync-whisperx-start",
     syncWithWhisperXProgress: "lyrics:sync-whisperx-progress",

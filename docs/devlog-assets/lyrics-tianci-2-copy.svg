@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="660" viewBox="0 0 1240 660" role="img">
+<title>填词歌歌词识别（2/3）：每条文案在哪、什么时候出现、用户能做什么</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="658" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">填词歌歌词识别（2/3）：每条文案在哪、什么时候出现、用户能做什么</text>
+<text x="34.0" y="66.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：失败按原因分开写，不统一成「网络请求失败」；被限流时用户知道该等，而不是反复重试把限流打得更狠。</text>
+<rect x="24" y="95" width="1192" height="541" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="124.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">文案对照表</text>
+<rect x="44" y="139" width="1152" height="30" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="54.0" y="159.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">文案</text>
+<text x="411.1" y="159.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">位置</text>
+<text x="607.0" y="159.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">什么情况</text>
+<text x="918.0" y="159.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">用户能做什么</text>
+<rect x="44" y="169" width="1152" height="33" fill="#edf7f1" stroke="#7fad91" />
+<text x="54.0" y="189.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#316247">来自视频画面</text>
+<text x="411.1" y="189.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">逐字状态标签右侧</text>
+<text x="607.0" y="189.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">画面歌词，和字幕读音吻合度高</text>
+<text x="918.0" y="189.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">和普通歌词一样：报错、上传自己的歌词</text>
+<rect x="44" y="202" width="1152" height="33" fill="#edf7f1" stroke="#7fad91" />
+<text x="54.0" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#316247">歌词来源：歌词来自 UP 主打在视频画面上的字幕。</text>
+<text x="411.1" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">点开标签的弹窗</text>
+<text x="607.0" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">同上</text>
+<text x="918.0" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">同上</text>
+<rect x="44" y="235" width="1152" height="50" fill="#fff8e8" stroke="#d9bd85" />
+<text x="54.0" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#7a6234">可能有错字</text>
+<text x="411.1" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">逐字状态标签右侧</text>
+<text x="607.0" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">画面歌词但吻合度低（书法字体等），或用的是 AI</text>
+<text x="607.0" y="272.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234"> 字幕原文</text>
+<text x="918.0" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">同上；手机窄屏不显示提示，弹窗里仍有来源</text>
+<rect x="44" y="285" width="1152" height="33" fill="#fff8e8" stroke="#d9bd85" />
+<text x="54.0" y="305.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#7a6234">歌词来源：歌词识别自视频画面，特殊字体处可能认错字。</text>
+<text x="411.1" y="305.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">弹窗</text>
+<text x="607.0" y="305.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">画面歌词、吻合度低</text>
+<text x="918.0" y="305.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">同上</text>
+<rect x="44" y="318" width="1152" height="33" fill="#fff8e8" stroke="#d9bd85" />
+<text x="54.0" y="338.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#7a6234">歌词来源：歌词来自 B 站 AI 字幕，可能有同音错字。</text>
+<text x="411.1" y="338.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">弹窗</text>
+<text x="607.0" y="338.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">画面上没找到歌词，退回 AI 字幕原文</text>
+<text x="918.0" y="338.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">同上</text>
+<rect x="44" y="351" width="1152" height="50" fill="#edf7f1" stroke="#7fad91" />
+<text x="54.0" y="371.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#316247">正在从视频画面识别歌词…</text>
+<text x="411.1" y="371.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">歌词区（原「歌词加载中」处</text>
+<text x="411.1" y="388.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">）</text>
+<text x="607.0" y="371.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">排队或识别中，约 30 秒~1 分钟</text>
+<text x="918.0" y="371.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">等；切歌不影响结果保存</text>
+<rect x="44" y="401" width="1152" height="33" fill="#fdeef0" stroke="#d99aa5" />
+<text x="54.0" y="421.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#96434f">登录后可自动识别填词歌歌词。</text>
+<text x="411.1" y="421.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌词区</text>
+<text x="607.0" y="421.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">没登录，或 B 站要求登录才给字幕</text>
+<text x="918.0" y="421.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">登录</text>
+<rect x="44" y="434" width="1152" height="33" fill="#fdeef0" stroke="#d99aa5" />
+<text x="54.0" y="454.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#96434f">识别请求太频繁，请稍后再试。</text>
+<text x="411.1" y="454.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌词区</text>
+<text x="607.0" y="454.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">B 站或识别服务限流</text>
+<text x="918.0" y="454.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">过一会儿再听这首；不会自动重试</text>
+<rect x="44" y="467" width="1152" height="33" fill="#fdeef0" stroke="#d99aa5" />
+<text x="54.0" y="487.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#96434f">视频画面下载失败，暂时无法识别歌词。</text>
+<text x="411.1" y="487.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌词区</text>
+<text x="607.0" y="487.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">B 站只给了不稳定节点或下载失败</text>
+<text x="918.0" y="487.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">过一会儿再试</text>
+<rect x="44" y="500" width="1152" height="33" fill="#fdeef0" stroke="#d99aa5" />
+<text x="54.0" y="520.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#96434f">获取 B 站 AI 字幕失败，暂时无法识别歌词。</text>
+<text x="411.1" y="520.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌词区</text>
+<text x="607.0" y="520.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">拉字幕时出错（非限流）</text>
+<text x="918.0" y="520.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">过一会儿再试</text>
+<rect x="44" y="533" width="1152" height="33" fill="#fdeef0" stroke="#d99aa5" />
+<text x="54.0" y="553.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#96434f">连不上歌词识别服务，请稍后再试。</text>
+<text x="411.1" y="553.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">歌词区</text>
+<text x="607.0" y="553.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">提交或查询识别任务时连不上服务器</text>
+<text x="918.0" y="553.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">检查网络后再试</text>
+<rect x="44" y="566" width="1152" height="50" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="54.0" y="586.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="700" fill="#4a4450">暂无歌词</text>
+<text x="411.1" y="586.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">歌词区</text>
+<text x="607.0" y="586.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">画面和字幕都没歌词，或视频没有 AI 字幕（一期</text>
+<text x="607.0" y="603.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">）</text>
+<text x="918.0" y="586.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">手动搜索 / 上传歌词；3 天后会再自动试</text>
+</svg>

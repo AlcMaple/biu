@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { aiSubtitleTarget, fetchAiSubtitle } from "../shared/bilibili-subtitle.js";
 import { createProviderClient, type ProviderClient } from "../shared/lyrics-provider-guard.js";
 import { ProviderTransportError, type ProviderTransport } from "../shared/lyrics-providers.js";
 import { WEB_LYRICS_PROXY_PATHS, WEB_LYRICS_PROXY_ROOT } from "../shared/web-lyrics-proxy.js";
@@ -141,6 +142,14 @@ function matchLyricsRoute(url: URL): LyricsRoute | undefined {
       artist: readTextQuery(url, "artist", false),
     };
     return { provider: (client, transport) => client.get(transport, params) };
+  }
+
+  // 只转发 AI 字幕 CDN 上的字幕文件，地址在 BFF 里再校验一遍；登录 Cookie 不发给字幕 CDN（地址自带签名）
+  if (url.pathname === WEB_LYRICS_PROXY_PATHS.aiSubtitle) {
+    assertAllowedQuery(url, new Set(["url"]));
+    const raw = readSingleQuery(url, "url", true)!;
+    if (!aiSubtitleTarget(raw)) throw new ProxyRequestError("字幕地址不合法", 400);
+    return { provider: (_client, transport) => fetchAiSubtitle(transport, raw) };
   }
 
   if (url.pathname === WEB_LYRICS_PROXY_PATHS.lrclibSearch) {

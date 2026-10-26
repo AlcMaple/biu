@@ -118,22 +118,13 @@ export class AlignQueue {
   // 按出队规则排出的完整顺序；排队的人看到的 position 和实际轮到的时刻一致
   private order(): Job[] {
     const manual = this.waiting.filter(j => j.origin === "manual");
-    const byMid = new Map<string, Job[]>();
-    for (const j of this.waiting) {
-      if (j.origin === "manual") continue;
-      byMid.set(j.mid, [...(byMid.get(j.mid) ?? []), j]);
-    }
-    // 每人自己的任务新的在前
-    for (const list of byMid.values()) list.sort((a, b) => b.createdAt - a.createdAt);
-    const mids = [...byMid.keys()].sort((a, b) => (this.lastServed.get(a) ?? 0) - (this.lastServed.get(b) ?? 0));
-    const rest: Job[] = [];
-    for (let round = 0; rest.length + manual.length < this.waiting.length; round++) {
-      for (const mid of mids) {
-        const j = byMid.get(mid)![round];
-        if (j) rest.push(j);
-      }
-    }
-    return [...manual, ...rest];
+    return [
+      ...manual,
+      ...fairOrder(
+        this.waiting.filter(j => j.origin !== "manual"),
+        this.lastServed,
+      ),
+    ];
   }
 
   private view(job: Job): JobView {
@@ -200,6 +191,25 @@ export class AlignQueue {
       void this.pump();
     }
   }
+}
+
+// 按人轮转：越久没轮到的人越先，每人先跑他最近点的那首（正在听的那首最有用）。lastServed：mid → 上次轮到他的时刻
+export function fairOrder<T extends { mid: string; createdAt: number }>(
+  waiting: T[],
+  lastServed: Map<string, number>,
+): T[] {
+  const byMid = new Map<string, T[]>();
+  for (const j of waiting) byMid.set(j.mid, [...(byMid.get(j.mid) ?? []), j]);
+  for (const list of byMid.values()) list.sort((a, b) => b.createdAt - a.createdAt);
+  const mids = [...byMid.keys()].sort((a, b) => (lastServed.get(a) ?? 0) - (lastServed.get(b) ?? 0));
+  const out: T[] = [];
+  for (let round = 0; out.length < waiting.length; round++) {
+    for (const mid of mids) {
+      const j = byMid.get(mid)![round];
+      if (j) out.push(j);
+    }
+  }
+  return out;
 }
 
 export const cacheKey = (t: { bvid: string; cid: string; lyricsHash: string }) => `${t.bvid}/${t.cid}/${t.lyricsHash}`;

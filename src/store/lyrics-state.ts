@@ -9,6 +9,9 @@ export type LyricLine = {
   nativeWords?: true;
 };
 
+// 填词歌从视频画面识别歌词的进度：显示在歌词区，只对当前这首歌有效
+export type ScreenStatus = { kind: "working" } | { kind: "failed"; message: string } | null;
+
 type LyricsPreview = { lyrics: LyricLine[]; translatedLyrics: LyricLine[] };
 
 interface LyricsState {
@@ -18,10 +21,14 @@ interface LyricsState {
   preview: LyricsPreview | null;
   offset: number;
   isLoading: boolean;
+  screenStatus: ScreenStatus;
+  screenOrigin: ScreenOrigin | null;
   setLyrics: (lyrics: LyricLine[], translatedLyrics?: LyricLine[]) => void;
   setPreview: (preview: LyricsPreview | null) => void;
   setOffset: (offset: number) => void;
   setIsLoading: (loading: boolean) => void;
+  setScreenStatus: (status: ScreenStatus) => void;
+  setScreenOrigin: (origin: ScreenOrigin | null) => void;
   reset: () => void;
 }
 
@@ -31,11 +38,24 @@ export const useLyricsState = create<LyricsState>(set => ({
   preview: null,
   offset: 0,
   isLoading: false,
+  screenStatus: null,
+  screenOrigin: null,
   setLyrics: (lyrics, translatedLyrics = []) => set({ lyrics, translatedLyrics }),
   setPreview: preview => set({ preview }),
   setOffset: offset => set({ offset }),
   setIsLoading: loading => set({ isLoading: loading }),
-  reset: () => set({ lyrics: [], translatedLyrics: [], preview: null, offset: 0, isLoading: false }),
+  setScreenStatus: screenStatus => set({ screenStatus }),
+  setScreenOrigin: screenOrigin => set({ screenOrigin }),
+  reset: () =>
+    set({
+      lyrics: [],
+      translatedLyrics: [],
+      preview: null,
+      offset: 0,
+      isLoading: false,
+      screenStatus: null,
+      screenOrigin: null,
+    }),
 }));
 
 // 试听时对齐结果自带准确时间，偏移归零；采用后缓存里的偏移也会归零

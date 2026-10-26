@@ -73,6 +73,7 @@ const Lyrics = ({
   // Read lyrics state from shared store (owned by LyricsBroadcaster)
   const { lyrics, translatedLyrics, offset } = useDisplayedLyrics();
   const isLoading = useLyricsState(s => s.isLoading);
+  const screenStatus = useLyricsState(s => s.screenStatus);
 
   // Reset fontSize when track changes
   useEffect(() => {
@@ -392,7 +393,13 @@ const Lyrics = ({
             </div>
           ) : (
             <div className="text-foreground/70 flex h-full items-center justify-center">
-              {isLoading ? "歌词加载中..." : "暂无歌词"}
+              {screenStatus?.kind === "working"
+                ? "正在从视频画面识别歌词…"
+                : screenStatus?.kind === "failed"
+                  ? screenStatus.message
+                  : isLoading
+                    ? "歌词加载中..."
+                    : "暂无歌词"}
             </div>
           )}
         </div>

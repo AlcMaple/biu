@@ -35,6 +35,9 @@ const mocks = vi.hoisted(() => ({
   searchNeteaseSongs: vi.fn<(params: SearchSongByNeteaseParams) => Promise<SearchSongByNeteaseResponse>>(),
   getNeteaseLyrics: vi.fn<(params: GetLyricsByNeteaseParams) => Promise<GetLyricsByNeteaseResponse>>(),
   searchLrclibLyrics: vi.fn(async () => []),
+  getAiSubtitle: vi.fn<() => Promise<import("@/service/ai-subtitle").AiSubtitleOutcome>>(),
+  createScreenJob: vi.fn<() => Promise<ScreenJobView>>(),
+  getScreenJob: vi.fn<() => Promise<ScreenJobView>>(),
 }));
 
 interface PlayListState {
@@ -69,7 +72,13 @@ vi.mock("@/service/lyrics-align", () => ({
   getPublishedLyrics: mocks.getPublishedLyrics,
   getRecognizedLyrics: mocks.getRecognizedLyrics,
   putRecognizedLyrics: mocks.putRecognizedLyrics,
+  createScreenJob: mocks.createScreenJob,
+  getScreenJob: mocks.getScreenJob,
+  AlignApiError: class extends Error {},
 }));
+vi.mock("@/service/ai-subtitle", () => ({ getAiSubtitle: mocks.getAiSubtitle }));
+const userMock = vi.hoisted(() => ({ user: { mid: 1 } as unknown }));
+vi.mock("@/store/user", () => ({ useUser: { getState: () => ({ user: userMock.user }) } }));
 vi.mock("@/components/lyrics/auto-match", async importOriginal => ({
   ...(await importOriginal<typeof import("@/components/lyrics/auto-match")>()),
   autoMatchLyrics: mocks.autoMatchLyrics,
@@ -146,6 +155,8 @@ beforeEach(() => {
   mocks.getPublishedLyrics.mockResolvedValue({ alignment: null, source: null });
   mocks.getRecognizedLyrics.mockResolvedValue({ recognized: null, missingUntil: null, v: null });
   mocks.putRecognizedLyrics.mockClear();
+  mocks.getAiSubtitle.mockResolvedValue({ kind: "none" });
+  userMock.user = { mid: 1 };
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -240,7 +251,7 @@ it("skips matching when the server says no channel has this song", async () => {
   expect(useLyricsState.getState().lyrics).toEqual([]);
 });
 
-it("reports a miss only when every channel was fully searched", async () => {
+it("reports a miss only when every channel was fully searched and the video has no AI subtitle", async () => {
   mocks.autoMatchLyrics.mockImplementation(async (_t, _d, _c, outcome) => {
     if (outcome) outcome.exhausted = true;
     return null;
@@ -484,3 +495,80 @@ it.each([
     expect(mocks.autoAlign).toHaveBeenLastCalledWith(hit.lyrics, { userChosen: false });
   },
 );
+
+const SUBTITLE = [{ from: 1, to: 3, content: "字幕第一句" }];
+const SCREEN_LRC = "[00:01.00]画面第一句\n[00:04.00]画面第二句\n[00:07.00]画面第三句";
+
+it("skips title search for tianci songs and uses lyrics recognized from the video frames", async () => {
+  mocks.getAiSubtitle.mockResolvedValue({ kind: "ok", lines: SUBTITLE });
+  mocks.createScreenJob.mockResolvedValue({ id: "job", state: "queued", position: 1 });
+  mocks.getScreenJob.mockResolvedValue({ id: "job", state: "done" });
+  mocks.getRecognizedLyrics.mockResolvedValueOnce({ recognized: null, missingUntil: null, v: null }).mockResolvedValue({
+    recognized: { lyrics: SCREEN_LRC, tLyrics: null, from: "screen", confident: false },
+    missingUntil: null,
+    v: AUTO_MATCH_VERSION,
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = { ...track(), title: "【原神】欧气分你一半（原曲：xxx）" };
+  await select(item);
+  await advance(2000);
+  expect(useLyricsState.getState().screenStatus).toEqual({ kind: "working" });
+  await advance(4000);
+
+  expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
+  expect(mocks.createScreenJob).toHaveBeenCalledWith({
+    bvid: item.bvid,
+    cid: item.cid,
+    v: AUTO_MATCH_VERSION,
+    subtitle: SUBTITLE,
+  });
+  expect(useLyricsState.getState().lyrics.map(l => l.text)).toEqual(["画面第一句", "画面第二句", "画面第三句"]);
+  expect(useLyricsState.getState().screenStatus).toBeNull();
+  expect(useLyricsState.getState().screenOrigin).toEqual({
+    kind: "screen-unsure",
+    text: "画面第一句画面第二句画面第三句",
+  });
+  expect(cache[cacheKey(item)]).toMatchObject({ lyrics: SCREEN_LRC, screenOrigin: { kind: "screen-unsure" } });
+  // 结果服务端已经存了，不再上报；照常自动对齐
+  expect(mocks.putRecognizedLyrics).not.toHaveBeenCalled();
+  expect(mocks.autoAlign).toHaveBeenLastCalledWith(SCREEN_LRC, { userChosen: false });
+});
+
+it("tells logged-out users that tianci recognition needs login, without requesting anything", async () => {
+  userMock.user = undefined;
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select({ ...track(), title: "【填词】某某" });
+  await advance();
+
+  expect(mocks.getAiSubtitle).not.toHaveBeenCalled();
+  expect(useLyricsState.getState().screenStatus).toEqual({
+    kind: "failed",
+    message: "登录后可自动识别填词歌歌词。",
+  });
+});
+
+it("shows the server's specific reason when recognition fails, and does not retry", async () => {
+  mocks.getAiSubtitle.mockResolvedValue({ kind: "ok", lines: SUBTITLE });
+  mocks.createScreenJob.mockResolvedValue({
+    id: "job",
+    state: "failed",
+    error: { code: "VIDEO_PCDN_ONLY", message: "视频画面下载失败，暂时无法识别歌词。" },
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select({ ...track(), title: "【填词】某某" });
+  await advance(10000);
+
+  expect(mocks.createScreenJob).toHaveBeenCalledTimes(1);
+  expect(useLyricsState.getState().screenStatus).toEqual({
+    kind: "failed",
+    message: "视频画面下载失败，暂时无法识别歌词。",
+  });
+});
+
+it("maps rate limiting to the dedicated message", async () => {
+  mocks.getAiSubtitle.mockResolvedValue({ kind: "rate-limited" });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  await select({ ...track(), title: "【填词】某某" });
+  await advance();
+  expect(useLyricsState.getState().screenStatus).toEqual({ kind: "failed", message: "识别请求太频繁，请稍后再试。" });
+});
