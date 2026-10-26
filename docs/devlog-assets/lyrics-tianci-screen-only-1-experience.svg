@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="946" viewBox="0 0 1240 946" role="img">
+<title>填词歌纯画面识别与双语歌词（1/2）：用户会经历什么</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="944" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">填词歌纯画面识别与双语歌词（1/2）：用户会经历什么</text>
+<text x="34.0" y="66.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：没有 AI 字幕的填词歌现在也能只靠视频画面认出歌词；英文填词歌的中文翻译跟着原文显示；合唱的「藤：」「薇：」标记保留，逐字点亮不受影响。只有标题像填词歌的视频</text>
+<text x="34.0" y="84.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">才走这条路。</text>
+<rect x="24" y="114" width="1192" height="164.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="143" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 什么时候识别画面</text>
+<rect x="44.0" y="159.0" width="569.0" height="101.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="183.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">标题带「填词 / 填翻 / 改词 / 原曲 / 替换」</text>
+<text x="58.0" y="205.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">判为填词歌，不按标题去搜（会搜到原曲歌词），直接从视频画面认歌词。</text>
+<text x="58.0" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">有 AI 字幕：画面文字按读音和字幕校对（一期做法）。</text>
+<text x="58.0" y="239.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">没有 AI 字幕：只看画面上字怎么出现（本期新增）。</text>
+<rect x="627.0" y="159.0" width="569.0" height="101.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="641.0" y="183.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">其他视频</text>
+<text x="641.0" y="205.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">照旧去五个歌词渠道按标题搜。</text>
+<text x="641.0" y="222.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">搜不到就显示暂无歌词，用户可以手动搜索，或报错让管理员处理。</text>
+<text x="641.0" y="239.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">不去识别画面：采访、小剧场的说话字幕和歌词长得一样，识别了会给人看假歌词。</text>
+<rect x="24" y="294" width="1192" height="344.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="323" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 用户看到的（上） / 背后在做的（下）</text>
+<text x="44.0" y="351.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11.5" font-weight="700" fill="#4a4450">素演（合唱，没有 AI 字幕）</text>
+<rect x="44.0" y="363.0" width="569.0" height="118.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="387.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">用户看到的</text>
+<text x="58.0" y="409.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">歌词区先显示「正在从视频画面识别歌词…」，约 1 分钟后出现 56 行歌词，标签提示「可能有</text>
+<text x="58.0" y="426.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">错字」。</text>
+<text x="58.0" y="443.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">「藤：又是一个熬夜的晚上」：「藤」「：」在开唱前 0.3 秒内快速逐字点亮，接着「又」随</text>
+<text x="58.0" y="460.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">歌声亮起。</text>
+<rect x="627.0" y="363.0" width="569.0" height="118.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="641.0" y="387.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">背后在做的</text>
+<text x="641.0" y="409.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">认出歌词占着的那条「车道」（画面上固定的高度），按一行接一行换新句的节奏收进来。</text>
+<text x="641.0" y="426.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">同一个前缀带着 3 句以上不同歌词才算演唱者标记；标记不送去对齐，对齐完再接回行首。</text>
+<text x="44.0" y="507.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11.5" font-weight="700" fill="#4a4450">英文坏女孩（上行英文唱词、下行中文翻译，没有 AI 字幕）</text>
+<rect x="44.0" y="519.0" width="569.0" height="101.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="543.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">用户看到的</text>
+<text x="58.0" y="565.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">原文「I let you go out of my sight」逐词点亮，下面一行显示翻译「那时我放开了的</text>
+<text x="58.0" y="582.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">手」。</text>
+<text x="58.0" y="599.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">开头几句只有英文没有翻译，照常只显示英文。</text>
+<rect x="627.0" y="519.0" width="569.0" height="101.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="641.0" y="543.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">背后在做的</text>
+<text x="641.0" y="565.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">同时出现、同时消失的英文行和中文行配成一对：英文进歌词，中文进翻译。</text>
+<text x="641.0" y="582.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">斜体英文常被认丢空格、把 I 认成 l / 1 / /，用系统词表补回（这首 15 处全部修好）。</text>
+<rect x="24" y="654" width="1192" height="268.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="683" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">③ 边界情况</text>
+<rect x="44.0" y="699.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="723.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">书法 / 毛笔字体 → 查无</text>
+<text x="58.0" y="745.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">每一帧认出来的字都不一样（印刷体几乎每帧一致），就算拼</text>
+<text x="58.0" y="762.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">出来错字率也在 29% 以上、读不通，宁可显示暂无歌词。</text>
+<rect x="432.7" y="699.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="446.7" y="723.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">说话字幕 → 查无</text>
+<text x="446.7" y="745.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">说话字幕约 6 字/秒，歌词不超过 3.3 字/秒；超过 4.5 </text>
+<text x="446.7" y="762.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">字/秒判查无。实测钢琴小剧场被拦下。</text>
+<rect x="821.3" y="699.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="723.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">淡出残句 → 去掉</text>
+<text x="835.3" y="745.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">上一句淡出那半秒会被认成残句（「notsayaword」「明弱是</text>
+<text x="835.3" y="762.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">方」），只停半秒、字都被上一句包含的直接丢掉。</text>
+<rect x="44.0" y="797.0" width="569.0" height="84.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="821.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">仍然拦不住：采访类说话视频</text>
+<text x="58.0" y="843.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">中英双语采访的中文行语速落在歌词范围内，会被当成歌词。这正是只给填词歌识别画面的原</text>
+<text x="58.0" y="860.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">因：普通视频不走这条路。</text>
+<rect x="627.0" y="797.0" width="569.0" height="84.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="641.0" y="821.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">UP 主自己打在歌词位置的话</text>
+<text x="641.0" y="843.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">没有字幕就分不出有没有人唱（搞cp抄 里的「等我一下」「正片快到了」会混进来），所以纯画</text>
+<text x="641.0" y="860.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">面结果一律标「可能有错字」。</text>
+<text x="44.0" y="903.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#756f73">常见情况：大多数填词歌有 AI 字幕，仍走一期的字幕校对；纯画面识别只接住没有字幕的那部分（素演、坏女孩这类）。</text>
+</svg>

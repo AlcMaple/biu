@@ -251,7 +251,7 @@ it("skips matching when the server says no channel has this song", async () => {
   expect(useLyricsState.getState().lyrics).toEqual([]);
 });
 
-it("reports a miss only when every channel was fully searched and the video has no AI subtitle", async () => {
+it("reports a miss for non-tianci videos without recognizing the video frames", async () => {
   mocks.autoMatchLyrics.mockImplementation(async (_t, _d, _c, outcome) => {
     if (outcome) outcome.exhausted = true;
     return null;
@@ -266,6 +266,8 @@ it("reports a miss only when every channel was fully searched and the video has 
     v: AUTO_MATCH_VERSION,
     missing: true,
   });
+  expect(mocks.getAiSubtitle).not.toHaveBeenCalled();
+  expect(mocks.createScreenJob).not.toHaveBeenCalled();
 
   mocks.putRecognizedLyrics.mockClear();
   mocks.autoMatchLyrics.mockResolvedValue(null);
@@ -532,6 +534,36 @@ it("skips title search for tianci songs and uses lyrics recognized from the vide
   // 结果服务端已经存了，不再上报；照常自动对齐
   expect(mocks.putRecognizedLyrics).not.toHaveBeenCalled();
   expect(mocks.autoAlign).toHaveBeenLastCalledWith(SCREEN_LRC, { userChosen: false });
+});
+
+it("recognizes tianci videos without an AI subtitle from the frames alone, keeping the translation", async () => {
+  mocks.getAiSubtitle.mockResolvedValue({ kind: "none" });
+  mocks.createScreenJob.mockResolvedValue({ id: "job", state: "done" });
+  mocks.getRecognizedLyrics.mockResolvedValueOnce({ recognized: null, missingUntil: null, v: null }).mockResolvedValue({
+    recognized: {
+      lyrics: "[00:01.00]I let you go\n[00:04.00]Walked away\n[00:07.00]Now",
+      tLyrics: "[00:01.00]那时我放开了的手\n[00:04.00]转过身只剩了保重",
+      from: "screen",
+      confident: false,
+    },
+    missingUntil: null,
+    v: AUTO_MATCH_VERSION,
+  });
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = { ...track(), title: "徐良《坏女孩》，但是英文填词" };
+  await select(item);
+  await advance(6000);
+
+  expect(mocks.createScreenJob).toHaveBeenCalledWith({
+    bvid: item.bvid,
+    cid: item.cid,
+    v: AUTO_MATCH_VERSION,
+    subtitle: [],
+  });
+  expect(mocks.putRecognizedLyrics).not.toHaveBeenCalled();
+  expect(useLyricsState.getState().lyrics.map(l => l.text)).toEqual(["I let you go", "Walked away", "Now"]);
+  expect(useLyricsState.getState().translatedLyrics.map(l => l.text)).toEqual(["那时我放开了的手", "转过身只剩了保重"]);
+  expect(cache[cacheKey(item)]).toMatchObject({ tLyrics: "[00:01.00]那时我放开了的手\n[00:04.00]转过身只剩了保重" });
 });
 
 it("tells logged-out users that tianci recognition needs login, without requesting anything", async () => {

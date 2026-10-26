@@ -198,13 +198,16 @@ const LyricsBroadcaster = () => {
           hit = matched;
           from = matched?.from;
           // 手机端的网易云 / LrcLib 还是空实现，「没查到」不能代表别的平台也没有
-          const exhausted = outcome.exhausted && !isNativeMobile;
-          // 按标题搜不到（或是填词歌），从视频画面识别；识别任务自己会在服务端记「查无歌词」
-          if (!hit && !isLocal && bvid && (tianci || exhausted)) {
+          if (!tianci && !hit && outcome.exhausted && !staleAuto && !isLocal && bvid && !isNativeMobile) {
+            void reportRecognized({ bvid, cid: String(playItem.cid), v: AUTO_MATCH_VERSION, missing: true });
+          }
+          // 只有填词歌才识别画面：普通视频按标题搜不到就是暂无歌词，画面上的说话字幕（采访、小剧场）
+          // 和歌词长得一样，识别了只会给人看假歌词。识别任务自己会在服务端记「查无歌词」
+          if (!hit && !isLocal && bvid && tianci) {
             const screen = await recognizeFromScreen(bvid, String(playItem.cid), AUTO_MATCH_VERSION, () => canceled);
             if (canceled) return;
             if (screen) {
-              hit = { lyrics: screen.lyrics };
+              hit = { lyrics: screen.lyrics, tLyrics: screen.tLyrics };
               screenOrigin = screenOriginOf(screen.kind, screen.lyrics);
               fromServer = true;
             }

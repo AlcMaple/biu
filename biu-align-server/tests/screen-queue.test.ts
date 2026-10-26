@@ -70,6 +70,28 @@ describe("ScreenQueue", () => {
     expect((await queue.submit(job("2", "1", 5))).id).not.toBeNull();
   });
 
+  it("双语画面的中文翻译存成翻译歌词，时间跟着原文", async () => {
+    const { queue, recognized, release } = await setup();
+    const a = await queue.submit({ ...job("1"), subtitle: [] });
+    await flush();
+    release.shift()!({
+      from: "screen",
+      lines: [
+        { t: 1, text: "I let you go", translation: "那时我放开了的手" },
+        { t: 3, text: "Now.." },
+        { t: 5, text: "Walked away", translation: "转过身只剩了保重" },
+      ],
+      confident: false,
+    });
+    await vi.waitFor(() => expect(queue.get(a.id!).state).toBe("done"));
+    expect((await recognized.get(page.bvid, "1")).recognized).toEqual({
+      lyrics: "[00:01.00]I let you go\n[00:03.00]Now..\n[00:05.00]Walked away",
+      tLyrics: "[00:01.00]那时我放开了的手\n[00:05.00]转过身只剩了保重",
+      from: "screen",
+      confident: false,
+    });
+  });
+
   it("画面和字幕都没有歌词时记为查无歌词", async () => {
     const { queue, recognized, release } = await setup();
     const a = await queue.submit(job("1"));

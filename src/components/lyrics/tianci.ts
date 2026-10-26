@@ -2,13 +2,7 @@ import type { LyricLine } from "@/store/lyrics-state";
 
 import { log } from "@/platform";
 import { getAiSubtitle } from "@/service/ai-subtitle";
-import {
-  AlignApiError,
-  createScreenJob,
-  getRecognizedLyrics,
-  getScreenJob,
-  putRecognizedLyrics,
-} from "@/service/lyrics-align";
+import { AlignApiError, createScreenJob, getRecognizedLyrics, getScreenJob } from "@/service/lyrics-align";
 import { useLyricsState } from "@/store/lyrics-state";
 import { useUser } from "@/store/user";
 import { ALIGN_POLL_INTERVAL_MS } from "@shared/lyrics-align";
@@ -34,6 +28,7 @@ export const matchesScreenOrigin = (lines: LyricLine[], origin: ScreenOrigin | u
 
 export interface ScreenHit {
   lyrics: string;
+  tLyrics?: string;
   kind: ScreenOriginKind;
 }
 
@@ -52,7 +47,9 @@ async function readScreenResult(bvid: string, cid: string, v: number): Promise<S
   const rec = shared.recognized;
   if (!rec || (shared.v ?? 0) < v) return null;
   if (rec.from === "subtitle") return { lyrics: rec.lyrics, kind: "subtitle" };
-  if (rec.from === "screen") return { lyrics: rec.lyrics, kind: rec.confident ? "screen" : "screen-unsure" };
+  if (rec.from === "screen") {
+    return { lyrics: rec.lyrics, tLyrics: rec.tLyrics ?? undefined, kind: rec.confident ? "screen" : "screen-unsure" };
+  }
   return null;
 }
 
@@ -83,21 +80,18 @@ export async function recognizeFromScreen(
       log.warn("[lyrics] 获取 B 站 AI 字幕失败", sub.detail);
       return fail("获取 B 站 AI 字幕失败，暂时无法识别歌词。");
     }
-    // 没有 AI 字幕：一期没有别的来源，和「搜不到歌词」一样处理
-    if (sub.kind === "none") {
-      setScreenStatus(null);
-      await putRecognizedLyrics({ bvid, cid, v, missing: true }).catch(err =>
-        log.warn("[lyrics] 上报查无歌词失败", err),
-      );
-      return null;
-    }
 
     stage = "server";
     let job = await createScreenJob({
       bvid,
       cid,
       v,
-      subtitle: sub.lines.map(l => ({ from: l.from, to: l.to, content: l.content.slice(0, 200) })),
+      // 没有 AI 字幕时传空，服务端只靠画面认歌词（素演、英文坏女孩这类）
+      subtitle: (sub.kind === "ok" ? sub.lines : []).map(l => ({
+        from: l.from,
+        to: l.to,
+        content: l.content.slice(0, 200),
+      })),
     });
     while (job.id && (job.state === "queued" || job.state === "running")) {
       await sleep(ALIGN_POLL_INTERVAL_MS);

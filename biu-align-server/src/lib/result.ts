@@ -116,21 +116,36 @@ export function looksMismatched(a: Pick<Alignment, "quality">, timed: boolean): 
   return timed ? medianScore < 0.25 && repairedLines >= 3 : medianScore < 0.2;
 }
 
+const TAG_LEAD_SEC = 0.3;
+const round3 = (t: number) => Math.round(t * 1000) / 1000;
+
 export function buildAlignment(
   target: { bvid: string; cid: string; lyricsHash: string },
   page: VideoPage,
   input: LyricLine[],
   output: WorkerOutput,
 ): Alignment {
-  const lines: AlignedLine[] = output.lines
-    .filter(l => l.t.length)
-    .map(l => ({
-      start: l.t[0],
-      text: l.text,
-      words: toWords(l),
-      score: l.score,
-      ...(l.repaired ? { repaired: true as const } : {}),
-    }));
+  // 演唱者标记没送去对齐，接回行首：在第一个字唱出前的 TAG_LEAD_SEC 里逐字点亮完，不和第一个字挤在同一刻；
+  // 往前借的时间不越过上一行最后一个字
+  let prevLast = 0;
+  const lines: AlignedLine[] = output.lines.flatMap((l, i) => {
+    if (!l.t.length) return [];
+    const tag = input[i]?.tag;
+    const first = l.t[0];
+    const lead = Math.max(0, Math.min(TAG_LEAD_SEC, first - prevLast));
+    const tagChars = tag ? [...tag] : [];
+    const tagWords = tagChars.map((c, k) => ({ text: c, start: round3(first - lead + (lead * k) / tagChars.length) }));
+    prevLast = l.t[l.t.length - 1];
+    return [
+      {
+        start: tagWords[0]?.start ?? first,
+        text: tag ? tag + l.text : l.text,
+        words: [...tagWords, ...toWords(l)],
+        score: l.score,
+        ...(l.repaired ? { repaired: true as const } : {}),
+      },
+    ];
+  });
   const scores = output.lines.filter(l => l.t.length).map(l => l.score);
   return {
     alignerVersion: ALIGNER_VERSION,

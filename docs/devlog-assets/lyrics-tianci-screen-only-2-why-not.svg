@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="891" viewBox="0 0 1240 891" role="img">
+<title>填词歌纯画面识别与双语歌词（2/2）：实测结果、为什么不那样做、哪里容易改错</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="889" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="19" font-weight="700" fill="#282529">填词歌纯画面识别与双语歌词（2/2）：实测结果、为什么不那样做、哪里容易改错</text>
+<text x="34.0" y="66.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" fill="#756f73">结论：不给字幕时 6 首能认出来，错字率和有字幕时持平或更低；下面每条「不那样做」都来自实测，改动前先看。</text>
+<rect x="24" y="96" width="1192" height="232.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="125" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">① 实测（错字率 = 和 UP 主发布的歌词逐字比，越低越好）</text>
+<rect x="44.0" y="141.0" width="374.7" height="169.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="165.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">9 首调参歌，故意不给字幕</text>
+<text x="58.0" y="187.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">牵丝戏 0.97%（有字幕时 5.16%）</text>
+<text x="58.0" y="204.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">饲养怪物 2.89%（5.53%）</text>
+<text x="58.0" y="221.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">搞cp抄 5.47%（3.65%）</text>
+<text x="58.0" y="238.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">欧气 8.42%（7.92%）</text>
+<text x="58.0" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">不负韶光 8.47%（8.47%）</text>
+<text x="58.0" y="272.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">红莲华 13.17%（13.17%）</text>
+<text x="58.0" y="289.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">书法字体 3 首：判为查无</text>
+<rect x="432.7" y="141.0" width="374.7" height="169.0" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="165.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#316247">两首验收歌，本机真实对齐</text>
+<text x="446.7" y="187.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">素演：识别 56 行，按中文逐字对齐 56/56 行，行起点和画</text>
+<text x="446.7" y="204.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">面时间吻合 98%。</text>
+<text x="446.7" y="221.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">坏女孩：识别 54 行，按英文逐词对齐 54/54 行，吻合 </text>
+<text x="446.7" y="238.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">93%。</text>
+<text x="446.7" y="255.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#316247">识别每首约 47–57 秒、内存约 170–195 MB。</text>
+<rect x="821.3" y="141.0" width="374.7" height="169.0" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="835.3" y="165.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#36566d">误认测试</text>
+<text x="835.3" y="187.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">钢琴小剧场（只有说话字幕）：判为查无。</text>
+<text x="835.3" y="204.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">模仿秀采访（双语说话字幕）：误认成 178 行歌词，因此普</text>
+<text x="835.3" y="221.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">通视频不走画面识别。</text>
+<text x="835.3" y="238.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#36566d">有字幕的 9 首：输出和改动前逐字相同。</text>
+<rect x="24" y="344" width="1192" height="262.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="373" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">② 为什么不那样做</text>
+<rect x="44.0" y="389.0" width="569.0" height="84.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="413.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">不给所有视频识别画面</text>
+<text x="58.0" y="435.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">只看画面分不出说话还是唱歌，采访视频会拼出整页假歌词。普通视频搜不到就是暂无歌词，属</text>
+<text x="58.0" y="452.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">于小众情况，交给用户手动搜或报错。</text>
+<rect x="627.0" y="389.0" width="569.0" height="84.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="641.0" y="413.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">不把翻译混进歌词</text>
+<text x="641.0" y="435.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">对齐整首只判一次语言，歌词里有一个汉字就整首按中文读，英文逐词对齐就做不成了。翻译单</text>
+<text x="641.0" y="452.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">独存，按行跟着原文显示。</text>
+<rect x="44.0" y="487.0" width="374.7" height="101.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="511.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">不删演唱者标记</text>
+<text x="58.0" y="533.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">用户要看到谁在唱。标记没人唱，送去对齐会占掉一段音频，</text>
+<text x="58.0" y="550.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">所以只在对齐时拿掉、对齐完接回。</text>
+<rect x="432.7" y="487.0" width="374.7" height="101.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="446.7" y="511.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">标记不和第一个字同时亮</text>
+<text x="446.7" y="533.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">同时亮看起来怪。改为开唱前 0.3 秒里逐字点亮完，且不往</text>
+<text x="446.7" y="550.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">前越过上一行最后一个字。</text>
+<rect x="821.3" y="487.0" width="374.7" height="101.0" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="835.3" y="511.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#96434f">不按出现次数挑车道</text>
+<text x="835.3" y="533.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">水印也占着车道，而且每帧被认成不同写法（bilibili 的各</text>
+<text x="835.3" y="550.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">种认法），按次数数会把水印当歌词。改数「互不相像的句</text>
+<text x="835.3" y="567.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#96434f">子」有多少。</text>
+<rect x="24" y="622" width="1192" height="245.0" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44" y="651" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" fill="#282529">③ 哪里容易改错</text>
+<rect x="44.0" y="667.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="691.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">每帧一致性门槛 0.9</text>
+<text x="58.0" y="713.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">印刷体 1.00、书法体 0.75，中间留了余量。调低会把读不</text>
+<text x="58.0" y="730.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">通的书法字体歌放出来。</text>
+<rect x="432.7" y="667.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="446.7" y="691.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">语速门槛 4.5 字/秒</text>
+<text x="446.7" y="713.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">歌词最高 3.3、说话约 6。只按中文行算：英文字母和音节换</text>
+<text x="446.7" y="730.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">算不稳，混进来会把说话的语速拉低。</text>
+<rect x="821.3" y="667.0" width="374.7" height="84.0" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="691.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">标记要 3 句以上不同歌词</text>
+<text x="835.3" y="713.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">只出现一两次的「他说：我爱你」是歌词本身；合唱歌开头就</text>
+<text x="835.3" y="730.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#7a6234">是「藤：」，也不能当制作名单删。</text>
+<rect x="44.0" y="765.0" width="569.0" height="84.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="789.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">同名概念：画面上的「字幕」</text>
+<text x="58.0" y="811.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">画面上打的歌词（UP 主做进视频里的字）和 B 站 AI 字幕（听写出来的文字）是两回事：前者</text>
+<text x="58.0" y="828.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">是识别对象，后者只是校对锚点，本期就是在没有后者时只靠前者。</text>
+<rect x="627.0" y="765.0" width="569.0" height="84.0" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="641.0" y="789.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">阈值改动的复测范围</text>
+<text x="641.0" y="811.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">任何阈值改动都要在 9 首调参歌、素演、坏女孩和两个误认视频上重跑；只看其中几首会顾此失</text>
+<text x="641.0" y="828.0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11" fill="#4a4450">彼。</text>
+</svg>

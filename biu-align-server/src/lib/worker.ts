@@ -18,7 +18,10 @@ export type RunWorker = (audio: string, lines: LyricLine[], workdir: string) => 
 export const runWorker: RunWorker = async (audio, lines, workdir) => {
   const lyricsFile = path.join(workdir, "lyrics.json");
   const outFile = path.join(workdir, "out.json");
-  await writeFile(lyricsFile, JSON.stringify(lines));
+  await writeFile(
+    lyricsFile,
+    JSON.stringify(lines.map(l => ({ t: l.t, text: l.tag ? l.text.slice(l.tag.length) : l.text }))),
+  );
   const stderr: string[] = [];
   const code = await new Promise<number | "timeout">((resolve, reject) => {
     const child = spawn(config.pythonBin, [SCRIPT, audio, lyricsFile, outFile, workdir], {

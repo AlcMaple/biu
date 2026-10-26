@@ -5,7 +5,7 @@ import path from "node:path";
 import type { downloadVideo, getVideoPage } from "./bilibili.js";
 import type { LyricLine } from "./lyrics.js";
 import type { RecognizedStore } from "./recognized.js";
-import type { RunScreen, SubtitleLine } from "./screen-worker.js";
+import type { RunScreen, ScreenLine, SubtitleLine } from "./screen-worker.js";
 
 import { AlignError } from "./errors.js";
 import { fairOrder } from "./queue.js";
@@ -57,6 +57,11 @@ const lrcTime = (t: number) => {
 };
 
 export const toLrc = (lines: LyricLine[]) => lines.map(l => `${lrcTime(l.t)}${l.text}`).join("\n");
+
+const translationLrc = (lines: ScreenLine[]) => {
+  const timed = lines.flatMap(l => (l.translation ? [{ t: l.t, text: l.translation }] : []));
+  return timed.length ? toLrc(timed) : undefined;
+};
 
 // 和对齐队列分开排：识别画面只占约 150 MB、半分钟，和对齐（峰值近 4 GB）并行不会挤爆内存，
 // 排在一条队里反而要等前面的对齐跑完。同样单并发、按人轮转（见 AlignQueue）。
@@ -130,7 +135,13 @@ export class ScreenQueue {
       const out = await this.deps.runScreen(video, job.subtitle, dir);
       const base = { bvid: job.bvid, cid: job.cid, v: job.v, by: job.mid };
       if (out.from && out.lines.length >= MIN_LINES) {
-        await this.deps.recognized.put({ ...base, lyrics: toLrc(out.lines), from: out.from, confident: out.confident });
+        await this.deps.recognized.put({
+          ...base,
+          lyrics: toLrc(out.lines),
+          tLyrics: translationLrc(out.lines),
+          from: out.from,
+          confident: out.confident,
+        });
       } else {
         await this.deps.recognized.put({ ...base, missing: true });
       }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { isPcdnUrl as sharedIsPcdn } from "../../shared/bilibili-stream.js";
 import { isPcdnUrl } from "../src/lib/bilibili.js";
-import { looksMismatched, toLrc, toWords } from "../src/lib/result.js";
+import { buildAlignment, looksMismatched, toLrc, toWords } from "../src/lib/result.js";
 
 describe("toWords", () => {
   it("汉字一字一段，拉丁字母按词成段，标点和空格并进前一段，拼回来等于原文", () => {
@@ -86,5 +86,64 @@ describe("looksMismatched", () => {
     expect(looksMismatched(q(0.35, 5), true)).toBe(false);
     expect(looksMismatched(q(0.19, 0), false)).toBe(true);
     expect(looksMismatched(q(0.215, 0), false)).toBe(false);
+  });
+});
+
+describe("buildAlignment", () => {
+  it("演唱者标记接回行首，在第一个字唱出前逐字点亮完，不越过上一行", () => {
+    const page = { bvid: "BV1a68z6GELa", cid: "1", title: "素演", part: "", durationSec: 214, audio: [] } as never;
+    const out = buildAlignment(
+      { bvid: "BV1a68z6GELa", cid: "1", lyricsHash: "h" },
+      page,
+      [
+        { t: 1, text: "合：想被骗", tag: "合：" },
+        { t: 3, text: "别说骗" },
+      ],
+      {
+        lang: "zh",
+        offset: 0,
+        frameMs: 20,
+        timelineMatch: 1,
+        lines: [
+          { text: "想被骗", chars: ["想", "被", "骗"], t: [1.2, 1.5, 1.8], score: 0.5 },
+          { text: "别说骗", chars: ["别", "说", "骗"], t: [3.1, 3.4, 3.7], score: 0.5 },
+        ],
+      },
+    );
+    expect(out.lines[0]).toMatchObject({
+      start: 0.9,
+      text: "合：想被骗",
+      words: [
+        { text: "合", start: 0.9 },
+        { text: "：", start: 1.05 },
+        { text: "想", start: 1.2 },
+        { text: "被", start: 1.5 },
+        { text: "骗", start: 1.8 },
+      ],
+    });
+    expect(out.lines[1].text).toBe("别说骗");
+    const tight = buildAlignment(
+      { bvid: "BV1a68z6GELa", cid: "1", lyricsHash: "h" },
+      page,
+      [
+        { t: 1, text: "想被骗" },
+        { t: 3, text: "合：别说骗", tag: "合：" },
+      ],
+      {
+        lang: "zh",
+        offset: 0,
+        frameMs: 20,
+        timelineMatch: 1,
+        lines: [
+          { text: "想被骗", chars: ["想", "被", "骗"], t: [1.2, 1.5, 3.0], score: 0.5 },
+          { text: "别说骗", chars: ["别", "说", "骗"], t: [3.1, 3.4, 3.7], score: 0.5 },
+        ],
+      },
+    );
+    expect(tight.lines[1].words.slice(0, 3)).toEqual([
+      { text: "合", start: 3 },
+      { text: "：", start: 3.05 },
+      { text: "别", start: 3.1 },
+    ]);
   });
 });

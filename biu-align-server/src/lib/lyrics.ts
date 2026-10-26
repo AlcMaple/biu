@@ -5,6 +5,8 @@ import { AlignError } from "./errors.js";
 export interface LyricLine {
   t: number;
   text: string;
+  // 行首的演唱者标记（「合：」「薇：」），原样显示，但不送去对齐：没人唱它，塞进音频会把整行往后挤
+  tag?: string;
 }
 
 const TIME_TAG = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g;
@@ -40,6 +42,20 @@ export function isSingerTag(text: string): boolean {
   return !names.every(w => VOCABLE.test(w.replace(/[^\p{L}\p{N}]/gu, "") || "x"));
 }
 const TITLE_LINE = /^.+ - .+$/;
+const SINGER_PREFIX = /^([^\s:：]{1,4})\s*[:：]\s*(?=\S)/;
+
+// 同一个前缀带着 3 句以上不同的歌词才算演唱者标记；只出现一两次的「他说：我爱你」是歌词本身
+function singerTags(lines: { text: string }[]): Set<string> {
+  const bodies = new Map<string, Set<string>>();
+  for (const { text } of lines) {
+    const m = SINGER_PREFIX.exec(text);
+    if (!m) continue;
+    const set = bodies.get(m[1]) ?? new Set<string>();
+    set.add(text.slice(m[0].length));
+    bodies.set(m[1], set);
+  }
+  return new Set([...bodies].filter(([, set]) => set.size >= 3).map(([name]) => name));
+}
 
 export const MAX_LINES = 300;
 export const MAX_CHARS = 20_000;
@@ -66,12 +82,20 @@ export function parseLyrics(raw: string): LyricLine[] {
     for (const t of times.length ? times : [0]) kept.push({ t, text, colon: SHORT_PREFIX_COLON.test(text) });
   }
   if (timed) kept.sort((a, b) => a.t - b.t);
+  const tags = singerTags(kept);
+  for (const line of kept) {
+    const m = SINGER_PREFIX.exec(line.text);
+    if (!m || !tags.has(m[1])) continue;
+    line.tag = m[0];
+    // 合唱歌开头就是「藤：」「薇：」，不是制作名单
+    line.colon = false;
+  }
   // 「短前缀 + 冒号」只在开头 / 结尾成片出现时才是制作名单；夹在中间的是歌词本身（如「他说：我爱你」），不能删
   let head = 0;
   let tail = kept.length;
   while (head < tail && kept[head].colon) head++;
   while (tail > head && kept[tail - 1].colon) tail--;
-  const out: LyricLine[] = kept.slice(head, tail).map(({ t, text }) => ({ t, text }));
+  const out: LyricLine[] = kept.slice(head, tail).map(({ t, text, tag }) => (tag ? { t, text, tag } : { t, text }));
   if (!out.length) throw new AlignError("LYRICS_EMPTY");
   if (out.length > MAX_LINES || out.reduce((n, l) => n + l.text.length, 0) > MAX_CHARS)
     throw new AlignError("LYRICS_TOO_LONG");

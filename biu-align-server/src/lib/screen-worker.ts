@@ -20,10 +20,15 @@ export interface SubtitleLine {
   content: string;
 }
 
+// 双语画面（上行英文唱词、下行中文翻译）的中文挂在 translation 上，存成翻译歌词
+export interface ScreenLine extends LyricLine {
+  translation?: string;
+}
+
 export interface ScreenOutput {
   // null = 字幕是空的，画面和字幕都没有歌词
   from: "screen" | "subtitle" | null;
-  lines: LyricLine[];
+  lines: ScreenLine[];
   confident: boolean;
 }
 
