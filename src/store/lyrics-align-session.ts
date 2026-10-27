@@ -3,7 +3,16 @@ import { create } from "zustand";
 
 import { type AlignedSource, adoptAlignment, lyricsCacheKey, previewAlignment } from "@/components/lyrics/alignment";
 import platform, { log } from "@/platform";
-import { AlignApiError, createAlignJob, getAlignJob, publishAlignment } from "@/service/lyrics-align";
+import {
+  AlignApiError,
+  createAlignJob,
+  discardAlignDraft,
+  getAlignDraft,
+  getAlignJob,
+  publishAlignment,
+  realignByHash,
+} from "@/service/lyrics-align";
+import { useAlignReview } from "@/store/align-review";
 import { useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { useUser } from "@/store/user";
@@ -25,20 +34,25 @@ export type AlignPhase =
   | { kind: "working"; view?: AlignJobView }
   // jobId 有值说明是查进度时失败（任务可能还在跑），可以接着查；没有就只能重新开始
   | { kind: "failed"; message: string; code?: string; jobId?: string }
-  | { kind: "preview"; alignment: LyricsAlignment }
+  // restored = 服务器上留着的上次重跑结果（切歌回来、换设备），不是这次刚跑出来的
+  | { kind: "preview"; alignment: LyricsAlignment; restored?: boolean }
   // 管理员采用了这次的结果，还没决定要不要发布给所有人
   | { kind: "adopted" };
 
 interface AlignSessionState {
   target: AlignTarget | null;
   mode: AlignMode;
-  // 送去对齐的歌词原文；发布要用同一份，服务端按它的指纹认缓存
+  // 送去对齐的歌词原文；从服务器恢复的草稿没有原文，重跑时改按 draftHash
   input: string;
+  // 管理员手动对齐结果（服务器上的草稿）对应的歌词哈希；发布、放弃、重跑都认它
+  draftHash: string | null;
   phase: AlignPhase;
   // 对齐中只能收起提示、不能取消（服务器上的任务停不下来）；进入下一阶段时重新显示
   hidden: boolean;
   auto: (lyrics: string, opts: { userChosen: boolean; immediate?: boolean }) => void;
   start: (lyrics: string) => Promise<void>;
+  rerun: () => Promise<void>;
+  restoreDraft: () => Promise<void>;
   resume: () => void;
   adopt: () => Promise<void>;
   discard: () => void;
@@ -79,7 +93,10 @@ const stop = () => {
   clearTimeout(timer);
 };
 
-const idle = { phase: { kind: "idle" } as AlignPhase, target: null, hidden: false };
+const idle = { phase: { kind: "idle" } as AlignPhase, target: null, hidden: false, draftHash: null };
+
+const sameLines = (a?: AlignedLyricLine[], b?: AlignedLyricLine[]) =>
+  Boolean(a && b && JSON.stringify(a) === JSON.stringify(b));
 
 export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
   const isCurrent = (target: AlignTarget) => currentAlignTarget()?.cacheKey === target.cacheKey;
@@ -112,7 +129,10 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
     if (mode === "manual") {
       const { lyrics, translatedLyrics, setPreview } = useLyricsState.getState();
       setPreview(previewAlignment(view.alignment, lyrics, translatedLyrics));
-      set(show({ kind: "preview", alignment: view.alignment }));
+      set({
+        draftHash: view.alignment.lyricsHash,
+        ...show({ kind: "preview", alignment: view.alignment, restored: view.draft && view.id === null }),
+      });
       return;
     }
     set(idle);
@@ -139,13 +159,20 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
     }, ALIGN_POLL_INTERVAL_MS);
   };
 
-  const submit = async (target: AlignTarget, text: string, gen: number, mode: AlignMode, source: AlignedSource) => {
+  const submit = async (
+    target: AlignTarget,
+    text: string,
+    gen: number,
+    mode: AlignMode,
+    source: AlignedSource,
+    force = false,
+  ) => {
     try {
       const view = await createAlignJob({
         bvid: target.bvid,
         cid: target.cid,
         lyrics: text,
-        ...(mode === "manual" ? { manual: true } : {}),
+        ...(mode === "manual" ? { manual: true, ...(force ? { force: true } : {}) } : {}),
       });
       if (gen !== generation) return;
       if (view.state === "done" || view.state === "failed") finish(target, view, gen, source);
@@ -166,6 +193,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
     target: null,
     mode: "auto",
     input: "",
+    draftHash: null,
     phase: { kind: "idle" },
     hidden: false,
 
@@ -184,7 +212,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       const gen = generation;
       lastSource = userChosen ? "aligned" : "approved";
       const source = lastSource;
-      set({ target, mode: "auto", input: text, phase: { kind: "idle" }, hidden: false });
+      set({ target, mode: "auto", input: text, draftHash: null, phase: { kind: "idle" }, hidden: false });
       timer = setTimeout(
         () => {
           if (gen !== generation || !isCurrent(target)) return;
@@ -204,13 +232,73 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       stop();
       const gen = generation;
       useLyricsState.getState().setPreview(null);
-      set({ target, mode: "manual", input: text, ...show({ kind: "working" }) });
+      set({ target, mode: "manual", input: text, draftHash: null, ...show({ kind: "working" }) });
       await submit(target, text, gen, "manual", "aligned");
+    },
+
+    // 草稿不满意时真的重跑一遍。从服务器恢复的草稿没有原文，按哈希让服务端用它存的原文重跑
+    rerun: async () => {
+      const { target, input, draftHash } = get();
+      if (!target || (!input && !draftHash)) return;
+      stop();
+      const gen = generation;
+      useLyricsState.getState().setPreview(null);
+      set({ mode: "manual", ...show({ kind: "working" }) });
+      if (input) {
+        await submit(target, input, gen, "manual", "aligned", true);
+        return;
+      }
+      try {
+        const view = await realignByHash({ bvid: target.bvid, cid: target.cid, lyricsHash: draftHash! });
+        if (gen !== generation) return;
+        if (view.state === "done" || view.state === "failed") finish(target, view, gen, "aligned");
+        else if (view.id) {
+          set({ phase: { kind: "working", view } });
+          poll(target, view.id, gen, "aligned");
+        }
+      } catch (err) {
+        if (gen === generation) set(show({ kind: "failed", message: message(err) }));
+      }
+    },
+
+    // 管理员切歌回来（或换了设备）时接着上次的试听，不用再等一遍对齐。草稿已采用到本机的，直接回到「待发布」
+    restoreDraft: async () => {
+      const target = currentAlignTarget();
+      if (!target || !useAlignReview.getState().isAdmin) return;
+      const busy = () => {
+        const { target: running, phase } = get();
+        return running?.cacheKey === target.cacheKey && phase.kind !== "idle" && get().mode === "manual";
+      };
+      if (busy()) return;
+      let draft: AlignDraft | null;
+      try {
+        draft = (await getAlignDraft(target.bvid, target.cid)).draft;
+      } catch (err) {
+        // 查不到只是少了恢复，照常听歌；原因留在日志里
+        log.warn(`[lyrics-align] ${target.cacheKey} 查询未发布的对齐结果失败`, err);
+        return;
+      }
+      if (!draft || !isCurrent(target) || busy()) return;
+      const entry = (await platform.getStore(StoreNameMap.LyricsCache))?.[target.cacheKey];
+      if (!isCurrent(target) || busy()) return;
+      stop();
+      const base = { target, mode: "manual" as const, input: "", draftHash: draft.lyricsHash };
+      if (sameLines(entry?.alignment?.lines, draft.alignment.lines)) {
+        set({ ...base, ...show({ kind: "adopted" }) });
+        return;
+      }
+      const { lyrics, translatedLyrics, setPreview } = useLyricsState.getState();
+      setPreview(previewAlignment(draft.alignment, lyrics, translatedLyrics));
+      set({ ...base, ...show({ kind: "preview", alignment: draft.alignment, restored: true }) });
     },
 
     resume: () => {
       const { target, phase, input, mode } = get();
       if (!target || phase.kind !== "failed") return;
+      if (!phase.jobId && mode === "manual" && !input) {
+        void get().rerun();
+        return;
+      }
       stop();
       set(show({ kind: "working" }));
       if (phase.jobId) poll(target, phase.jobId, generation, mode === "manual" ? "aligned" : lastSource);
@@ -232,18 +320,25 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       }
     },
 
+    // 放弃要连服务器上的草稿一起删，否则下次播放这首又会被恢复成「试听中」
     discard: () => {
+      const { target, draftHash } = get();
       useLyricsState.getState().setPreview(null);
       set(idle);
+      if (!target || !draftHash) return;
+      discardAlignDraft({ bvid: target.bvid, cid: target.cid, lyricsHash: draftHash }).catch(err =>
+        addToast({ title: `已放弃，但服务器上的这份结果没删掉：${message(err)}`, color: "warning" }),
+      );
     },
 
     publish: async () => {
-      const { target, input } = get();
-      if (!target) return;
+      const { target, draftHash } = get();
+      if (!target || !draftHash) return;
       try {
-        await publishAlignment({ bvid: target.bvid, cid: target.cid, lyrics: input });
-        addToast({ title: "已发布，所有人打开这首歌都会用这份", color: "success" });
+        await publishAlignment({ bvid: target.bvid, cid: target.cid, lyricsHash: draftHash });
+        addToast({ title: "已发布，所有人打开这首歌都会用这份；这首歌的报错已一并关闭", color: "success" });
         set(idle);
+        void useAlignReview.getState().refresh();
       } catch (err) {
         addToast({ title: message(err), color: "danger" });
       }
@@ -263,7 +358,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
 });
 
 // 切歌：只跟当前这首有关，旧的计时器和轮询一并停掉（服务器上的任务照常跑完，结果缓存着，下次播放直接命中）。
-// 管理员的试听和「要不要发布」也作废，没采用就等于放弃
+// 管理员的试听和「要不要发布」只是从界面上收起：结果是服务器上的草稿，切回来由 restoreDraft 接着试听
 usePlayList.subscribe((state, prevState) => {
   if (state.playId === prevState.playId) return;
   const { target } = useLyricsAlignSession.getState();

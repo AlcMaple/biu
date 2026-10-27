@@ -28,6 +28,10 @@ const CATALOG = {
   JOB_NOT_FOUND: [404, "找不到这个对齐任务，可能服务器重启过，请重新提交"],
   ALIGNMENT_NOT_READY: [409, "这份歌词还没对齐完成，等对齐完再操作"],
   ALIGNMENT_WITHDRAWN: [422, "这份歌词的时间轴被确认有误，已经下线；可以上传正确的歌词"],
+  INPUT_UNAVAILABLE: [
+    409,
+    "服务器上没存这份歌词的原文（对齐得比较早），请播放这首，在歌词区菜单里「重新对齐当前歌词」",
+  ],
   ALREADY_APPROVED: [409, "这份歌词已经是这首歌正在使用的版本"],
   SUBMISSION_NOT_FOUND: [404, "找不到这条提交"],
   SUBMISSION_NOT_PENDING: [409, "这条提交已经处理过了"],

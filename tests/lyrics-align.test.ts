@@ -48,6 +48,10 @@ describe("align route whitelist", () => {
     expect(matchAlignRoute("POST", "/me")).toBeUndefined();
     expect(matchAlignRoute("POST", "/lyrics/reports")).toEqual({ auth: true });
     expect(matchAlignRoute("GET", "/lyrics/reports/mine")).toEqual({ auth: true });
+    expect(matchAlignRoute("GET", "/admin/drafts/BV13LFNzmEHG/123")).toEqual({ auth: true });
+    expect(matchAlignRoute("GET", "/admin/drafts/BV13LFNzmEHG/123/../x")).toBeUndefined();
+    expect(matchAlignRoute("POST", "/admin/drafts/discard")).toEqual({ auth: true });
+    expect(matchAlignRoute("POST", "/admin/realign")).toEqual({ auth: true });
     expect(matchAlignRoute("GET", "/admin/reports?status=pending")).toEqual({ auth: true });
     expect(matchAlignRoute("POST", "/admin/reports/0b5e7f3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b/resolve")).toEqual({
       auth: true,

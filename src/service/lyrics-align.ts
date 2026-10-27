@@ -21,9 +21,14 @@ async function call<T>(req: AlignRequest): Promise<T> {
 
 export const getAlignMe = () => call<{ mid: string; isAdmin: boolean }>({ method: "GET", path: "/me" });
 
-// manual 只对管理员生效：插到队首、跳过缓存重跑
-export const createAlignJob = (body: { bvid: string; cid: string; lyrics: string; manual?: boolean }) =>
-  call<AlignJobView>({ method: "POST", path: "/align/jobs", body });
+// manual 只对管理员生效：插到队首、跳过缓存重跑；已有没发布的草稿时直接返回草稿，force 才重跑
+export const createAlignJob = (body: {
+  bvid: string;
+  cid: string;
+  lyrics: string;
+  manual?: boolean;
+  force?: boolean;
+}) => call<AlignJobView>({ method: "POST", path: "/align/jobs", body });
 
 export const getAlignJob = (id: string) => call<AlignJobView>({ method: "GET", path: `/align/jobs/${id}` });
 
@@ -82,5 +87,16 @@ export const resolveReport = (id: string, body: { withdraw: boolean; reason?: st
 export const dismissReport = (id: string, reason: string) =>
   call<AlignReport>({ method: "POST", path: `/admin/reports/${id}/dismiss`, body: { reason } });
 
-export const publishAlignment = (body: { bvid: string; cid: string; lyrics: string }) =>
+// 发布时服务端会关掉这首歌待处理的报错
+export const publishAlignment = (body: { bvid: string; cid: string; lyricsHash: string }) =>
   call<AlignPublished>({ method: "POST", path: "/admin/published", body });
+
+// 按报错记下的歌词哈希重跑，审核页不用先播放这首、也不用有歌词原文
+export const realignByHash = (body: { bvid: string; cid: string; lyricsHash: string }) =>
+  call<AlignJobView>({ method: "POST", path: "/admin/realign", body });
+
+export const getAlignDraft = (bvid: string, cid: string) =>
+  call<{ draft: AlignDraft | null }>({ method: "GET", path: `/admin/drafts/${bvid}/${cid}` });
+
+export const discardAlignDraft = (body: { bvid: string; cid: string; lyricsHash: string }) =>
+  call<{ ok: true }>({ method: "POST", path: "/admin/drafts/discard", body });

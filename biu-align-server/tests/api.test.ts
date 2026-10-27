@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
 import { AlignmentCache, FailureCache } from "../src/lib/alignment-cache.js";
+import { DraftStore, InputStore } from "../src/lib/drafts.js";
 import { AlignQueue } from "../src/lib/queue.js";
 import { RecognizedStore } from "../src/lib/recognized.js";
 import { ReportStore } from "../src/lib/reports.js";
@@ -26,9 +27,13 @@ beforeAll(async () => {
   const cache = new AlignmentCache(dir);
   const failures = new FailureCache(dir);
   const submissions = new SubmissionStore(dir);
+  const drafts = new DraftStore(dir);
+  const inputs = new InputStore(dir);
   const queue = new AlignQueue({
     cache,
     failures,
+    drafts,
+    inputs,
     runWorker: async (_audio, lines) => ({
       lang: "zh",
       lines: lines.map((l, i) => ({
@@ -64,6 +69,8 @@ beforeAll(async () => {
     queue,
     cache,
     failures,
+    drafts,
+    inputs,
     submissions,
     reports: new ReportStore(dir),
     recognized,
@@ -374,5 +381,56 @@ describe("识别结果：登录用户写，所有人读", () => {
       });
       expect(r.status).toBe(400);
     });
+  });
+});
+
+describe("管理员重跑对照：草稿不影响在用版本，发布后关掉报错", () => {
+  it("审核页按报错重跑、并排对照、用重跑结果替换", async () => {
+    const cid = 7;
+    const first = await call("POST", "/align/jobs", "1", { bvid: BV, cid, lyrics: LYRICS });
+    const done = await waitDone(first.json.id, "1");
+    const hash = done.json.alignment.lyricsHash;
+    const live = (await call("GET", `/lyrics/${BV}/${cid}`)).json.alignment;
+    expect(live.lyricsHash).toBe(hash);
+
+    const rep = await call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, note: "慢" });
+    const before = await call("GET", `/admin/reports/${rep.json.id}`, "900");
+    expect(before.json).toMatchObject({ draft: null, canRealign: true });
+
+    expect((await call("POST", "/admin/realign", "1", { bvid: BV, cid, lyricsHash: hash })).status).toBe(403);
+    const rerun = await call("POST", "/admin/realign", "900", { bvid: BV, cid, lyricsHash: hash });
+    expect(rerun.status).toBe(202);
+    expect((await waitDone(rerun.json.id, "900")).json).toMatchObject({ state: "done", draft: true });
+
+    // 试听期间所有人拿到的仍是原来那份，报错详情里「被报的那份」也还在
+    expect((await call("GET", `/lyrics/${BV}/${cid}`)).json.alignment.createdAt).toBe(live.createdAt);
+    const after = await call("GET", `/admin/reports/${rep.json.id}`, "900");
+    expect(after.json.alignment.createdAt).toBe(live.createdAt);
+    expect(after.json.draft.createdAt).toBeGreaterThanOrEqual(live.createdAt);
+    expect((await call("GET", `/admin/drafts/${BV}/${cid}`, "900")).json.draft.lyricsHash).toBe(hash);
+
+    // 播放器里再点「重新对齐」直接拿到草稿，不重跑
+    const again = await call("POST", "/align/jobs", "900", { bvid: BV, cid, lyrics: LYRICS, manual: true });
+    expect(again.json).toMatchObject({ id: null, state: "done", draft: true });
+
+    const pub = await call("POST", "/admin/published", "900", { bvid: BV, cid, lyricsHash: hash });
+    expect(pub.json.alignment.createdAt).toBe(after.json.draft.createdAt);
+    expect((await call("GET", `/admin/drafts/${BV}/${cid}`, "900")).json.draft).toBeNull();
+    expect((await call("GET", `/admin/reports/${rep.json.id}`, "900")).json.report).toMatchObject({
+      status: "resolved",
+      reason: "已换成管理员重新对齐的版本",
+    });
+  });
+
+  it("放弃草稿后恢复为没有草稿；没存原文的哈希不能在审核页重跑", async () => {
+    const cid = 8;
+    const m = await call("POST", "/align/jobs", "900", { bvid: BV, cid, lyrics: LYRICS, manual: true });
+    const done = await waitDone(m.json.id, "900");
+    const hash = done.json.alignment.lyricsHash;
+    expect((await call("GET", `/lyrics/${BV}/${cid}`)).json.alignment).toBeNull();
+    await call("POST", "/admin/drafts/discard", "900", { bvid: BV, cid, lyricsHash: hash });
+    expect((await call("GET", `/admin/drafts/${BV}/${cid}`, "900")).json.draft).toBeNull();
+    const missing = await call("POST", "/admin/realign", "900", { bvid: BV, cid, lyricsHash: "0123456789abcdef" });
+    expect(missing.json.error.code).toBe("INPUT_UNAVAILABLE");
   });
 });

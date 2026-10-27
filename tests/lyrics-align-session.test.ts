@@ -5,7 +5,12 @@ const h = vi.hoisted(() => ({
   store: {} as Record<string, unknown>,
   createAlignJob: vi.fn(),
   getAlignJob: vi.fn(),
+  getAlignDraft: vi.fn(),
+  discardAlignDraft: vi.fn(),
+  publishAlignment: vi.fn(),
+  realignByHash: vi.fn(),
   isLogin: true,
+  isAdmin: false,
 }));
 
 vi.mock("@heroui/react", () => ({ addToast: vi.fn() }));
@@ -24,7 +29,14 @@ vi.mock("@/service/lyrics-align", () => ({
   AlignApiError: class extends Error {},
   createAlignJob: h.createAlignJob,
   getAlignJob: h.getAlignJob,
-  publishAlignment: vi.fn(),
+  getAlignDraft: h.getAlignDraft,
+  discardAlignDraft: h.discardAlignDraft,
+  publishAlignment: h.publishAlignment,
+  realignByHash: h.realignByHash,
+}));
+
+vi.mock("@/store/align-review", () => ({
+  useAlignReview: { getState: () => ({ isAdmin: h.isAdmin, refresh: vi.fn() }) },
 }));
 
 vi.mock("@/store/user", () => ({
@@ -170,5 +182,90 @@ describe("automatic alignment while listening", () => {
     expect(useLyricsAlignSession.getState().phase).toMatchObject({ kind: "failed", code: "LYRICS_MISMATCH" });
     await settle(30_000);
     expect(h.createAlignJob).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("admin re-align drafts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    h.isLogin = true;
+    h.isAdmin = true;
+    LYRICS = `[00:01.00]你好 ${seq++}`;
+    h.store = { [StoreNameMap.LyricsCache]: { [KEY]: { lyrics: LYRICS, source: "auto" } } };
+    for (const fn of [h.createAlignJob, h.getAlignJob, h.getAlignDraft, h.discardAlignDraft, h.publishAlignment])
+      fn.mockReset();
+    h.discardAlignDraft.mockResolvedValue({ ok: true });
+    usePlayList.setState({ playId: "a" });
+    useLyricsState.getState().reset();
+  });
+
+  afterEach(() => {
+    useLyricsAlignSession.getState().dismiss();
+    vi.useRealTimers();
+  });
+
+  it("switching away and back resumes the trial instead of aligning again", async () => {
+    h.createAlignJob.mockResolvedValue({ id: "j1", state: "running" });
+    h.getAlignJob.mockResolvedValue({ id: "j1", state: "done", alignment, draft: true });
+    await useLyricsAlignSession.getState().start(LYRICS);
+    await settle(3000);
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("preview");
+
+    usePlayList.setState({ playId: "b" });
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
+    expect(useLyricsState.getState().preview).toBeNull();
+
+    usePlayList.setState({ playId: "a" });
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    await useLyricsAlignSession.getState().restoreDraft();
+    expect(useLyricsAlignSession.getState().phase).toMatchObject({ kind: "preview", restored: true });
+    expect(useLyricsState.getState().preview?.lyrics[0].text).toBe("你好");
+    expect(h.createAlignJob).toHaveBeenCalledTimes(1);
+
+    await useLyricsAlignSession.getState().publish();
+    expect(h.publishAlignment).toHaveBeenCalledWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyricsHash: "h1" });
+  });
+
+  it("goes straight back to 'ready to publish' when the draft was already adopted here", async () => {
+    cache()[KEY] = { lyrics: LYRICS, alignment: { lyricsHash: "h1", lines: alignment.lines } } as MusicLyrics;
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    await useLyricsAlignSession.getState().restoreDraft();
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("adopted");
+    expect(useLyricsState.getState().preview).toBeNull();
+  });
+
+  it("only restores for admins, and discarding deletes the server draft", async () => {
+    h.isAdmin = false;
+    await useLyricsAlignSession.getState().restoreDraft();
+    expect(h.getAlignDraft).not.toHaveBeenCalled();
+
+    h.isAdmin = true;
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    await useLyricsAlignSession.getState().restoreDraft();
+    useLyricsAlignSession.getState().discard();
+    expect(h.discardAlignDraft).toHaveBeenCalledWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyricsHash: "h1" });
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
+  });
+
+  it("re-running a restored draft goes by its lyrics hash and forces a fresh run", async () => {
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    await useLyricsAlignSession.getState().restoreDraft();
+    h.realignByHash.mockResolvedValue({ id: "j2", state: "queued", position: 1 });
+    h.getAlignJob.mockResolvedValue({ id: "j2", state: "done", alignment, draft: true });
+    await useLyricsAlignSession.getState().rerun();
+    expect(h.realignByHash).toHaveBeenCalledWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyricsHash: "h1" });
+    await settle(3000);
+    expect(useLyricsAlignSession.getState().phase).toMatchObject({ kind: "preview", restored: false });
+
+    await useLyricsAlignSession.getState().start(LYRICS);
+    h.createAlignJob.mockResolvedValue({ id: "j3", state: "queued" });
+    await useLyricsAlignSession.getState().rerun();
+    expect(h.createAlignJob).toHaveBeenLastCalledWith({
+      bvid: "BV1aaaaaaaaa",
+      cid: "1",
+      lyrics: LYRICS,
+      manual: true,
+      force: true,
+    });
   });
 });

@@ -37,6 +37,9 @@ const ROUTES: { method: "GET" | "POST"; pattern: RegExp; auth: boolean }[] = [
   { method: "GET", pattern: new RegExp(`^/admin/reports/${UUID}$`), auth: true },
   { method: "POST", pattern: new RegExp(`^/admin/reports/${UUID}/(resolve|dismiss)$`), auth: true },
   { method: "POST", pattern: /^\/admin\/published$/, auth: true },
+  { method: "POST", pattern: /^\/admin\/realign$/, auth: true },
+  { method: "GET", pattern: /^\/admin\/drafts\/BV[0-9A-Za-z]{10}\/\d{1,15}$/, auth: true },
+  { method: "POST", pattern: /^\/admin\/drafts\/discard$/, auth: true },
 ];
 
 export function matchAlignRoute(method: string, path: string): { auth: boolean } | undefined {

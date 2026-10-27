@@ -4,6 +4,7 @@ import path from "node:path";
 
 import type { AlignmentCache, FailureCache } from "./alignment-cache.js";
 import type { downloadAudio, getVideoPage } from "./bilibili.js";
+import type { DraftStore, InputStore } from "./drafts.js";
 import type { LyricLine } from "./lyrics.js";
 import type { RunWorker } from "./worker.js";
 
@@ -42,11 +43,15 @@ export interface JobView {
   position?: number;
   error?: { code: string; message: string };
   alignment?: Alignment;
+  // 管理员手动对齐的结果：还没发布，所有人在用的仍是原来那份
+  draft?: true;
 }
 
 export interface QueueDeps {
   cache: AlignmentCache;
   failures: FailureCache;
+  drafts: DraftStore;
+  inputs: InputStore;
   runWorker: RunWorker;
   getVideoPage: typeof getVideoPage;
   downloadAudio: typeof downloadAudio;
@@ -83,12 +88,20 @@ export class AlignQueue {
     cid: string;
     lyricsHash: string;
     lines: LyricLine[];
+    // 只对 manual 有意义：已有草稿也重跑
+    force?: boolean;
   }): Promise<JobView> {
-    const { cache, failures } = this.deps;
+    const { cache, failures, drafts } = this.deps;
+    const { force, ...rest } = input;
     const key = cacheKey(input);
     const manual = input.origin === "manual";
 
-    // 管理员手动对齐就是为了重跑一遍看结果，跳过成功和失败两种缓存
+    // 管理员手动对齐跳过成功和失败两种缓存（为了重跑一遍看结果）；但上次重跑过、还没发布的草稿直接给回去，
+    // 否则管理员切歌回来、或在审核页和播放器之间来回，每次都要白等 2 分钟
+    if (manual && !force) {
+      const draft = await drafts.get(input);
+      if (draft) return { id: null, state: "done", alignment: draft.alignment, draft: true };
+    }
     if (!manual) {
       const failed = await failures.get(key);
       if (failed) return { id: null, state: "failed", error: new AlignError(failed.code).toJSON() };
@@ -96,13 +109,11 @@ export class AlignQueue {
       if (cached) return { id: null, state: "done", alignment: cached };
     }
 
-    const same = [...this.jobs.values()].find(j => j.key === key && isActive(j));
-    if (same) {
-      if (manual && same.state === "queued") same.origin = "manual";
-      return this.view(same);
-    }
+    // 手动和非手动的结果写到不同地方（草稿 / 对齐缓存），不能互相合并
+    const same = [...this.jobs.values()].find(j => j.key === key && isActive(j) && (j.origin === "manual") === manual);
+    if (same) return this.view(same);
 
-    const job: Job = { ...input, id: randomUUID(), key, state: "queued", createdAt: Date.now() };
+    const job: Job = { ...rest, id: randomUUID(), key, state: "queued", createdAt: Date.now() };
     this.jobs.set(job.id, job);
     this.waiting.push(job);
     void this.pump();
@@ -139,6 +150,7 @@ export class AlignQueue {
           : {}),
       ...(job.error ? { error: job.error.toJSON() } : {}),
       ...(job.alignment ? { alignment: job.alignment } : {}),
+      ...(job.alignment && job.origin === "manual" ? { draft: true as const } : {}),
     };
   }
 
@@ -167,14 +179,27 @@ export class AlignQueue {
         )
       )
         throw new AlignError("LYRICS_MISMATCH");
-      await this.deps.cache.put(job.key, alignment);
+      if (job.origin === "manual") {
+        await this.deps.drafts.put({
+          bvid: job.bvid,
+          cid: job.cid,
+          lyricsHash: job.lyricsHash,
+          alignment,
+          by: job.mid,
+          createdAt: Date.now(),
+        });
+      } else {
+        await this.deps.cache.put(job.key, alignment);
+      }
+      await this.deps.inputs.put(job.key, job.lines).catch(err => console.error(`[job ${job.id}] 保存原歌词失败`, err));
       job.alignment = alignment;
       job.state = "done";
       await this.deps.onAligned?.(job).catch(err => console.error(`[job ${job.id}] 对齐后处理失败`, err));
     } catch (err) {
       job.error = err instanceof AlignError ? err : new AlignError("ALIGN_FAILED", String(err));
       job.state = "failed";
-      if (STICKY_FAILURES.has(job.error.code)) {
+      // 手动重跑的失败不记：它和成功结果一样只是给管理员看的，不该改变其他听众自动对齐时拿到的结果
+      if (job.origin !== "manual" && STICKY_FAILURES.has(job.error.code)) {
         await this.deps.failures
           .put(job.key, job.error.code)
           .catch(e => console.error(`[job ${job.id}] 记录失败结果出错`, e));

@@ -125,6 +125,8 @@ const LyricsBroadcaster = () => {
         if (!isLocal) {
           const published = await fetchPublished(playItem.bvid, String(playItem.cid));
           if (canceled) return;
+          // 管理员上次重跑、还没发布的结果：切歌回来接着试听，不用重新对齐
+          void useLyricsAlignSession.getState().restoreDraft();
           if (published && !isUserChosen(entry)) {
             if (entry?.source === "approved" && entry.alignment?.lyricsHash === published.lyricsHash) return;
             const latest = (await platform.getStore(StoreNameMap.LyricsCache))?.[cacheKey];

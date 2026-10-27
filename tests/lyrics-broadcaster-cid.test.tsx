@@ -85,7 +85,7 @@ vi.mock("@/components/lyrics/auto-match", async importOriginal => ({
 }));
 vi.mock("@/store/lyrics-align-session", () => ({
   alignInputOf: (entry?: MusicLyrics) => entry?.lyrics ?? "",
-  useLyricsAlignSession: { getState: () => ({ auto: mocks.autoAlign }) },
+  useLyricsAlignSession: { getState: () => ({ auto: mocks.autoAlign, restoreDraft: async () => {} }) },
 }));
 vi.mock("@/pages/desktop-lyrics", () => ({ DESKTOP_LYRICS_CHANNEL: "test-desktop-lyrics" }));
 

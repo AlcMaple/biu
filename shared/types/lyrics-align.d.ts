@@ -50,6 +50,14 @@ interface AlignJobView {
   position?: number;
   alignment?: LyricsAlignment;
   error?: { code: string; message: string };
+  /** 管理员手动对齐的结果，还没发布 */
+  draft?: true;
+}
+
+interface AlignDraft {
+  lyricsHash: string;
+  alignment: LyricsAlignment;
+  createdAt: number;
 }
 
 // 结果不随任务返回：done 之后去「已识别歌词」读
@@ -135,4 +143,8 @@ interface AlignReportDetail {
   alignment: LyricsAlignment | null;
   current: LyricsAlignment | null;
   currentSource: AlignPublishSource | null;
+  /** 同一份歌词重新对齐出的、还没发布的结果 */
+  draft: LyricsAlignment | null;
+  /** 服务器存着这份歌词的原文，审核页里就能重跑 */
+  canRealign: boolean;
 }

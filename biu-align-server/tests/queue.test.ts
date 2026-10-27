@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkerOutput } from "../src/lib/result.js";
 
 import { AlignmentCache, FailureCache } from "../src/lib/alignment-cache.js";
+import { DraftStore, InputStore } from "../src/lib/drafts.js";
 import { AlignError } from "../src/lib/errors.js";
 import { AlignQueue, type JobOrigin, type QueueDeps } from "../src/lib/queue.js";
 
@@ -30,6 +31,8 @@ async function setup(over: Partial<QueueDeps> = {}) {
   const deps: QueueDeps = {
     cache: new AlignmentCache(dir),
     failures: new FailureCache(dir),
+    drafts: new DraftStore(dir),
+    inputs: new InputStore(dir),
     runWorker,
     getVideoPage: vi.fn(async () => page),
     downloadAudio: vi.fn(async () => {}),
@@ -148,5 +151,50 @@ describe("AlignQueue", () => {
   it("查不到的任务给 JOB_NOT_FOUND", async () => {
     const { queue } = await setup();
     expect(() => queue.get("nope")).toThrow(AlignError);
+  });
+
+  it("管理员手动对齐的结果只进草稿，不碰所有人在用的缓存；再提交直接给回草稿，force 才重跑", async () => {
+    const { queue, deps, release, runWorker } = await setup();
+    const auto = await queue.submit(job("1", "h1"));
+    await flush();
+    release.shift()!();
+    await flush();
+    const live = await deps.cache.get(`${page.bvid}/1/h1`);
+    expect(live).toBeDefined();
+    expect(queue.get(auto.id!).state).toBe("done");
+
+    const m = await queue.submit(job("900", "h1", "manual"));
+    await flush();
+    release.shift()!();
+    await flush();
+    expect(queue.get(m.id!)).toMatchObject({ state: "done", draft: true });
+    expect(await deps.cache.get(`${page.bvid}/1/h1`)).toEqual(live);
+    expect(await deps.drafts.get({ bvid: page.bvid, cid: "1", lyricsHash: "h1" })).toMatchObject({ by: "900" });
+    expect(await deps.inputs.get(`${page.bvid}/1/h1`)).toEqual([{ t: 0, text: "你好" }]);
+
+    expect(await queue.submit(job("900", "h1", "manual"))).toMatchObject({ id: null, state: "done", draft: true });
+    expect(runWorker).toHaveBeenCalledTimes(2);
+    const forced = await queue.submit({ ...job("900", "h1", "manual"), force: true });
+    expect(forced.id).not.toBeNull();
+    await flush();
+    expect(runWorker).toHaveBeenCalledTimes(3);
+  });
+
+  it("手动重跑和同一份歌词的自动任务不合并，手动的失败也不记成粘滞失败", async () => {
+    const { queue, deps } = await setup({
+      getVideoPage: vi.fn(async () => {
+        throw new AlignError("LYRICS_MISMATCH");
+      }),
+    });
+    const a = await queue.submit(job("1", "h1"));
+    const m = await queue.submit(job("900", "h1", "manual"));
+    expect(m.id).not.toBe(a.id);
+    await flush();
+    await flush();
+    expect(queue.get(m.id!).error?.code).toBe("LYRICS_MISMATCH");
+    const m2 = await queue.submit(job("900", "h2", "manual"));
+    await flush();
+    expect(queue.get(m2.id!).state).toBe("failed");
+    expect(await deps.failures.get(`${page.bvid}/1/h2`)).toBeUndefined();
   });
 });

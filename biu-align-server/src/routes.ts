@@ -2,6 +2,7 @@ import { type NextFunction, type Request, type Response, Router } from "express"
 import rateLimit from "express-rate-limit";
 
 import type { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
+import type { DraftStore, InputStore } from "./lib/drafts.js";
 import type { AlignQueue } from "./lib/queue.js";
 import type { RecognizedStore } from "./lib/recognized.js";
 import type { Report, ReportStore } from "./lib/reports.js";
@@ -19,6 +20,8 @@ export interface RouteDeps {
   queue: AlignQueue;
   cache: AlignmentCache;
   failures: FailureCache;
+  drafts: DraftStore;
+  inputs: InputStore;
   submissions: SubmissionStore;
   reports: ReportStore;
   recognized: RecognizedStore;
@@ -62,7 +65,7 @@ const parseSubtitle = (value: unknown): SubtitleLine[] => {
 };
 
 export function createRouter(deps: RouteDeps): Router {
-  const { queue, cache, failures, submissions, reports, recognized, screen } = deps;
+  const { queue, cache, failures, drafts, inputs, submissions, reports, recognized, screen } = deps;
   const router = Router();
   const limiter = rateLimit({
     windowMs: 60_000,
@@ -81,6 +84,18 @@ export function createRouter(deps: RouteDeps): Router {
     return { alignment: alignment ?? null, source: alignment ? (cur!.source ?? "upload") : null };
   };
 
+  // 审核页按报错重跑：报错只带歌词哈希，原文从对齐时留下的记录或同一份上传里找
+  const inputOf = async (t: { bvid: string; cid: string; lyricsHash: string }) =>
+    (await inputs.get(cacheKey(t))) ??
+    (await submissions.list(s => s.bvid === t.bvid && s.cid === t.cid && s.lyricsHash === t.lyricsHash))[0]?.lines;
+
+  // 生效版本换了，这首歌之前的报错就都有了着落：不管从审核页还是播放器里发布，都不用再回审核页逐条点「已处理」
+  const closeReportsOf = async (bvid: string, cid: string, by: string, reason: string) => {
+    for (const r of await reports.list(r => r.status === "pending" && r.bvid === bvid && r.cid === cid)) {
+      await reports.close(r.id, by, { status: "resolved", reason });
+    }
+  };
+
   router.get("/health", (_req, res) => {
     res.json({ ok: true, ts: Date.now() });
   });
@@ -91,7 +106,8 @@ export function createRouter(deps: RouteDeps): Router {
     wrap(async (req, res) => res.json({ mid: req.mid, isAdmin: isAdmin(req.mid) })),
   );
 
-  // 普通用户由客户端在播放时自动发起；manual 只对管理员生效：插到队首、跳过缓存重跑一遍，用来判断问题出在哪
+  // 普通用户由客户端在播放时自动发起；manual 只对管理员生效：插到队首、跳过缓存重跑一遍，用来判断问题出在哪。
+  // 结果是草稿，不影响所有人在用的版本；已有草稿时直接给回草稿，force 才真的重跑
   router.post(
     "/align/jobs",
     requireAuth,
@@ -101,7 +117,15 @@ export function createRouter(deps: RouteDeps): Router {
       if (typeof req.body?.lyrics !== "string") throw new AlignError("BAD_REQUEST", "缺少 lyrics");
       const lines = parseLyrics(req.body.lyrics);
       const origin = req.body?.manual === true && isAdmin(req.mid) ? "manual" : "auto";
-      const view = await queue.submit({ mid: req.mid!, origin, bvid, cid, lyricsHash: lyricsHash(lines), lines });
+      const view = await queue.submit({
+        mid: req.mid!,
+        origin,
+        bvid,
+        cid,
+        lyricsHash: lyricsHash(lines),
+        lines,
+        force: origin === "manual" && req.body?.force === true,
+      });
       res.status(view.id ? 202 : 200).json(view);
     }),
   );
@@ -292,6 +316,7 @@ export function createRouter(deps: RouteDeps): Router {
       if (!(await cache.get(cacheKey(sub)))) throw new AlignError("ALIGNMENT_NOT_READY");
       const done = await submissions.approve(sub.id, req.mid!);
       await failures.clear(cacheKey(sub));
+      await closeReportsOf(sub.bvid, sub.cid, req.mid!, "已换成审核通过的上传版本");
       res.json(brief(done));
     }),
   );
@@ -313,14 +338,22 @@ export function createRouter(deps: RouteDeps): Router {
     }),
   );
 
-  // 被报错的那份对齐结果 + 现在在用的版本（报错之后可能已经换过）
+  // 被报错的那份对齐结果 + 现在在用的版本（报错之后可能已经换过）+ 同一份歌词重跑出的草稿，审核页并排对照
   admin.get(
     "/reports/:id",
     wrap(async (req, res) => {
       const report = await reports.get(String(req.params.id));
       const alignment = await cache.get(cacheKey(report));
       const cur = await published(report.bvid, report.cid);
-      res.json({ report, alignment: alignment ?? null, current: cur.alignment, currentSource: cur.source });
+      const draft = await drafts.get(report);
+      res.json({
+        report,
+        alignment: alignment ?? null,
+        current: cur.alignment,
+        currentSource: cur.source,
+        draft: draft?.alignment ?? null,
+        canRealign: Boolean(await inputOf(report)),
+      });
     }),
   );
 
@@ -353,17 +386,68 @@ export function createRouter(deps: RouteDeps): Router {
     }),
   );
 
-  // 管理员手动对齐、预览满意后直接发布，替换当前版本；也会清掉这份歌词之前「对不上 / 已下线」的记录
+  admin.post(
+    "/realign",
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
+      const hash = parseHash(req.body?.lyricsHash);
+      const lines = await inputOf({ bvid, cid, lyricsHash: hash });
+      if (!lines?.length) throw new AlignError("INPUT_UNAVAILABLE");
+      const view = await queue.submit({
+        mid: req.mid!,
+        origin: "manual",
+        bvid,
+        cid,
+        lyricsHash: hash,
+        lines,
+        force: true,
+      });
+      res.status(view.id ? 202 : 200).json(view);
+    }),
+  );
+
+  // 管理员切歌回来时恢复上次的试听：只看这首歌最近一次没发布的草稿
+  admin.get(
+    "/drafts/:bvid/:cid",
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.params.bvid, req.params.cid);
+      const draft = await drafts.latest(bvid, cid);
+      res.json({
+        draft: draft ? { lyricsHash: draft.lyricsHash, alignment: draft.alignment, createdAt: draft.createdAt } : null,
+      });
+    }),
+  );
+
+  admin.post(
+    "/drafts/discard",
+    wrap(async (req, res) => {
+      const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
+      await drafts.delete({ bvid, cid, lyricsHash: parseHash(req.body?.lyricsHash) });
+      res.json({ ok: true });
+    }),
+  );
+
+  // 管理员发布：有草稿就用草稿替换当前版本（没有就用已有的对齐结果），并关掉这首歌的报错；
+  // 也会清掉这份歌词之前「对不上 / 已下线」的记录。审核页没有歌词原文，可以只给 lyricsHash
   admin.post(
     "/published",
     wrap(async (req, res) => {
       const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
-      if (typeof req.body?.lyrics !== "string") throw new AlignError("BAD_REQUEST", "缺少 lyrics");
-      const hash = lyricsHash(parseLyrics(req.body.lyrics));
-      const key = cacheKey({ bvid, cid, lyricsHash: hash });
+      let hash: string;
+      if (typeof req.body?.lyricsHash === "string") hash = parseHash(req.body.lyricsHash);
+      else if (typeof req.body?.lyrics === "string") hash = lyricsHash(parseLyrics(req.body.lyrics));
+      else throw new AlignError("BAD_REQUEST", "缺少 lyrics");
+      const target = { bvid, cid, lyricsHash: hash };
+      const key = cacheKey(target);
+      const draft = await drafts.get(target);
+      if (draft) {
+        await cache.put(key, draft.alignment);
+        await drafts.delete(target);
+      }
       if (!(await cache.get(key))) throw new AlignError("ALIGNMENT_NOT_READY");
       await submissions.publish({ bvid, cid, lyricsHash: hash, source: "admin", by: req.mid! });
       await failures.clear(key);
+      await closeReportsOf(bvid, cid, req.mid!, "已换成管理员重新对齐的版本");
       res.json(await published(bvid, cid));
     }),
   );

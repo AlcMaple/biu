@@ -130,11 +130,14 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
     view = {
       dot: <Dot color={DOT_GREEN} hollow />,
       label: "试听中",
-      title: "正在试听这次的对齐结果",
-      body: offsetText(phase.alignment.offsetSec) ?? "确认没问题就采用，不满意可以放弃。",
+      title: phase.restored ? "正在试听上次重新对齐的结果" : "正在试听这次的对齐结果",
+      body:
+        (phase.restored ? "还没发布，所有人在用的仍是原来那份。" : "") +
+        (offsetText(phase.alignment.offsetSec) ?? "确认没问题就采用，不满意可以放弃或再跑一遍。"),
       actions: (
         <>
           {act("放弃", session.discard)}
+          {act("再跑一遍", () => void session.rerun())}
           {act("采用", () => run(session.adopt), true)}
         </>
       ),
@@ -144,7 +147,7 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
       dot: <Dot color={DOT_GREEN} />,
       label: "待发布",
       title: "已换成这次的对齐结果",
-      body: "确认没问题可以发布，替换所有人在用的版本。",
+      body: "确认没问题可以发布，替换所有人在用的版本；这首歌待处理的报错会一并关闭。",
       actions: act("发布给所有人", () => run(session.publish), true),
     };
   } else {
