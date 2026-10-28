@@ -1,4 +1,4 @@
-import { isOfflineDemo } from "@/common/offline-demo";
+import { isOfflineDemo, isSandbox } from "@/common/offline-demo";
 import {
   getWebNeteaseLyrics,
   getWebProviderLyrics,
@@ -21,8 +21,8 @@ import type { Logger, Platform } from "./types";
 
 import { installWebLogTransport, reportWebLog } from "./web-log-transport";
 
-const STORE_KEY_PREFIX = isOfflineDemo ? "biu-demo:" : "biu:";
-const WEB_STORE_DATABASE = isOfflineDemo ? "biu-demo-web-store" : "biu-web-store";
+const STORE_KEY_PREFIX = isSandbox ? "biu-sandbox:" : isOfflineDemo ? "biu-demo:" : "biu:";
+const WEB_STORE_DATABASE = isSandbox ? "biu-sandbox-web-store" : isOfflineDemo ? "biu-demo-web-store" : "biu-web-store";
 const WEB_STORE_OBJECT_STORE = "stores";
 
 // 歌单、同步基线与滚动备份会随用户数据增长；localStorage 的同步配额不适合承载它们。
@@ -133,7 +133,12 @@ function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefi
 }
 
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
-  if (isOfflineDemo) {
+  // 沙盒里设置、歌单都要能改、能存下来，只有登录用户跟着页面选的身份走
+  if (process.env.BIU_SANDBOX === "true" && name === StoreNameMap.UserLoginInfo) {
+    const { sandboxUser } = await import("@/common/sandbox-fixtures");
+    return sandboxUser() as StoreDataMap[N] | undefined;
+  }
+  if (isOfflineDemo && !isSandbox) {
     const { DEMO_STORE_DATA } = await import("@/common/offline-demo-fixtures");
     const demoStores: Partial<Record<StoreName, unknown>> = {
       [StoreNameMap.AppSettings]: { appSettings: DEMO_STORE_DATA.appSettings },
@@ -261,9 +266,17 @@ const platform: Platform = {
   navigate: unsubscribe,
   getCookie: async () => undefined,
   setCookie: asyncNoop,
-  searchNeteaseSongs: async params => (isOfflineDemo ? {} : searchWebNeteaseSongs(params)),
+  searchNeteaseSongs: async params => {
+    if (process.env.BIU_SANDBOX === "true") {
+      return (await import("@/common/sandbox-fixtures")).sandboxNeteaseSearch(params.s ?? "");
+    }
+    return isOfflineDemo ? {} : searchWebNeteaseSongs(params);
+  },
   getNeteaseSimilarSongs: async () => ({}),
-  getNeteaseLyrics: async params => (isOfflineDemo ? {} : getWebNeteaseLyrics(params)),
+  getNeteaseLyrics: async params => {
+    if (process.env.BIU_SANDBOX === "true") return (await import("@/common/sandbox-fixtures")).sandboxNeteaseLyrics();
+    return isOfflineDemo ? {} : getWebNeteaseLyrics(params);
+  },
   neteaseAudioMatch: async params => (isOfflineDemo ? {} : matchWebNeteaseAudio(params)),
   searchLrclibLyrics: async params => (isOfflineDemo ? [] : searchWebLrclibLyrics(params)),
   searchProviderLyrics: async params => (isOfflineDemo ? { ok: true, data: [] } : searchWebProviderLyrics(params)),
@@ -338,6 +351,23 @@ const platform: Platform = {
   onSyncLyricsWithWhisperXDone: unsubscribe,
   onSyncLyricsWithWhisperXProgress: unsubscribe,
 };
+
+// 沙盒独占一个端口（见 rsbuild.config.ts），这个源下的存储全是沙盒的，可以整源清空
+export async function clearSandboxBrowserData() {
+  if (!isSandbox) return;
+  getStorage()?.clear();
+  const databases = await indexedDB.databases();
+  await Promise.all(
+    databases.map(
+      ({ name }) =>
+        new Promise<void>(resolve => {
+          if (!name) return resolve();
+          const request = indexedDB.deleteDatabase(name);
+          request.onsuccess = request.onerror = request.onblocked = () => resolve();
+        }),
+    ),
+  );
+}
 
 export const log: Logger = {
   error: (...args) => {

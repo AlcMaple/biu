@@ -7,9 +7,12 @@ import { execFileSync } from "node:child_process";
 import { createBilibiliWebMiddleware } from "./plugins/bilibili-web-proxy";
 import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
+import { createSandboxMiddleware } from "./plugins/sandbox-dev";
 import { UMAMI_HOST, UMAMI_WEBSITE_ID } from "./shared/umami";
 
-const isDemoTarget = process.env.BIU_TARGET === "demo";
+const isSandboxTarget = process.env.BIU_TARGET === "sandbox";
+// 沙盒复用离线 Demo 的 B 站假数据，所以 Demo 的判断都对它成立；它只用于本机 dev，见 scripts/sandbox.mjs
+const isDemoTarget = process.env.BIU_TARGET === "demo" || isSandboxTarget;
 const isWebTarget = process.env.BIU_TARGET === "web" || isDemoTarget;
 
 function resolveSentryRelease() {
@@ -24,6 +27,9 @@ function resolveSentryRelease() {
 }
 
 export default defineConfig(({ command }) => {
+  if (isSandboxTarget && command !== "dev") {
+    throw new Error("BIU_TARGET=sandbox 只用于本机 dev，不能出构建产物");
+  }
   const isWebDevelopment = isWebTarget && command === "dev";
   const isWebProduction = isWebTarget && command === "build";
   const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
@@ -59,6 +65,7 @@ export default defineConfig(({ command }) => {
         // Keep this as a string because the browser bundle does not provide a runtime
         // `process` object. Rsbuild replaces the complete expression at build time.
         "process.env.BIU_OFFLINE_DEMO": JSON.stringify(isDemoTarget ? "true" : "false"),
+        "process.env.BIU_SANDBOX": JSON.stringify(isSandboxTarget ? "true" : "false"),
         __BIU_SENTRY_ENABLED__: JSON.stringify(Boolean(isWebProduction && process.env.VITE_SENTRY_DSN?.trim())),
         "import.meta.env.VITE_SENTRY_DSN": JSON.stringify(process.env.VITE_SENTRY_DSN?.trim() || ""),
         "import.meta.env.VITE_SENTRY_ENVIRONMENT": JSON.stringify(process.env.VITE_SENTRY_ENVIRONMENT?.trim() || ""),
@@ -163,10 +170,19 @@ export default defineConfig(({ command }) => {
             },
           }
         : {}),
+      ...(isSandboxTarget
+        ? {
+            setupMiddlewares: ({ unshift }) => {
+              unshift(createSandboxMiddleware());
+            },
+          }
+        : {}),
     },
     server: {
       host: "0.0.0.0",
-      port: 5678,
+      // 沙盒用独立端口 = 独立的浏览器源：有些 store 直接存在不带前缀的 localStorage 里，
+      // 和 dev:web 同源就会共用播放列表、搜索历史，「清空本页数据」也会误删真实开发数据
+      port: isSandboxTarget ? 5679 : 5678,
       strictPort: true,
       printUrls: isWebTarget,
       open: false,

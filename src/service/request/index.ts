@@ -9,8 +9,10 @@ import { requestInterceptors } from "./request-interceptors";
 import { geetestInterceptors } from "./response-interceptors";
 
 const offlineDemoAdapter: AxiosAdapter = async config => {
-  const { offlineDemoResponse } = await import("@/common/offline-demo-fixtures");
-  const data = offlineDemoResponse(config);
+  const data =
+    process.env.BIU_SANDBOX === "true"
+      ? (await import("@/common/sandbox-fixtures")).sandboxResponse(config)
+      : (await import("@/common/offline-demo-fixtures")).offlineDemoResponse(config);
   return {
     data,
     status: 200,

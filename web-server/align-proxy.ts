@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { matchAlignRoute, WEB_ALIGN_PROXY_ROOT } from "../shared/lyrics-align.js";
-import { resolveSession, type WebSessionResolver } from "./auth/handler.js";
+import { resolveSession, type ResolvedWebSession, type WebSessionResolver } from "./auth/handler.js";
 import { isCrossSiteRequest, readProxyBody, sendProxyJson, type ProxyNext } from "./proxy-common.js";
 import { isLoopbackHostname, SyncProxyError, SyncTokenCache } from "./sync-proxy.js";
 
@@ -17,6 +17,13 @@ export interface BiuAlignProxyHandlerOptions {
   publicOrigin?: string;
   sessionResolver?: WebSessionResolver;
   syncInternalOrigin?: string;
+  // 本地沙盒用自己签的 token 替换「拿 B 站会话去同步服务换」，其余转发逻辑和线上同一份
+  tokenSource?: AlignTokenSource;
+}
+
+export interface AlignTokenSource {
+  get: (session: ResolvedWebSession, signal: AbortSignal) => Promise<{ token: string }>;
+  invalidate: (sessionId: string) => void;
 }
 
 export type BiuAlignProxyHandler = (
@@ -51,11 +58,15 @@ export function createBiuAlignProxyHandler(options: BiuAlignProxyHandlerOptions 
     options.alignInternalOrigin ?? process.env.BIU_ALIGN_INTERNAL_ORIGIN ?? DEFAULT_ALIGN_INTERNAL_ORIGIN,
     "BIU_ALIGN_INTERNAL_ORIGIN",
   );
-  const syncOrigin = internalOrigin(
-    options.syncInternalOrigin ?? process.env.BIU_SYNC_INTERNAL_ORIGIN ?? DEFAULT_SYNC_INTERNAL_ORIGIN,
-    "BIU_SYNC_INTERNAL_ORIGIN",
-  );
-  const tokenCache = new SyncTokenCache(syncOrigin, options.now ?? Date.now);
+  const tokenCache =
+    options.tokenSource ??
+    new SyncTokenCache(
+      internalOrigin(
+        options.syncInternalOrigin ?? process.env.BIU_SYNC_INTERNAL_ORIGIN ?? DEFAULT_SYNC_INTERNAL_ORIGIN,
+        "BIU_SYNC_INTERNAL_ORIGIN",
+      ),
+      options.now ?? Date.now,
+    );
   const sessionResolver = options.sessionResolver ?? resolveSession;
 
   return async (request, response, next) => {

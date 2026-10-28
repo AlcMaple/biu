@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Outlet, useLocation } from "react-router";
 
@@ -23,6 +23,10 @@ import { useUser } from "@/store/user";
 import Navbar from "./navbar";
 import SideNav from "./side";
 import { SideDrawerContext } from "./side-drawer-context";
+
+// 直接写环境变量表达式（原因见 offline-demo.ts）：非沙盒构建里这条分支连同 import() 一起被删掉
+const SandboxIdentitySwitcher =
+  process.env.BIU_SANDBOX === "true" ? lazy(() => import("@/components/sandbox-identity")) : null;
 
 const Layout = () => {
   const updateUser = useUser(state => state.updateUser);
@@ -129,6 +133,11 @@ const Layout = () => {
       <PlayListDrawer />
       <FullScreenPlayer />
       <LyricsBroadcaster />
+      {SandboxIdentitySwitcher && (
+        <Suspense>
+          <SandboxIdentitySwitcher />
+        </Suspense>
+      )}
     </ErrorBoundary>
   );
 };

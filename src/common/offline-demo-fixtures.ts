@@ -92,7 +92,8 @@ const authors = ["林峰", "陈淑桦", "OneRepublic", "阿遥", "りょうづ�
 
 export const DEMO_VIDEOS = titles.map((title, index) => ({
   aid: 100_000 + index,
-  bvid: `BV1DEMO${String(index + 1).padStart(2, "0")}`,
+  // 和真实 BV 号同为 BV + 10 位，否则沙盒里对齐服务按格式直接拒收
+  bvid: `BV1DEMO${String(index + 1).padStart(5, "0")}`,
   title,
   author: authors[index % authors.length],
   pic: svgData(`BIU ${String(index + 1).padStart(2, "0")}`, index),
