@@ -10,7 +10,8 @@ import { foldVariants } from "./variant-fold";
 // 改动提取或打分后升级，只重匹配自动缓存；手动采用的歌词保留。案例见 docs/lyrics/自动匹配歌词-错误案例.md。
 // 4：标题像填词歌的不再按标题搜（会配上原曲歌词），改从视频画面识别；旧版本按原曲配错的共享结果随之作废
 // 5：没有 AI 字幕的填词歌也从画面识别、双语画面带翻译；4 版因为没字幕记下的「查无歌词」要重新识别
-export const AUTO_MATCH_VERSION = 5;
+// 6：歌名里的 Redo 不再被噪声词清洗成「R o」，纯符号歌名（$・¥・€）能匹配；这两类此前记下的「查无歌词」要重新匹配
+export const AUTO_MATCH_VERSION = 6;
 
 const NETEASE_TYPE_SONG = 1;
 /** 视频时长与曲库时长允许的最大差距（秒）：翻唱/搬运常有前后奏差异，过严会漏，过松会配错歌 */
@@ -87,11 +88,16 @@ const SONG_MARK_BEFORE_CORNER =
   /(?:\b(?:OP|ED|OST|IN)\d*(?![a-z])(?:\s*主题[曲歌])?|插曲|主题[曲歌]|片头[曲歌]|片尾[曲歌]|角色歌)\s*[:：]?\s*[「『]([^」』]+)[」』]/i;
 const ARTIST_LIST = /[、,，&＆]/;
 const SEPARATORS = /\s*[-－—–]\s*|\s*\/\s*|\s+covered?\s+by\s+|\s*cover\s*[:：]?\s+|\s+feat\.?\s+/i;
+// 英文噪声词必须是独立单词：不加边界时「Redo」里的 ed 会被当成 ED 删成「R o」
 /** 标题里的非歌名噪声词；遇到新的噪声往这里补 */
 const NOISE_WORDS =
-  /(翻唱|翻调|填词|中字|搬运|官方|原创|完整版|高音质|动态歌词|歌词版|歌词|字幕版|MV|PV|Official|Lyric\s*Video|Hi-?Res|无损|OP\d*|ED\d*)/gi;
+  /(翻唱|翻调|填词|中字|搬运|官方|原创|完整版|高音质|动态歌词|歌词版|歌词|字幕版|无损|(?<![a-z])(?:MV|PV|Official|Lyric\s*Video|Hi-?Res|OP\d*|ED\d*)(?![a-z]))/gi;
 
-const normalize = (s: string) => foldVariants(s.normalize("NFKC").toLowerCase()).replace(/[\s\p{P}\p{S}]/gu, "");
+// 「$・¥・€」这类纯符号歌名剥掉标点符号后是空串，会让它与任何曲库结果都对不上；此时退回只去空白，保留符号本身
+const normalize = (s: string) => {
+  const folded = foldVariants(s.normalize("NFKC").toLowerCase());
+  return folded.replace(/[\s\p{P}\p{S}]/gu, "") || folded.replace(/\s/g, "");
+};
 
 const cleanTitle = (s: string) =>
   s
@@ -156,6 +162,12 @@ export const titleIncludesSong = (videoTitle: string, songName: string) => {
   const song = normalize(songName);
   return song.length > 0 && normalize(videoTitle).includes(song);
 };
+
+/** 曲库结果里是否有歌名对得上关键词：全是歌手的其他作品（歌名对不上）说明关键词是歌手，不是歌名 */
+export const songsMatchTitle = (songs: NeteaseSong[], title: string) =>
+  songs.some(song =>
+    [song.name ?? "", ...(song.alias ?? []), ...(song.transNames ?? [])].some(n => titleMatches(n, title)),
+  );
 
 const titleMatches = (songName: string, title: string) => {
   const a = normalize(songName);

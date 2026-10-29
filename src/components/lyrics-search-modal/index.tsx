@@ -6,7 +6,7 @@ import type { LyricLine } from "@/store/lyrics-state";
 import type { LyricsProvider } from "@shared/lyrics-format";
 import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
 
-import { extractSongInfo, extractTitleCandidates } from "@/components/lyrics/auto-match";
+import { extractSongInfo, extractTitleCandidates, songsMatchTitle } from "@/components/lyrics/auto-match";
 import { PROVIDER_LABELS, describeProviderError, linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
@@ -48,6 +48,8 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   const [providerError, setProviderError] = useState<string>();
   const keywordRef = useRef("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const suggestionsRef = useRef<string[]>([]);
+  suggestionsRef.current = suggestions;
   // 换来源 / 再搜 / 切歌都换一代，慢的旧结果回来时直接丢掉
   const searchRef = useRef(0);
 
@@ -124,7 +126,27 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           });
 
           if (search !== searchRef.current) return;
-          setNeteaseSongs(res?.result?.songs ?? []);
+          let songs = res?.result?.songs ?? [];
+          // 标题「歌名 - 歌手」「歌手 - 歌名」两种顺序都常见，默认关键词可能是歌手：
+          // 结果里没有一首歌名对得上，就换下一个候选搜一次，选出歌名真正对得上的那个
+          if (songs.length && !songsMatchTitle(songs, query)) {
+            for (const alt of suggestionsRef.current.filter(s => s !== query).slice(0, 2)) {
+              const altRes = await platform.searchNeteaseSongs({
+                s: alt,
+                type: NETEASE_TYPE_SONG,
+                limit: DEFAULT_LIMIT,
+                offset: 0,
+              });
+              if (search !== searchRef.current) return;
+              const altSongs = altRes?.result?.songs ?? [];
+              if (altSongs.length && songsMatchTitle(altSongs, alt)) {
+                songs = altSongs;
+                setKeyword(alt);
+                break;
+              }
+            }
+          }
+          setNeteaseSongs(songs);
         } catch {
           setNeteaseSongs([]);
           addToast({ title: "网易云搜索失败", color: "danger" });

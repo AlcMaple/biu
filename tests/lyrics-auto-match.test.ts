@@ -388,3 +388,45 @@ describe("是否「确实没有」的判断（outcome.exhausted）", () => {
     expect(await run(180)).toBe(false);
   });
 });
+
+describe("歌名与歌手顺序、纯符号歌名", () => {
+  const song = (id: number, name: string, artist: string, sec: number): NeteaseSong =>
+    ({ id, name, artists: [{ name: artist }], duration: sec * 1000 }) as NeteaseSong;
+  const redoTitle = "【re0】Redo - 鈴木このみ";
+  const symbolTitle = "【中日歌词首发/完整ED】FX战士久留美ED「$・¥・€」 福賀くるみ(CV:鈴木愛奈)【无损音质】";
+
+  it("「歌名 - 歌手」顺序：歌手搜到的全是别的歌，仍选中 Redo", async () => {
+    const db: Record<string, NeteaseSong[]> = {
+      鈴木このみ: [song(1, "Realize", "鈴木このみ", 245), song(2, "Redo", "鈴木このみ", 258)],
+      Redo: [song(2, "Redo", "鈴木このみ", 258), song(3, "Redo", "别人", 200)],
+    };
+    mocks.searchNeteaseSongs.mockImplementation(async ({ s }) => ({ code: 200, result: { songs: db[s] ?? [] } }));
+    const res = await match(redoTitle, 259);
+    expect(res?.lyrics).toBe(lyrics(2));
+  });
+
+  it("「歌手 - 歌名」顺序同样能匹配", async () => {
+    mocks.searchNeteaseSongs.mockImplementation(async ({ s }) => ({
+      code: 200,
+      result: { songs: s === "Redo" ? [song(2, "Redo", "鈴木このみ", 258)] : [song(1, "Realize", "鈴木このみ", 245)] },
+    }));
+    expect((await match("鈴木このみ - Redo", 259))?.lyrics).toBe(lyrics(2));
+  });
+
+  it("纯符号歌名不会被归一化清空，Instrumental 版不参与", async () => {
+    mocks.searchNeteaseSongs.mockImplementation(async ({ s }) => ({
+      code: 200,
+      result: {
+        songs:
+          s === "$・¥・€"
+            ? [
+                song(10, "1F2F", "€URO TRA$H", 175),
+                song(11, "$・¥・€", "鈴木愛奈", 218),
+                song(12, "$・¥・€ (Instrumental)", "鈴木愛奈", 218),
+              ]
+            : [],
+      },
+    }));
+    expect((await match(symbolTitle, 218))?.lyrics).toBe(lyrics(11));
+  });
+});
