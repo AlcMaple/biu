@@ -19,6 +19,9 @@ interface AlignedLyricLine {
   words: { text: string; start: number }[];
   score: number;
   repaired?: true;
+  /** 同一句的译文 / 罗马音，不参与对齐，显示在这一行下面 */
+  translation?: string;
+  romanization?: string;
 }
 
 interface LyricsAlignment {
@@ -120,6 +123,9 @@ interface AlignSubmissionDetail {
 
 type AlignReportStatus = "pending" | "resolved" | "dismissed";
 
+/** original = 原文的时间轴；translation / romanization = 译文 / 罗马音的内容 */
+type AlignReportTrack = "original" | "translation" | "romanization";
+
 interface AlignReport {
   id: string;
   bvid: string;
@@ -128,6 +134,11 @@ interface AlignReport {
   lyricsHash: string;
   title: string;
   note: string;
+  /** 老记录没有，按 original */
+  track?: AlignReportTrack;
+  /** 只报一段时的起止行（从 1 数，含两端） */
+  fromLine?: number;
+  toLine?: number;
   /** 报错时那份是不是对所有人生效的版本；不是说明报错人自己换过歌词 */
   wasPublished: boolean;
   status: AlignReportStatus;

@@ -382,6 +382,39 @@ describe("识别结果：登录用户写，所有人读", () => {
       expect(r.status).toBe(400);
     });
   });
+
+  it("报错可以选译文 / 罗马音，也可以只报一段；没有对应的轨或起止行不对都拒绝", async () => {
+    const cid = 91;
+    const lyrics =
+      "[00:01.00]雨に濡れた小道\n[00:01.00]Ame ni nureta\n[00:01.00]雨后的小路\n[00:05.00]足跡攫う時の波\n[00:05.00]足迹带走时间";
+    const job = await call("POST", "/align/jobs", "1", { bvid: BV, cid, lyrics });
+    const hash = (await waitDone(job.json.id, "1")).json.alignment.lyricsHash;
+    const report = (body: object) => call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, ...body });
+
+    expect((await report({ track: "translation", fromLine: 1, toLine: 2 })).json).toMatchObject({
+      track: "translation",
+      fromLine: 1,
+      toLine: 2,
+    });
+    expect((await report({ track: "original" })).json.track).toBe("original");
+    // 同一人对同一轨重复报错只更新；不同轨各是一条
+    expect((await call("GET", "/admin/reports", "900")).json.items).toHaveLength(2);
+    expect((await report({ track: "translation", fromLine: 2, toLine: 2 })).json.fromLine).toBe(2);
+    expect((await call("GET", "/admin/reports", "900")).json.items).toHaveLength(2);
+
+    for (const body of [{ track: "lyrics" }, { fromLine: 1 }, { fromLine: 2, toLine: 1 }, { fromLine: 1, toLine: 9 }]) {
+      expect((await report(body)).json.error.code).toBe("BAD_REQUEST");
+    }
+    const plain = await call("POST", "/align/jobs", "1", { bvid: BV, cid: 92, lyrics: LYRICS });
+    const plainHash = (await waitDone(plain.json.id, "1")).json.alignment.lyricsHash;
+    const none = await call("POST", "/lyrics/reports", "3", {
+      bvid: BV,
+      cid: 92,
+      lyricsHash: plainHash,
+      track: "romanization",
+    });
+    expect(none.json.error.code).toBe("BAD_REQUEST");
+  });
 });
 
 describe("管理员重跑对照：草稿不影响在用版本，发布后关掉报错", () => {

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { adoptAlignment, alignmentToLines, isUserChosen, restorePreAlign } from "@/components/lyrics/alignment";
+import {
+  adoptAlignment,
+  alignmentToLines,
+  alignmentTrack,
+  isUserChosen,
+  restorePreAlign,
+} from "@/components/lyrics/alignment";
 import {
   AUTO_MATCH_VERSION,
   autoMatchLyrics,
@@ -114,7 +120,11 @@ const LyricsBroadcaster = () => {
           setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
           setScreenOrigin(cached.screenOrigin ?? null);
           if (cached.alignment) {
-            setLyrics(alignmentToLines(cached.alignment.lines), parseLrc(cached.tLyrics));
+            setLyrics(
+              alignmentToLines(cached.alignment.lines),
+              parseLrc(cached.tLyrics),
+              alignmentTrack(cached.alignment.lines, "romanization"),
+            );
           } else if (cached.lyrics || cached.tLyrics) {
             setLyrics(linesOfEntry(cached), parseLrc(cached.tLyrics));
           }
@@ -131,9 +141,9 @@ const LyricsBroadcaster = () => {
             if (entry?.source === "approved" && entry.alignment?.lyricsHash === published.lyricsHash) return;
             const latest = (await platform.getStore(StoreNameMap.LyricsCache))?.[cacheKey];
             if (canceled || isUserChosen(latest)) return;
-            const { lines, tLines } = await adoptAlignment(cacheKey, published, "approved");
+            const { lines, tLines, rLines } = await adoptAlignment(cacheKey, published, "approved");
             if (canceled) return;
-            setLyrics(lines, tLines);
+            setLyrics(lines, tLines, rLines);
             setOffset(0);
             setScreenOrigin(latest?.screenOrigin ?? null);
             return;

@@ -24,6 +24,7 @@ import { ALIGN_POLL_INTERVAL_MS } from "@shared/lyrics-align";
 
 import AlignmentPreview from "./alignment-preview";
 import { formatShortDate } from "./format-date";
+import { scopeText } from "./report-scope";
 
 const offsetText = (sec: number) =>
   Math.abs(sec) < 0.3 ? "和原歌词基本一致" : `原歌词整体${sec > 0 ? "快" : "慢"}了 ${Math.abs(sec).toFixed(1)} 秒`;
@@ -269,6 +270,9 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
   const { report, alignment, current, currentSource, draft, canRealign } = detail;
   // 报错之后这首歌可能已经换过版本；只有被报的那份还在用，下线 / 替换才有意义
   const stillInUse = current?.lyricsHash === report.lyricsHash;
+  // 译文 / 罗马音有问题时，下线整份逐字歌词是杀鸡用牛刀；改对要靠上传 / 重新对齐一份改好的歌词，这里只标记处理完
+  const contentOnly = (report.track ?? "original") !== "original";
+  const range = report.fromLine && report.toLine ? { from: report.fromLine, to: report.toLine } : undefined;
   const busyAny = Boolean(busy) || realign.running;
 
   const rerunButton = (label: string) => (
@@ -312,6 +316,7 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
           {report.bvid} · 报错者 UID {report.mid} · {formatShortDate(report.createdAt)} 报错
         </div>
         <div className="text-foreground/80 mt-1">{report.note ? `说明：${report.note}` : "没写说明"}</div>
+        <div className="text-warning mt-1 text-xs">报的是：{scopeText(report)}</div>
       </div>
       <div className="text-foreground-500 flex flex-wrap gap-x-4 text-xs">
         <span>{report.wasPublished ? "报的是当时所有人在用的版本" : "报的是报错人自己换过的歌词，不影响其他人"}</span>
@@ -322,7 +327,7 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
         left={{
           title: "被报的版本",
           body: alignment ? (
-            <AlignmentPreview alignment={alignment} />
+            <AlignmentPreview alignment={alignment} range={range} />
           ) : (
             <Alert color="warning" title="被报的这份对齐结果已经不在服务器上了（算法升级过或清理过）" />
           ),
@@ -346,7 +351,7 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
         >
           没问题，驳回
         </Button>
-        {stillInUse ? (
+        {stillInUse && !contentOnly ? (
           <>
             <Button
               color="danger"
@@ -386,12 +391,16 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
             onPress={() =>
               act(
                 "close",
-                () => resolveReport(id, { withdraw: false, reason: reason.trim() || "这首歌已经换过版本" }),
+                () =>
+                  resolveReport(id, {
+                    withdraw: false,
+                    reason: reason.trim() || (contentOnly ? "已处理" : "这首歌已经换过版本"),
+                  }),
                 "已关闭，报错人能看到处理结果",
               )
             }
           >
-            已换过版本，关闭报错
+            {contentOnly && stillInUse ? "已处理，关闭报错" : "已换过版本，关闭报错"}
           </Button>
         )}
       </div>

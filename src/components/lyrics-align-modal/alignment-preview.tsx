@@ -14,17 +14,20 @@ const fmt = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).pa
 
 interface Props {
   alignment: Pick<LyricsAlignment, "bvid" | "cid" | "lines">;
+  /** 报错人选的那一段（从 1 数，含两端）：高亮并滚到它 */
+  range?: { from: number; to: number };
   className?: string;
 }
 
 // 只有当前播放的正是这首投稿时才跟随播放点亮，否则时间轴对不上，点亮反而误导
-const AlignmentPreview = ({ alignment, className }: Props) => {
+const AlignmentPreview = ({ alignment, range, className }: Props) => {
   const playItem = usePlayList(s => s.list.find(i => i.id === s.playId));
   const isCurrent = playItem?.bvid === alignment.bvid && String(playItem?.cid) === String(alignment.cid);
   const lines = useMemo(() => alignmentToLines(alignment.lines), [alignment.lines]);
   const tracked = useMemo(() => (isCurrent ? lines : []), [isCurrent, lines]);
   const activeIndex = useActiveLyricIndex(tracked, 0);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const inRange = (index: number) => Boolean(range && index + 1 >= range.from && index + 1 <= range.to);
   const activeTiming = useMemo(
     () => (activeIndex >= 0 ? karaokeTiming(lines[activeIndex], lines[activeIndex + 1]?.time) : null),
     [lines, activeIndex],
@@ -41,6 +44,16 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
       behavior: "smooth",
     });
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (!range) return;
+    const el = lineRefs.current[range.from - 1];
+    const viewport = el?.closest<HTMLElement>("[data-overlayscrollbars-viewport]");
+    if (!el || !viewport) return;
+    viewport.scrollTo({
+      top: viewport.scrollTop + el.getBoundingClientRect().top - viewport.getBoundingClientRect().top - 8,
+    });
+  }, [range]);
 
   return (
     <div className={className}>
@@ -61,6 +74,7 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
               "flex gap-3 rounded-md px-2 py-1 text-sm leading-relaxed",
               isCurrent && "cursor-pointer",
               index === activeIndex ? "bg-primary/10 text-foreground" : "text-foreground/70",
+              inRange(index) && "ring-warning/60 bg-warning/10 ring-1",
             )}
           >
             <span className="text-foreground/40 w-12 shrink-0 font-mono text-xs leading-6 tabular-nums">
@@ -72,6 +86,13 @@ const AlignmentPreview = ({ alignment, className }: Props) => {
               ) : (
                 line.text
               )}
+              {/* 译文 / 罗马音一起列出来：报错常常就是它们和原文错了位 */}
+              {alignment.lines[index]?.romanization ? (
+                <span className="text-foreground/50 block text-xs">{alignment.lines[index].romanization}</span>
+              ) : null}
+              {alignment.lines[index]?.translation ? (
+                <span className="text-foreground/50 block text-xs">{alignment.lines[index].translation}</span>
+              ) : null}
             </span>
             {alignment.lines[index]?.repaired ? (
               <span className="text-warning shrink-0 text-xs leading-6">二次校准过</span>

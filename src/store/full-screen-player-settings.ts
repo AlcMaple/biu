@@ -11,6 +11,9 @@ export interface FullScreenPlayerSettingsState {
   lyricsColor?: string;
   /** 是否使用精美全屏播放器 */
   useFancyPlayer: boolean;
+  /** 歌词下方是否显示译文 / 罗马音 */
+  showTranslation: boolean;
+  showRomanization: boolean;
 }
 
 interface Actions {
@@ -27,6 +30,8 @@ const defaultSettings: FullScreenPlayerSettingsState = {
   spectrumColor: "currentColor",
   lyricsColor: "#ffffff",
   useFancyPlayer: false,
+  showTranslation: true,
+  showRomanization: true,
 };
 
 export const useFullScreenPlayerSettings = create<FullScreenPlayerSettingsState & Actions>()(
@@ -47,6 +52,8 @@ export const useFullScreenPlayerSettings = create<FullScreenPlayerSettingsState 
         spectrumColor: state.spectrumColor,
         lyricsColor: state.lyricsColor,
         useFancyPlayer: state.useFancyPlayer,
+        showTranslation: state.showTranslation,
+        showRomanization: state.showRomanization,
       }),
     },
   ),

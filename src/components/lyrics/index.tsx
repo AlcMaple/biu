@@ -1,7 +1,7 @@
 import { useCallback, use, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, Popover, PopoverContent, PopoverTrigger, addToast, useDisclosure } from "@heroui/react";
+import { Button, Popover, PopoverContent, PopoverTrigger, Switch, addToast, useDisclosure } from "@heroui/react";
 import { RiEqualizerLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
@@ -10,13 +10,14 @@ import { lyricsCacheKey, restorePreAlign } from "@/components/lyrics/alignment";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import platform, { isElectron } from "@/platform";
 import { useAlignReview } from "@/store/align-review";
+import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
 import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { type LyricLine, useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
 import LyricsAlignModal, { type LyricsEditMode } from "../lyrics-align-modal";
-import ReportModal from "../lyrics-align-modal/report-modal";
+import ReportModal, { type ReportSubject } from "../lyrics-align-modal/report-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import AlignChip from "./align-chip";
 import { AlignChipSlotContext } from "./align-chip-slot";
@@ -39,7 +40,7 @@ type AlignAction = "upload" | "report" | "restore" | "align" | "edit";
 
 const ALIGN_MENU: { key: AlignAction; label: string; description: string; admin?: true }[] = [
   { key: "upload", label: "上传我的歌词", description: "带不带时间都行，审核通过后所有人都用它" },
-  { key: "report", label: "报错：时间轴不对", description: "逐字歌词和演唱对不上，告诉管理员" },
+  { key: "report", label: "歌词报错", description: "时间轴、译文、罗马音哪里不对，告诉管理员" },
   { key: "restore", label: "还原为对齐前的歌词", description: "回到逐字对齐之前的歌词和偏移，之后不再自动对齐" },
   { key: "align", label: "重新对齐当前歌词", description: "插到队首、跳过缓存重跑，先试听再决定", admin: true },
   { key: "edit", label: "换一份歌词再对齐", description: "粘贴或修改歌词后插队对齐", admin: true },
@@ -71,7 +72,9 @@ const Lyrics = ({
   const [fontSize, setFontSize] = useState<number>(DEFAULT_FONT_SIZE);
 
   // Read lyrics state from shared store (owned by LyricsBroadcaster)
-  const { lyrics, translatedLyrics, offset } = useDisplayedLyrics();
+  const { lyrics, translatedLyrics, romanizedLyrics, offset } = useDisplayedLyrics();
+  const showTranslation = useFullScreenPlayerSettings(s => s.showTranslation);
+  const showRomanization = useFullScreenPlayerSettings(s => s.showRomanization);
   const isLoading = useLyricsState(s => s.isLoading);
   const screenStatus = useLyricsState(s => s.screenStatus);
 
@@ -112,12 +115,14 @@ const Lyrics = ({
     onOpenChange: setIsSearchOpen,
   } = useDisclosure();
 
-  const translationMap = useMemo(() => {
-    if (!translatedLyrics?.length) return new Map<number, string>();
-    const map = new Map<number, string>();
-    translatedLyrics.forEach(item => map.set(item.time, item.text));
-    return map;
-  }, [translatedLyrics]);
+  const translationMap = useMemo(
+    () => new Map((showTranslation ? translatedLyrics : []).map(item => [item.time, item.text])),
+    [translatedLyrics, showTranslation],
+  );
+  const romanizationMap = useMemo(
+    () => new Map((showRomanization ? romanizedLyrics : []).map(item => [item.time, item.text])),
+    [romanizedLyrics, showRomanization],
+  );
 
   const activeIndex = useActiveLyricIndex(lyrics, offset);
 
@@ -220,7 +225,7 @@ const Lyrics = ({
 
   const isAdmin = useAlignReview(s => s.isAdmin);
   const [editor, setEditor] = useState<{ mode: LyricsEditMode; input: string } | null>(null);
-  const [reportHash, setReportHash] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportSubject | null>(null);
   const [menuEntry, setMenuEntry] = useState<MusicLyrics | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -253,7 +258,7 @@ const Lyrics = ({
         return;
       }
       if (action === "report") {
-        setReportHash(entry?.alignment?.lyricsHash ?? null);
+        setReport(entry?.alignment ?? null);
         return;
       }
       if (action === "restore" && key) {
@@ -315,6 +320,7 @@ const Lyrics = ({
   const renderLine = (line: LyricLine, index: number) => {
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
+    const romanization = romanizationMap.get(line.time);
     const activeWeight = stableTypography ? "font-medium" : isActive ? "font-extrabold" : "font-normal";
     const activeShadow = isActive ? activeTextBase : "";
 
@@ -356,6 +362,14 @@ const Lyrics = ({
             line.text
           )}
         </div>
+        {romanization ? (
+          <div
+            className="mt-1 text-sm break-words whitespace-pre-wrap text-white/60"
+            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+          >
+            {romanization}
+          </div>
+        ) : null}
         {translation ? (
           <div
             className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80"
@@ -441,6 +455,28 @@ const Lyrics = ({
                   <div className="flex w-full flex-col">
                     <FontSizeControl value={fontSize} onChange={handleFontSizeChange} />
                     <OffsetControl value={offset} onChange={handleOffsetChange} />
+                    {translatedLyrics.length > 0 && (
+                      <Switch
+                        size="sm"
+                        className="max-w-full px-3 py-1"
+                        classNames={{ base: "w-full max-w-full flex-row-reverse justify-between" }}
+                        isSelected={showTranslation}
+                        onValueChange={v => useFullScreenPlayerSettings.getState().update({ showTranslation: v })}
+                      >
+                        显示译文
+                      </Switch>
+                    )}
+                    {romanizedLyrics.length > 0 && (
+                      <Switch
+                        size="sm"
+                        className="max-w-full px-3 py-1"
+                        classNames={{ base: "w-full max-w-full flex-row-reverse justify-between" }}
+                        isSelected={showRomanization}
+                        onValueChange={v => useFullScreenPlayerSettings.getState().update({ showRomanization: v })}
+                      >
+                        显示罗马音
+                      </Switch>
+                    )}
                     <div className="bg-divider my-1 h-px" />
                     <Button
                       variant="light"
@@ -503,7 +539,7 @@ const Lyrics = ({
         onOpenChange={open => !open && setEditor(null)}
         initialLyrics={editor?.input ?? ""}
       />
-      <ReportModal lyricsHash={reportHash} onClose={() => setReportHash(null)} />
+      <ReportModal subject={report} onClose={() => setReport(null)} />
     </>
   );
 };

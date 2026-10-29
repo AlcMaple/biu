@@ -25,6 +25,10 @@ export const alignmentToLines = (lines: AlignedLyricLine[]): LyricLine[] =>
     words: l.words.map(w => ({ text: w.text, time: Math.round(w.start * 1000) })),
   }));
 
+// 上传歌词里带的译文 / 罗马音随对齐结果走，按对齐后的行时间挂靠
+export const alignmentTrack = (lines: AlignedLyricLine[], field: "translation" | "romanization"): LyricLine[] =>
+  lines.flatMap(l => (l[field] ? [{ time: Math.round(l.start * 1000), text: l[field] }] : []));
+
 const fmt = (ms: number) => {
   const m = Math.floor(ms / 60000);
   return `${String(m).padStart(2, "0")}:${(sec(ms) - m * 60).toFixed(2).padStart(5, "0")}`;
@@ -57,7 +61,12 @@ const retimeTranslation = (original: LyricLine[], translated: LyricLine[], align
 // 试听用：不读写缓存，翻译按当前在显示的原歌词搬到对齐后的时间上
 export const previewAlignment = (alignment: LyricsAlignment, original: LyricLine[], translated: LyricLine[]) => {
   const lines = alignmentToLines(alignment.lines);
-  return { lyrics: lines, translatedLyrics: retimeTranslation(original, translated, lines) };
+  const own = alignmentTrack(alignment.lines, "translation");
+  return {
+    lyrics: lines,
+    translatedLyrics: own.length ? own : retimeTranslation(original, translated, lines),
+    romanizedLyrics: alignmentTrack(alignment.lines, "romanization"),
+  };
 };
 
 export type AlignedSource = "aligned" | "approved";
@@ -86,7 +95,10 @@ export async function adoptAlignment(key: string, alignment: LyricsAlignment, so
       : undefined);
   const base = preAlign ?? prev;
   const lines = alignmentToLines(alignment.lines);
-  const tLines = retimeTranslation(parseLrc(base.lyrics), parseLrc(base.tLyrics), lines);
+  const ownTranslation = alignmentTrack(alignment.lines, "translation");
+  const tLines = ownTranslation.length
+    ? ownTranslation
+    : retimeTranslation(parseLrc(base.lyrics), parseLrc(base.tLyrics), lines);
   const next: MusicLyrics = {
     ...prev,
     lyrics: toLineLrc(lines),
@@ -99,7 +111,7 @@ export async function adoptAlignment(key: string, alignment: LyricsAlignment, so
     noAutoAlign: undefined,
   };
   await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
-  return { lines, tLines, hasPreAlign: Boolean(preAlign) };
+  return { lines, tLines, rLines: alignmentTrack(alignment.lines, "romanization"), hasPreAlign: Boolean(preAlign) };
 }
 
 // byUser：用户点「还原」，标成手动选择，否则打开时会再被生效版本覆盖、自动对齐又换回来，点了等于没点。

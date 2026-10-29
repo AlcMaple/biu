@@ -7,6 +7,7 @@ import { AlignApiError, getMyReports, getMySubmissions } from "@/service/lyrics-
 import { usePlayList } from "@/store/play-list";
 
 import { formatShortDate } from "./format-date";
+import { scopeText } from "./report-scope";
 
 type ChipColor = "warning" | "success" | "danger" | "default";
 
@@ -49,7 +50,7 @@ const toRows = (uploads: AlignSubmissionBrief[], reports: AlignReport[]): Row[] 
     ...reports.map<Row>(r => ({
       ...r,
       kind: "report",
-      meta: `报错时间轴 · ${formatShortDate(r.createdAt)}`,
+      meta: `报错：${scopeText(r)} · ${formatShortDate(r.createdAt)}`,
       status: reportStatus(r),
       reason: r.status !== "pending" && r.reason ? `管理员说明：${r.reason}` : undefined,
     })),

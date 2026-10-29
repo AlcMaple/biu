@@ -6,6 +6,7 @@ import type { DraftStore, InputStore } from "./lib/drafts.js";
 import type { AlignQueue } from "./lib/queue.js";
 import type { RecognizedStore } from "./lib/recognized.js";
 import type { Report, ReportStore } from "./lib/reports.js";
+import type { Alignment } from "./lib/result.js";
 import type { ScreenQueue } from "./lib/screen-queue.js";
 import type { SubtitleLine } from "./lib/screen-worker.js";
 import type { SubmissionStore, Submission } from "./lib/submissions.js";
@@ -43,6 +44,29 @@ const parseHash = (value: unknown) => {
   if (typeof value !== "string" || !/^[0-9a-f]{16}$/.test(value))
     throw new AlignError("BAD_REQUEST", "lyricsHash 不对");
   return value;
+};
+
+const parseReportScope = (body: unknown, alignment: Alignment) => {
+  const { track = "original", fromLine, toLine } = (body ?? {}) as Record<string, unknown>;
+  if (track !== "original" && track !== "translation" && track !== "romanization") {
+    throw new AlignError("BAD_REQUEST", "track 不对");
+  }
+  // 译文 / 罗马音只有随对齐结果存在服务器上的才报得了，管理员看不到的东西没法处理
+  if (track !== "original" && !alignment.lines.some(l => l[track])) {
+    throw new AlignError("BAD_REQUEST", track === "translation" ? "这份歌词没有译文可报" : "这份歌词没有罗马音可报");
+  }
+  if (fromLine === undefined && toLine === undefined) return { track } as const;
+  const total = alignment.lines.length;
+  if (
+    !Number.isInteger(fromLine) ||
+    !Number.isInteger(toLine) ||
+    (fromLine as number) < 1 ||
+    (toLine as number) > total ||
+    (fromLine as number) > (toLine as number)
+  ) {
+    throw new AlignError("BAD_REQUEST", "起止行不对");
+  }
+  return { track, fromLine: fromLine as number, toLine: toLine as number } as const;
 };
 
 const MAX_SUBTITLE_LINES = 1000;
@@ -189,6 +213,7 @@ export function createRouter(deps: RouteDeps): Router {
         title: alignment.video.title,
         note: text(req.body?.note, 200),
         wasPublished: cur?.lyricsHash === hash,
+        ...parseReportScope(req.body, alignment),
       });
       res.status(201).json(report);
     }),

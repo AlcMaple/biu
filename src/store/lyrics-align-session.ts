@@ -105,10 +105,10 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
   const applyAuto = async (target: AlignTarget, alignment: LyricsAlignment, input: string, source: AlignedSource) => {
     const entry = (await platform.getStore(StoreNameMap.LyricsCache))?.[target.cacheKey];
     if (!isCurrent(target) || alignInputOf(entry).trim() !== input) return;
-    const { lines, tLines } = await adoptAlignment(target.cacheKey, alignment, source);
+    const { lines, tLines, rLines } = await adoptAlignment(target.cacheKey, alignment, source);
     if (!isCurrent(target)) return;
     const lyricsState = useLyricsState.getState();
-    lyricsState.setLyrics(lines, tLines);
+    lyricsState.setLyrics(lines, tLines, rLines);
     lyricsState.setOffset(0);
   };
 
@@ -309,9 +309,9 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       const { target, phase } = get();
       if (!target || phase.kind !== "preview") return;
       try {
-        const { lines, tLines } = await adoptAlignment(target.cacheKey, phase.alignment, "aligned");
+        const { lines, tLines, rLines } = await adoptAlignment(target.cacheKey, phase.alignment, "aligned");
         const lyricsState = useLyricsState.getState();
-        lyricsState.setLyrics(lines, tLines);
+        lyricsState.setLyrics(lines, tLines, rLines);
         lyricsState.setOffset(0);
         lyricsState.setPreview(null);
         set(show({ kind: "adopted" }));

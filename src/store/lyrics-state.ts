@@ -12,18 +12,20 @@ export type LyricLine = {
 // 填词歌从视频画面识别歌词的进度：显示在歌词区，只对当前这首歌有效
 export type ScreenStatus = { kind: "working" } | { kind: "failed"; message: string } | null;
 
-type LyricsPreview = { lyrics: LyricLine[]; translatedLyrics: LyricLine[] };
+type LyricsPreview = { lyrics: LyricLine[]; translatedLyrics: LyricLine[]; romanizedLyrics: LyricLine[] };
 
 interface LyricsState {
   lyrics: LyricLine[];
   translatedLyrics: LyricLine[];
+  // 罗马音只来自上传歌词随对齐结果带来的那一轨
+  romanizedLyrics: LyricLine[];
   // 试听中的对齐结果：只用于显示（歌词面板 + 桌面歌词），不写缓存；采用才落盘，放弃或切歌就丢掉
   preview: LyricsPreview | null;
   offset: number;
   isLoading: boolean;
   screenStatus: ScreenStatus;
   screenOrigin: ScreenOrigin | null;
-  setLyrics: (lyrics: LyricLine[], translatedLyrics?: LyricLine[]) => void;
+  setLyrics: (lyrics: LyricLine[], translatedLyrics?: LyricLine[], romanizedLyrics?: LyricLine[]) => void;
   setPreview: (preview: LyricsPreview | null) => void;
   setOffset: (offset: number) => void;
   setIsLoading: (loading: boolean) => void;
@@ -35,12 +37,14 @@ interface LyricsState {
 export const useLyricsState = create<LyricsState>(set => ({
   lyrics: [],
   translatedLyrics: [],
+  romanizedLyrics: [],
   preview: null,
   offset: 0,
   isLoading: false,
   screenStatus: null,
   screenOrigin: null,
-  setLyrics: (lyrics, translatedLyrics = []) => set({ lyrics, translatedLyrics }),
+  setLyrics: (lyrics, translatedLyrics = [], romanizedLyrics = []) =>
+    set({ lyrics, translatedLyrics, romanizedLyrics }),
   setPreview: preview => set({ preview }),
   setOffset: offset => set({ offset }),
   setIsLoading: loading => set({ isLoading: loading }),
@@ -50,6 +54,7 @@ export const useLyricsState = create<LyricsState>(set => ({
     set({
       lyrics: [],
       translatedLyrics: [],
+      romanizedLyrics: [],
       preview: null,
       offset: 0,
       isLoading: false,
@@ -62,6 +67,7 @@ export const useLyricsState = create<LyricsState>(set => ({
 export const useDisplayedLyrics = () => {
   const lyrics = useLyricsState(s => s.preview?.lyrics ?? s.lyrics);
   const translatedLyrics = useLyricsState(s => s.preview?.translatedLyrics ?? s.translatedLyrics);
+  const romanizedLyrics = useLyricsState(s => s.preview?.romanizedLyrics ?? s.romanizedLyrics);
   const offset = useLyricsState(s => (s.preview ? 0 : s.offset));
-  return { lyrics, translatedLyrics, offset };
+  return { lyrics, translatedLyrics, romanizedLyrics, offset };
 };

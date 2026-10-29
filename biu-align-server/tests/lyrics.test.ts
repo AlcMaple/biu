@@ -107,6 +107,59 @@ describe("parseLyrics", () => {
     ]);
   });
 
+  it("同一时间的原文 / 译文 / 罗马音合成一句，只有原文参与对齐", () => {
+    const raw = [
+      "[00:10.00]雨に濡れた小道",
+      "[00:10.00]Ame ni nureta komichi",
+      "[00:10.00]雨后的小路泛着微光",
+      "[00:14.00]足跡攫う時の波",
+      "[00:14.00]足迹带走时间的波浪",
+    ].join("\n");
+    expect(parseLyrics(raw)).toEqual([
+      { t: 10, text: "雨に濡れた小道", romanization: "Ame ni nureta komichi", translation: "雨后的小路泛着微光" },
+      { t: 14, text: "足跡攫う時の波", translation: "足迹带走时间的波浪" },
+    ]);
+  });
+
+  it("译文排在日文前面时仍以日文为原文", () => {
+    const raw = "[00:10.00]雨后的小路\n[00:10.00]雨に濡れた小道";
+    expect(parseLyrics(raw)).toEqual([{ t: 10, text: "雨に濡れた小道", translation: "雨后的小路" }]);
+  });
+
+  it("纯文本里日文 + 罗马音 + 译文成组出现时也合成一句", () => {
+    const raw = [
+      "雨に濡れた",
+      "Ame ni nureta",
+      "被雨淋湿",
+      "足跡攫う",
+      "Ashiato",
+      "足迹",
+      "季節を刻む",
+      "Kisetsu",
+      "刻下季节",
+    ].join("\n");
+    const lines = parseLyrics(raw);
+    expect(lines.map(l => l.text)).toEqual(["雨に濡れた", "足跡攫う", "季節を刻む"]);
+    expect(lines[0]).toMatchObject({ romanization: "Ame ni nureta", translation: "被雨淋湿" });
+  });
+
+  it("中文歌里零星的英文不会把后面的歌词吃成译文", () => {
+    const raw = ["我爱你", "baby", "你好吗", "再见了", "我走了", "你要好好的"].join("\n");
+    expect(parseLyrics(raw).map(l => l.text)).toEqual(["我爱你", "baby", "你好吗", "再见了", "我走了", "你要好好的"]);
+  });
+
+  it("英文原文后的拉丁字母行算译文，不是罗马音", () => {
+    expect(parseLyrics("[00:10.00]I love you\n[00:10.00]Je t'aime")).toEqual([
+      { t: 10, text: "I love you", translation: "Je t'aime" },
+    ]);
+  });
+
+  it("译文变了哈希也变", () => {
+    const a = parseLyrics("[00:10.00]雨に濡れた\n[00:10.00]被雨淋湿");
+    const b = parseLyrics("[00:10.00]雨に濡れた\n[00:10.00]淋了雨");
+    expect(lyricsHash(a)).not.toBe(lyricsHash(b));
+  });
+
   it("清洗后为空 / 过长给出对应错误码", () => {
     expect(codeOf(() => parseLyrics("[00:00]作词：某某\n"))).toBe("LYRICS_EMPTY");
     expect(codeOf(() => parseLyrics(Array.from({ length: 301 }, (_, i) => `第${i}句`).join("\n")))).toBe(

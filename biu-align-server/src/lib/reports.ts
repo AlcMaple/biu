@@ -8,6 +8,9 @@ import { listJson, readJson, writeJsonAtomic } from "./json-file.js";
 // 同一人对同一首歌的同一份时间轴重复报错，只更新说明，不堆新条目
 export type ReportStatus = "pending" | "resolved" | "dismissed";
 
+// 报的是哪一轨：original = 原文的时间轴，translation / romanization = 译文 / 罗马音的内容
+export type ReportTrack = "original" | "translation" | "romanization";
+
 export interface Report {
   id: string;
   bvid: string;
@@ -17,6 +20,10 @@ export interface Report {
   lyricsHash: string;
   title: string;
   note: string;
+  track: ReportTrack;
+  // 只报一段时的起止行（从 1 数，含两端），整首都有问题时不带
+  fromLine?: number;
+  toLine?: number;
   // 报错时那份是不是对所有人生效的版本；不是的话说明报错人自己换过歌词，下线无从谈起
   wasPublished: boolean;
   status: ReportStatus;
@@ -58,7 +65,12 @@ export class ReportStore {
     return (await listJson<Report>(this.dir())).filter(filter).sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  create(input: Pick<Report, "bvid" | "cid" | "mid" | "lyricsHash" | "title" | "note" | "wasPublished">) {
+  create(
+    input: Pick<
+      Report,
+      "bvid" | "cid" | "mid" | "lyricsHash" | "title" | "note" | "wasPublished" | "track" | "fromLine" | "toLine"
+    >,
+  ) {
     return this.serial(async () => {
       const [dup] = await this.list(
         r =>
@@ -66,10 +78,11 @@ export class ReportStore {
           r.bvid === input.bvid &&
           r.cid === input.cid &&
           r.lyricsHash === input.lyricsHash &&
+          (r.track ?? "original") === input.track &&
           r.status === "pending",
       );
       const report: Report = dup
-        ? { ...dup, note: input.note, createdAt: Date.now() }
+        ? { ...dup, note: input.note, fromLine: input.fromLine, toLine: input.toLine, createdAt: Date.now() }
         : { ...input, id: randomUUID(), status: "pending", createdAt: Date.now() };
       await writeJsonAtomic(this.file(report.id), report);
       return report;

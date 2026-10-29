@@ -71,8 +71,15 @@ export const approveSubmission = (id: string) =>
 export const rejectSubmission = (id: string, reason: string) =>
   call<AlignSubmissionBrief>({ method: "POST", path: `/admin/submissions/${id}/reject`, body: { reason } });
 
-export const reportAlignment = (body: { bvid: string; cid: string; lyricsHash: string; note?: string }) =>
-  call<AlignReport>({ method: "POST", path: "/lyrics/reports", body });
+export const reportAlignment = (body: {
+  bvid: string;
+  cid: string;
+  lyricsHash: string;
+  note?: string;
+  track?: AlignReportTrack;
+  fromLine?: number;
+  toLine?: number;
+}) => call<AlignReport>({ method: "POST", path: "/lyrics/reports", body });
 
 export const getMyReports = () => call<{ items: AlignReport[] }>({ method: "GET", path: "/lyrics/reports/mine" });
 

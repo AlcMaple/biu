@@ -31,6 +31,9 @@ export interface AlignedLine {
   words: { text: string; start: number }[];
   score: number;
   repaired?: true;
+  /** 同一句的译文 / 罗马音，不参与对齐 */
+  translation?: string;
+  romanization?: string;
 }
 
 export interface Alignment {
@@ -142,6 +145,8 @@ export function buildAlignment(
         text: tag ? tag + l.text : l.text,
         words: [...tagWords, ...toWords(l)],
         score: l.score,
+        ...(input[i]?.translation ? { translation: input[i].translation } : {}),
+        ...(input[i]?.romanization ? { romanization: input[i].romanization } : {}),
         ...(l.repaired ? { repaired: true as const } : {}),
       },
     ];
