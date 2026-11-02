@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>歌词对齐状态原型</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#1b1b1d;overflow:hidden}
+.bg{position:fixed;inset:-40px;background:radial-gradient(circle at 30% 40%,#6b5a4a,#2b2a2e 55%,#141416);filter:blur(30px);opacity:.9}
+.ctl{position:fixed;left:16px;top:90px;z-index:20;display:flex;flex-direction:column;gap:8px;background:rgb(0 0 0/.6);padding:12px;border-radius:12px;font-size:12px;width:300px}
+.ctl label{display:flex;gap:6px;align-items:flex-start;line-height:1.4}
+.ctl button{background:#3a3a3e;color:#ddd;border:0;border-radius:99px;padding:5px 10px;cursor:pointer;font-size:12px}
+.ctl .row{display:flex;gap:6px;flex-wrap:wrap}
+.top{position:relative;display:flex;justify-content:space-between;align-items:center;padding:28px 40px}
+.title{font-size:24px}
+.chip{display:flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:99px;background:rgb(255 255 255/.08);border:1px solid rgb(255 255 255/.18);font-size:14px;backdrop-filter:blur(10px)}
+.dot{width:8px;height:8px;border-radius:50%}
+.stage{position:relative;display:flex;align-items:center;gap:80px;padding:0 6vw;height:calc(100vh - 220px)}
+.cover{width:520px;aspect-ratio:4/3;border-radius:12px;background:linear-gradient(135deg,#7c6a58,#3a3634);flex-shrink:0}
+.area{position:relative;flex:1;height:100%}
+.wrap{position:absolute;inset:0;overflow:hidden;
+ -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.15) 6%,rgba(0,0,0,.5) 12%,#000 24%,#000 76%,rgba(0,0,0,.5) 88%,rgba(0,0,0,.15) 94%,transparent 100%)}
+.list{position:absolute;left:0;right:0;transition:transform .3s ease-out}
+.line{padding:8px 0;margin-bottom:8px;font-size:26px;line-height:1.375;opacity:.6;transition:all .3s ease-out}
+.line.cur{opacity:1;font-size:39px;font-weight:800;filter:drop-shadow(0 4px 24px rgba(0,0,0,.35))}
+.static .wrap{overflow-y:auto;-webkit-mask-image:none}.static .list{position:static;transform:none!important;padding:24px 0 40vh}.static .line{opacity:.9;font-size:26px;font-weight:600}
+.head{font-size:14px;color:rgb(255 255 255/.6);padding:8px 0 16px;display:flex;align-items:center;gap:8px}
+.u{position:relative;display:inline-block;white-space:pre}
+.u .b{opacity:.45}
+.u .f{position:absolute;top:0;left:0;height:100%;overflow:hidden;white-space:pre;width:0;color:#a3e635;text-shadow:0 0 10px rgb(163 230 53/55%),0 1px 4px rgb(0 0 0/60%)}
+.setbtn{position:absolute;top:16px;right:24px;z-index:5;height:32px;padding:0 12px;border-radius:12px;border:0;background:rgb(255 255 255/.2);color:#fff;font-size:14px;cursor:pointer}
+.pop{position:absolute;top:56px;right:24px;z-index:6;width:288px;padding:4px;border-radius:14px;background:#18181b;box-shadow:0 10px 30px rgb(0 0 0/.5);font-size:14px;display:none}
+.pop.open{display:block}
+.pop .it{padding:8px 12px}.pop .it small{display:block;color:#a1a1aa;font-size:12px;margin-top:2px}
+.pop .sep{height:1px;background:#3f3f46;margin:4px 0}
+.pop .st{margin:4px;padding:8px 10px;border-radius:10px;background:rgb(255 255 255/.06);font-size:13px;display:flex;gap:8px;align-items:center}
+.slider{height:4px;background:#3f3f46;border-radius:2px;margin:12px 0 6px;position:relative}.slider i{position:absolute;left:0;top:0;bottom:0;width:50%;background:#1ed760;border-radius:2px}
+.toast{position:fixed;left:50%;bottom:140px;transform:translate(-50%,12px);opacity:0;transition:all .35s;background:rgb(24 24 27/.92);border:1px solid rgb(255 255 255/.12);padding:10px 16px;border-radius:12px;font-size:14px;display:flex;gap:8px;align-items:center;z-index:10;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.spin{width:12px;height:12px;border:1.5px solid rgb(255 255 255/.6);border-top-color:transparent;border-radius:50%;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(1turn)}}
+.bar{position:fixed;left:0;right:0;bottom:0;height:120px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:14px;color:#ccc}
+.prog{width:60vw;height:4px;background:rgb(255 255 255/.2);border-radius:2px}.prog i{display:block;height:100%;background:#1ed760;border-radius:2px}
+</style></head><body>
+<div class="bg"></div>
+<div class="top"><span class="title">⌄ 《那些你很冒险的梦》-林俊杰 ⚙</span><span class="chip" id="chip"></span></div>
+<div class="stage"><div class="cover"></div>
+ <div class="area">
+  <button class="setbtn" id="setbtn">☰ 歌词设置</button>
+  <div class="pop" id="pop">
+   <div class="st" id="popst"><span class="spin"></span><span>歌词正在对齐，约 2 分钟后自动校准</span></div>
+   <div class="it">字号<div class="slider"><i></i></div></div>
+   <div class="it">歌词快慢<div class="slider"><i></i></div></div>
+   <div class="sep"></div>
+   <div class="it">歌词报错<small>歌词有错字、时间轴不对</small></div>
+  </div>
+  <div class="wrap"><div class="list" id="list"></div></div>
+ </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="bar"><span id="t">0:00</span><span class="prog"><i id="pi"></i></span><span>4:05</span></div>
+
+<div class="ctl">
+<b>对齐前歌词怎么显示</b>
+ <label><input type="radio" name="d" id="dNow" checked>现状：按字数平均逐字填色</label>
+ <label><input type="radio" name="d" id="dE">E 静态文字（Apple Music 无时间轴时的做法）：不高亮、不自动滚动，可自己滚</label>
+ <b>歌词保持现状，只用其他方式提示（可多选）</b>
+ <label><input type="checkbox" id="oHead">A 歌词开头多一行状态（随歌词一起滚走，不常驻）</label>
+ <label><input type="checkbox" id="oEnter">B 进歌词页时底部提示 4 秒，自己消失</label>
+ <label><input type="checkbox" id="oPop" checked>C 用户觉得不对、去点「歌词设置」时，面板顶部写明正在对齐</label>
+ <label><input type="checkbox" id="oDone" checked>D 对齐完成那一刻底部提示「歌词已校准」3 秒</label>
+ <div class="row"><button id="restart">从头重放（对齐中）</button><button id="finish">模拟对齐完成</button></div>
+ <span style="color:#aaa">歌词显示和项目现状一致：对齐前按字数平均逐字填色</span>
+</div>
+
+<script>
+const LINES=[[0,"我输了 累了 当你 再也 不回头"],[5.2,"那些你很冒险的梦 我陪你去疯"],[10.6,"折纸飞机 碰到雨天 终究会坠落"],[16,"太残忍的话我直说 因为爱很重"],[21.4,"你却不想懂 只往反方向走"],[26.6,"你真的不懂 我的爱已降落"],[32,"我输了 累了 当你 再也 不回头"]];
+const TOTAL=37.5;
+const units=t=>{const r=[];let lead="";for(const m of t.match(/[\p{Script=Han}]|[^\p{Script=Han}\s\p{P}]+|[\s\p{P}]+/gu)||[]){if(/^[\s\p{P}]+$/u.test(m)){if(r.length)r[r.length-1]+=m;else lead+=m}else{r.push(lead+m);lead=""}}return r};
+// 对齐前：本行时间到下一行时间按字数平均摊（项目现状）；对齐后：真实逐字时间，模拟唱得时快时慢
+function timing(i,real){const[s,txt]=LINES[i],end=(LINES[i+1]?.[0]??s+5)*1000,st=s*1000,us=units(txt),n=us.length;
+ if(!real){const per=(end-st)/n;return{w:us.map((x,k)=>({x,t:st+k*per})),end}}
+ const sing=(end-st)*0.78;let acc=0;const ws=us.map((x,k)=>{const d=sing*(0.6+0.8*((k*37)%10)/10)/n;const r={x,t:st+acc};acc+=d;return r});
+ return{w:ws,end:Math.min(end,ws[n-1].t+1200)}}
+const prog=(tm,ms)=>tm.w.map((w,k)=>{const u=tm.w[k+1]?.t??tm.end;return Math.min(1,Math.max(0,(ms-w.t)/Math.max(1,u-w.t)))});
+
+const $=id=>document.getElementById(id);
+let state="working",t0=performance.now(),cur=-1,curTiming=null,fills=[],toastTimer;
+const list=$('list'),chip=$('chip');
+function build(){list.innerHTML=($('oHead').checked&&state!=="aligned"?'<div class="head"><span class="spin"></span>逐字歌词生成中，好了会自动切换</div>':'')+LINES.map(([,x])=>`<div class="line">${x}</div>`).join('');cur=-1}
+const els=()=>[...list.querySelectorAll('.line')];
+function chipView(){chip.innerHTML=state==="aligned"?'<span class="dot" style="background:#1ed760"></span>已对齐':'<span class="dot" style="border:1.5px solid #1ed760"></span>对齐中 · 约 2 分钟';
+ $('popst').style.display=state!=="aligned"&&$('oPop').checked?'flex':'none'}
+function toast(html,ms){clearTimeout(toastTimer);const t=$('toast');t.innerHTML=html;t.classList.add('show');toastTimer=setTimeout(()=>t.classList.remove('show'),ms)}
+function enter(i){const es=els();es.forEach((e,k)=>{e.classList.toggle('cur',k===i);if(k!==i)e.textContent=LINES[k][1]});
+ const e=es[i];curTiming=timing(i,state==="aligned");
+ e.innerHTML=curTiming.w.map(w=>`<span class="u"><span class="b">${w.x}</span><span class="f">${w.x}</span></span>`).join('');fills=[...e.querySelectorAll('.f')];
+ requestAnimationFrame(()=>{const wrap=list.parentElement;const top=e.offsetTop-wrap.clientHeight/2+e.clientHeight/2;list.style.transform=`translateY(${-Math.max(0,top)}px)`})}
+const isStatic=()=>$('dE').checked&&state!=="aligned";
+function tick(){document.querySelector('.stage').classList.toggle('static',isStatic());if(isStatic()){const s=((performance.now()-t0)%(TOTAL*1000))/1000;$('t').textContent=`0:${String(Math.floor(s)).padStart(2,'0')}`;$('pi').style.width=(s/245*100)+'%';cur=-1;els().forEach(e=>{e.classList.remove('cur');if(e.querySelector('.u'))e.textContent=e.textContent});requestAnimationFrame(tick);return}
+const ms=(performance.now()-t0)%(TOTAL*1000);let i=0;LINES.forEach(([s],k)=>{if(ms>=s*1000)i=k});
+ if(i!==cur){cur=i;enter(i)}
+ prog(curTiming,ms).forEach((p,k)=>fills[k].style.width=(p*100).toFixed(2)+'%');
+ const s=ms/1000;$('t').textContent=`0:${String(Math.floor(s)).padStart(2,'0')}`;$('pi').style.width=(s/245*100)+'%';
+ requestAnimationFrame(tick)}
+function restart(){state="working";t0=performance.now();build();chipView();
+ if($('oEnter').checked)toast('<span class="spin"></span>歌词正在对齐，约 2 分钟后自动校准',4000)}
+$('restart').onclick=restart;
+$('finish').onclick=()=>{if(state==="aligned")return;state="aligned";chipView();
+ // 状态行在列表里，完成后下次重建才去掉，避免当前歌词位置跳动
+ if($('oDone').checked)toast('<span class="dot" style="background:#1ed760"></span>歌词已校准',3000)};
+$('setbtn').onclick=()=>$('pop').classList.toggle('open');
+['dNow','dE'].forEach(id=>$(id).onchange=()=>{build();chipView()});
+['oHead','oPop'].forEach(id=>$(id).onchange=()=>{build();chipView()});
+restart();tick();
+</script></body></html>

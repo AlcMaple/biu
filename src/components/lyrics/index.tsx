@@ -1,7 +1,16 @@
 import { useCallback, use, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, Popover, PopoverContent, PopoverTrigger, Switch, addToast, useDisclosure } from "@heroui/react";
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Spinner,
+  Switch,
+  addToast,
+  useDisclosure,
+} from "@heroui/react";
 import { RiEqualizerLine } from "@remixicon/react";
 import clsx from "classnames";
 import { debounce } from "es-toolkit";
@@ -69,6 +78,13 @@ const Lyrics = ({
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [centerPadding, setCenterPadding] = useState(0);
   const playId = usePlayList(s => s.playId);
+  // 觉得歌词不对的人第一反应是来这里调快慢或报错，此时告诉他正在对齐，比在角落常驻提示更能被看到
+  const aligningNote = useLyricsAlignSession(s => {
+    const currentKey = lyricsCacheKey(usePlayList.getState().getPlayItem());
+    if (s.phase.kind !== "working" || !s.target || s.target.cacheKey !== currentKey) return null;
+    const position = s.phase.view?.state === "queued" ? s.phase.view.position : undefined;
+    return position ? `排队对齐中，前面还有 ${position} 首` : "正在对齐，约 2 分钟后自动校准";
+  });
   const canAlign = usePlayList(s => {
     const item = s.list.find(i => i.id === s.playId);
     return Boolean(item && item.source !== "local" && item.bvid && item.cid);
@@ -232,6 +248,14 @@ const Lyrics = ({
   const [report, setReport] = useState<ReportSubject | null>(null);
   const [menuEntry, setMenuEntry] = useState<MusicLyrics | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const alignMenu = canAlign
+    ? ALIGN_MENU.filter(
+        item =>
+          (!item.admin || isAdmin) &&
+          (item.key !== "restore" || Boolean(menuEntry?.alignment && menuEntry.preAlign)) &&
+          (item.key !== "report" || Boolean(menuEntry?.alignment)),
+      )
+    : [];
 
   // 控件随播放器自动收起时浮层跟着卸载，开着的状态要一起清掉，否则再显示时第一下点击只是把它“关上”
   useEffect(() => {
@@ -253,6 +277,16 @@ const Lyrics = ({
     const key = lyricsCacheKey(usePlayList.getState().getPlayItem());
     return { key, entry: key ? (await platform.getStore(StoreNameMap.LyricsCache))?.[key] : undefined };
   }, []);
+
+  // 面板开着时对齐完成，歌词会被换掉；跟着重读缓存，否则「歌词报错」要关掉重开才出现
+  useEffect(() => {
+    if (!settingsOpen || !canAlign) return;
+    let canceled = false;
+    void readCacheEntry().then(({ entry }) => !canceled && setMenuEntry(entry));
+    return () => {
+      canceled = true;
+    };
+  }, [settingsOpen, canAlign, readCacheEntry, lyrics]);
 
   const handleAlignAction = useCallback(
     async (action: AlignAction) => {
@@ -441,7 +475,6 @@ const Lyrics = ({
                 onOpenChange={open => {
                   setSettingsOpen(open);
                   onControlsOpenChange?.(open);
-                  if (open && canAlign) void readCacheEntry().then(({ entry }) => setMenuEntry(entry));
                 }}
               >
                 <PopoverTrigger>
@@ -457,31 +490,37 @@ const Lyrics = ({
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-1">
                   <div className="flex w-full flex-col">
+                    {aligningNote && (
+                      <div className="bg-foreground/5 m-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm">
+                        <Spinner size="sm" variant="simple" />
+                        {aligningNote}
+                      </div>
+                    )}
                     <FontSizeControl value={fontSize} onChange={handleFontSizeChange} />
                     <OffsetControl value={offset} onChange={handleOffsetChange} />
                     {translatedLyrics.length > 0 && (
-                      <Switch
-                        size="sm"
-                        className="max-w-full px-3 py-1"
-                        classNames={{ base: "w-full max-w-full flex-row-reverse justify-between" }}
-                        isSelected={showTranslation}
-                        onValueChange={v => useFullScreenPlayerSettings.getState().update({ showTranslation: v })}
-                      >
-                        显示译文
-                      </Switch>
+                      <div className="flex items-center justify-between px-3 py-2 text-sm">
+                        <span>显示译文</span>
+                        <Switch
+                          size="sm"
+                          aria-label="显示译文"
+                          isSelected={showTranslation}
+                          onValueChange={v => useFullScreenPlayerSettings.getState().update({ showTranslation: v })}
+                        />
+                      </div>
                     )}
                     {romanizedLyrics.length > 0 && (
-                      <Switch
-                        size="sm"
-                        className="max-w-full px-3 py-1"
-                        classNames={{ base: "w-full max-w-full flex-row-reverse justify-between" }}
-                        isSelected={showRomanization}
-                        onValueChange={v => useFullScreenPlayerSettings.getState().update({ showRomanization: v })}
-                      >
-                        显示罗马音
-                      </Switch>
+                      <div className="flex items-center justify-between px-3 py-2 text-sm">
+                        <span>显示罗马音</span>
+                        <Switch
+                          size="sm"
+                          aria-label="显示罗马音"
+                          isSelected={showRomanization}
+                          onValueChange={v => useFullScreenPlayerSettings.getState().update({ showRomanization: v })}
+                        />
+                      </div>
                     )}
-                    <div className="bg-divider my-1 h-px" />
+                    {(isAdmin || alignMenu.length > 0) && <div className="bg-divider my-1 h-px" />}
                     {isAdmin && (
                       <Button
                         variant="light"
@@ -498,29 +537,23 @@ const Lyrics = ({
                         </span>
                       </Button>
                     )}
-                    {canAlign &&
-                      ALIGN_MENU.filter(
-                        item =>
-                          (!item.admin || isAdmin) &&
-                          (item.key !== "restore" || Boolean(menuEntry?.alignment && menuEntry.preAlign)) &&
-                          (item.key !== "report" || Boolean(menuEntry?.alignment)),
-                      ).map(item => (
-                        <Button
-                          key={item.key}
-                          variant="light"
-                          className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
-                          onPress={() => {
-                            setSettingsOpen(false);
-                            onControlsOpenChange?.(false);
-                            void handleAlignAction(item.key);
-                          }}
-                        >
-                          <span className="text-sm">{item.label}</span>
-                          <span className="text-foreground-500 text-xs font-normal whitespace-normal">
-                            {item.description}
-                          </span>
-                        </Button>
-                      ))}
+                    {alignMenu.map(item => (
+                      <Button
+                        key={item.key}
+                        variant="light"
+                        className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                        onPress={() => {
+                          setSettingsOpen(false);
+                          onControlsOpenChange?.(false);
+                          void handleAlignAction(item.key);
+                        }}
+                      >
+                        <span className="text-sm">{item.label}</span>
+                        <span className="text-foreground-500 text-xs font-normal whitespace-normal">
+                          {item.description}
+                        </span>
+                      </Button>
+                    ))}
                   </div>
                 </PopoverContent>
               </Popover>

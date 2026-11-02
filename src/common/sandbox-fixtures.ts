@@ -36,8 +36,8 @@ const paramOf = (config: AxiosRequestConfig, key: string) => {
 };
 
 // isUrlValid 按 deadline 判断地址是否过期，和 B 站真实播放地址同一口径
-const audioUrl = () =>
-  `${window.location.origin}${SANDBOX_AUDIO_PATH}?deadline=${Math.floor(Date.now() / 1000) + 86_400}`;
+const audioUrl = (song: number) =>
+  `${window.location.origin}${SANDBOX_AUDIO_PATH}?song=${song}&deadline=${Math.floor(Date.now() / 1000) + 86_400}`;
 
 const responseForPath = (path: string, config: AxiosRequestConfig) => {
   if (path === "/x/web-interface/nav") {
@@ -62,7 +62,7 @@ const responseForPath = (path: string, config: AxiosRequestConfig) => {
     });
   }
   if (path.includes("player/wbi/playurl")) {
-    const url = audioUrl();
+    const url = audioUrl(item.aid);
     return base({
       quality: 64,
       format: "mp4",

@@ -110,6 +110,8 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
     const lyricsState = useLyricsState.getState();
     lyricsState.setLyrics(lines, tLines, rLines);
     lyricsState.setOffset(0);
+    // 对齐期间看到歌词对不上的人，需要知道现在已经好了，否则会去报错
+    addToast({ title: "歌词已校准", color: "success", timeout: 3000 });
   };
 
   const finish = (target: AlignTarget, view: AlignJobView, gen: number, source: AlignedSource) => {

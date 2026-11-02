@@ -14,10 +14,45 @@ import { createBiuAlignProxyHandler, type AlignTokenSource } from "../web-server
 // 提供合成音频，并把对齐请求按页面选的身份转发给本机 mock 对齐服务
 
 const SAMPLE_RATE = 22_050;
-// 五声音阶，每句歌词换一个音，听得出「在播放、在换句」
-const NOTES = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25];
 
-function synthesizeWav(): Buffer {
+// 每首示例歌一套调式和速度，换歌听得出来。频率单位 Hz，和弦按一句歌词一个，循环使用
+const VARIANTS = [
+  // C 大调 I–V–vi–IV，每拍 0.5 s
+  {
+    beat: 0.5,
+    chords: [
+      [261.63, 329.63, 392.0],
+      [196.0, 246.94, 293.66],
+      [220.0, 261.63, 329.63],
+      [174.61, 220.0, 261.63],
+    ],
+  },
+  // A 小调 i–VI–III–VII，每拍 0.6 s
+  {
+    beat: 0.6,
+    chords: [
+      [220.0, 261.63, 329.63],
+      [174.61, 220.0, 261.63],
+      [261.63, 329.63, 392.0],
+      [196.0, 246.94, 293.66],
+    ],
+  },
+  // G 大调 I–IV–vi–V，每拍 0.45 s
+  {
+    beat: 0.45,
+    chords: [
+      [196.0, 246.94, 293.66],
+      [261.63, 329.63, 392.0],
+      [164.81, 196.0, 246.94],
+      [293.66, 369.99, 440.0],
+    ],
+  },
+];
+
+// 原来是每拍换频率的方波感音色：换音时相位断开会爆一下「哒」，听久了刺耳。
+// 现在每个音从自己的起点算相位、首尾各 15 ms 淡入淡出（句尾截断的音也一样）并指数衰减，底下垫一层很轻的持续和弦，听起来像柔和的琶音
+function synthesizeWav(variant: number): Buffer {
+  const { beat, chords } = VARIANTS[variant % VARIANTS.length];
   const samples = SAMPLE_RATE * SANDBOX_AUDIO_SECONDS;
   const buffer = Buffer.alloc(44 + samples * 2);
   buffer.write("RIFF", 0);
@@ -32,23 +67,38 @@ function synthesizeWav(): Buffer {
   buffer.writeUInt16LE(16, 34);
   buffer.write("data", 36);
   buffer.writeUInt32LE(samples * 2, 40);
-  const beat = SAMPLE_RATE / 2;
+  const lineLen = SAMPLE_RATE * SANDBOX_LINE_SECONDS;
+  const beatLen = Math.round(SAMPLE_RATE * beat);
+  const fade = SAMPLE_RATE * 0.015;
   for (let i = 0; i < samples; i++) {
-    const line = Math.floor(i / (SAMPLE_RATE * SANDBOX_LINE_SECONDS));
-    const freq = NOTES[(line + Math.floor(i / beat)) % NOTES.length];
-    const t = i / SAMPLE_RATE;
-    const envelope = Math.exp(-3 * ((i % beat) / beat));
-    const value = (Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(4 * Math.PI * freq * t)) * envelope * 0.25;
+    const chord = chords[Math.floor(i / lineLen) % chords.length];
+    const inLine = i % lineLen;
+    const k = Math.floor(inLine / beatLen);
+    const freq = chord[k % 3] * (k % 6 >= 3 ? 2 : 1);
+    const n = inLine - k * beatLen;
+    const nt = n / SAMPLE_RATE;
+    const note =
+      Math.sin(2 * Math.PI * freq * nt) *
+      Math.min(1, n / fade, (beatLen - n) / fade, (lineLen - inLine) / fade) *
+      Math.exp(-4 * nt);
+    const lt = inLine / SAMPLE_RATE;
+    const lineEnv = Math.min(1, inLine / (SAMPLE_RATE * 0.3), (lineLen - inLine) / (SAMPLE_RATE * 0.3));
+    const pad = chord.reduce((sum, f) => sum + Math.sin(2 * Math.PI * (f / 2) * lt), 0) / chord.length;
+    const value = (note * 0.22 + pad * 0.06 * lineEnv) * 0.8;
     buffer.writeInt16LE(Math.round(value * 32_767), 44 + i * 2);
   }
   return buffer;
 }
 
-let audio: Buffer | undefined;
+const audios = new Map<number, Buffer>();
 
 // 拖动进度条靠 Range；不支持的话浏览器每次拖动都从头加载
-function sendAudio(rangeHeader: string | undefined, response: Parameters<RequestHandler>[1]) {
-  audio ??= synthesizeWav();
+function sendAudio(variant: number, rangeHeader: string | undefined, response: Parameters<RequestHandler>[1]) {
+  let audio = audios.get(variant);
+  if (!audio) {
+    audio = synthesizeWav(variant);
+    audios.set(variant, audio);
+  }
   response.setHeader("Content-Type", "audio/wav");
   response.setHeader("Accept-Ranges", "bytes");
   response.setHeader("Cache-Control", "no-store");
@@ -105,9 +155,10 @@ export function createSandboxMiddleware(): RequestHandler {
   });
 
   return (request, response, next) => {
-    const pathname = new URL(request.url ?? "/", "http://sandbox.local").pathname;
+    const url = new URL(request.url ?? "/", "http://sandbox.local");
+    const pathname = url.pathname;
     if (pathname === SANDBOX_AUDIO_PATH) {
-      sendAudio(request.headers.range, response);
+      sendAudio(Number(url.searchParams.get("song")) || 0, request.headers.range, response);
       return;
     }
     void alignProxy(request, response, next).catch(next);
