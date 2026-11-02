@@ -11,6 +11,19 @@ export type ReportStatus = "pending" | "resolved" | "dismissed";
 // 报的是哪一轨：original = 原文的时间轴，translation / romanization = 译文 / 罗马音的内容
 export type ReportTrack = "original" | "translation" | "romanization";
 
+// 「其他错误」的分类；歌词文本错误（原文 / 译文 / 罗马音）走 track，不在这里
+export const OTHER_TYPES = [
+  "timeline",
+  "lyrics",
+  "instrumental",
+  "title",
+  "audio",
+  "quality",
+  "sensitive",
+  "other",
+] as const;
+export type OtherType = (typeof OTHER_TYPES)[number];
+
 export interface Report {
   id: string;
   bvid: string;
@@ -21,6 +34,11 @@ export interface Report {
   title: string;
   note: string;
   track: ReportTrack;
+  // text = 歌词文本错误（看 track），other = 其他错误（看 otherType）；老记录没有，按 text
+  kind?: "text" | "other";
+  otherType?: OtherType;
+  // 用户改过的那一轨的完整歌词（一行一句，和 track 对应）；管理员拿它和对齐结果里的那一轨对照。老记录没有
+  corrected?: string;
   // 只报一段时的起止行（从 1 数，含两端），整首都有问题时不带
   fromLine?: number;
   toLine?: number;
@@ -68,7 +86,19 @@ export class ReportStore {
   create(
     input: Pick<
       Report,
-      "bvid" | "cid" | "mid" | "lyricsHash" | "title" | "note" | "wasPublished" | "track" | "fromLine" | "toLine"
+      | "bvid"
+      | "cid"
+      | "mid"
+      | "lyricsHash"
+      | "title"
+      | "note"
+      | "wasPublished"
+      | "track"
+      | "kind"
+      | "otherType"
+      | "corrected"
+      | "fromLine"
+      | "toLine"
     >,
   ) {
     return this.serial(async () => {
@@ -79,10 +109,19 @@ export class ReportStore {
           r.cid === input.cid &&
           r.lyricsHash === input.lyricsHash &&
           (r.track ?? "original") === input.track &&
+          (r.kind ?? "text") === (input.kind ?? "text") &&
+          r.otherType === input.otherType &&
           r.status === "pending",
       );
       const report: Report = dup
-        ? { ...dup, note: input.note, fromLine: input.fromLine, toLine: input.toLine, createdAt: Date.now() }
+        ? {
+            ...dup,
+            note: input.note,
+            corrected: input.corrected,
+            fromLine: input.fromLine,
+            toLine: input.toLine,
+            createdAt: Date.now(),
+          }
         : { ...input, id: randomUUID(), status: "pending", createdAt: Date.now() };
       await writeJsonAtomic(this.file(report.id), report);
       return report;

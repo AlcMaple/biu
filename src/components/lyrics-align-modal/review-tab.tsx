@@ -23,6 +23,7 @@ import { usePlayList } from "@/store/play-list";
 import { ALIGN_POLL_INTERVAL_MS } from "@shared/lyrics-align";
 
 import AlignmentPreview from "./alignment-preview";
+import CorrectionDiff from "./correction-diff";
 import { formatShortDate } from "./format-date";
 import { scopeText } from "./report-scope";
 
@@ -270,8 +271,14 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
   const { report, alignment, current, currentSource, draft, canRealign } = detail;
   // 报错之后这首歌可能已经换过版本；只有被报的那份还在用，下线 / 替换才有意义
   const stillInUse = current?.lyricsHash === report.lyricsHash;
-  // 译文 / 罗马音有问题时，下线整份逐字歌词是杀鸡用牛刀；改对要靠上传 / 重新对齐一份改好的歌词，这里只标记处理完
-  const contentOnly = (report.track ?? "original") !== "original";
+  // 文字内容有问题（用户给了改好的歌词、译文、罗马音等）时，下线整份逐字歌词是杀鸡用牛刀；
+  // 改对要靠管理员换一份歌词重新对齐，这里只标记处理完。只有时间轴 / 歌词缺失这类和对齐结果本身有关的才可能需要下线
+  const legacy = !report.corrected && report.kind !== "other";
+  const contentOnly = legacy
+    ? (report.track ?? "original") !== "original"
+    : report.kind === "other"
+      ? report.otherType !== "timeline" && report.otherType !== "lyrics"
+      : true;
   const range = report.fromLine && report.toLine ? { from: report.fromLine, to: report.toLine } : undefined;
   const busyAny = Boolean(busy) || realign.running;
 
@@ -323,6 +330,7 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
         <span>{stillInUse ? "这份现在仍在用" : currentText(current, currentSource)}</span>
       </div>
       <PlayButton {...report} />
+      <CorrectionDiff report={report} alignment={alignment} />
       <Compare
         left={{
           title: "被报的版本",
@@ -446,11 +454,11 @@ const List = ({
   );
 };
 
-// 管理员只处理两类事：用户上传的歌词、用户对时间轴的报错。自动对齐的结果不经审核直接生效
+// 管理员处理用户报错；上传歌词的入口已撤掉，这里只留之前遗留的上传。自动对齐的结果不经审核直接生效
 const ReviewTab = () => {
   const [data, setData] = useState<{ uploads: AlignSubmissionBrief[]; reports: AlignReport[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<Kind>("uploads");
+  const [kind, setKind] = useState<Kind>("reports");
   const [selected, setSelected] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -510,8 +518,8 @@ const ReviewTab = () => {
   return (
     <>
       <Tabs selectedKey={kind} onSelectionChange={key => setKind(key as Kind)} size="sm" className="mb-2">
-        <Tab key="uploads" title={`用户上传${data.uploads.length ? ` ${data.uploads.length}` : ""}`} />
-        <Tab key="reports" title={`时间轴报错${data.reports.length ? ` ${data.reports.length}` : ""}`} />
+        <Tab key="reports" title={`用户报错${data.reports.length ? ` ${data.reports.length}` : ""}`} />
+        <Tab key="uploads" title={`历史上传${data.uploads.length ? ` ${data.uploads.length}` : ""}`} />
       </Tabs>
       <List kind={kind} items={kind === "uploads" ? data.uploads : data.reports} onSelect={setSelected} />
     </>

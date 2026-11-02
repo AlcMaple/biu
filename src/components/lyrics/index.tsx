@@ -16,7 +16,7 @@ import { type LyricLine, useDisplayedLyrics, useLyricsState } from "@/store/lyri
 import { usePlayList } from "@/store/play-list";
 import { StoreNameMap } from "@shared/store";
 
-import LyricsAlignModal, { type LyricsEditMode } from "../lyrics-align-modal";
+import LyricsAlignModal from "../lyrics-align-modal";
 import ReportModal, { type ReportSubject } from "../lyrics-align-modal/report-modal";
 import LyricsSearchModal from "../lyrics-search-modal";
 import AlignChip from "./align-chip";
@@ -34,14 +34,18 @@ const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
 const DEFAULT_FONT_SIZE = 20;
 
-// 普通用户不需要点「对齐」：播放时自动对齐、好了自动换上。这里只留上传、报错和还原；
-// 手动重跑是管理员的调试手段，用来判断是算法错了还是歌词 / 音频的问题
-type AlignAction = "upload" | "report" | "restore" | "align" | "edit";
+// 歌词是全员共享的同一份：识别、对齐都在后台自动完成，普通用户不能自己换歌词，只能报错，由管理员统一更新。
+// 换歌词、还原、手动重跑是管理员的维护手段，用来判断是算法错了还是歌词 / 音频的问题
+type AlignAction = "report" | "restore" | "align" | "edit";
 
 const ALIGN_MENU: { key: AlignAction; label: string; description: string; admin?: true }[] = [
-  { key: "upload", label: "上传我的歌词", description: "带不带时间都行，审核通过后所有人都用它" },
-  { key: "report", label: "歌词报错", description: "时间轴、译文、罗马音哪里不对，告诉管理员" },
-  { key: "restore", label: "还原为对齐前的歌词", description: "回到逐字对齐之前的歌词和偏移，之后不再自动对齐" },
+  { key: "report", label: "歌词报错", description: "歌词、译文、罗马音等哪里不对，告诉管理员" },
+  {
+    key: "restore",
+    label: "还原为对齐前的歌词",
+    description: "回到逐字对齐之前的歌词和偏移，之后不再自动对齐",
+    admin: true,
+  },
   { key: "align", label: "重新对齐当前歌词", description: "插到队首、跳过缓存重跑，先试听再决定", admin: true },
   { key: "edit", label: "换一份歌词再对齐", description: "粘贴或修改歌词后插队对齐", admin: true },
 ];
@@ -224,7 +228,7 @@ const Lyrics = ({
   }, [activeIndex]);
 
   const isAdmin = useAlignReview(s => s.isAdmin);
-  const [editor, setEditor] = useState<{ mode: LyricsEditMode; input: string } | null>(null);
+  const [editor, setEditor] = useState<string | null>(null);
   const [report, setReport] = useState<ReportSubject | null>(null);
   const [menuEntry, setMenuEntry] = useState<MusicLyrics | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -253,8 +257,8 @@ const Lyrics = ({
   const handleAlignAction = useCallback(
     async (action: AlignAction) => {
       const { key, entry } = await readCacheEntry();
-      if (action === "upload" || action === "edit") {
-        setEditor({ mode: action === "upload" ? "upload" : "align", input: alignInputOf(entry) });
+      if (action === "edit") {
+        setEditor(alignInputOf(entry));
         return;
       }
       if (action === "report") {
@@ -345,6 +349,14 @@ const Lyrics = ({
           overflowWrap: stableTypography ? "anywhere" : undefined,
         }}
       >
+        {romanization ? (
+          <div
+            className="mb-1 text-sm break-words whitespace-pre-wrap text-white/60"
+            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+          >
+            {romanization}
+          </div>
+        ) : null}
         <div
           className={clsx(
             "leading-snug break-words whitespace-pre-wrap",
@@ -362,14 +374,6 @@ const Lyrics = ({
             line.text
           )}
         </div>
-        {romanization ? (
-          <div
-            className="mt-1 text-sm break-words whitespace-pre-wrap text-white/60"
-            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
-          >
-            {romanization}
-          </div>
-        ) : null}
         {translation ? (
           <div
             className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80"
@@ -478,20 +482,22 @@ const Lyrics = ({
                       </Switch>
                     )}
                     <div className="bg-divider my-1 h-px" />
-                    <Button
-                      variant="light"
-                      className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
-                      onPress={() => {
-                        setSettingsOpen(false);
-                        onControlsOpenChange?.(false);
-                        onOpenSearch();
-                      }}
-                    >
-                      <span className="text-sm">换一份歌词</span>
-                      <span className="text-foreground-500 text-xs font-normal whitespace-normal">
-                        从网易云、LrcLib、QQ、酷狗、AMLL 搜索并使用
-                      </span>
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="light"
+                        className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                        onPress={() => {
+                          setSettingsOpen(false);
+                          onControlsOpenChange?.(false);
+                          onOpenSearch();
+                        }}
+                      >
+                        <span className="text-sm">换一份歌词</span>
+                        <span className="text-foreground-500 text-xs font-normal whitespace-normal">
+                          从网易云、LrcLib、QQ、酷狗、AMLL 搜索并使用
+                        </span>
+                      </Button>
+                    )}
                     {canAlign &&
                       ALIGN_MENU.filter(
                         item =>
@@ -524,20 +530,17 @@ const Lyrics = ({
       </div>
       {chipSlot
         ? createPortal(
-            <AlignChip
-              onSearchLyrics={onOpenSearch}
-              onUploadLyrics={() => void handleAlignAction("upload")}
-              onOpenChange={onControlsOpenChange}
-            />,
+            <AlignChip onSearchLyrics={isAdmin ? onOpenSearch : undefined} onOpenChange={onControlsOpenChange} />,
             chipSlot,
           )
         : null}
-      <LyricsSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onLyricsAdopted={handleLyricsAdopted} />
+      {isAdmin && (
+        <LyricsSearchModal isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onLyricsAdopted={handleLyricsAdopted} />
+      )}
       <LyricsAlignModal
-        mode={editor?.mode ?? "upload"}
         isOpen={editor !== null}
         onOpenChange={open => !open && setEditor(null)}
-        initialLyrics={editor?.input ?? ""}
+        initialLyrics={editor ?? ""}
       />
       <ReportModal subject={report} onClose={() => setReport(null)} />
     </>

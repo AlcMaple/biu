@@ -50,7 +50,7 @@ afterEach(async () => {
 const text = () => host.querySelector("button")?.textContent ?? null;
 
 it("tells line-estimated lyrics apart from aligned ones", async () => {
-  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} onUploadLyrics={vi.fn()} />));
+  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} />));
   expect(text()).toContain("未对齐");
 
   await act(async () =>
@@ -69,7 +69,7 @@ it("tells line-estimated lyrics apart from aligned ones", async () => {
 });
 
 it("歌词平台自带的逐字时间不显示成「已对齐」", async () => {
-  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} onUploadLyrics={vi.fn()} />));
+  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} />));
   await act(async () =>
     useLyricsState
       .getState()
@@ -80,7 +80,7 @@ it("歌词平台自带的逐字时间不显示成「已对齐」", async () => {
 });
 
 it("shows a queued automatic job with its queue position", async () => {
-  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} onUploadLyrics={vi.fn()} />));
+  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} />));
   await act(async () =>
     useLyricsAlignSession.setState({
       target,
@@ -93,7 +93,7 @@ it("shows a queued automatic job with its queue position", async () => {
 });
 
 it("shows a failure as a short chip, with the full reason and next step in the panel", async () => {
-  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} onUploadLyrics={vi.fn()} />));
+  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} />));
   await act(async () =>
     useLyricsAlignSession.setState({
       target,
@@ -109,6 +109,6 @@ it("shows a failure as a short chip, with the full reason and next step in the p
 
 it("renders nothing without lyrics", async () => {
   useLyricsState.getState().setLyrics([]);
-  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} onUploadLyrics={vi.fn()} />));
+  await act(async () => root.render(<AlignChip onSearchLyrics={vi.fn()} />));
   expect(text()).toBeNull();
 });

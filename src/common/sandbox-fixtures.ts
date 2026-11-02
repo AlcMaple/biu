@@ -103,11 +103,21 @@ export function sandboxResponse(config: AxiosRequestConfig) {
 // 「Live Session」那首模拟「查无歌词」，用来看暂无歌词的状态
 const NO_LYRICS_KEYWORD = "Live Session";
 
+// 歌词请求只带歌曲 id，所以语种编在 id 里：1 中文，2 日语，3 英文
+const sandboxSongId = (keyword: string) => (keyword.includes("夏夜漫游") ? 2 : keyword.includes("Apologize") ? 3 : 1);
+
 export function sandboxNeteaseSearch(keyword: string) {
   if (!keyword || keyword.includes(NO_LYRICS_KEYWORD)) return { result: { songs: [] } };
   return {
     result: {
-      songs: [{ id: 1, name: keyword, artists: [{ name: "沙盒歌手" }], duration: SANDBOX_AUDIO_SECONDS * 1000 }],
+      songs: [
+        {
+          id: sandboxSongId(keyword),
+          name: keyword,
+          artists: [{ name: "沙盒歌手" }],
+          duration: SANDBOX_AUDIO_SECONDS * 1000,
+        },
+      ],
     },
   };
 }
@@ -115,9 +125,27 @@ export function sandboxNeteaseSearch(keyword: string) {
 const formatTime = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}.00`;
 
-export function sandboxNeteaseLyrics() {
-  const lines = Array.from({ length: SANDBOX_AUDIO_SECONDS / SANDBOX_LINE_SECONDS }, (_, i) => {
-    return `[${formatTime(i * SANDBOX_LINE_SECONDS)}]这是沙盒测试歌词第${i + 1}句`;
+// 按歌名给不同语种，用来看报错弹窗里「译文 / 罗马音」按语种出现：
+// 标题带「夏夜漫游」的是日语歌（原文 + 译文 + 罗马音），带「Apologize」的是英文歌（原文 + 译文），其余是中文歌（只有原文）
+const SANDBOX_JA = [
+  ["夏の夜をさまよう", "在夏夜里漫游", "natsu no yoru o samayou"],
+  ["遠い街の灯りを", "远方城市的灯火", "tooi machi no akari o"],
+  ["君と見たあの空", "和你看过的那片天", "kimi to mita ano sora"],
+] as const;
+const SANDBOX_EN = [
+  ["I'm sorry that I hurt you", "对不起我伤害了你"],
+  ["It's something I must live with everyday", "这是我必须每天背负的"],
+  ["And all the pain I put you through", "还有我带给你的所有痛苦"],
+] as const;
+
+export function sandboxNeteaseLyrics(id?: number) {
+  const groups = id === 2 ? SANDBOX_JA : id === 3 ? SANDBOX_EN : null;
+  const count = SANDBOX_AUDIO_SECONDS / SANDBOX_LINE_SECONDS;
+  const lines = Array.from({ length: count }, (_, i) => {
+    // 从 1 秒起：[00:00.00] 在服务端算「没有时间」，原文和译文、罗马音不会被合成同一句
+    const time = `[${formatTime(i * SANDBOX_LINE_SECONDS + 1)}]`;
+    if (!groups) return `${time}这是沙盒测试歌词第${i + 1}句`;
+    return groups[i % groups.length].map(text => `${time}${text}`).join("\n");
   });
   return { lrc: { lyric: lines.join("\n") } };
 }

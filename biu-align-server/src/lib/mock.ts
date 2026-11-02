@@ -8,6 +8,14 @@ import type { RunWorker } from "./worker.js";
 
 const PUNCT = /[\p{P}\p{S}\p{Z}_]/u;
 
+// 按文字猜语种，沙盒里才能看到日语歌的罗马音、英文歌的译文这些按语种出现的界面
+const guessLang = (text: string): WorkerOutput["lang"] => {
+  if (/[\u3040-\u30ff]/.test(text)) return "ja";
+  if (/[\uac00-\ud7af]/.test(text)) return "ko";
+  if (/[\u4e00-\u9fff]/.test(text)) return "zh";
+  return "en";
+};
+
 export const mockGetVideoPage: typeof getVideoPage = async (bvid, cid) => ({
   bvid,
   cid,
@@ -24,7 +32,7 @@ export function mockRunWorker(delayMs: number): RunWorker {
     // 有原时间就沿用（整体晚 0.3 s，模拟投稿偏移）；纯文本就每行 3 s 顺排
     const starts = lines.map((l, i) => (lines.some(x => x.t > 0) ? l.t + 0.3 : 5 + i * 3));
     const out: WorkerOutput = {
-      lang: "zh",
+      lang: guessLang(lines.map(l => l.text).join("")),
       lines: lines.map((l, i) => {
         const chars = [...l.text].filter(c => c.trim() && !PUNCT.test(c));
         const span = Math.max(0.5, Math.min((starts[i + 1] ?? starts[i] + 3) - starts[i] - 0.3, chars.length * 0.35));

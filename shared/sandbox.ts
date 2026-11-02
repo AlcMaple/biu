@@ -35,3 +35,10 @@ export function resolveSandboxIdentity(cookieHeader: string | undefined): Sandbo
 export const SANDBOX_AUDIO_PATH = "/__biu_sandbox/audio.wav";
 export const SANDBOX_AUDIO_SECONDS = 60;
 export const SANDBOX_LINE_SECONDS = 5;
+
+// 换身份整页刷新时的防闪烁幕布，用法见 src/common/sandbox-veil.ts；BOOT 是注入 HTML 头部的同步脚本
+export const SANDBOX_VEIL_FLAG = "biu-sandbox-veil";
+export const SANDBOX_VEIL_ID = "biu-sandbox-veil-el";
+export const SANDBOX_VEIL_STYLE =
+  "position:fixed;inset:0;z-index:2147483647;background:rgb(23,24,26);transition:opacity 200ms ease;pointer-events:none";
+export const SANDBOX_VEIL_BOOT = `try{if(sessionStorage.getItem("${SANDBOX_VEIL_FLAG}")){var v=document.createElement("div");v.id="${SANDBOX_VEIL_ID}";v.style.cssText="${SANDBOX_VEIL_STYLE}";document.documentElement.appendChild(v)}}catch(e){}`;

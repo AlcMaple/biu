@@ -76,7 +76,7 @@ export const DEMO_USER = {
 const titles = [
   "【无损音质】爱在记忆中找你",
   "陈淑桦-梦醒时分（无损发烧版）",
-  "百万级装备听《Apologize》",
+  "【英语】百万级装备听《Apologize》",
   "这个人坏掉了",
   "蔡鹤峰&邓智伟 // 续集（原声）",
   "近半年妄想症系列涨粉实录",
@@ -84,7 +84,7 @@ const titles = [
   "衍生竞技 / part1 song mix",
   "【fgo 终章 ed】时计塔的约定",
   "谢谢每一位按下播放键的人",
-  "【重音テト生誕】夏夜漫游",
+  "【日语】重音テト 夏夜漫游",
   "Bobby No Peace · Live Session",
 ];
 

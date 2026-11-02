@@ -20,6 +20,7 @@ async function bootstrap() {
   else document.documentElement.dataset.hoverEffects = "enabled";
 
   installIosKeyboardFocus();
+  if (process.env.BIU_SANDBOX === "true") void import("./common/sandbox-veil").then(m => m.resumeSandboxVeil());
 
   createRoot(document.getElementById("root") as Element, {
     onRecoverableError: captureRecoverableError

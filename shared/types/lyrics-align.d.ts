@@ -126,6 +126,17 @@ type AlignReportStatus = "pending" | "resolved" | "dismissed";
 /** original = 原文的时间轴；translation / romanization = 译文 / 罗马音的内容 */
 type AlignReportTrack = "original" | "translation" | "romanization";
 
+/** 「其他错误」的分类，和 biu-align-server 的 OTHER_TYPES 对齐 */
+type AlignReportOtherType =
+  | "timeline"
+  | "lyrics"
+  | "instrumental"
+  | "title"
+  | "audio"
+  | "quality"
+  | "sensitive"
+  | "other";
+
 interface AlignReport {
   id: string;
   bvid: string;
@@ -136,6 +147,11 @@ interface AlignReport {
   note: string;
   /** 老记录没有，按 original */
   track?: AlignReportTrack;
+  /** text = 歌词文本错误，other = 其他错误；老记录没有，按 text */
+  kind?: "text" | "other";
+  otherType?: AlignReportOtherType;
+  /** 用户改过的那一轨的完整歌词，一行一句；老记录没有 */
+  corrected?: string;
   /** 只报一段时的起止行（从 1 数，含两端） */
   fromLine?: number;
   toLine?: number;

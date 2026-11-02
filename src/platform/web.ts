@@ -274,7 +274,9 @@ const platform: Platform = {
   },
   getNeteaseSimilarSongs: async () => ({}),
   getNeteaseLyrics: async params => {
-    if (process.env.BIU_SANDBOX === "true") return (await import("@/common/sandbox-fixtures")).sandboxNeteaseLyrics();
+    if (process.env.BIU_SANDBOX === "true") {
+      return (await import("@/common/sandbox-fixtures")).sandboxNeteaseLyrics(params.id);
+    }
     return isOfflineDemo ? {} : getWebNeteaseLyrics(params);
   },
   neteaseAudioMatch: async params => (isOfflineDemo ? {} : matchWebNeteaseAudio(params)),

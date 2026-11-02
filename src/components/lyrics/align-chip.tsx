@@ -28,9 +28,8 @@ const SCREEN_SOURCE: Record<ScreenOrigin["kind"], { hint: string; text: string }
 };
 
 interface Props {
-  // 歌词和音频对不上时，换一份歌词（选好就会自动再对齐）
-  onSearchLyrics: () => void;
-  onUploadLyrics: () => void;
+  // 歌词和音频对不上时，管理员换一份歌词（选好就会自动再对齐）；普通用户没有这个入口，只能等管理员处理
+  onSearchLyrics?: () => void;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -54,7 +53,7 @@ const Dot = ({ color, hollow }: { color?: string; hollow?: boolean }) => (
 
 // 和桌面歌词工具条同一套玻璃样式（半透明底 + 细白边），放在播放器顶栏右端，不占歌词区。
 // 标签只放不超过 8 个字的状态词，细节收进点开的小面板：Web 版没有悬停，不能靠 Tooltip 才看得到原因
-const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
+const AlignChip = ({ onSearchLyrics, onOpenChange }: Props) => {
   const { lyrics } = useDisplayedLyrics();
   const { target, mode, phase } = useLyricsAlignSession();
   const currentKey = usePlayList(s => lyricsCacheKey(s.list.find(i => i.id === s.playId)));
@@ -108,14 +107,17 @@ const AlignChip = ({ onSearchLyrics, onUploadLyrics, onOpenChange }: Props) => {
         (mode === "manual" ? "这是管理员重跑，好了先试听再决定是否采用。" : ""),
     };
   } else if (active && phase.kind === "failed") {
-    // 歌词配错时原样重试只会再配错一次，所以只给「换一份歌词」；被下线的那份重跑也一样，只能换一份上传
+    // 歌词配错时原样重试只会再配错一次，所以只给管理员「换一份歌词」；被下线的那份重跑也一样。
+    // 普通用户在这几种情况下没有可做的操作，等管理员更新即可
+    const mustReplace =
+      phase.code === "LYRICS_MISMATCH" || phase.code === "AUDIO_TOO_SHORT" || phase.code === "ALIGNMENT_WITHDRAWN";
     const next = phase.jobId
       ? act("继续查询", session.resume, true)
-      : phase.code === "LYRICS_MISMATCH" || phase.code === "AUDIO_TOO_SHORT"
-        ? act("换一份歌词", onSearchLyrics, true)
-        : phase.code === "ALIGNMENT_WITHDRAWN"
-          ? act("上传我的歌词", onUploadLyrics, true)
-          : act("重试", session.resume, true);
+      : mustReplace
+        ? onSearchLyrics
+          ? act("换一份歌词", onSearchLyrics, true)
+          : undefined
+        : act("重试", session.resume, true);
     view = {
       dot: <RiAlertLine size={14} style={{ color: DOT_AMBER }} />,
       label: "对齐失败",

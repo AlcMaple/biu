@@ -10,8 +10,6 @@ import {
   ModalHeader,
   Radio,
   RadioGroup,
-  Select,
-  SelectItem,
   Textarea,
   addToast,
 } from "@heroui/react";
@@ -19,10 +17,19 @@ import {
 import { AlignApiError, reportAlignment } from "@/service/lyrics-align";
 import { currentAlignTarget } from "@/store/lyrics-align-session";
 
-import { TRACK_LABEL } from "./report-scope";
+import {
+  OTHER_NOTE_MAX,
+  OTHER_NOTE_MIN,
+  OTHER_TYPE_LABEL,
+  TRACK_LABEL,
+  isCorrectionChanged,
+  reportTracks,
+  trackLines,
+} from "./report-scope";
 
 export interface ReportSubject {
   lyricsHash: string;
+  quality?: Pick<LyricsAlignment["quality"], "lang">;
   lines: Pick<AlignedLyricLine, "text" | "translation" | "romanization">[];
 }
 
@@ -35,13 +42,12 @@ interface Props {
 const ReportModal = ({ subject, onClose }: Props) => {
   const lyricsHash = subject?.lyricsHash ?? null;
   const lines = subject?.lines ?? [];
-  const tracks = (["original", "translation", "romanization"] as const).filter(
-    track => track === "original" || lines.some(l => l[track]),
-  );
+  const tracks = reportTracks(subject?.quality?.lang, lines);
+  const [kind, setKind] = useState<"text" | "other">("text");
+  const [otherType, setOtherType] = useState<AlignReportOtherType | null>(null);
   const [track, setTrack] = useState<AlignReportTrack>("original");
-  // 起止行都留空 = 整首；只选了起始行 = 只报这一行
-  const [from, setFrom] = useState<number | null>(null);
-  const [to, setTo] = useState<number | null>(null);
+  // 把这一轨现在的歌词放进输入框让用户直接改，发给管理员的是改好的整份，不是一句「哪里不对」
+  const [edited, setEdited] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   // 失败写在弹窗里而不是 toast，理由同上传弹窗：toast 会盖住「发送」按钮
@@ -50,18 +56,28 @@ const ReportModal = ({ subject, onClose }: Props) => {
   useEffect(() => {
     if (!lyricsHash) return;
     setNote("");
+    setKind("text");
+    setOtherType(null);
     setTrack("original");
-    setFrom(null);
-    setTo(null);
     setError(null);
   }, [lyricsHash]);
+
+  const original = trackLines(lines, track);
+  const originalKey = original.join("\n");
+  useEffect(() => {
+    setEdited(originalKey);
+    setError(null);
+  }, [lyricsHash, track, originalKey]);
 
   const send = async () => {
     const target = currentAlignTarget();
     if (!target || !lyricsHash) return;
-    const last = to ?? from;
-    if (from !== null && last !== null && last < from) {
-      setError("结束行不能在起始行前面");
+    if (kind === "other" && (!otherType || note.trim().length < OTHER_NOTE_MIN)) {
+      setError(otherType ? `请用 ${OTHER_NOTE_MIN}-${OTHER_NOTE_MAX} 个字描述具体的错误` : "请选择错误类型");
+      return;
+    }
+    if (kind === "text" && !isCorrectionChanged(original, edited)) {
+      setError("歌词还没有改动，改完再发送");
       return;
     }
     setBusy(true);
@@ -71,9 +87,9 @@ const ReportModal = ({ subject, onClose }: Props) => {
         bvid: target.bvid,
         cid: target.cid,
         lyricsHash,
-        note: note.trim() || undefined,
-        track,
-        ...(from !== null ? { fromLine: from, toLine: last ?? from } : {}),
+        note: kind === "other" ? note.trim() : undefined,
+        kind,
+        ...(kind === "other" ? { otherType: otherType! } : { track, corrected: edited }),
       });
       addToast({
         title: "已告诉管理员，谢谢",
@@ -93,57 +109,80 @@ const ReportModal = ({ subject, onClose }: Props) => {
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           歌词报错
-          <span className="text-foreground/60 text-sm font-normal">管理员会带着译文和罗马音一起看你选的那一段</span>
+          <span className="text-foreground/60 text-sm font-normal">管理员会处理，结果在侧边栏「我的提交」里</span>
         </ModalHeader>
         <ModalBody>
-          {tracks.length > 1 ? (
-            <RadioGroup
-              orientation="horizontal"
-              size="sm"
-              label="哪里不对"
-              value={track}
-              onValueChange={value => setTrack(value as AlignReportTrack)}
-            >
-              {tracks.map(item => (
-                <Radio key={item} value={item}>
-                  {TRACK_LABEL[item]}
-                </Radio>
-              ))}
-            </RadioGroup>
-          ) : null}
-          <div className="flex gap-2">
-            {(
-              [
-                ["起始行（不选 = 整首）", from, setFrom],
-                ["结束行", to, setTo],
-              ] as const
-            ).map(([label, value, set]) => (
-              <Select
-                key={label}
-                size="sm"
-                label={label}
-                selectedKeys={value === null ? [] : [String(value)]}
-                onSelectionChange={keys => {
-                  const key = [...keys][0];
-                  set(key === undefined ? null : Number(key));
+          <RadioGroup
+            orientation="horizontal"
+            size="sm"
+            label="错误类型"
+            value={kind}
+            onValueChange={value => {
+              setKind(value as "text" | "other");
+              setError(null);
+            }}
+          >
+            <Radio value="text">歌词文本错误</Radio>
+            <Radio value="other">其他错误</Radio>
+          </RadioGroup>
+          {kind === "text" ? (
+            <>
+              {tracks.length > 1 ? (
+                <RadioGroup
+                  orientation="horizontal"
+                  size="sm"
+                  label="要改哪里"
+                  value={track}
+                  onValueChange={value => setTrack(value as AlignReportTrack)}
+                >
+                  {tracks.map(item => (
+                    <Radio key={item} value={item}>
+                      {TRACK_LABEL[item]}
+                    </Radio>
+                  ))}
+                </RadioGroup>
+              ) : null}
+              {tracks.length === 1 ? <div className="text-small">{TRACK_LABEL[track]}</div> : null}
+              <Textarea
+                value={edited}
+                onValueChange={value => {
+                  setEdited(value);
+                  setError(null);
                 }}
-              >
-                {lines.map((line, index) => (
-                  <SelectItem key={String(index + 1)} textValue={`${index + 1}. ${line.text}`}>
-                    {`${index + 1}. ${line.text}`}
-                  </SelectItem>
+                minRows={8}
+                maxRows={14}
+                maxLength={20000}
+                description="直接在上面改，一行一句，改好后发送"
+                aria-label={`${TRACK_LABEL[track]}（可修改）`}
+              />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(OTHER_TYPE_LABEL) as AlignReportOtherType[]).map(item => (
+                  <Button
+                    key={item}
+                    size="sm"
+                    radius="full"
+                    variant={otherType === item ? "solid" : "bordered"}
+                    color={otherType === item ? "primary" : "default"}
+                    aria-pressed={otherType === item}
+                    onPress={() => setOtherType(item)}
+                  >
+                    {OTHER_TYPE_LABEL[item]}
+                  </Button>
                 ))}
-              </Select>
-            ))}
-          </div>
-          <Textarea
-            value={note}
-            onValueChange={setNote}
-            minRows={3}
-            maxLength={200}
-            placeholder="具体情况（可选），比如「第二段整体慢半拍」「译文错位了一行」"
-            aria-label="哪里不对"
-          />
+              </div>
+              <Textarea
+                value={note}
+                onValueChange={setNote}
+                minRows={4}
+                maxLength={OTHER_NOTE_MAX}
+                placeholder={`请描述具体的错误（${OTHER_NOTE_MIN}-${OTHER_NOTE_MAX} 字）`}
+                aria-label="错误描述"
+              />
+            </>
+          )}
           {error ? <Alert color="danger" title={error} /> : null}
         </ModalBody>
         <ModalFooter>

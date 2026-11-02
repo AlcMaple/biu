@@ -53,9 +53,6 @@ export const createScreenJob = (body: {
 
 export const getScreenJob = (id: string) => call<ScreenJobView>({ method: "GET", path: `/lyrics/screen-jobs/${id}` });
 
-export const submitLyrics = (body: { bvid: string; cid: string; lyrics: string; title: string; note?: string }) =>
-  call<AlignSubmissionBrief>({ method: "POST", path: "/lyrics/submissions", body });
-
 export const getMySubmissions = () =>
   call<{ items: AlignSubmissionBrief[] }>({ method: "GET", path: "/lyrics/submissions/mine" });
 
@@ -77,8 +74,9 @@ export const reportAlignment = (body: {
   lyricsHash: string;
   note?: string;
   track?: AlignReportTrack;
-  fromLine?: number;
-  toLine?: number;
+  kind?: "text" | "other";
+  otherType?: AlignReportOtherType;
+  corrected?: string;
 }) => call<AlignReport>({ method: "POST", path: "/lyrics/reports", body });
 
 export const getMyReports = () => call<{ items: AlignReport[] }>({ method: "GET", path: "/lyrics/reports/mine" });

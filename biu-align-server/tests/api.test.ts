@@ -156,7 +156,10 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
 
   it("上传：服务端代为对齐 → 打回带原因 → 重新上传 → 通过后替换当前版本", async () => {
     const lyrics = "你好呀\n世界";
-    const sub = await call("POST", "/lyrics/submissions", "1", {
+    expect((await call("POST", "/lyrics/submissions", "1", { bvid: BV, cid: 1, lyrics })).json.error.code).toBe(
+      "FORBIDDEN",
+    );
+    const sub = await call("POST", "/lyrics/submissions", "900", {
       bvid: BV,
       cid: 1,
       lyrics,
@@ -174,10 +177,10 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
       (await call("POST", `/admin/submissions/${sub.json.id}/reject`, "900", { reason: " " })).json.error.code,
     ).toBe("REJECT_REASON_REQUIRED");
     await call("POST", `/admin/submissions/${sub.json.id}/reject`, "900", { reason: "第二句时间不对" });
-    const mine = await call("GET", "/lyrics/submissions/mine", "1");
+    const mine = await call("GET", "/lyrics/submissions/mine", "900");
     expect(mine.json.items[0]).toMatchObject({ status: "rejected", reason: "第二句时间不对" });
 
-    const again = await call("POST", "/lyrics/submissions", "1", { bvid: BV, cid: 1, lyrics });
+    const again = await call("POST", "/lyrics/submissions", "900", { bvid: BV, cid: 1, lyrics });
     let detail = await call("GET", `/admin/submissions/${again.json.id}`, "900");
     for (let i = 0; i < 50 && !detail.json.alignment; i++) {
       await new Promise(r => setTimeout(r, 10));
@@ -191,9 +194,35 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
     );
     const pub = await call("GET", `/lyrics/${BV}/1`);
     expect(pub.json).toMatchObject({ source: "upload", alignment: { lyricsHash: detail.json.alignment.lyricsHash } });
-    expect((await call("POST", "/lyrics/submissions", "2", { bvid: BV, cid: 1, lyrics })).json.error.code).toBe(
+    expect((await call("POST", "/lyrics/submissions", "900", { bvid: BV, cid: 1, lyrics })).json.error.code).toBe(
       "ALREADY_APPROVED",
     );
+  });
+
+  it("其他错误：必须选类型并写 5-50 字描述，且和同一人的文本报错各算一条", async () => {
+    const cid = 9;
+    const job = await call("POST", "/align/jobs", "1", { bvid: BV, cid, lyrics: LYRICS });
+    const hash = (await waitDone(job.json.id, "1")).json.alignment.lyricsHash;
+    const other = { bvid: BV, cid, lyricsHash: hash, kind: "other" };
+
+    const noType = await call("POST", "/lyrics/reports", "3", { ...other, note: "歌手名写错了" });
+    expect(noType.json.error.code).toBe("BAD_REQUEST");
+    const short = await call("POST", "/lyrics/reports", "3", { ...other, otherType: "title", note: "错了" });
+    expect(short.json.error.code).toBe("BAD_REQUEST");
+
+    const ok = await call("POST", "/lyrics/reports", "3", { ...other, otherType: "title", note: "歌手名写错了" });
+    expect(ok.json).toMatchObject({ kind: "other", otherType: "title", status: "pending" });
+    const text = await call("POST", "/lyrics/reports", "3", {
+      bvid: BV,
+      cid,
+      lyricsHash: hash,
+      note: "慢半拍",
+      corrected: "你好呀\n世界啊",
+    });
+    expect(text.json.id).not.toBe(ok.json.id);
+    // 测试间共用数据目录，别把待处理的报错留给后面按数量断言的用例
+    for (const id of [ok.json.id, text.json.id])
+      await call("POST", `/admin/reports/${id}/dismiss`, "900", { reason: "测试" });
   });
 
   it("报错 → 确认并下线：下一位听众不会把这份自动对齐回来；管理员手动对齐后可重新发布", async () => {
@@ -202,10 +231,22 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
     const done = await waitDone(job.json.id, "1");
     const hash = done.json.alignment.lyricsHash;
 
-    const rep = await call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, note: "整体慢半拍" });
+    const rep = await call("POST", "/lyrics/reports", "3", {
+      bvid: BV,
+      cid,
+      lyricsHash: hash,
+      note: "整体慢半拍",
+      corrected: "你好呀\n世界",
+    });
     expect(rep.json).toMatchObject({ status: "pending", wasPublished: true, title: "测试投稿" });
     // 同一人重复报错只更新说明
-    const dup = await call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, note: "慢一拍" });
+    const dup = await call("POST", "/lyrics/reports", "3", {
+      bvid: BV,
+      cid,
+      lyricsHash: hash,
+      note: "慢一拍",
+      corrected: "你好呀\n世界啊",
+    });
     expect(dup.json.id).toBe(rep.json.id);
     expect((await call("GET", "/admin/reports", "900")).json.items).toHaveLength(1);
     expect((await call("GET", `/admin/reports/${rep.json.id}`, "900")).json.alignment.lyricsHash).toBe(hash);
@@ -241,6 +282,7 @@ describe("自动对齐 → 所有人可用；上传 / 报错 → 管理员处理
       bvid: BV,
       cid: 3,
       lyricsHash: done.json.alignment.lyricsHash,
+      corrected: "你好呀\n世界",
     });
     expect((await call("POST", `/admin/reports/${rep.json.id}/dismiss`, "900", {})).json.error.code).toBe(
       "REJECT_REASON_REQUIRED",
@@ -383,26 +425,37 @@ describe("识别结果：登录用户写，所有人读", () => {
     });
   });
 
-  it("报错可以选译文 / 罗马音，也可以只报一段；没有对应的轨或起止行不对都拒绝", async () => {
+  it("文本错误要带改好的歌词：可以改原文 / 译文 / 罗马音；没改、没有对应的轨都拒绝", async () => {
     const cid = 91;
     const lyrics =
       "[00:01.00]雨に濡れた小道\n[00:01.00]Ame ni nureta\n[00:01.00]雨后的小路\n[00:05.00]足跡攫う時の波\n[00:05.00]足迹带走时间";
     const job = await call("POST", "/align/jobs", "1", { bvid: BV, cid, lyrics });
-    const hash = (await waitDone(job.json.id, "1")).json.alignment.lyricsHash;
+    const done = await waitDone(job.json.id, "1");
+    const hash = done.json.alignment.lyricsHash;
+    const lines = done.json.alignment.lines as { text: string; translation?: string }[];
     const report = (body: object) => call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, ...body });
 
-    expect((await report({ track: "translation", fromLine: 1, toLine: 2 })).json).toMatchObject({
+    const fixedTranslation = lines.map((l, i) => (i === 0 ? "雨后的小径" : (l.translation ?? ""))).join("\n");
+    expect((await report({ track: "translation", corrected: fixedTranslation })).json).toMatchObject({
       track: "translation",
-      fromLine: 1,
-      toLine: 2,
+      corrected: fixedTranslation,
     });
-    expect((await report({ track: "original" })).json.track).toBe("original");
+    expect((await report({ track: "original", corrected: "雨に濡れた小路\n足跡攫う時の波" })).json.track).toBe(
+      "original",
+    );
     // 同一人对同一轨重复报错只更新；不同轨各是一条
     expect((await call("GET", "/admin/reports", "900")).json.items).toHaveLength(2);
-    expect((await report({ track: "translation", fromLine: 2, toLine: 2 })).json.fromLine).toBe(2);
+    const again = await report({ track: "translation", corrected: "雨后的小径\n足迹带走了时间" });
+    expect(again.json.corrected).toBe("雨后的小径\n足迹带走了时间");
     expect((await call("GET", "/admin/reports", "900")).json.items).toHaveLength(2);
 
-    for (const body of [{ track: "lyrics" }, { fromLine: 1 }, { fromLine: 2, toLine: 1 }, { fromLine: 1, toLine: 9 }]) {
+    const same = lines.map(l => l.text).join("\n");
+    for (const body of [
+      { track: "lyrics", corrected: "x" },
+      { track: "original" },
+      { track: "original", corrected: "  \n" },
+      { track: "original", corrected: `${same}\n\n` },
+    ]) {
       expect((await report(body)).json.error.code).toBe("BAD_REQUEST");
     }
     const plain = await call("POST", "/align/jobs", "1", { bvid: BV, cid: 92, lyrics: LYRICS });
@@ -412,6 +465,7 @@ describe("识别结果：登录用户写，所有人读", () => {
       cid: 92,
       lyricsHash: plainHash,
       track: "romanization",
+      corrected: "x",
     });
     expect(none.json.error.code).toBe("BAD_REQUEST");
   });
@@ -426,7 +480,13 @@ describe("管理员重跑对照：草稿不影响在用版本，发布后关掉�
     const live = (await call("GET", `/lyrics/${BV}/${cid}`)).json.alignment;
     expect(live.lyricsHash).toBe(hash);
 
-    const rep = await call("POST", "/lyrics/reports", "3", { bvid: BV, cid, lyricsHash: hash, note: "慢" });
+    const rep = await call("POST", "/lyrics/reports", "3", {
+      bvid: BV,
+      cid,
+      lyricsHash: hash,
+      note: "慢",
+      corrected: "你好\n世界啊",
+    });
     const before = await call("GET", `/admin/reports/${rep.json.id}`, "900");
     expect(before.json).toMatchObject({ draft: null, canRealign: true });
 

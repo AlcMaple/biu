@@ -5,7 +5,6 @@ import type { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import type { DraftStore, InputStore } from "./lib/drafts.js";
 import type { AlignQueue } from "./lib/queue.js";
 import type { RecognizedStore } from "./lib/recognized.js";
-import type { Report, ReportStore } from "./lib/reports.js";
 import type { Alignment } from "./lib/result.js";
 import type { ScreenQueue } from "./lib/screen-queue.js";
 import type { SubtitleLine } from "./lib/screen-worker.js";
@@ -16,6 +15,7 @@ import { AlignError } from "./lib/errors.js";
 import { lyricsHash, MAX_CHARS, parseLyrics, parseTarget } from "./lib/lyrics.js";
 import { cacheKey } from "./lib/queue.js";
 import { RECOGNIZED_FROM, type RecognizedFrom, type RecognizedInput } from "./lib/recognized.js";
+import { OTHER_TYPES, type OtherType, type Report, type ReportStore } from "./lib/reports.js";
 
 export interface RouteDeps {
   queue: AlignQueue;
@@ -46,8 +46,27 @@ const parseHash = (value: unknown) => {
   return value;
 };
 
+const MAX_CORRECTED_CHARS = 20_000;
+
+// 比较「有没有改」时忽略行尾空白和结尾的空行，免得用户多敲了个换行就算改过
+const normalizeLines = (value: string) => {
+  const lines = value.split(/\r?\n/).map(l => l.trimEnd());
+  while (lines.length && !lines[lines.length - 1]) lines.pop();
+  return lines.join("\n");
+};
+
+const trackText = (alignment: Alignment, track: "original" | "translation" | "romanization") =>
+  alignment.lines.map(l => (track === "original" ? l.text : (l[track] ?? ""))).join("\n");
+
 const parseReportScope = (body: unknown, alignment: Alignment) => {
-  const { track = "original", fromLine, toLine } = (body ?? {}) as Record<string, unknown>;
+  const { track = "original", kind = "text", otherType, corrected } = (body ?? {}) as Record<string, unknown>;
+  if (kind === "other") {
+    if (!(OTHER_TYPES as readonly string[]).includes(otherType as string)) {
+      throw new AlignError("BAD_REQUEST", "错误类型不对");
+    }
+    return { kind, otherType: otherType as OtherType, track: "original" } as const;
+  }
+  if (kind !== "text") throw new AlignError("BAD_REQUEST", "kind 不对");
   if (track !== "original" && track !== "translation" && track !== "romanization") {
     throw new AlignError("BAD_REQUEST", "track 不对");
   }
@@ -55,18 +74,16 @@ const parseReportScope = (body: unknown, alignment: Alignment) => {
   if (track !== "original" && !alignment.lines.some(l => l[track])) {
     throw new AlignError("BAD_REQUEST", track === "translation" ? "这份歌词没有译文可报" : "这份歌词没有罗马音可报");
   }
-  if (fromLine === undefined && toLine === undefined) return { track } as const;
-  const total = alignment.lines.length;
-  if (
-    !Number.isInteger(fromLine) ||
-    !Number.isInteger(toLine) ||
-    (fromLine as number) < 1 ||
-    (toLine as number) > total ||
-    (fromLine as number) > (toLine as number)
-  ) {
-    throw new AlignError("BAD_REQUEST", "起止行不对");
+  // 文本错误必须带上用户改好的那一轨歌词：只说「不对」管理员没法处理，改对的内容才是有用的信息
+  if (typeof corrected !== "string" || corrected.length > MAX_CORRECTED_CHARS) {
+    throw new AlignError("BAD_REQUEST", "请把改好的歌词一起发来");
   }
-  return { track, fromLine: fromLine as number, toLine: toLine as number } as const;
+  const fixed = normalizeLines(corrected);
+  if (!fixed) throw new AlignError("BAD_REQUEST", "改好的歌词不能是空的");
+  if (fixed === normalizeLines(trackText(alignment, track))) {
+    throw new AlignError("BAD_REQUEST", "歌词没有改动，改完再发送");
+  }
+  return { kind, track, corrected: fixed } as const;
 };
 
 const MAX_SUBTITLE_LINES = 1000;
@@ -161,10 +178,11 @@ export function createRouter(deps: RouteDeps): Router {
     wrap(async (req, res) => res.json(queue.get(String(req.params.id)))),
   );
 
-  // 用户上传自己的歌词（带不带时间都行）：服务端先排队对齐，审核员看到的是对齐后的效果
+  // 歌词全员共用一份，换歌词只有管理员能做；普通用户走报错。管理员上传同样先排队对齐、再走审核
   router.post(
     "/lyrics/submissions",
     requireAuth,
+    requireAdmin,
     limiter,
     wrap(async (req, res) => {
       const { bvid, cid } = parseTarget(req.body?.bvid, req.body?.cid);
@@ -205,15 +223,20 @@ export function createRouter(deps: RouteDeps): Router {
       const alignment = await cache.get(cacheKey({ bvid, cid, lyricsHash: hash }));
       if (!alignment) throw new AlignError("ALIGNMENT_NOT_READY");
       const cur = await submissions.getPublished(bvid, cid);
+      const scope = parseReportScope(req.body, alignment);
+      const note = text(req.body?.note, scope.kind === "other" ? 50 : 200);
+      // 其他错误没有行号可指，只能靠描述让管理员知道哪里不对
+      if (scope.kind === "other" && note.length < 5)
+        throw new AlignError("BAD_REQUEST", "请用 5-50 个字描述具体的错误");
       const report = await reports.create({
         bvid,
         cid,
         mid: req.mid!,
         lyricsHash: hash,
         title: alignment.video.title,
-        note: text(req.body?.note, 200),
+        note,
         wasPublished: cur?.lyricsHash === hash,
-        ...parseReportScope(req.body, alignment),
+        ...scope,
       });
       res.status(201).json(report);
     }),

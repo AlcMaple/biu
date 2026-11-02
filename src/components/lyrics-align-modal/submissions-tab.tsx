@@ -100,12 +100,7 @@ const SubmissionsTab = () => {
           <Spinner size="lg" label="加载中..." />
         </div>
       ) : !shown.length ? (
-        <Empty
-          title={
-            filter === "all" ? "还没有上传过歌词或报过错，可以在歌词区右下角的逐字歌词菜单里操作" : "这一类下面没有记录"
-          }
-          className="h-[40vh]"
-        />
+        <Empty title={filter === "all" ? "还没有报过错" : "这一类下面没有记录"} className="h-[40vh]" />
       ) : (
         <div className="flex flex-col gap-0.5 pb-4">
           {shown.map(row => (

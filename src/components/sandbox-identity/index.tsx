@@ -4,6 +4,7 @@ import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownSection, Dropdown
 import { RiFlaskLine } from "@remixicon/react";
 
 import { currentSandboxIdentity } from "@/common/sandbox-fixtures";
+import { raiseSandboxVeil } from "@/common/sandbox-veil";
 import { clearSandboxBrowserData } from "@/platform/web";
 import { SANDBOX_IDENTITIES, SANDBOX_IDENTITY_COOKIE, type SandboxIdentityId } from "@shared/sandbox";
 
@@ -20,6 +21,7 @@ const SandboxIdentitySwitcher = () => {
     } else {
       document.cookie = `${SANDBOX_IDENTITY_COOKIE}=${key as SandboxIdentityId}; path=/; max-age=31536000; SameSite=Lax`;
     }
+    raiseSandboxVeil();
     window.location.reload();
   };
 

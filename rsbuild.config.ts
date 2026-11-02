@@ -8,6 +8,7 @@ import { createBilibiliWebMiddleware } from "./plugins/bilibili-web-proxy";
 import postcssScopeDataHover from "./plugins/postcss-scope-data-hover";
 import { pluginElectron } from "./plugins/rsbuild-plugin-electron";
 import { createSandboxMiddleware } from "./plugins/sandbox-dev";
+import { SANDBOX_VEIL_BOOT } from "./shared/sandbox";
 import { UMAMI_HOST, UMAMI_WEBSITE_ID } from "./shared/umami";
 
 const isSandboxTarget = process.env.BIU_TARGET === "sandbox";
@@ -101,7 +102,14 @@ export default defineConfig(({ command }) => {
     html: {
       template: "./src/index.html",
       favicon: "./src/assets/favicon.svg",
-      ...(umamiTrackingTag ? { tags: [umamiTrackingTag] } : {}),
+      ...(umamiTrackingTag || isSandboxTarget
+        ? {
+            tags: [
+              ...(umamiTrackingTag ? [umamiTrackingTag] : []),
+              ...(isSandboxTarget ? [{ tag: "script", children: SANDBOX_VEIL_BOOT, head: true, append: false }] : []),
+            ],
+          }
+        : {}),
     },
     plugins: [
       pluginReact(),
