@@ -86,8 +86,54 @@
   - 部分音频清晰度与解析可能需要登录或大会员权限。
   - 请遵循 Bilibili 使用条款，合理合规使用。
 
+## 🛠️ 本地开发与测试
+
+### 环境要求
+- Node.js 22.x
+- pnpm 10.x
+
+### 安装依赖
+```bash
+pnpm install
+```
+安装时会自动下载 Electron；下载慢时可配置镜像后重试
+
+### 本地运行
+| 目标 | 命令 | 说明 |
+| --- | --- | --- |
+| 桌面端（Electron） | `pnpm dev` | 同时启动主窗口、mini 播放器、桌面歌词，支持热更新 |
+| Web 版开发 | `pnpm dev:web` | 浏览器访问终端输出的本地地址 |
+
+### 本地部署 Web 版
+```bash
+pnpm build:web
+pnpm start:web
+```
+- 默认监听 `127.0.0.1:5678`，浏览器打开 `http://127.0.0.1:5678` 即可
+- 端口与地址通过 `BIU_WEB_PORT`、`BIU_WEB_HOST` 调整
+- 对外暴露（监听非回环地址）或 `NODE_ENV=production` 时，必须设置 `BIU_WEB_PUBLIC_ORIGIN`（如 `https://example.com`），否则服务拒绝启动
+- Web 版必须由该服务提供，不能当静态站点部署：B 站接口有 CORS 与 Referer 限制，需经服务端代理
+
+### 打包
+```bash
+pnpm build                 # 桌面端
+```
+
+### 测试
+```bash
+pnpm test                  # Vitest 监听模式
+pnpm exec vitest run       # 单次运行，适合提交前和 CI
+pnpm exec vitest run tests/focus.test.ts   # 只跑指定文件
+```
+- 测试放在 `tests/` 目录，使用 Vitest + jsdom，已开启 globals
+- 提交前建议再跑一次 `pnpm exec eslint .` 和 `pnpm exec tsc --noEmit`
+- 播放、跨窗口同步等行为类改动，需要用 `pnpm dev` 实际操作确认
+
+### 可选服务端
+云同步与歌词对齐服务各自独立运行，部署步骤见 [`biu-sync-server`](./biu-sync-server/README.md) 与 [`biu-align-server`](./biu-align-server/README.md)
+
 ## 📄 许可证
-本项目以 PolyForm Noncommercial License 1.0.0（非商业许可）发布，禁止任何商业用途。详情参见 [`LICENSE`](LICENSE)（SPDX：`PolyForm-Noncommercial-1.0.0`）。
+本项目以 PolyForm Noncommercial License 1.0.0（非商业许可）发布，禁止任何商业用途。详情参见 [`LICENSE`](LICENSE)（SPDX：`PolyForm-Noncommercial-1.0.0`）
 
 ---
 
