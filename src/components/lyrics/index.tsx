@@ -43,6 +43,10 @@ const activeTextBase = "text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]";
 
 const DEFAULT_FONT_SIZE = 20;
 
+// 高亮只做视觉放大：所有行都按「宽度 / 倍率」排版，高亮行 scale 后刚好撑满整宽。
+// 若改字号 / 字重放大，高亮行会比平时多折一行，把整列歌词顶得上下跳动。
+const ACTIVE_SCALE = 1.35;
+
 // 歌词是全员共享的同一份：识别、对齐都在后台自动完成，普通用户不能自己换歌词，只能报错，由管理员统一更新。
 // 换歌词、还原、手动重跑是管理员的维护手段，用来判断是算法错了还是歌词 / 音频的问题
 type AlignAction = "report" | "restore" | "align" | "edit";
@@ -359,7 +363,8 @@ const Lyrics = ({
     const isActive = index === activeIndex;
     const translation = translationMap.get(line.time);
     const romanization = romanizationMap.get(line.time);
-    const activeWeight = stableTypography ? "font-medium" : isActive ? "font-extrabold" : "font-normal";
+    const activeWeight = stableTypography ? "font-medium" : "font-semibold";
+    const scaled = isActive && !stableTypography;
     const activeShadow = isActive ? activeTextBase : "";
 
     return (
@@ -371,51 +376,61 @@ const Lyrics = ({
           lineRefs.current[index] = node;
         }}
         className={clsx(
-          "w-full transform-none py-2 duration-300 ease-out",
+          "w-full py-3 duration-300 ease-out",
           stableTypography ? "transition-opacity" : "transition-all",
           stableTypography && "fancy-lyric-line",
           centered ? "text-center" : "text-left",
           stableTypography || isActive ? "opacity-100" : "opacity-60",
         )}
         style={{
-          fontSize: isActive && !stableTypography ? fontSize * 1.5 : fontSize,
-          transform: "none",
+          fontSize,
           overflowWrap: stableTypography ? "anywhere" : undefined,
         }}
       >
-        {romanization ? (
-          <div
-            className="mb-1 text-sm break-words whitespace-pre-wrap text-white/60"
-            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
-          >
-            {romanization}
-          </div>
-        ) : null}
         <div
           className={clsx(
-            "leading-snug break-words whitespace-pre-wrap",
-            activeWeight,
-            !stableTypography && activeShadow,
+            "transition-transform duration-300 ease-out",
+            centered ? "mx-auto origin-center" : "origin-left",
           )}
           style={{
-            color: stableTypography ? undefined : color || undefined,
-            overflowWrap: stableTypography ? "anywhere" : undefined,
+            width: stableTypography ? undefined : `${100 / ACTIVE_SCALE}%`,
+            transform: scaled ? `scale(${ACTIVE_SCALE})` : undefined,
           }}
         >
-          {isActive && activeTiming?.words.length ? (
-            <KaraokeText timing={activeTiming} subscribe={subscribeClock} baseClassName="opacity-45" />
-          ) : (
-            line.text
-          )}
-        </div>
-        {translation ? (
+          {romanization ? (
+            <div
+              className="mb-1 text-sm break-words whitespace-pre-wrap text-white/60"
+              style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+            >
+              {romanization}
+            </div>
+          ) : null}
           <div
-            className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80"
-            style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+            className={clsx(
+              "leading-snug break-words whitespace-pre-wrap",
+              activeWeight,
+              !stableTypography && activeShadow,
+            )}
+            style={{
+              color: stableTypography ? undefined : color || undefined,
+              overflowWrap: stableTypography ? "anywhere" : undefined,
+            }}
           >
-            {translation}
+            {isActive && activeTiming?.words.length ? (
+              <KaraokeText timing={activeTiming} subscribe={subscribeClock} baseClassName="opacity-45" />
+            ) : (
+              line.text
+            )}
           </div>
-        ) : null}
+          {translation ? (
+            <div
+              className="mt-1 text-sm break-words whitespace-pre-wrap text-white/80"
+              style={{ overflowWrap: stableTypography ? "anywhere" : undefined }}
+            >
+              {translation}
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   };

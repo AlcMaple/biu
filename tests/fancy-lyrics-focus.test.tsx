@@ -70,8 +70,12 @@ it("moves the sole lyric focus without changing font size or weight", async () =
 it("preserves ordinary player color and enlarged active lyrics", async () => {
   await act(async () => root.render(<Lyrics color="#ffffff" />));
   const lines = [...host.querySelectorAll<HTMLElement>("[data-lyric-state]")];
-  expect(lines[0].style.fontSize).toBe("30px");
-  expect(lines[1].style.fontSize).toBe("20px");
-  expect((lines[0].firstElementChild as HTMLElement).style.color).toBe("rgb(255, 255, 255)");
+  // 高亮只做 scale：字号与排版宽度对所有行一致，折行才不会随高亮变化
+  expect(lines.map(line => line.style.fontSize)).toEqual(["20px", "20px", "20px"]);
+  const boxes = lines.map(line => line.firstElementChild as HTMLElement);
+  expect(boxes[0].style.transform).toContain("scale(");
+  expect(boxes[1].style.transform).toBe("");
+  expect(boxes[0].style.width).toBe(boxes[1].style.width);
+  expect((boxes[0].firstElementChild as HTMLElement).style.color).toBe("rgb(255, 255, 255)");
   expect(host.querySelector(".fancy-lyric-line")).toBeNull();
 });
