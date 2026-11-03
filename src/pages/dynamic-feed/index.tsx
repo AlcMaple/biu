@@ -4,6 +4,7 @@ import { Spinner, Button } from "@heroui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { useScrollElement } from "@/common/hooks/use-scroll-element";
 import { scrollEventTarget, scrollerClientHeight, scrollerObservers } from "@/common/utils/scroll-element";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getWebDynamicFeedAll, getWebDynamicFeedSpace, type WebDynamicItem } from "@/service/web-dynamic";
@@ -23,7 +24,6 @@ const DynamicFeedPage = () => {
   const requestIdRef = useRef(0);
 
   const scrollRef = useRef<ScrollRefObject>(null);
-  const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
 
   const invalidateRequests = useCallback(() => {
     requestIdRef.current += 1;
@@ -83,15 +83,7 @@ const DynamicFeedPage = () => {
     };
   }, [fetchData, invalidateRequests]);
 
-  useEffect(() => {
-    const initScrollElement = () => {
-      const viewport = scrollRef.current?.getViewport();
-      if (viewport) setScrollElement(viewport);
-    };
-    initScrollElement();
-    const timer = setTimeout(initScrollElement, 100);
-    return () => clearTimeout(timer);
-  }, []);
+  const scrollElement = useScrollElement(() => scrollRef.current?.getViewport() ?? null);
 
   const rowVirtualizer = useVirtualizer({
     count: items.length,

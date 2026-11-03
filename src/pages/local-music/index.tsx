@@ -5,6 +5,7 @@ import { RiDeleteBinLine, RiFolderAddLine, RiRefreshLine, RiPlayFill, RiPlayList
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { useScrollElement } from "@/common/hooks/use-scroll-element";
 import { scrollerObservers } from "@/common/utils/scroll-element";
 import Empty from "@/components/empty";
 import IconButton from "@/components/icon-button";
@@ -60,9 +61,11 @@ const LocalMusicPage = () => {
     return parts[parts.length - 1] || trimmed;
   };
 
+  const scrollElement = useScrollElement(() => (scrollRef.current?.getViewport() as HTMLElement | null) ?? null);
+
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
-    getScrollElement: () => scrollRef.current?.getViewport() as HTMLElement | null,
+    getScrollElement: () => scrollElement,
     ...scrollerObservers,
     estimateSize: () => itemRowHeight,
     overscan: 10,

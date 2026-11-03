@@ -12,6 +12,7 @@ import { Spinner } from "@heroui/react";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import clx from "classnames";
 
+import { useScrollElement } from "@/common/hooks/use-scroll-element";
 import {
   observeScrollerOffset,
   observeScrollerRect,
@@ -48,6 +49,8 @@ export default function VirtualList<T>({
   scrollToIndexRef,
   highlightIndex,
 }: VirtualListProps<T>) {
+  const scrollEl = useScrollElement(getScrollElement);
+  const getResolvedScrollElement = useCallback(() => scrollEl, [scrollEl]);
   const scrollElRef = useRef<HTMLElement | null>(null);
   const loadLockRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,13 +60,13 @@ export default function VirtualList<T>({
 
   const updateOffsetTop = useCallback(() => {
     const el = containerRef.current;
-    const scrollEl = getScrollElement();
-    if (el && scrollEl) {
+    const scrollElement = scrollEl;
+    if (el && scrollElement) {
       const rect = el.getBoundingClientRect();
-      const offset = rect.top - scrollerViewportTop(scrollEl) + scrollEl.scrollTop;
+      const offset = rect.top - scrollerViewportTop(scrollElement) + scrollElement.scrollTop;
       setOffsetTop(prev => (Math.abs(prev - offset) > 1 ? offset : prev));
     }
-  }, [getScrollElement]);
+  }, [scrollEl]);
 
   /** 保持 updateOffsetTopRef 最新 */
   useEffect(() => {
@@ -77,12 +80,12 @@ export default function VirtualList<T>({
 
   /** 只绑定一次 scroll element */
   useLayoutEffect(() => {
-    scrollElRef.current = getScrollElement();
-  }, [getScrollElement]);
+    scrollElRef.current = scrollEl;
+  }, [scrollEl]);
 
   const rowVirtualizer = useVirtualizer({
     count: hasMore ? items.length + 1 : items.length,
-    getScrollElement,
+    getScrollElement: getResolvedScrollElement,
     estimateSize: useCallback(() => rowHeight, [rowHeight]),
     overscan: 4,
     scrollMargin: offsetTop,

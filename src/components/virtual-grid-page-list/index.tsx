@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSize } from "ahooks";
 import { twMerge } from "tailwind-merge";
 
+import { useScrollElement } from "@/common/hooks/use-scroll-element";
 import { isDocumentScroller, scrollerObservers, scrollerViewportTop } from "@/common/utils/scroll-element";
 import Empty from "@/components/empty";
 
@@ -37,6 +38,8 @@ const VirtualGridPageList = <T,>({
   scrollToIndexRef,
   highlightIndex,
 }: VirtualGridPageListProps<T>) => {
+  const scrollEl = useScrollElement(getScrollElement);
+  const getResolvedScrollElement = useCallback(() => scrollEl, [scrollEl]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialWidthRef = useRef(0);
@@ -78,7 +81,7 @@ const VirtualGridPageList = <T,>({
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement,
+    getScrollElement: getResolvedScrollElement,
     ...scrollerObservers,
     estimateSize: () => rowHeight + ROW_GAP,
     overscan: 5,
@@ -132,7 +135,7 @@ const VirtualGridPageList = <T,>({
 
   // 使用 useLayoutEffect 确保 DOM 更新后再设置 observer
   useLayoutEffect(() => {
-    const scrollElement = getRootRef.current();
+    const scrollElement = scrollEl;
     if (!scrollElement || !bottomRef.current) {
       return;
     }
@@ -157,7 +160,7 @@ const VirtualGridPageList = <T,>({
         observerRef.current = null;
       }
     };
-  }, [handleIntersection, width, rows.length]);
+  }, [handleIntersection, scrollEl, width, rows.length]);
 
   // 标记初始挂载完成 - 使用 requestAnimationFrame 更可靠
   useEffect(() => {
