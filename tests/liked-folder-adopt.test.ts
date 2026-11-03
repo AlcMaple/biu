@@ -6,7 +6,6 @@ vi.mock("@/platform", () => ({
     setStore: vi.fn().mockResolvedValue(undefined),
     clearStore: vi.fn().mockResolvedValue(undefined),
   },
-  isAndroid: false,
 }));
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";

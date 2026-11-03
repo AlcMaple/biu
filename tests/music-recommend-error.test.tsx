@@ -53,7 +53,6 @@ vi.mock("@/platform", () => ({
     addMediaDownloadTask: vi.fn(),
     openExternal: vi.fn(),
   },
-  isNativeMobile: false,
   isWeb: true,
 }));
 

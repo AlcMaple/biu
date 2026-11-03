@@ -29,7 +29,7 @@ import {
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import FontSelect from "@/components/font-select";
 import UpdateCheckButton from "@/components/update-check-button";
-import platform, { isNativeMobile, isWeb } from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { DEFAULT_ALIGN_SERVER_URL } from "@shared/lyrics-align";
 
 import ColorSettings from "./color-settings";
@@ -61,8 +61,7 @@ export const SystemSettingsTab = ({
   const labelCls = isMobileLayout ? "space-y-1" : "mr-6 space-y-1";
   // 这几项调用 platform.selectDirectory / selectFile，是平台能力而不是版式差异：
   // 只能按平台判断，不能跟着视口宽度走（否则把 Electron 窗口拖窄就会让桌面设置消失）。
-  const showDesktopSystemSettings = !isNativeMobile && !isWeb;
-  const showFileSystemSettings = !isNativeMobile;
+  const showDesktopSystemSettings = !isWeb;
 
   return (
     <Form className="w-full space-y-6">
@@ -340,66 +339,62 @@ export const SystemSettingsTab = ({
         </>
       )}
 
-      {showFileSystemSettings && <Divider />}
-      {showFileSystemSettings && <h2>下载</h2>}
-      {showFileSystemSettings && (
-        <div className={rowCls}>
-          <div className={labelCls}>
-            <div className="text-medium font-medium">下载目录</div>
-            <div className="text-sm text-zinc-500">选择音视频保存的位置</div>
-          </div>
-          <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
-            <Controller
-              control={control}
-              name="downloadPath"
-              render={({ field }) => (
-                <div className="flex items-center space-x-1">
-                  <Input isDisabled placeholder="选择文件夹" value={field.value} onValueChange={field.onChange} />
-                  <Button
-                    variant="flat"
-                    onPress={async () => {
-                      const path = await platform.selectDirectory();
-                      if (path) setValue("downloadPath", path, { shouldDirty: true, shouldTouch: true });
-                    }}
-                  >
-                    选择
-                  </Button>
-                </div>
-              )}
-            />
-          </div>
+      <Divider />
+      <h2>下载</h2>
+      <div className={rowCls}>
+        <div className={labelCls}>
+          <div className="text-medium font-medium">下载目录</div>
+          <div className="text-sm text-zinc-500">选择音视频保存的位置</div>
         </div>
-      )}
+        <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
+          <Controller
+            control={control}
+            name="downloadPath"
+            render={({ field }) => (
+              <div className="flex items-center space-x-1">
+                <Input isDisabled placeholder="选择文件夹" value={field.value} onValueChange={field.onChange} />
+                <Button
+                  variant="flat"
+                  onPress={async () => {
+                    const path = await platform.selectDirectory();
+                    if (path) setValue("downloadPath", path, { shouldDirty: true, shouldTouch: true });
+                  }}
+                >
+                  选择
+                </Button>
+              </div>
+            )}
+          />
+        </div>
+      </div>
 
       {/* FFmpeg 路径配置 */}
-      {showFileSystemSettings && (
-        <div className={rowCls}>
-          <div className={labelCls}>
-            <div className="text-medium font-medium">FFmpeg 路径</div>
-            <div className="text-sm text-zinc-500">手动指定 FFmpeg 可执行文件路径</div>
-          </div>
-          <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
-            <Controller
-              control={control}
-              name="ffmpegPath"
-              render={({ field }) => (
-                <div className="flex items-center space-x-1">
-                  <Input isDisabled placeholder="自动检测" value={field.value} onValueChange={field.onChange} />
-                  <Button
-                    variant="flat"
-                    onPress={async () => {
-                      const path = await platform.selectFile();
-                      if (path) setValue("ffmpegPath", path, { shouldDirty: true, shouldTouch: true });
-                    }}
-                  >
-                    选择
-                  </Button>
-                </div>
-              )}
-            />
-          </div>
+      <div className={rowCls}>
+        <div className={labelCls}>
+          <div className="text-medium font-medium">FFmpeg 路径</div>
+          <div className="text-sm text-zinc-500">手动指定 FFmpeg 可执行文件路径</div>
         </div>
-      )}
+        <div className={isMobileLayout ? "w-full" : "w-[360px]"}>
+          <Controller
+            control={control}
+            name="ffmpegPath"
+            render={({ field }) => (
+              <div className="flex items-center space-x-1">
+                <Input isDisabled placeholder="自动检测" value={field.value} onValueChange={field.onChange} />
+                <Button
+                  variant="flat"
+                  onPress={async () => {
+                    const path = await platform.selectFile();
+                    if (path) setValue("ffmpegPath", path, { shouldDirty: true, shouldTouch: true });
+                  }}
+                >
+                  选择
+                </Button>
+              </div>
+            )}
+          />
+        </div>
+      </div>
       {!isWeb && (
         <>
           <Divider />

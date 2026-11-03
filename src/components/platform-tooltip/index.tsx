@@ -8,7 +8,7 @@ interface PlatformTooltipProps extends Omit<TooltipProps, "children"> {
   children: ReactElement;
 }
 
-/** Web 禁用悬停提示；桌面和 Android 保持原 Tooltip 行为。 */
+/** Web 禁用悬停提示；桌面保持原 Tooltip 行为。 */
 const PlatformTooltip = ({ children, ...props }: PlatformTooltipProps) => {
   if (isWeb) return children;
   return <Tooltip {...props}>{children}</Tooltip>;

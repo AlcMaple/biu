@@ -4,12 +4,10 @@ import { RiApps2AddFill, RiApps2AddLine } from "@remixicon/react";
 
 import { getDefaultMenuList } from "@/common/constants/menus";
 import MenuGroup from "@/components/menu/menu-group";
-import { isNativeMobile, isWeb } from "@/platform";
+import { isWeb } from "@/platform";
 import { refreshAlignReviewOnFocus, useAlignReview } from "@/store/align-review";
 import { useSettings } from "@/store/settings";
 import { useUser } from "@/store/user";
-
-const MOBILE_HIDDEN_HREFS = new Set(["/download-list"]);
 
 interface Props {
   isCollapsed?: boolean;
@@ -45,7 +43,6 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
       .filter(item => (item.needLogin ? user?.isLogin : true))
       .filter(item => (item.needReviewer ? isReviewer : true))
       .filter(item => item.href && !hiddenMenuKeys.includes(item.href))
-      .filter(item => !(isNativeMobile && item.href && MOBILE_HIDDEN_HREFS.has(item.href)))
       .map(item => (item.needReviewer ? { ...item, badge: pendingReviews } : item));
 
     // 展开态的「新建收藏夹」在收藏夹分组的标题栏里，而该分组未登录时整个不渲染；

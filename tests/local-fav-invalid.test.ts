@@ -18,7 +18,6 @@ vi.mock("@/platform", () => ({
     setStore: vi.fn().mockResolvedValue(undefined),
     clearStore: vi.fn().mockResolvedValue(undefined),
   },
-  isAndroid: false,
 }));
 
 import { getFavResourceInfos } from "@/service/fav-resource-infos";

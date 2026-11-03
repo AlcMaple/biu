@@ -55,7 +55,6 @@ vi.mock("@/platform", () => ({
   get isWeb() {
     return startupMocks.isWeb;
   },
-  isNativeMobile: false,
   log: startupMocks.log,
 }));
 

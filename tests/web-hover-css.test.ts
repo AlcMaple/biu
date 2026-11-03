@@ -56,18 +56,9 @@ describe("Web hover CSS gates", () => {
 
 describe("hover platform marker", () => {
   const originalUserAgent = navigator.userAgent;
-  const originalCapacitor = Reflect.get(globalThis, "Capacitor");
 
-  const setRuntime = (userAgent: string, platform?: "android" | "ios", native = false) => {
+  const setRuntime = (userAgent: string) => {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: userAgent });
-    if (platform) {
-      Reflect.set(globalThis, "Capacitor", {
-        getPlatform: () => platform,
-        isNativePlatform: () => native,
-      });
-    } else {
-      Reflect.deleteProperty(globalThis, "Capacitor");
-    }
   };
 
   beforeEach(() => {
@@ -81,30 +72,14 @@ describe("hover platform marker", () => {
 
   afterEach(() => {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: originalUserAgent });
-    if (originalCapacitor === undefined) Reflect.deleteProperty(globalThis, "Capacitor");
-    else Reflect.set(globalThis, "Capacitor", originalCapacitor);
   });
 
   it.each([
     { expectedMarker: undefined, label: "ordinary Web", userAgent: "Mozilla/5.0 Chrome/140.0.0.0" },
     { expectedMarker: "enabled", label: "Electron", userAgent: "Mozilla/5.0 Electron/38.6.0" },
-    {
-      expectedMarker: "enabled",
-      label: "native Android",
-      native: true,
-      platform: "android" as const,
-      userAgent: "Mozilla/5.0 Linux; Android 16",
-    },
-    {
-      expectedMarker: "enabled",
-      label: "native iOS",
-      native: true,
-      platform: "ios" as const,
-      userAgent: "Mozilla/5.0 iPhone",
-    },
-  ])("sets the root marker before React for $label", async ({ expectedMarker, native, platform, userAgent }) => {
+  ])("sets the root marker before React for $label", async ({ expectedMarker, userAgent }) => {
     const markerAtCreateRoot: Array<string | undefined> = [];
-    setRuntime(userAgent, platform, native);
+    setRuntime(userAgent);
     rootMocks.createRoot.mockImplementation(() => {
       markerAtCreateRoot.push(document.documentElement.dataset.hoverEffects);
       return { render: rootMocks.render };

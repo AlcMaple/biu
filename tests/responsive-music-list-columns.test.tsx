@@ -4,10 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/platform/detect", () => ({
-  isAndroid: false,
   isElectron: false,
-  isIOS: false,
-  isNativeMobile: false,
   isWeb: true,
 }));
 

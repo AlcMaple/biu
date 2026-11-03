@@ -1,9 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-import { isNativeMobile } from "@/platform/detect";
-
 /** 与 docs/responsive-prototype 的断点保持一致 */
-/** ≤ 767px：移动形态（抽屉侧栏 + MobilePlayBar），与 Capacitor 原生端同形 */
+/** ≤ 767px：移动形态（抽屉侧栏 + MobilePlayBar） */
 const MOBILE_MAX_WIDTH = 767;
 /** ≤ 820px：窄平板，歌曲列表再收掉播放量 */
 const NARROW_TABLET_MAX_WIDTH = 820;
@@ -41,9 +39,6 @@ const getMediaQueryLists = () => {
 };
 
 const readLayoutMode = (): LayoutMode => {
-  // 原生移动端不看视口：平板尺寸的 Android/iOS 设备同样要走移动形态。
-  if (isNativeMobile) return "mobile";
-
   const mqls = getMediaQueryLists();
   if (!mqls) return "desktop";
   if (mqls.mobile.matches) return "mobile";
@@ -72,7 +67,7 @@ const handleChange = () => {
 let isListening = false;
 
 const startListening = () => {
-  if (isListening || isNativeMobile) return;
+  if (isListening) return;
 
   const mqls = getMediaQueryLists();
   if (!mqls) return;
@@ -102,7 +97,7 @@ export const useLayoutMode = () => useSyncExternalStore(subscribe, getSnapshot, 
 
 /**
  * 移动形态：原生移动端，或视口 ≤ 767px 的 Web 窗口。
- * 窄 Web 与 Capacitor 走同一套组件形态，不另建路由树。
+ * 窄 Web 走同一套移动形态，不另建路由树。
  */
 export const useIsMobileLayout = () => useLayoutMode() === "mobile";
 

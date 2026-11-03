@@ -12,7 +12,6 @@ vi.mock("@/platform", () => ({
     setStore: vi.fn().mockResolvedValue(undefined),
     clearStore: vi.fn().mockResolvedValue(undefined),
   },
-  isAndroid: false,
 }));
 
 import { getWebInterfaceWbiSearchType } from "@/service/web-interface-search-type";

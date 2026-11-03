@@ -1,3 +1,0 @@
-#include "App/App/Version.xcconfig"
-
-CAPACITOR_DEBUG = true

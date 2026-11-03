@@ -4,8 +4,6 @@
  * macOS 的 node_modules 含原生 binding（如 better-sqlite3、Electron 二进制等），
  * Windows 直接用会崩，所以打包时排除依赖与构建产物，让 Windows 自己装。
  *
- * 同样排除 android/ 和 ios/ —— Capacitor 原生工程不参与 Windows 桌面端构建。
- *
  * 用法：node scripts/pack.mjs
  */
 
@@ -24,7 +22,7 @@ const DATE = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())
 const TIME = `${pad(now.getHours())}${pad(now.getMinutes())}`;
 const OUTPUT = resolve(ROOT, `${PROJECT}-${DATE}-${TIME}.zip`);
 
-// 一律排除：依赖、版本控制、构建产物、平台元数据、Capacitor 原生工程
+// 一律排除：依赖、版本控制、构建产物、平台元数据
 const EXCLUDE_DIRS = [
   "node_modules",
   ".git",
@@ -39,8 +37,6 @@ const EXCLUDE_DIRS = [
   "build",
   "logs",
   "archive",
-  "android", // Capacitor Android 工程，Windows 仅运行 Electron
-  "ios", // Capacitor iOS 工程，Windows 无法使用
 ];
 
 // ★ 用 */${p}/* 而非 ${PROJECT}/${p}/* —— zip 的 glob 里 `*` 会跨 `/`，

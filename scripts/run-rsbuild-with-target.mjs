@@ -4,11 +4,11 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const [target, command, ...args] = process.argv.slice(2);
-const targets = new Set(["android", "ios", "web"]);
+const targets = new Set(["web"]);
 const commands = new Set(["build", "dev"]);
 
 if (!targets.has(target) || !commands.has(command)) {
-  console.error("用法：node scripts/run-rsbuild-with-target.mjs <android|ios|web> <build|dev> [...rsbuild 参数]");
+  console.error("用法：node scripts/run-rsbuild-with-target.mjs <web> <build|dev> [...rsbuild 参数]");
   process.exit(1);
 }
 

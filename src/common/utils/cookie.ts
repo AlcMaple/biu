@@ -25,9 +25,6 @@ async function getPublicKey() {
 }
 
 export const refreshCookie = async () => {
-  // Android：CapacitorCookies 已通过 capacitor.config.ts 启用，
-  // platform.getCookie/setCookie 接到 WebView 系统 cookie jar，
-  // refresh 流程的 set-cookie 会自动生效，与 PC 行为一致。
   const res = await getPassportLoginWebCookieInfo();
   if (res?.data?.refresh) {
     const timestamp = res?.data?.timestamp;

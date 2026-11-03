@@ -19,7 +19,6 @@ import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import { looksLikeTianci, recognizeFromScreen, screenOriginOf } from "@/components/lyrics/tianci";
 import { DESKTOP_LYRICS_CHANNEL } from "@/pages/desktop-lyrics";
 import platform, { log } from "@/platform";
-import { isNativeMobile } from "@/platform/detect";
 import { getPublishedLyrics, getRecognizedLyrics, putRecognizedLyrics } from "@/service/lyrics-align";
 import { alignInputOf, useLyricsAlignSession } from "@/store/lyrics-align-session";
 import { useDisplayedLyrics, useLyricsState } from "@/store/lyrics-state";
@@ -209,8 +208,7 @@ const LyricsBroadcaster = () => {
           if (canceled) return;
           hit = matched;
           from = matched?.from;
-          // 手机端的网易云 / LrcLib 还是空实现，「没查到」不能代表别的平台也没有
-          if (!tianci && !hit && outcome.exhausted && !staleAuto && !isLocal && bvid && !isNativeMobile) {
+          if (!tianci && !hit && outcome.exhausted && !staleAuto && !isLocal && bvid) {
             void reportRecognized({ bvid, cid: String(playItem.cid), v: AUTO_MATCH_VERSION, missing: true });
           }
           // 只有填词歌才识别画面：普通视频按标题搜不到就是暂无歌词，画面上的说话字幕（采访、小剧场）

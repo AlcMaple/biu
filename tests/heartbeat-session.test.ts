@@ -14,7 +14,6 @@ vi.mock("@/platform", () => ({
     }),
     updatePlaybackState: vi.fn(),
   },
-  isAndroid: false,
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 

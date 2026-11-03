@@ -35,7 +35,7 @@ vi.mock("@heroui/react", () => ({
   addToast: vi.fn(),
 }));
 
-vi.mock("@/platform", () => ({ isNativeMobile: false, isWeb: true }));
+vi.mock("@/platform", () => ({ isWeb: true }));
 vi.mock("@/store/favorite", () => ({
   useFavoritesStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
