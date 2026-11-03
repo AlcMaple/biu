@@ -8,7 +8,9 @@ import { isValidBvid, parseShareParams } from "@/common/utils/share";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Image from "@/components/image";
 import { getWebInterfaceView, type WebInterfaceViewData } from "@/service/web-interface-view";
+import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
+import { usePlayProgress } from "@/store/play-progress";
 
 type State =
   | { status: "loading" }
@@ -40,17 +42,25 @@ const Share = () => {
 
   const start = useCallback((data: WebInterfaceViewData, cid: string) => {
     const page = data.pages?.find(item => String(item.cid) === cid);
-    void usePlayList.getState().play({
-      type: "mv",
-      bvid: data.bvid,
-      cid,
-      title: data.title,
-      cover: formatUrlProtocol(data.pic),
-      ownerName: data.owner?.name,
-      ownerMid: data.owner?.mid,
-      playCount: data.stat?.view,
-      duration: page?.duration ?? data.duration,
-    });
+    // 本机之前听过同一首时 play() 会续上旧进度；分享链接的收听者应当从头听
+    usePlayProgress.getState().setCurrentTime(0);
+    void usePlayList
+      .getState()
+      .play({
+        type: "mv",
+        bvid: data.bvid,
+        cid,
+        title: data.title,
+        cover: formatUrlProtocol(data.pic),
+        ownerName: data.owner?.name,
+        ownerMid: data.owner?.mid,
+        playCount: data.stat?.view,
+        duration: page?.duration ?? data.duration,
+      })
+      .then(() => {
+        // 同一首已在本机播放器里时 play() 只会恢复播放，进度要显式拨回开头
+        if (usePlayList.getState().getAudio().currentTime > 1) usePlayList.getState().seek(0);
+      });
   }, []);
 
   useEffect(() => {
@@ -81,6 +91,8 @@ const Share = () => {
           autoPlayed.current = key;
           // 浏览器可能拒绝无手势的自动播放，此时停在已加载状态，由下方按钮完成播放
           start(res.data, cid);
+          // 落地页的重点是歌词：直接打开全屏播放器，自动播放被拦时用它里面的播放键即可
+          useModalStore.getState().openFullScreenPlayer();
         }
       })
       .catch(error => {
