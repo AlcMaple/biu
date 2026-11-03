@@ -21,6 +21,7 @@ import {
   RiEraserLine,
   RiErrorWarningLine,
   RiExternalLinkLine,
+  RiShareForwardLine,
   RiFileMusicLine,
   RiMoreLine,
   RiPencilLine,
@@ -44,6 +45,7 @@ import {
 } from "@/common/utils/fav";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { autoReplaceFolder, seedDebugInvalidLogs } from "@/common/utils/replace-invalid";
+import { shareSong } from "@/common/utils/share";
 import { formatMillisecond, parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -91,6 +93,7 @@ const getLocalItemMenus = (isBiliItem: boolean, invalid?: boolean) => [
   { key: "add-to-playlist", label: "添加到播放列表", icon: <RiPlayListAddLine size={18} /> },
   { key: "download-audio", label: "下载音乐", icon: <RiFileMusicLine size={18} />, hidden: !isBiliItem },
   { key: "rename", label: "重命名", icon: <RiPencilLine size={18} /> },
+  { key: "share", label: "分享", icon: <RiShareForwardLine size={18} />, hidden: !isBiliItem },
   { key: "bililink", label: "在 B 站打开", icon: <RiExternalLinkLine size={18} />, hidden: !isBiliItem },
 ];
 
@@ -431,6 +434,9 @@ const LocalFavorites = () => {
             sid: item.type === 12 ? Number(item.rid) : undefined,
           });
           addToast({ title: "已添加下载任务", color: "success" });
+          break;
+        case "share":
+          void shareSong({ bvid: item.bvid, cid: item.type === 2 ? item.cid : undefined });
           break;
         case "bililink":
           openBiliVideoLink({

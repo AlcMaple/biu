@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { addToast, Button, Spinner } from "@heroui/react";
 
+import { shareSong } from "@/common/utils/share";
 import { stripHtml } from "@/common/utils/str";
 import { parseDuration } from "@/common/utils/time";
 import { formatUrlProtocol } from "@/common/utils/url";
@@ -194,6 +195,9 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid });
         break;
       case "bililink":
         platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);

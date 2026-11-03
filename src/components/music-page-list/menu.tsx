@@ -1,6 +1,7 @@
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, useDisclosure } from "@heroui/react";
-import { RiDeleteBinLine, RiExternalLinkLine, RiMoreFill } from "@remixicon/react";
+import { RiDeleteBinLine, RiExternalLinkLine, RiMoreFill, RiShareForwardLine } from "@remixicon/react";
 
+import { shareSong } from "@/common/utils/share";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { isWeb } from "@/platform";
 import { usePlayList, type PlayData } from "@/store/play-list";
@@ -51,6 +52,13 @@ const Menus = ({ data }: Props) => {
             }}
           >
             在 B 站打开
+          </DropdownItem>
+          <DropdownItem
+            key="share"
+            startContent={<RiShareForwardLine size={16} />}
+            onPress={() => void shareSong(data)}
+          >
+            分享
           </DropdownItem>
           <DropdownItem
             key="del"

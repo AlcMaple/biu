@@ -8,6 +8,7 @@ import { PlayMode } from "@/common/constants/audio";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import { toPlaybackFavoriteModalData } from "@/common/utils/fav";
 import { getPlayListDisplayKey, isSamePlayListDisplayItem } from "@/common/utils/playlist-display";
+import { shareSong } from "@/common/utils/share";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
@@ -80,6 +81,9 @@ const PlayListDrawer = () => {
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid, cid: item.cid, pageIndex: item.pageIndex });
         break;
       case "bililink":
         openBiliVideoLink(item);

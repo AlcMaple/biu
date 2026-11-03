@@ -8,6 +8,7 @@ import type { Media } from "@/service/user-video-archives-list";
 
 import { CollectionType } from "@/common/constants/collection";
 import { resolvePlayCount } from "@/common/utils/number";
+import { shareSong } from "@/common/utils/share";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
 import { getSeriesArchives } from "@/service/series-archives";
@@ -225,6 +226,9 @@ const Series = () => {
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid });
         break;
       case "bililink":
         platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);

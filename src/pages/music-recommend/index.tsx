@@ -4,6 +4,7 @@ import { addToast, Spinner, Tab, Tabs } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import { shareSong } from "@/common/utils/share";
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform, { isWeb } from "@/platform";
@@ -321,6 +322,9 @@ const MusicRecommend = () => {
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid });
         break;
       case "bililink":
         if (item.bvid) {

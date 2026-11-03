@@ -8,6 +8,7 @@ import { CollectionType } from "@/common/constants/collection";
 import { useRowFlash } from "@/common/hooks/use-row-flash";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { resolvePlayCount } from "@/common/utils/number";
+import { shareSong } from "@/common/utils/share";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
 import { postFavSeasonFav } from "@/service/fav-season-fav";
@@ -229,6 +230,9 @@ const VideoCollections = () => {
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid });
         break;
       case "bililink":
         platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);

@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { addToast, Button, Spinner } from "@heroui/react";
 import { RiDeleteBinLine } from "@remixicon/react";
 
+import { shareSong } from "@/common/utils/share";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
 import { postHistoryToViewDel } from "@/service/history-toview-del";
@@ -191,6 +192,9 @@ const Later = () => {
           title: "已添加下载任务",
           color: "success",
         });
+        break;
+      case "share":
+        void shareSong({ bvid: item.bvid });
         break;
       case "bililink":
         platform.openExternal(`https://www.bilibili.com/video/${item.bvid}`);

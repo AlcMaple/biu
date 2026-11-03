@@ -10,6 +10,7 @@ import { fillFavMediaPlayCount, getAllFavMedia } from "@/common/utils/fav";
 import { favPageKey, forgetFavFolder, readFavPage, writeFavPage } from "@/common/utils/fav-page-cache";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { resolvePlayCount } from "@/common/utils/number";
+import { shareSong } from "@/common/utils/share";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
@@ -616,6 +617,9 @@ const Favorites = () => {
             title: "已添加下载任务",
             color: "success",
           });
+          break;
+        case "share":
+          void shareSong({ bvid: item.type === 2 ? item.bvid : undefined });
           break;
         case "bililink":
           openBiliVideoLink({

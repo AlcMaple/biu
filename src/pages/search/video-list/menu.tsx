@@ -1,5 +1,6 @@
 import {
   RiExternalLinkLine,
+  RiShareForwardLine,
   RiFileMusicLine,
   RiFileVideoLine,
   RiPlayCircleLine,
@@ -38,6 +39,11 @@ export const getContextMenus = () => {
       icon: <RiExternalLinkLine size={18} />,
       key: "bililink",
       label: "在 B 站打开",
+    },
+    {
+      key: "share",
+      label: "分享",
+      icon: <RiShareForwardLine size={18} />,
     },
   ];
 };

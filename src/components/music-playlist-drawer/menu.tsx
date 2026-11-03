@@ -1,4 +1,11 @@
-import { RiDeleteBinLine, RiExternalLinkLine, RiFileMusicLine, RiFileVideoLine, RiStarLine } from "@remixicon/react";
+import {
+  RiDeleteBinLine,
+  RiExternalLinkLine,
+  RiShareForwardLine,
+  RiFileMusicLine,
+  RiFileVideoLine,
+  RiStarLine,
+} from "@remixicon/react";
 
 export const getMenus = ({ isLogin, isLocal }: { isLogin: boolean; isLocal: boolean }) =>
   [
@@ -24,6 +31,12 @@ export const getMenus = ({ isLogin, isLocal }: { isLogin: boolean; isLocal: bool
       key: "bililink",
       label: "在 B 站打开",
       icon: <RiExternalLinkLine size={18} />,
+      hidden: isLocal,
+    },
+    {
+      key: "share",
+      label: "分享",
+      icon: <RiShareForwardLine size={18} />,
       hidden: isLocal,
     },
     {

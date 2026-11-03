@@ -4,6 +4,7 @@ import { addToast, Spinner, Switch } from "@heroui/react";
 import { RiDeleteBinLine } from "@remixicon/react";
 import { useShallow } from "zustand/react/shallow";
 
+import { shareSong } from "@/common/utils/share";
 import IconButton from "@/components/icon-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import platform from "@/platform";
@@ -301,6 +302,9 @@ const History = () => {
             title: "已添加下载任务",
             color: "success",
           });
+          break;
+        case "share":
+          void shareSong({ bvid: item.history.bvid });
           break;
         case "bililink":
           platform.openExternal(`https://www.bilibili.com/video/${item.history.bvid}`);
