@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 
 import { addToast } from "@heroui/react";
-import { RiHeart3Fill, RiHeart3Line, RiHeartPulseFill, RiSparklingLine } from "@remixicon/react";
+import { RiHeart3Fill, RiHeart3Line, RiHeartPulseFill, RiSkipForwardFill } from "@remixicon/react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import Image from "@/components/image";
 import { restoreSession, useHeartbeat } from "@/store/heartbeat";
-import { useHeartbeatFx } from "@/store/heartbeat-fx";
 import { type LocalFavItem, useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList } from "@/store/play-list";
-
-import { NebulaCanvas, type NebulaApi } from "./nebula-canvas";
 
 const EMPTY_LIKED_ITEMS: LocalFavItem[] = [];
 
@@ -63,226 +61,100 @@ const Heartbeat = () => {
     else if (r === "removed") addToast({ title: `已移出「${LIKED_FOLDER_TITLE}」`, color: "default" });
   };
 
-  const lite = useHeartbeatFx(st => st.lite);
-  const setLite = useHeartbeatFx(st => st.setLite);
-  const vinylRef = useRef<HTMLDivElement>(null);
-  const nebulaRef = useRef<NebulaApi | null>(null);
-  const [charge, setCharge] = useState(0);
-  const holdRef = useRef<{ raf: number; start: number; fired: boolean } | null>(null);
-  const HOLD_MS = 800;
-
-  const endHold = () => {
-    const h = holdRef.current;
-    if (!h) return false;
-    cancelAnimationFrame(h.raf);
-    holdRef.current = null;
-    setCharge(0);
-    nebulaRef.current?.setCharge(0);
-    return h.fired;
-  };
-  const startHold = () => {
-    if (!current || holdRef.current) return;
-    const h = { raf: 0, start: performance.now(), fired: false };
-    holdRef.current = h;
-    const tick = () => {
-      const p = Math.min((performance.now() - h.start) / HOLD_MS, 1);
-      setCharge(p);
-      nebulaRef.current?.setCharge(p);
-      if (p >= 1) {
-        h.fired = true;
-        nebulaRef.current?.burst();
-        // 彩蛋：长按满格 = 收藏（已收藏则只放烟花，不取消）
-        if (!isLiked) toggleLikeCurrent();
-        setCharge(0);
-        nebulaRef.current?.setCharge(0);
-        cancelAnimationFrame(h.raf);
-        return;
-      }
-      h.raf = requestAnimationFrame(tick);
-    };
-    h.raf = requestAnimationFrame(tick);
-  };
-  const releaseHold = () => {
-    const fired = endHold();
-    if (!fired && charge < 1) handleLike();
-  };
-  useEffect(() => () => void endHold(), []);
-
   const title = current ? current.pageTitle || current.title : "私人FM";
   const cover = current ? current.pageCover || current.cover : "";
   const owner = current?.customArtist || current?.ownerName || "";
-  const spin = { animationPlayState: isPlaying ? "running" : "paused" } as const;
-  const chars = Array.from(title);
-  const R = 22;
-  const C = 2 * Math.PI * R;
+  const next = usePlayList(s => s.next);
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center gap-9 overflow-hidden p-8 select-none">
-      <style>{`
-        @keyframes fm-spin { to { transform: rotate(360deg); } }
-        @keyframes fm-ripple { 0% { transform: scale(.85); opacity: .55; } 100% { transform: scale(1.75); opacity: 0; } }
-        @keyframes fm-drift { 0%,100% { transform: translate3d(0,0,0) scale(1.25); } 50% { transform: translate3d(3%,-4%,0) scale(1.4); } }
-        @keyframes fm-beat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.28); } 30% { transform: scale(1); } 45% { transform: scale(1.16); } }
-        @keyframes fm-char { 0% { opacity: 0; transform: translateY(0.6em) scale(.8); filter: blur(10px); } 100% { opacity: 1; transform: none; filter: blur(0); } }
-        @keyframes fm-sheen { 0% { background-position: 200% 0; } 100% { background-position: -100% 0; } }
-        @keyframes fm-heart-idle { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-      `}</style>
-
-      {/* 氛围背景：封面高斯模糊铺底 */}
-      {cover && (
-        <img
-          key={cover}
-          src={cover}
-          alt=""
-          aria-hidden
-          referrerPolicy="no-referrer"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40 blur-3xl saturate-150"
-          style={{ animation: "fm-drift 14s ease-in-out infinite", ...spin }}
-        />
-      )}
+    <div className="relative flex h-full flex-col items-center justify-center gap-6 overflow-hidden p-6 select-none md:gap-8 md:p-8">
+      <AnimatePresence>
+        {cover && (
+          <motion.img
+            key={cover}
+            src={cover}
+            alt=""
+            aria-hidden
+            referrerPolicy="no-referrer"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40 blur-3xl saturate-150"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          />
+        )}
+      </AnimatePresence>
       <div className="from-background/30 via-background/60 to-background pointer-events-none absolute inset-0 bg-gradient-to-b" />
 
-      {/* 粒子星云：每首歌由 bvid 生成不同旋臂/方向/色相，低频驱动呼吸，高频驱动闪烁 */}
-      <NebulaCanvas
-        seed={current?.bvid ?? "biu"}
-        cover={cover || ""}
-        playing={isPlaying}
-        lite={lite}
-        anchorRef={vinylRef}
-        apiRef={nebulaRef}
-      />
+      <div className="text-primary relative flex items-center gap-1.5 text-xs tracking-widest">
+        <RiHeartPulseFill size={14} />
+        私人FM
+      </div>
 
-      <button
-        type="button"
-        onClick={() => setLite(!lite)}
-        aria-pressed={lite}
-        className={`absolute top-4 right-5 z-10 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs backdrop-blur-md transition-colors ${
-          lite
-            ? "border-white/10 bg-white/5 text-zinc-500"
-            : "border-primary/40 bg-primary/10 text-primary shadow-[0_0_16px_-4px_var(--heroui-primary)]"
-        }`}
+      <motion.div
+        key={cover}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="relative aspect-square w-[min(72vw,20rem)] md:w-72 lg:w-80"
       >
-        <RiSparklingLine size={14} />
-        {lite ? "特效已简化" : "完整特效"}
-      </button>
-
-      {/* 黑胶唱片 */}
-      <div className="relative flex h-72 w-72 max-w-[70vw] items-center justify-center" style={{ maxHeight: "70vw" }}>
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            className="border-primary/50 absolute inset-6 rounded-full border"
-            style={{ animation: "fm-ripple 3.6s ease-out infinite", animationDelay: `${i * 1.2}s`, ...spin }}
-          />
-        ))}
-        <div
-          ref={vinylRef}
-          className="relative h-56 w-56 rounded-full shadow-[0_20px_60px_-10px_rgba(0,0,0,0.7)]"
-          style={{
-            animation: "fm-spin 22s linear infinite",
-            ...spin,
-            background: "repeating-radial-gradient(circle at center, #0c0c0d 0, #0c0c0d 2px, #17171a 3px, #0c0c0d 4px)",
-          }}
+        <motion.div
+          animate={{ scale: isPlaying ? 1 : 0.94 }}
+          transition={{ duration: 0.3 }}
+          className="bg-content2 h-full w-full overflow-hidden rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.7)]"
         >
-          <div
-            className="absolute inset-0 rounded-full opacity-40"
-            style={{
-              background:
-                "conic-gradient(from 30deg, transparent 0 20%, rgba(255,255,255,.28) 27%, transparent 34% 70%, rgba(255,255,255,.2) 77%, transparent 84%)",
-            }}
-          />
-          <div className="bg-content2 absolute inset-[27%] overflow-hidden rounded-full ring-4 ring-black/70">
-            {cover ? (
-              <Image
-                key={cover}
-                removeWrapper
-                radius="none"
-                src={cover}
-                alt={title}
-                params="672w_378h_1c.avif"
-                classNames={{ img: "h-full w-full object-cover" }}
-              />
-            ) : (
-              <div className="text-primary flex h-full w-full items-center justify-center">
-                <RiHeartPulseFill size={40} />
-              </div>
-            )}
-          </div>
-          <div className="absolute top-1/2 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/90" />
-        </div>
-      </div>
+          {cover ? (
+            <Image
+              removeWrapper
+              radius="none"
+              src={cover}
+              alt={title}
+              params="672w_378h_1c.avif"
+              classNames={{ img: "h-full w-full object-cover" }}
+            />
+          ) : (
+            <div className="text-primary flex h-full w-full items-center justify-center">
+              <RiHeartPulseFill size={40} />
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
 
-      <div className="relative flex max-w-2xl flex-col items-center gap-3 text-center">
-        {/* 歌名：逐字模糊浮现，随后一道高光扫过；换歌重新入场 */}
-        <div
-          key={title}
-          className="line-clamp-2 text-3xl leading-tight font-black tracking-wide text-balance"
-          style={{
-            backgroundImage: "linear-gradient(100deg, currentColor 40%, #fff 50%, currentColor 60%)",
-            backgroundSize: "300% 100%",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-            animation: "fm-sheen 4s ease-in-out 1.2s 1 both",
-            textShadow: "0 0 30px rgba(255,255,255,0.15)",
-          }}
-        >
-          {chars.map((ch, i) => (
-            <span
-              key={i}
-              className="inline-block whitespace-pre text-zinc-100"
-              style={{ animation: `fm-char .7s cubic-bezier(.2,.8,.2,1) ${Math.min(i * 45, 900)}ms both` }}
-            >
-              {ch}
-            </span>
-          ))}
-        </div>
-        <div className="text-sm tracking-widest text-zinc-400">{owner}</div>
-      </div>
+      <motion.div
+        key={title}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="relative flex max-w-2xl flex-col items-center gap-2 text-center"
+      >
+        <div className="line-clamp-2 text-xl leading-tight font-bold text-balance md:text-2xl">{title}</div>
+        <div className="text-sm text-zinc-400">{owner}</div>
+      </motion.div>
 
-      {/* 收藏：点按 = 收藏/取消；长按蓄力到满 = 彩蛋（冲击波 + 红心流星雨 + 星云染粉） */}
-      <div className="relative flex flex-col items-center gap-2">
+      <div className="relative flex items-center gap-6">
         <button
           type="button"
           disabled={!current || loading}
-          onPointerDown={startHold}
-          onPointerUp={releaseHold}
-          onPointerLeave={() => void endHold()}
-          onPointerCancel={() => void endHold()}
-          onContextMenu={e => e.preventDefault()}
-          aria-label={`加入${LIKED_FOLDER_TITLE}`}
-          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition-transform active:scale-95 disabled:opacity-40"
-          style={{
-            boxShadow: isLiked || charge > 0 ? `0 0 ${24 + charge * 40}px -2px #f0607a` : undefined,
-            transform: `scale(${1 + charge * 0.25})`,
-          }}
+          onClick={handleLike}
+          aria-label={isLiked ? `移出${LIKED_FOLDER_TITLE}` : `加入${LIKED_FOLDER_TITLE}`}
+          aria-pressed={isLiked}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition-transform active:scale-95 disabled:opacity-40"
         >
-          <svg className="pointer-events-none absolute inset-0 -rotate-90" viewBox="0 0 56 56">
-            <circle
-              cx="28"
-              cy="28"
-              r={R}
-              fill="none"
-              stroke="#f0607a"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={C}
-              strokeDashoffset={C * (1 - charge)}
-            />
-          </svg>
           {isLiked ? (
-            <RiHeart3Fill
-              size={26}
-              className="text-[#f0607a]"
-              style={{ animation: "fm-heart-idle 1.4s ease-in-out infinite" }}
-            />
+            <RiHeart3Fill size={26} className="text-[#f0607a]" />
           ) : (
             <RiHeart3Line size={26} className="text-zinc-200" />
           )}
         </button>
-        <div className="text-[11px] tracking-widest text-zinc-500">
-          {isLiked ? "已收藏" : `加入${LIKED_FOLDER_TITLE}`}
-        </div>
+        <button
+          type="button"
+          disabled={!current || loading}
+          onClick={() => void next()}
+          aria-label="下一首"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition-transform active:scale-95 disabled:opacity-40"
+        >
+          <RiSkipForwardFill size={24} className="text-zinc-200" />
+        </button>
       </div>
     </div>
   );
