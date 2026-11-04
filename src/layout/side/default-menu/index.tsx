@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo } from "react";
 
-import { RiApps2AddFill, RiApps2AddLine } from "@remixicon/react";
+import { RiApps2AddFill, RiApps2AddLine, RiHeartFill, RiHeartLine } from "@remixicon/react";
 
+import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import { getDefaultMenuList } from "@/common/constants/menus";
 import MenuGroup from "@/components/menu/menu-group";
 import { isWeb } from "@/platform";
@@ -39,7 +40,17 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
   }, [user?.isLogin]);
 
   const items = useMemo(() => {
-    const filtered = getDefaultMenuList(isWeb)
+    const menuList = getDefaultMenuList(isWeb);
+    if (!user?.isLogin) {
+      menuList.push({
+        title: LIKED_FOLDER_TITLE,
+        href: `/local-collection/${LIKED_FOLDER_ID}`,
+        icon: RiHeartLine,
+        activeIcon: RiHeartFill,
+      });
+    }
+
+    const filtered = menuList
       .filter(item => (item.needLogin ? user?.isLogin : true))
       .filter(item => (item.needReviewer ? isReviewer : true))
       .filter(item => item.href && !hiddenMenuKeys.includes(item.href))
