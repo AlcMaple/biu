@@ -26,6 +26,13 @@ export const buildShareUrl = ({ bvid, cid, pageIndex }: ShareTarget, origin = ge
   return `${origin}/#/share/${bvid}${query ? `?${query}` : ""}`;
 };
 
+export const isValidFolderId = (id?: string): id is string => !!id && /^\d{1,15}$/.test(id);
+
+export const buildFolderShareUrl = (folderId?: string | number, origin = getShareOrigin()) => {
+  const id = String(folderId ?? "");
+  return isValidFolderId(id) ? `${origin}/#/share/folder/${id}` : undefined;
+};
+
 export const parseShareParams = (search: string) => {
   const params = new URLSearchParams(search);
   const cid = params.get("cid") ?? undefined;
@@ -58,15 +65,28 @@ const writeClipboard = async (text: string) => {
   }
 };
 
+const copyShareUrl = async (url: string) => {
+  if (await writeClipboard(url)) {
+    addToast({ title: "分享链接已复制", color: "success" });
+  } else {
+    addToast({ title: "复制失败，请检查浏览器的剪贴板权限", color: "danger" });
+  }
+};
+
 export const shareSong = async (target: ShareTarget) => {
   const url = buildShareUrl(target);
   if (!url) {
     addToast({ title: "这个内容没有可分享的视频链接", color: "warning" });
     return;
   }
-  if (await writeClipboard(url)) {
-    addToast({ title: "分享链接已复制", color: "success" });
-  } else {
-    addToast({ title: "复制失败，请检查浏览器的剪贴板权限", color: "danger" });
+  await copyShareUrl(url);
+};
+
+export const shareFolder = async (folderId?: string | number) => {
+  const url = buildFolderShareUrl(folderId);
+  if (!url) {
+    addToast({ title: "这个歌单没有可分享的链接", color: "warning" });
+    return;
   }
+  await copyShareUrl(url);
 };

@@ -1,4 +1,4 @@
-import { buildShareUrl, isValidBvid, parseShareParams } from "@/common/utils/share";
+import { buildFolderShareUrl, buildShareUrl, isValidBvid, parseShareParams } from "@/common/utils/share";
 
 describe("share link", () => {
   it("builds hash link with cid and part", () => {
@@ -16,5 +16,11 @@ describe("share link", () => {
   it("parses only numeric cid / p", () => {
     expect(parseShareParams("?cid=123&p=2")).toEqual({ cid: "123", pageIndex: 2 });
     expect(parseShareParams("?cid=abc&p=-1")).toEqual({ cid: undefined, pageIndex: undefined });
+  });
+
+  it("builds folder link and rejects bad id", () => {
+    expect(buildFolderShareUrl(123456, "https://a.b")).toBe("https://a.b/#/share/folder/123456");
+    expect(buildFolderShareUrl("../x", "https://a.b")).toBeUndefined();
+    expect(buildFolderShareUrl(undefined, "https://a.b")).toBeUndefined();
   });
 });

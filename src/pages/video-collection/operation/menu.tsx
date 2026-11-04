@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { Dropdown, DropdownTrigger, Button, DropdownMenu, DropdownItem, useDisclosure } from "@heroui/react";
-import { RiDeleteBinLine, RiEraserLine, RiFileMusicLine, RiFileVideoLine, RiMoreLine } from "@remixicon/react";
+import { RiDeleteBinLine, RiEraserLine, RiFileMusicLine, RiFileVideoLine, RiMoreLine, RiShareForwardLine } from "@remixicon/react";
 
 import { CollectionType } from "@/common/constants/collection";
 import { isDefaultFav } from "@/common/utils/fav";
@@ -19,9 +19,10 @@ export interface MenuProps {
   /** 0：公开, 1：私密 */
   attr?: number;
   onClearInvalid?: () => Promise<void>;
+  onShare?: () => void;
 }
 
-const Menu = ({ type, isCreatedBySelf, mediaCount, attr, onClearInvalid }: MenuProps) => {
+const Menu = ({ type, isCreatedBySelf, mediaCount, attr, onClearInvalid, onShare }: MenuProps) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [outputFileType, setOutputFileType] = useState<MediaDownloadOutputFileType>("audio");
@@ -35,6 +36,13 @@ const Menu = ({ type, isCreatedBySelf, mediaCount, attr, onClearInvalid }: MenuP
   } = useDisclosure();
 
   const menus = [
+    {
+      key: "share",
+      show: Boolean(onShare),
+      startContent: <RiShareForwardLine size={18} />,
+      label: "分享歌单",
+      onPress: () => onShare?.(),
+    },
     {
       key: "download-audio",
       show: Boolean(mediaCount),

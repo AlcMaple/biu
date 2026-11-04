@@ -6,11 +6,11 @@ import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
 import { useRowFlash } from "@/common/hooks/use-row-flash";
-import { fillFavMediaPlayCount, getAllFavMedia } from "@/common/utils/fav";
+import { fillFavMediaPlayCount, getAllFavMedia, isPrivateFav } from "@/common/utils/fav";
 import { favPageKey, forgetFavFolder, readFavPage, writeFavPage } from "@/common/utils/fav-page-cache";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { resolvePlayCount } from "@/common/utils/number";
-import { shareSong } from "@/common/utils/share";
+import { shareFolder, shareSong } from "@/common/utils/share";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
@@ -674,6 +674,7 @@ const Favorites = () => {
         onAddToPlayList={addAllMedia}
         onLocate={locateCurrent}
         onClearInvalid={clearInvalid}
+        onShare={favInfo && !isPrivateFav(favInfo.attr) ? () => void shareFolder(favFolderId) : undefined}
         tagFilter={
           <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
         }

@@ -36,6 +36,7 @@ const Operations = ({
   onAddToPlayList,
   onLocate,
   onClearInvalid,
+  onShare,
   tagFilter,
 }: Props) => {
   const isMobileLayout = useIsMobileLayout();
@@ -70,6 +71,7 @@ const Operations = ({
           mediaCount={mediaCount}
           attr={attr}
           onClearInvalid={onClearInvalid}
+          onShare={onShare}
         />
       </div>
       <div className={isMobileLayout ? "flex w-full min-w-0 items-center gap-2" : "flex items-center space-x-2"}>
