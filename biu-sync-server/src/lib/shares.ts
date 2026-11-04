@@ -72,7 +72,13 @@ function sanitizeItem(raw: unknown): SharedItem | null {
     const bvid = str(item.bvid, 12);
     if (!bvid || !BVID_RE.test(bvid)) return null;
     const cid = typeof item.cid === "string" || typeof item.cid === "number" ? String(item.cid) : undefined;
-    return { ...base, type: 2, rid: String(item.rid ?? bvid).slice(0, 32), bvid, cid: cid && /^\d+$/.test(cid) ? cid : undefined };
+    return {
+      ...base,
+      type: 2,
+      rid: String(item.rid ?? bvid).slice(0, 32),
+      bvid,
+      cid: cid && /^\d+$/.test(cid) ? cid : undefined,
+    };
   }
   if (item.type === 12) {
     const sid = Number(item.rid);
@@ -86,7 +92,8 @@ function sanitizeItem(raw: unknown): SharedItem | null {
 export function parseShareBody(body: unknown) {
   const raw = (body ?? {}) as Record<string, unknown>;
   const folderId = Number(raw.folderId);
-  if (!Number.isSafeInteger(folderId) || folderId <= 0) throw new ShareRequestError("歌单 ID 无效");
+  // 本地歌单的 id 是负数（由客户端生成），线上收藏夹是正数；只排除 0 和非整数
+  if (!Number.isSafeInteger(folderId) || folderId === 0) throw new ShareRequestError("歌单 ID 无效");
   const title = str(raw.title, 100)?.trim();
   if (!title) throw new ShareRequestError("歌单名称不能为空");
   if (!Array.isArray(raw.items)) throw new ShareRequestError("歌单内容无效");
