@@ -161,3 +161,18 @@ export async function getCurrentMid(): Promise<string | null> {
   const token = await getToken();
   return token?.mid ?? null;
 }
+
+export interface SharePublishPayload {
+  folderId: number;
+  title: string;
+  cover?: string;
+  ownerName?: string;
+  items: unknown[];
+}
+
+export async function publishFolderShare(payload: SharePublishPayload): Promise<{ code: string; count: number } | null> {
+  return withAuthRetry(token => {
+    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    return syncHttp.post<{ code: string; count: number }>("/share", payload, { headers });
+  });
+}

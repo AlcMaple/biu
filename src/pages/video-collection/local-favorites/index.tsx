@@ -45,7 +45,7 @@ import {
 } from "@/common/utils/fav";
 import { resolveLocateIndex } from "@/common/utils/locate-playing";
 import { autoReplaceFolder, seedDebugInvalidLogs } from "@/common/utils/replace-invalid";
-import { shareSong } from "@/common/utils/share";
+import { shareLocalFolder, shareSong } from "@/common/utils/share";
 import { formatMillisecond, parseDuration } from "@/common/utils/time";
 import { openBiliVideoLink } from "@/common/utils/url";
 import AsyncButton from "@/components/async-button";
@@ -484,6 +484,15 @@ const LocalFavorites = () => {
   }, [folderId, rawItems]);
 
   const dropdownMenuItems = [
+    {
+      key: "share-folder",
+      label: "分享歌单",
+      hidden: !rawItems.some(item => item.source !== "local" && !item.invalid),
+      startContent: <RiShareForwardLine size={18} />,
+      className: undefined as string | undefined,
+      color: undefined as "danger" | undefined,
+      onPress: () => void shareLocalFolder(folderId),
+    },
     {
       key: "simulate-invalid",
       label: "【调试】生成失效记录演示数据",

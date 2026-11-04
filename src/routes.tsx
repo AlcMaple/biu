@@ -23,6 +23,7 @@ import Search from "./pages/search";
 import Settings from "./pages/settings";
 import Share from "./pages/share";
 import ShareFolder from "./pages/share/folder";
+import ShareLocal from "./pages/share/local";
 import UserProfile from "./pages/user-profile";
 import Folder from "./pages/video-collection";
 import LocalFavorites from "./pages/video-collection/local-favorites";
@@ -95,6 +96,10 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "share/folder/:id",
         element: <ShareFolder />,
+      },
+      {
+        path: "share/local/:code",
+        element: <ShareLocal />,
       },
       {
         path: "share/:bvid",

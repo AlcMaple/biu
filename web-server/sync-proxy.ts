@@ -212,6 +212,7 @@ function allowedSyncRoute(url: URL) {
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/session`) return { kind: "session" as const };
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/watch`) return { kind: "watch" as const };
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/play-ranking`) return { kind: "ranking" as const };
+  if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/share`) return { kind: "share" as const };
 
   const prefix = `${BIU_SYNC_PROXY_ROOT}/sync/`;
   if (!url.pathname.startsWith(prefix)) return undefined;
@@ -238,7 +239,7 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
 
     const method = request.method ?? "GET";
-    const allowedMethods = ["sync", "ranking"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
+    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
     if (!allowedMethods.has(method)) {
       response.setHeader("Allow", [...allowedMethods].join(", "));
       jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
@@ -284,7 +285,9 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
           ? "/api/watch"
           : route.kind === "ranking"
             ? "/api/play-ranking"
-            : `/api/sync/${route.store}`;
+            : route.kind === "share"
+              ? "/api/share"
+              : `/api/sync/${route.store}`;
       const target = pathFor(origin, pathname, route.kind === "watch" ? url.search : "");
       let upstream = await requestSyncService(target, {
         body,
