@@ -674,7 +674,17 @@ const Favorites = () => {
         onAddToPlayList={addAllMedia}
         onLocate={locateCurrent}
         onClearInvalid={clearInvalid}
-        onShare={favInfo && !isPrivateFav(favInfo.attr) ? () => void shareFolder(favFolderId) : undefined}
+        onShare={
+          favInfo
+            ? () => {
+                if (isPrivateFav(favInfo.attr)) {
+                  addToast({ title: "这是私密收藏夹，不能分享。请先在 B 站把它设为公开", color: "warning" });
+                  return;
+                }
+                void shareFolder(favFolderId);
+              }
+            : undefined
+        }
         tagFilter={
           <TagFilterPopover activeTagIds={activeTagIds} availableTagIds={availableTagIds} onChange={setActiveTagIds} />
         }
