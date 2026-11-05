@@ -124,19 +124,24 @@ const Share = () => {
 
   const { data, cid } = state;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center space-y-4 px-4 py-10">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-10">
       <Image
         src={formatUrlProtocol(data.pic)}
         alt={data.title}
-        className="aspect-video w-full max-w-sm rounded-lg object-cover"
+        className="aspect-video w-full max-w-md rounded-xl object-cover shadow-lg"
       />
-      <div className="flex max-w-sm flex-col items-center space-y-1 text-center">
-        <span className="text-lg font-medium">{data.title}</span>
+      <div className="flex max-w-md flex-col items-center gap-1 text-center">
+        <h1 className="line-clamp-2 text-xl font-semibold break-words">{data.title}</h1>
         <span className="text-default-500 text-sm">{data.owner?.name}</span>
       </div>
-      <Button color="primary" startContent={<RiPlayFill size={18} />} onPress={() => start(data, cid)}>
-        播放
-      </Button>
+      <div className="flex gap-3">
+        <Button color="primary" startContent={<RiPlayFill size={18} />} onPress={() => start(data, cid)}>
+          播放
+        </Button>
+        <Button variant="flat" onPress={() => useModalStore.getState().openFullScreenPlayer()}>
+          查看歌词
+        </Button>
+      </div>
     </div>
   );
 };
