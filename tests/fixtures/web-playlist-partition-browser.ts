@@ -99,12 +99,17 @@ document.getElementById("run")!.addEventListener("click", async () => {
       assert(JSON.stringify(await b.read()) === before, "事务没有回滚");
       assert((await guest.read()).items.folderItems[-1].length === 1, "访客原件改变");
     });
-    await check("旧会话晚到读取和排队写入拒绝", async () => {
+    await check("旧会话晚到读取和已开始写盘的事务拒绝", async () => {
       const old = createPlaylistSession(store, playlistScope(900001));
       const read = old.read();
       old.close();
       await rejects(read);
       await rejects(old.write("items", items));
+      const writer = createPlaylistSession(store, playlistScope(900001));
+      const pending = writer.write("items", items);
+      writer.close();
+      await rejects(pending);
+      assert((await a.read()).items.folderItems[-1] === undefined, "旧会话写盘未中止");
     });
     await check("不认领、不覆盖、不删除未分区原件与云同步记账", async () => {
       const original = { original: "合成旧数据" };
