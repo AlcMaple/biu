@@ -17,13 +17,19 @@ const MusicPlayControl = () => {
 
   return (
     <div className="flex items-center justify-center space-x-6">
-      <IconButton radius="md" onPress={prev} isDisabled={isEmptyPlayList || isSingle}>
+      <IconButton radius="md" onPress={prev} isDisabled={isEmptyPlayList || isSingle} aria-label="上一首">
         <RiSkipBackFill size={22} />
       </IconButton>
-      <IconButton isDisabled={isEmptyPlayList} radius="full" onPress={togglePlay} className="size-12 min-w-12">
+      <IconButton
+        isDisabled={isEmptyPlayList}
+        radius="full"
+        onPress={togglePlay}
+        className="size-12 min-w-12"
+        aria-label={isPlaying ? "暂停" : "播放"}
+      >
         {isPlaying ? <RiPauseCircleFill size={48} /> : <RiPlayCircleFill size={48} />}
       </IconButton>
-      <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle}>
+      <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle} aria-label="下一首">
         <RiSkipForwardFill size={22} />
       </IconButton>
     </div>
