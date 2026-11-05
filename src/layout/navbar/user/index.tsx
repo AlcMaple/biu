@@ -11,9 +11,7 @@ import {
   type DropdownItemProps,
 } from "@heroui/react";
 import {
-  RiExternalLinkLine,
   RiFeedbackLine,
-  RiLightbulbLine,
   RiLoginCircleLine,
   RiLogoutCircleLine,
   RiProfileLine,
@@ -23,6 +21,7 @@ import {
 import { twMerge } from "tailwind-merge";
 
 import { isTestAccount, isTestAccountEnabled } from "@/common/constants/test-account";
+import FeedbackModal from "@/components/feedback-modal";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
 import platform, { isWeb, log } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
@@ -51,6 +50,8 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const isMobileLayout = useIsMobileLayout();
 
   const { isOpen: isLoginModalOpen, onOpen: openLoginModal, onOpenChange: onLoginModalOpenChange } = useDisclosure();
+
+  const { isOpen: isFeedbackOpen, onOpen: openFeedbackModal, onOpenChange: onFeedbackOpenChange } = useDisclosure();
 
   const onOpenConfirmModal = useModalStore(s => s.onOpenConfirmModal);
 
@@ -160,18 +161,10 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
       },
     },
     {
-      key: "feature-request",
-      label: "功能建议",
-      startContent: <RiLightbulbLine size={18} />,
-      endContent: <RiExternalLinkLine size={18} />,
-      onPress: () => platform.openExternal("https://github.com/wood3n/biu/issues/new?template=feature-request.yml"),
-    },
-    {
       key: "feedback",
-      label: "问题反馈",
+      label: "问题反馈与建议",
       startContent: <RiFeedbackLine size={18} />,
-      endContent: <RiExternalLinkLine size={18} />,
-      onPress: () => platform.openExternal("https://github.com/wood3n/biu/issues"),
+      onPress: openFeedbackModal,
     },
     {
       key: "logout",
@@ -226,6 +219,7 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
           )}
         </DropdownMenu>
       </Dropdown>
+      <FeedbackModal isOpen={isFeedbackOpen} onOpenChange={onFeedbackOpenChange} />
       <Login isOpen={isLoginModalOpen} onOpenChange={onLoginModalOpenChange} />
     </>
   );

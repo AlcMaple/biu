@@ -105,3 +105,14 @@ export const getAlignDraft = (bvid: string, cid: string) =>
 
 export const discardAlignDraft = (body: { bvid: string; cid: string; lyricsHash: string }) =>
   call<{ ok: true }>({ method: "POST", path: "/admin/drafts/discard", body });
+
+export const sendFeedback = (body: { kind: FeedbackKind; content: string; appVersion: string; platform: string }) =>
+  call<FeedbackItem>({ method: "POST", path: "/feedback", body });
+
+export const getMyFeedback = () => call<{ items: FeedbackItem[] }>({ method: "GET", path: "/feedback/mine" });
+
+export const getFeedbackList = (status: "pending" | "done" = "pending") =>
+  call<{ items: FeedbackItem[] }>({ method: "GET", path: `/admin/feedback?status=${status}` });
+
+export const markFeedbackDone = (id: string, reply?: string) =>
+  call<FeedbackItem>({ method: "POST", path: `/admin/feedback/${id}/done`, body: { reply } });

@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 
 import type { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import type { DraftStore, InputStore } from "./lib/drafts.js";
+import type { FeedbackStore } from "./lib/feedbacks.js";
 import type { AlignQueue } from "./lib/queue.js";
 import type { RecognizedStore } from "./lib/recognized.js";
 import type { Alignment } from "./lib/result.js";
@@ -15,6 +16,7 @@ import { AlignError } from "./lib/errors.js";
 import { lyricsHash, MAX_CHARS, parseLyrics, parseTarget } from "./lib/lyrics.js";
 import { cacheKey } from "./lib/queue.js";
 import { RECOGNIZED_FROM, type RecognizedFrom, type RecognizedInput } from "./lib/recognized.js";
+import { FEEDBACK_KINDS, type FeedbackKind } from "./lib/feedbacks.js";
 import { OTHER_TYPES, type OtherType, type Report, type ReportStore } from "./lib/reports.js";
 
 export interface RouteDeps {
@@ -25,6 +27,7 @@ export interface RouteDeps {
   inputs: InputStore;
   submissions: SubmissionStore;
   reports: ReportStore;
+  feedbacks: FeedbackStore;
   recognized: RecognizedStore;
   screen: ScreenQueue;
   rateLimitPerMinute: number;
@@ -106,7 +109,7 @@ const parseSubtitle = (value: unknown): SubtitleLine[] => {
 };
 
 export function createRouter(deps: RouteDeps): Router {
-  const { queue, cache, failures, drafts, inputs, submissions, reports, recognized, screen } = deps;
+  const { queue, cache, failures, drafts, inputs, submissions, reports, feedbacks, recognized, screen } = deps;
   const router = Router();
   const limiter = rateLimit({
     windowMs: 60_000,
@@ -327,6 +330,38 @@ export function createRouter(deps: RouteDeps): Router {
     }),
   );
 
+  const MAX_FEEDBACK_CHARS = 2000;
+  const MIN_FEEDBACK_CHARS = 5;
+
+  router.post(
+    "/feedback",
+    requireAuth,
+    limiter,
+    wrap(async (req, res) => {
+      const kind = req.body?.kind;
+      if (!(FEEDBACK_KINDS as readonly string[]).includes(kind)) throw new AlignError("BAD_REQUEST", "反馈类型不对");
+      const content = text(req.body?.content, MAX_FEEDBACK_CHARS);
+      if (content.length < MIN_FEEDBACK_CHARS) {
+        throw new AlignError("BAD_REQUEST", `请至少写 ${MIN_FEEDBACK_CHARS} 个字，说清楚具体情况`);
+      }
+      const created = await feedbacks.create({
+        mid: req.mid!,
+        kind: kind as FeedbackKind,
+        content,
+        appVersion: text(req.body?.appVersion, 30),
+        platform: text(req.body?.platform, 30),
+      });
+      res.status(201).json(created);
+    }),
+  );
+
+  router.get(
+    "/feedback/mine",
+    requireAuth,
+    limiter,
+    wrap(async (req, res) => res.json({ items: await feedbacks.list(f => f.mid === req.mid) })),
+  );
+
   const admin = Router();
   admin.use(requireAuth, requireAdmin, limiter);
 
@@ -498,6 +533,19 @@ export function createRouter(deps: RouteDeps): Router {
       await closeReportsOf(bvid, cid, req.mid!, "已换成管理员重新对齐的版本");
       res.json(await published(bvid, cid));
     }),
+  );
+
+  admin.get(
+    "/feedback",
+    wrap(async (req, res) => {
+      const status = req.query.status === "done" ? "done" : "pending";
+      res.json({ items: await feedbacks.list(f => f.status === status) });
+    }),
+  );
+
+  admin.post(
+    "/feedback/:id/done",
+    wrap(async (req, res) => res.json(await feedbacks.close(String(req.params.id), req.mid!, text(req.body?.reply, 200)))),
   );
 
   router.use("/admin", admin);

@@ -175,3 +175,18 @@ interface AlignReportDetail {
   /** 服务器存着这份歌词的原文，审核页里就能重跑 */
   canRealign: boolean;
 }
+
+type FeedbackKind = "bug" | "feature";
+
+interface FeedbackItem {
+  id: string;
+  mid: string;
+  kind: FeedbackKind;
+  content: string;
+  appVersion: string;
+  platform: string;
+  status: "pending" | "done";
+  reply?: string;
+  createdAt: number;
+  reviewedAt?: number;
+}
