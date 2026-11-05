@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import { isValidShareCode } from "@/common/utils/share";
 import { parseDuration } from "@/common/utils/time";
 import { getSharedFolder, type SharedFolderItem } from "@/service/shared-folder";
-import { useModalStore } from "@/store/modal";
 import { usePlayList, type PlayItem } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
@@ -26,11 +25,15 @@ const toPlayItem = (item: SharedFolderItem): PlayItem => {
 const ShareLocal = () => {
   const { code } = useParams();
   const [state, setState] = useState<FolderLandingState>({ status: "loading" });
-  const autoPlayed = useRef("");
 
-  const start = useCallback((medias: PlayItem[]) => {
+  const start = useCallback((medias: PlayItem[], index?: number) => {
     usePlayProgress.getState().setCurrentTime(0);
-    void usePlayList.getState().playList(medias);
+    if (index === undefined) {
+      void usePlayList.getState().playList(medias);
+    } else {
+      // 和自己的歌单一致：点某一首只播这一首，不重建队列
+      void usePlayList.getState().play(medias[index]);
+    }
   }, []);
 
   useEffect(() => {
@@ -49,11 +52,6 @@ const ShareLocal = () => {
           return;
         }
         setState({ status: "ready", title: data.title, cover: data.cover, ownerName: data.ownerName, medias });
-        if (autoPlayed.current !== code) {
-          autoPlayed.current = code;
-          start(medias);
-          useModalStore.getState().openFullScreenPlayer();
-        }
       })
       .catch(error => {
         if (cancelled) return;

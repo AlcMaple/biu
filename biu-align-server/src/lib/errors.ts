@@ -38,6 +38,8 @@ const CATALOG = {
   REJECT_REASON_REQUIRED: [400, "打回时要写原因，上传者会看到"],
   REPORT_NOT_FOUND: [404, "找不到这条报错"],
   REPORT_NOT_PENDING: [409, "这条报错已经处理过了"],
+  FEEDBACK_NOT_FOUND: [404, "找不到这条反馈"],
+  FEEDBACK_NOT_PENDING: [409, "这条反馈已经处理过了"],
 } as const satisfies Record<string, readonly [number, string]>;
 
 export type AlignErrorCode = keyof typeof CATALOG;

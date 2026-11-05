@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import { getAllFavMedia } from "@/common/utils/fav";
 import { isValidFolderId } from "@/common/utils/share";
 import { getFavFolderInfo } from "@/service/fav-folder-info";
-import { useModalStore } from "@/store/modal";
 import { usePlayList, type PlayItem } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
@@ -19,12 +18,16 @@ const CODE_MESSAGES: Record<number, string> = {
 const ShareFolder = () => {
   const { id } = useParams();
   const [state, setState] = useState<FolderLandingState>({ status: "loading" });
-  const autoPlayed = useRef("");
 
-  const start = useCallback((medias: PlayItem[]) => {
+  const start = useCallback((medias: PlayItem[], index?: number) => {
     // 收听者应当从头听，而不是续上本机之前的进度
     usePlayProgress.getState().setCurrentTime(0);
-    void usePlayList.getState().playList(medias);
+    if (index === undefined) {
+      void usePlayList.getState().playList(medias);
+    } else {
+      // 和自己的歌单一致：点某一首只播这一首，不重建队列
+      void usePlayList.getState().play(medias[index]);
+    }
   }, []);
 
   useEffect(() => {
@@ -57,12 +60,6 @@ const ShareFolder = () => {
           ownerName: res.data.upper?.name,
           medias,
         });
-        if (autoPlayed.current !== id) {
-          autoPlayed.current = id;
-          // 浏览器可能拒绝无手势的自动播放，此时由全屏播放器里的播放键或下方按钮完成
-          start(medias);
-          useModalStore.getState().openFullScreenPlayer();
-        }
       })
       .catch(error => {
         if (!cancelled) setState({ status: "error", message: describeShareFailure(error) });

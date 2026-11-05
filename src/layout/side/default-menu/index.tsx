@@ -19,6 +19,7 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
   const hiddenMenuKeys = useSettings(state => state.hiddenMenuKeys);
   const isReviewer = useAlignReview(state => state.isAdmin);
   const pendingReviews = useAlignReview(state => state.pendingCount);
+  const pendingFeedback = useAlignReview(state => state.feedbackCount);
 
   // 审核员身份由对齐服务按登录账号判定，换号 / 退出都要重新查
   useEffect(() => {
@@ -43,7 +44,7 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
       .filter(item => (item.needLogin ? user?.isLogin : true))
       .filter(item => (item.needReviewer ? isReviewer : true))
       .filter(item => item.href && !hiddenMenuKeys.includes(item.href))
-      .map(item => (item.needReviewer ? { ...item, badge: pendingReviews } : item));
+      .map(item => (item.needReviewer ? { ...item, badge: item.href === "/feedback-review" ? pendingFeedback : pendingReviews } : item));
 
     // 展开态的「新建收藏夹」在收藏夹分组的标题栏里，而该分组未登录时整个不渲染；
     // 折叠轨把这个入口提到菜单里，同样要跟着登录态走，否则未登录也会多出一个按钮。
@@ -60,7 +61,7 @@ const DefaultMenus = ({ isCollapsed, onOpenAddFavorite }: Props) => {
     }
 
     return filtered;
-  }, [user?.isLogin, hiddenMenuKeys, isCollapsed, onOpenAddFavorite, isReviewer, pendingReviews]);
+  }, [user?.isLogin, hiddenMenuKeys, isCollapsed, onOpenAddFavorite, isReviewer, pendingReviews, pendingFeedback]);
 
   return <MenuGroup items={items} collapsed={isCollapsed} />;
 };

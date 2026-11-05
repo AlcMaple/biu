@@ -294,6 +294,12 @@ let audioGestureUnlocked = false;
  */
 let awaitingUserGesture = false;
 
+// 分享链接打开时的自动播放本来就可能被浏览器拦下，页面上有显眼的播放按钮，不再弹「被阻止」的提示
+let suppressAutoplayBlockedToast = false;
+export const setSuppressAutoplayBlockedToast = (value: boolean) => {
+  suppressAutoplayBlockedToast = value;
+};
+
 const primeAudioForGesture = () => {
   // 真实用户手势到达：解除「等待手势」闸门，让后续换源/续播恢复
   awaitingUserGesture = false;
@@ -322,7 +328,7 @@ const handlePlayError = (error: any) => {
     awaitingUserGesture = true;
     if (!audio.paused) audio.pause();
     usePlayList.setState({ isPlaying: false });
-    toastError("浏览器阻止了自动播放，请再点一次播放");
+    if (!suppressAutoplayBlockedToast) toastError("浏览器阻止了自动播放，请再点一次播放");
     return;
   }
   if (!errorMsg.includes("interrupted")) {

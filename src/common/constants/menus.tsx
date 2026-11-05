@@ -17,6 +17,8 @@ import {
   RiTrophyFill,
   RiShieldCheckLine,
   RiShieldCheckFill,
+  RiFeedbackLine,
+  RiFeedbackFill,
   RiFileEditLine,
   RiFileEditFill,
 } from "@remixicon/react";
@@ -98,6 +100,14 @@ export const DefaultMenuList: DefaultMenuItem[] = [
     needReviewer: true,
     icon: RiShieldCheckLine,
     activeIcon: RiShieldCheckFill,
+  },
+  {
+    title: "用户反馈",
+    href: "/feedback-review",
+    needLogin: true,
+    needReviewer: true,
+    icon: RiFeedbackLine,
+    activeIcon: RiFeedbackFill,
   },
 ];
 

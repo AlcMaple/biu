@@ -13,6 +13,7 @@ import Heartbeat from "./pages/heartbeat";
 import History from "./pages/history";
 import Later from "./pages/later";
 import LocalMusicPage from "./pages/local-music";
+import FeedbackReview from "./pages/feedback-review";
 import LyricsReview from "./pages/lyrics-review";
 import LyricsSubmissions from "./pages/lyrics-submissions";
 import MiniPlayer from "./pages/mini-player";
@@ -56,6 +57,10 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "lyrics-review",
         element: <LyricsReview />,
+      },
+      {
+        path: "feedback-review",
+        element: <FeedbackReview />,
       },
       {
         path: "lyrics-submissions",

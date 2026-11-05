@@ -5,6 +5,7 @@ import { createApp } from "./app.js";
 import { AlignmentCache, FailureCache } from "./lib/alignment-cache.js";
 import { downloadAudio, downloadVideo, getVideoPage } from "./lib/bilibili.js";
 import { config } from "./lib/config.js";
+import { FeedbackStore } from "./lib/feedbacks.js";
 import { DraftStore, InputStore } from "./lib/drafts.js";
 import { mockDownloadAudio, mockDownloadVideo, mockGetVideoPage, mockRunScreen, mockRunWorker } from "./lib/mock.js";
 import { AlignQueue } from "./lib/queue.js";
@@ -22,6 +23,7 @@ const drafts = new DraftStore(config.dataDir, mock ? "mock" : undefined);
 const inputs = new InputStore(config.dataDir, mock ? "mock" : undefined);
 const submissions = new SubmissionStore(config.dataDir);
 const reports = new ReportStore(config.dataDir);
+const feedbacks = new FeedbackStore(config.dataDir);
 const recognized = new RecognizedStore(config.dataDir);
 const queue = new AlignQueue({
   cache,
@@ -53,6 +55,7 @@ createApp({
   inputs,
   submissions,
   reports,
+  feedbacks,
   recognized,
   screen,
   rateLimitPerMinute: config.rateLimitPerMinute,
