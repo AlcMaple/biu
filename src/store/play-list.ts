@@ -143,7 +143,7 @@ interface Action {
   init: VoidFunction;
   play: (params: PlayItem) => Promise<void>;
   playListItem: (id: string) => Promise<void>;
-  playList: (items: PlayItem[]) => Promise<void>;
+  playList: (items: PlayItem[], startIndex?: number) => Promise<void>;
   addToNext: (item: PlayItem) => void;
   addList: (items: PlayItem[]) => void;
   delPage: (id: string) => void;
@@ -294,6 +294,12 @@ let audioGestureUnlocked = false;
  */
 let awaitingUserGesture = false;
 
+// 分享链接打开时的自动播放本来就可能被浏览器拦下，页面上有显眼的播放按钮，不再弹「被阻止」的提示
+let suppressAutoplayBlockedToast = false;
+export const setSuppressAutoplayBlockedToast = (value: boolean) => {
+  suppressAutoplayBlockedToast = value;
+};
+
 const primeAudioForGesture = () => {
   // 真实用户手势到达：解除「等待手势」闸门，让后续换源/续播恢复
   awaitingUserGesture = false;
@@ -322,7 +328,7 @@ const handlePlayError = (error: any) => {
     awaitingUserGesture = true;
     if (!audio.paused) audio.pause();
     usePlayList.setState({ isPlaying: false });
-    toastError("浏览器阻止了自动播放，请再点一次播放");
+    if (!suppressAutoplayBlockedToast) toastError("浏览器阻止了自动播放，请再点一次播放");
     return;
   }
   if (!errorMsg.includes("interrupted")) {
@@ -1487,7 +1493,7 @@ export const usePlayList = create<State & Action>()(
             }
           });
         },
-        playList: async items => {
+        playList: async (items, startIndex = 0) => {
           const { playId: oldPlayId, list: oldList, playMode, randomHistory: oldHistory } = get();
           const oldPlayItem = oldList.find(item => item.id === oldPlayId);
 
@@ -1497,10 +1503,13 @@ export const usePlayList = create<State & Action>()(
             id: item.source === "local" && item.id ? item.id : idGenerator(),
           }));
 
+          // 指定了起播位置就直接从那首开始：先起播第一首再切过去，会让第一首短暂出声
           const initialId =
-            playMode === PlayMode.Random && newList.length > 1
-              ? newList[Math.floor(Math.random() * newList.length)].id
-              : newList[0].id;
+            startIndex > 0 && newList[startIndex]
+              ? newList[startIndex].id
+              : playMode === PlayMode.Random && newList.length > 1
+                ? newList[Math.floor(Math.random() * newList.length)].id
+                : newList[0].id;
 
           // 随机模式：重建历史栈。
           //

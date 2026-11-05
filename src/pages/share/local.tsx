@@ -28,13 +28,7 @@ const ShareLocal = () => {
 
   const start = useCallback((medias: PlayItem[], index = 0) => {
     usePlayProgress.getState().setCurrentTime(0);
-    void usePlayList
-      .getState()
-      .playList(medias)
-      .then(() => {
-        const target = usePlayList.getState().list[index];
-        if (index > 0 && target) void usePlayList.getState().playListItem(target.id);
-      });
+    void usePlayList.getState().playList(medias, index);
   }, []);
 
   useEffect(() => {

@@ -22,13 +22,7 @@ const ShareFolder = () => {
   const start = useCallback((medias: PlayItem[], index = 0) => {
     // 收听者应当从头听，而不是续上本机之前的进度
     usePlayProgress.getState().setCurrentTime(0);
-    void usePlayList
-      .getState()
-      .playList(medias)
-      .then(() => {
-        const target = usePlayList.getState().list[index];
-        if (index > 0 && target) void usePlayList.getState().playListItem(target.id);
-      });
+    void usePlayList.getState().playList(medias, index);
   }, []);
 
   useEffect(() => {
