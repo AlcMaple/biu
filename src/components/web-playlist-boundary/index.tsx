@@ -11,6 +11,7 @@ import {
 } from "@/platform/web-playlist-runtime";
 import { applyWebPlaylistPartition } from "@/service/web-playlist-view";
 import { ensureLikedFolder, useFavoritesStore } from "@/store/favorite";
+import { useLegacyRecovery } from "@/store/legacy-recovery";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
@@ -46,6 +47,8 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [legacyOpen, setLegacyOpen] = useState(false);
+  const [legacyOffer, setLegacyOffer] = useState<Session["legacyOffer"]>(null);
   const started = useRef<Promise<void> | null>(null);
   const mounted = useRef(false);
   const activeMid = user?.isLogin ? user.mid : null;
@@ -68,6 +71,8 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
         if (mounted.current) {
           setSession(next);
           setOffer(nextOffer);
+          setLegacyOffer(next.legacyOffer ?? null);
+          setLegacyOpen(Boolean(next.legacyOffer));
         }
       })().catch(error => {
         if (mounted.current) setError(error instanceof Error ? error.message : "收藏载入失败");
@@ -78,6 +83,20 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    useLegacyRecovery.setState({
+      open: legacyOffer
+        ? () => {
+            setError(undefined);
+            setLegacyOpen(true);
+          }
+        : undefined,
+    });
+    return () => {
+      useLegacyRecovery.setState({ open: undefined });
+    };
+  }, [legacyOffer]);
 
   useEffect(() => {
     if (!session || session.scope === expectedScope) return;
@@ -106,7 +125,29 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
     }
   };
 
-  if (!session || session.scope !== expectedScope || (error && !offer)) {
+  const recoverLegacy = async () => {
+    if (!session || !legacyOffer) return;
+    setError(undefined);
+    setBusy(true);
+    try {
+      await flushWebPlaylistWrites();
+      await session.legacy.recover(legacyOffer);
+      applyWebPlaylistPartition(await session.read());
+      ensureLikedFolder();
+      await flushWebPlaylistWrites();
+      if (mounted.current) {
+        setLegacyOpen(false);
+        setLegacyOffer(null);
+        addToast({ title: "旧版收藏已恢复，原件已保留", color: "success" });
+      }
+    } catch (error) {
+      if (mounted.current) setError(error instanceof Error ? error.message : "恢复失败，原件已保留");
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  };
+
+  if (!session || session.scope !== expectedScope || (error && !offer && !legacyOpen)) {
     return (
       <div className="flex h-full items-center justify-center" role={error ? "alert" : "status"}>
         {error ? <span>{error}</span> : <Spinner label="正在载入收藏" />}
@@ -116,9 +157,34 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
 
   return (
     <>
-      {error && !offer ? <div role="alert">{error}</div> : null}
       {children}
-      <Modal isOpen={Boolean(offer)} hideCloseButton isDismissable={false} isKeyboardDismissDisabled>
+      <Modal isOpen={legacyOpen} hideCloseButton isDismissable={false} isKeyboardDismissDisabled>
+        <ModalContent>
+          <ModalHeader>恢复旧版收藏</ModalHeader>
+          <ModalBody>
+            <p>
+              将旧版 {legacyOffer?.folders} 个歌单、{legacyOffer?.songs} 首歌曲恢复到「{user?.uname ?? "访客"}」
+            </p>
+            {error ? <p role="alert">{error}</p> : null}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="light"
+              isDisabled={busy}
+              onPress={() => {
+                setError(undefined);
+                setLegacyOpen(false);
+              }}
+            >
+              暂不恢复
+            </Button>
+            <Button color="primary" isLoading={busy} onPress={() => void recoverLegacy()}>
+              恢复到当前身份
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal isOpen={Boolean(offer) && !legacyOpen} hideCloseButton isDismissable={false} isKeyboardDismissDisabled>
         <ModalContent>
           <ModalHeader>并入访客收藏？</ModalHeader>
           <ModalBody>

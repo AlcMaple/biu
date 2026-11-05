@@ -69,6 +69,7 @@ export function createPlaylistSession(store: PlaylistPartitionStore, scope: Play
 
   return {
     scope,
+    checkActive: assertActive,
     close: () => (active = false),
     read: async () => (await readPartition(scope)).data,
     write: async <K extends keyof PlaylistPartitionData>(name: K, value: PlaylistPartitionData[K]) => {
@@ -137,7 +138,7 @@ export function createPlaylistSession(store: PlaylistPartitionStore, scope: Play
   };
 }
 
-function parsePartition(value: unknown): PlaylistPartition | undefined {
+export function parsePlaylistPartition(value: unknown): PlaylistPartition | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== "object" || value === null) throw new Error("收藏分区损坏，已保留原件");
   const partition = value as Partial<PlaylistPartition>;
@@ -164,7 +165,7 @@ function parsePartition(value: unknown): PlaylistPartition | undefined {
 }
 
 export function createIndexedDBPlaylistPartitionStore(database: IDBDatabase, prefix: string): PlaylistPartitionStore {
-  const key = (scope: PlaylistScope) => `${prefix}playlist-partition:v1:${scope}`;
+  const key = (scope: PlaylistScope) => webPlaylistPartitionKey(prefix, scope);
   return {
     read: scope =>
       new Promise((resolve, reject) => {
@@ -172,7 +173,7 @@ export function createIndexedDBPlaylistPartitionStore(database: IDBDatabase, pre
         const request = transaction.objectStore("stores").get(key(scope));
         transaction.oncomplete = () => {
           try {
-            resolve(parsePartition(request.result));
+            resolve(parsePlaylistPartition(request.result));
           } catch (error) {
             reject(error);
           }
@@ -190,7 +191,7 @@ export function createIndexedDBPlaylistPartitionStore(database: IDBDatabase, pre
         let cause: unknown;
         request.onsuccess = () => {
           try {
-            const next = transform(parsePartition(request.result));
+            const next = transform(parsePlaylistPartition(request.result));
             objectStore.put(next.partition, key(scope));
             result = { value: next.result };
           } catch (error) {
@@ -207,3 +208,6 @@ export function createIndexedDBPlaylistPartitionStore(database: IDBDatabase, pre
       }),
   };
 }
+
+export const webPlaylistPartitionKey = (prefix: string, scope: PlaylistScope) =>
+  `${prefix}playlist-partition:v1:${scope}`;

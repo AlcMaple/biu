@@ -21,12 +21,13 @@ import {
 import { twMerge } from "tailwind-merge";
 
 import { isTestAccount, isTestAccountEnabled } from "@/common/constants/test-account";
-import FeedbackModal from "@/components/feedback-modal";
 import { useIsMobileLayout } from "@/common/hooks/use-responsive";
+import FeedbackModal from "@/components/feedback-modal";
 import platform, { isWeb, log } from "@/platform";
 import { postPassportLoginExit } from "@/service/passport-login-exit";
 import { logoutWebAuthSession, refreshWebAuthSession } from "@/service/web-auth";
 import { useFavoritesStore } from "@/store/favorite";
+import { useLegacyRecovery } from "@/store/legacy-recovery";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
@@ -42,6 +43,7 @@ interface UserCardProps {
 
 const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   const user = useUser(s => s.user);
+  const openLegacyRecovery = useLegacyRecovery(state => state.open);
   const clearUser = useUser(s => s.clear);
   const loginAsTestAccount = useUser(s => s.loginAsTestAccount);
   const clearToken = useToken(s => s.clear);
@@ -105,6 +107,9 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
   };
 
   const dropdownItems: (DropdownItemProps & { label: string; hidden?: boolean })[] = [
+    ...(process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true"
+      ? [{ key: "legacy-recovery", label: "恢复旧版收藏", hidden: !openLegacyRecovery, onPress: openLegacyRecovery }]
+      : []),
     {
       key: "login",
       label: "登录",

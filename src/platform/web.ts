@@ -21,6 +21,7 @@ import type { Logger, Platform } from "./types";
 import type { PlaylistPartitionData } from "./web-playlist-partition";
 
 import { installWebLogTransport, reportWebLog } from "./web-log-transport";
+import { createLegacyPlaylistRecovery } from "./web-playlist-legacy";
 import { createIndexedDBPlaylistPartitionStore } from "./web-playlist-partition";
 import {
   failWebPlaylistStartup,
@@ -244,13 +245,16 @@ export async function prepareWebPlaylistSession(mid: number | null) {
   try {
     const database = await openDatabase();
     if (!database) throw new Error("浏览器收藏存储暂不可用");
-    for (const name of Object.keys(playlistNames) as (keyof typeof playlistNames)[]) {
-      const indexed = await readIndexedValue<unknown>(database, storageKey(name));
-      const legacy = indexed === undefined ? readLegacyStore(name) : indexed;
-      // 预览仅接入全新隔离样本；旧数据未认领前不展示空替身，更不自动分给当前账号。
-      if (legacy !== undefined && legacy !== null) throw new Error("此预览尚未接入旧版收藏恢复，原件已保留");
-    }
-    return startWebPlaylistSession(createIndexedDBPlaylistPartitionStore(database, STORE_KEY_PREFIX), mid);
+    const session = startWebPlaylistSession(createIndexedDBPlaylistPartitionStore(database, STORE_KEY_PREFIX), mid);
+    const legacy = createLegacyPlaylistRecovery(
+      database,
+      STORE_KEY_PREFIX,
+      session.scope,
+      readLegacyStore,
+      session.checkActive,
+    );
+    const legacyOffer = await legacy.inspect();
+    return { ...session, legacy, legacyOffer };
   } catch (error) {
     failWebPlaylistStartup(error);
     throw error;

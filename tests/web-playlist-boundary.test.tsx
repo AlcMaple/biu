@@ -20,6 +20,7 @@ const mock = vi.hoisted(() => ({
   read: vi.fn(),
   apply: vi.fn(),
   ensure: vi.fn(),
+  recover: vi.fn(),
 }));
 
 vi.mock("@heroui/react", () => ({
@@ -113,6 +114,7 @@ describe("分区预览使用原页面和明确选择", () => {
     });
     mock.read.mockResolvedValue({ accountSnapshot: true });
     mock.onError.mockReturnValue(() => undefined);
+    mock.recover.mockResolvedValue(true);
   });
   afterEach(async () => {
     await act(async () => root.unmount());
@@ -190,5 +192,46 @@ describe("分区预览使用原页面和明确选择", () => {
     await mount();
     expect(container.querySelector('[data-testid="real-layout"]')).not.toBeNull();
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("旧版恢复需要明确选择，目标身份与数量可见，成功后才应用快照", async () => {
+    mock.offer.mockResolvedValue(null);
+    mock.prepare.mockResolvedValue({
+      scope: "account:900001",
+      guestOffer: mock.offer,
+      read: mock.read,
+      legacyOffer: { raw: {}, songs: 2, folders: 2 },
+      legacy: { recover: mock.recover },
+    });
+    await mount();
+    expect(container.textContent).toContain("普通 A");
+    expect(container.textContent).toContain("2 首歌曲");
+    expect(mock.recover).not.toHaveBeenCalled();
+    await choose("恢复到当前身份");
+    expect(mock.recover).toHaveBeenCalledOnce();
+    expect(mock.apply).toHaveBeenCalledWith({ accountSnapshot: true });
+    expect(mock.toast).toHaveBeenCalledWith({ title: "旧版收藏已恢复，原件已保留", color: "success" });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("暂不恢复不写入；恢复失败保留弹窗而不显示成功", async () => {
+    mock.offer.mockResolvedValue(null);
+    mock.recover.mockRejectedValue(new Error("当前身份已有收藏，请先保留旧版原件"));
+    mock.prepare.mockResolvedValue({
+      scope: "account:900001",
+      guestOffer: mock.offer,
+      read: mock.read,
+      legacyOffer: { raw: {}, songs: 2, folders: 2 },
+      legacy: { recover: mock.recover },
+    });
+    await mount();
+    await choose("暂不恢复");
+    expect(mock.recover).not.toHaveBeenCalled();
+    const { useLegacyRecovery } = await import("@/store/legacy-recovery");
+    await act(async () => useLegacyRecovery.getState().open?.());
+    await choose("恢复到当前身份");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("原件");
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(mock.toast).not.toHaveBeenCalled();
   });
 });
