@@ -26,9 +26,14 @@ const ShareLocal = () => {
   const { code } = useParams();
   const [state, setState] = useState<FolderLandingState>({ status: "loading" });
 
-  const start = useCallback((medias: PlayItem[], index = 0) => {
+  const start = useCallback((medias: PlayItem[], index?: number) => {
     usePlayProgress.getState().setCurrentTime(0);
-    void usePlayList.getState().playList(medias, index);
+    if (index === undefined) {
+      void usePlayList.getState().playList(medias);
+    } else {
+      // 和自己的歌单一致：点某一首只播这一首，不重建队列
+      void usePlayList.getState().play(medias[index]);
+    }
   }, []);
 
   useEffect(() => {

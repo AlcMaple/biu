@@ -143,7 +143,7 @@ interface Action {
   init: VoidFunction;
   play: (params: PlayItem) => Promise<void>;
   playListItem: (id: string) => Promise<void>;
-  playList: (items: PlayItem[], startIndex?: number) => Promise<void>;
+  playList: (items: PlayItem[]) => Promise<void>;
   addToNext: (item: PlayItem) => void;
   addList: (items: PlayItem[]) => void;
   delPage: (id: string) => void;
@@ -1493,7 +1493,7 @@ export const usePlayList = create<State & Action>()(
             }
           });
         },
-        playList: async (items, startIndex = 0) => {
+        playList: async items => {
           const { playId: oldPlayId, list: oldList, playMode, randomHistory: oldHistory } = get();
           const oldPlayItem = oldList.find(item => item.id === oldPlayId);
 
@@ -1503,13 +1503,10 @@ export const usePlayList = create<State & Action>()(
             id: item.source === "local" && item.id ? item.id : idGenerator(),
           }));
 
-          // 指定了起播位置就直接从那首开始：先起播第一首再切过去，会让第一首短暂出声
           const initialId =
-            startIndex > 0 && newList[startIndex]
-              ? newList[startIndex].id
-              : playMode === PlayMode.Random && newList.length > 1
-                ? newList[Math.floor(Math.random() * newList.length)].id
-                : newList[0].id;
+            playMode === PlayMode.Random && newList.length > 1
+              ? newList[Math.floor(Math.random() * newList.length)].id
+              : newList[0].id;
 
           // 随机模式：重建历史栈。
           //
