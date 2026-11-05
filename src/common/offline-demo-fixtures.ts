@@ -530,13 +530,22 @@ const responseForPath = (path: string, config: AxiosRequestConfig) => {
         numPages: 1,
         result: searchUsers,
       });
+    const keywords = String(getParam(config, "keyword") ?? "")
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const result = searchVideoItems.filter(item => {
+      const text = `${item.title} ${item.author}`.toLowerCase();
+      return keywords.every(keyword => text.includes(keyword));
+    });
     return base({
       seid: "demo",
       page: 1,
       pagesize: 20,
-      numResults: searchVideoItems.length,
-      numPages: 1,
-      result: searchVideoItems,
+      numResults: result.length,
+      numPages: result.length > 0 ? 1 : 0,
+      result,
       suggest_keyword: "",
     });
   }

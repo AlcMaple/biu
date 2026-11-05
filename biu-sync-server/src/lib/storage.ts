@@ -42,7 +42,7 @@ function storeFilePath(mid: string, store: StoreName): string {
  */
 const mutexQueues = new Map<string, Promise<unknown>>();
 
-function withMutex<T>(key: string, task: () => Promise<T>): Promise<T> {
+export function withMutex<T>(key: string, task: () => Promise<T>): Promise<T> {
   const prev = mutexQueues.get(key) ?? Promise.resolve();
   const next = prev.then(task, task);
   // 队列里只保留"最新一个待完成的 promise"，避免 Map 无限增长；

@@ -9,7 +9,7 @@ import { formatUrlProtocol } from "@/common/utils/url";
 import Image from "@/components/image";
 import { getWebInterfaceView, type WebInterfaceViewData } from "@/service/web-interface-view";
 import { useModalStore } from "@/store/modal";
-import { usePlayList } from "@/store/play-list";
+import { setSuppressAutoplayBlockedToast, usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
 type State =
@@ -90,9 +90,21 @@ const Share = () => {
         if (autoPlayed.current !== key) {
           autoPlayed.current = key;
           // 浏览器可能拒绝无手势的自动播放，此时停在已加载状态，由下方按钮完成播放
+          setSuppressAutoplayBlockedToast(true);
           start(res.data, cid);
-          // 落地页的重点是歌词：直接打开全屏播放器，自动播放被拦时用它里面的播放键即可
-          useModalStore.getState().openFullScreenPlayer();
+          // 落地页的重点是歌词：真的播起来了再展开全屏播放器；被浏览器拦下时留在这个页面，
+          // 由页面上的「播放」按钮（真实手势）起播，而不是盖一个没在播放的全屏页再弹报错
+          const unsubscribe = usePlayList.subscribe(s => {
+            if (!s.isPlaying) return;
+            cleanup();
+            useModalStore.getState().openFullScreenPlayer();
+          });
+          const timer = window.setTimeout(() => cleanup(), 5000);
+          const cleanup = () => {
+            unsubscribe();
+            window.clearTimeout(timer);
+            setSuppressAutoplayBlockedToast(false);
+          };
         }
       })
       .catch(error => {
@@ -124,19 +136,28 @@ const Share = () => {
 
   const { data, cid } = state;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center space-y-4 px-4 py-10">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-10">
       <Image
         src={formatUrlProtocol(data.pic)}
         alt={data.title}
-        className="aspect-video w-full max-w-sm rounded-lg object-cover"
+        className="aspect-video w-full max-w-md rounded-xl object-cover shadow-lg"
       />
-      <div className="flex max-w-sm flex-col items-center space-y-1 text-center">
-        <span className="text-lg font-medium">{data.title}</span>
+      <div className="flex max-w-md flex-col items-center gap-1 text-center">
+        <h1 className="line-clamp-2 text-xl font-semibold break-words">{data.title}</h1>
         <span className="text-default-500 text-sm">{data.owner?.name}</span>
       </div>
-      <Button color="primary" startContent={<RiPlayFill size={18} />} onPress={() => start(data, cid)}>
-        播放
-      </Button>
+      <div className="flex gap-3">
+        <Button color="primary" startContent={<RiPlayFill size={18} />} onPress={() => {
+            start(data, cid);
+            useModalStore.getState().openFullScreenPlayer();
+          }}
+        >
+          播放
+        </Button>
+        <Button variant="flat" onPress={() => useModalStore.getState().openFullScreenPlayer()}>
+          查看歌词
+        </Button>
+      </div>
     </div>
   );
 };

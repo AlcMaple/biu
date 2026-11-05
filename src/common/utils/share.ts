@@ -1,6 +1,10 @@
 import { addToast } from "@heroui/react";
 
 import { isElectron } from "@/platform/detect";
+import { publishFolderShare } from "@/service/sync/client";
+import { useFavoritesStore } from "@/store/favorite";
+import { useLocalFavItemsStore } from "@/store/local-fav-items";
+import { useUser } from "@/store/user";
 
 // 桌面端没有自己的网址，分享链接固定指向线上站点
 const DESKTOP_SHARE_ORIGIN = "https://music.alcmaple.cn";
@@ -25,6 +29,18 @@ export const buildShareUrl = ({ bvid, cid, pageIndex }: ShareTarget, origin = ge
   const query = params.toString();
   return `${origin}/#/share/${bvid}${query ? `?${query}` : ""}`;
 };
+
+export const isValidFolderId = (id?: string): id is string => !!id && /^\d{1,15}$/.test(id);
+
+export const buildFolderShareUrl = (folderId?: string | number, origin = getShareOrigin()) => {
+  const id = String(folderId ?? "");
+  return isValidFolderId(id) ? `${origin}/#/share/folder/${id}` : undefined;
+};
+
+export const isValidShareCode = (code?: string): code is string => !!code && /^[A-Za-z0-9_-]{11}$/.test(code);
+
+export const buildLocalShareUrl = (code: string, origin = getShareOrigin()) =>
+  isValidShareCode(code) ? `${origin}/#/share/local/${code}` : undefined;
 
 export const parseShareParams = (search: string) => {
   const params = new URLSearchParams(search);
@@ -58,15 +74,63 @@ const writeClipboard = async (text: string) => {
   }
 };
 
+const copyShareUrl = async (url: string) => {
+  if (await writeClipboard(url)) {
+    addToast({ title: "分享链接已复制", color: "success" });
+  } else {
+    addToast({ title: "复制失败，请检查浏览器的剪贴板权限", color: "danger" });
+  }
+};
+
 export const shareSong = async (target: ShareTarget) => {
   const url = buildShareUrl(target);
   if (!url) {
     addToast({ title: "这个内容没有可分享的视频链接", color: "warning" });
     return;
   }
-  if (await writeClipboard(url)) {
-    addToast({ title: "分享链接已复制", color: "success" });
-  } else {
-    addToast({ title: "复制失败，请检查浏览器的剪贴板权限", color: "danger" });
+  await copyShareUrl(url);
+};
+
+export const shareFolder = async (folderId?: string | number) => {
+  const url = buildFolderShareUrl(folderId);
+  if (!url) {
+    addToast({ title: "这个歌单没有可分享的链接", color: "warning" });
+    return;
+  }
+  await copyShareUrl(url);
+};
+
+const describePublishFailure = (error: unknown) => {
+  const e = error as { response?: { status?: number; data?: { error?: string } } };
+  const status = e.response?.status;
+  if (e.response?.data?.error && status && status < 500) return e.response.data.error;
+  if (status === 429) return "请求过于频繁，请等一两分钟再分享";
+  if (status && status >= 500) return "分享服务暂时不可用，稍后再试";
+  return "没能连上分享服务，请检查网络后重试";
+};
+
+export const shareLocalFolder = async (folderId: number) => {
+  const folder = useFavoritesStore.getState().createdFavorites.find(f => f.id === folderId);
+  const items = useLocalFavItemsStore.getState().folderItems[folderId] ?? [];
+  if (!folder || !items.length) {
+    addToast({ title: "歌单是空的，没有可分享的内容", color: "warning" });
+    return;
+  }
+  try {
+    const result = await publishFolderShare({
+      folderId,
+      title: folder.title,
+      cover: folder.cover,
+      ownerName: useUser.getState().user?.uname,
+      items,
+    });
+    if (!result) {
+      addToast({ title: "请先登录 B 站账号再分享本地歌单", color: "warning" });
+      return;
+    }
+    const url = buildLocalShareUrl(result.code);
+    if (url) await copyShareUrl(url);
+  } catch (error) {
+    addToast({ title: describePublishFailure(error), color: "danger" });
   }
 };

@@ -12,9 +12,13 @@ import express from "express";
 import { scheduleTombstoneCleanup } from "./lib/cleanup.js";
 import { config } from "./lib/config.js";
 import { createAuthRouter } from "./routes/auth.js";
+import { createShareRouter } from "./routes/share.js";
 import { createSyncRouter } from "./routes/sync.js";
 
 const app = express();
+
+// 前面是同机 Apache 反代，公开读取接口按真实来源 IP 限流
+app.set("trust proxy", "loopback");
 
 app.use(
   cors({
@@ -32,6 +36,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", createAuthRouter());
+// 必须在同步路由之前：同步路由对其下所有路径强制登录，而分享读取是公开的
+app.use("/api", createShareRouter());
 app.use("/api", createSyncRouter());
 
 scheduleTombstoneCleanup();

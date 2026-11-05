@@ -406,6 +406,11 @@ export const getAllFavMedia = async ({ id: favFolderId }: { id: string }) => {
     }
   }
 
+  // 详情接口返回的顺序和请求的顺序不保证一致；按 ids 接口给的顺序（收藏夹里的顺序）还原
+  const order = new Map(validIds.map((item, index) => [`${item.id}:${item.type}`, index]));
+  const rank = (item: FavResourceInfo) => order.get(`${item.id}:${item.type}`) ?? Number.MAX_SAFE_INTEGER;
+  allInfos.sort((a, b) => rank(a) - rank(b));
+
   return allInfos
     .filter(item => [2, 12].includes(item.type) && !isInvalidFavResource(item.attr))
     .map(item => {

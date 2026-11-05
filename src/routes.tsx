@@ -13,6 +13,7 @@ import Heartbeat from "./pages/heartbeat";
 import History from "./pages/history";
 import Later from "./pages/later";
 import LocalMusicPage from "./pages/local-music";
+import FeedbackReview from "./pages/feedback-review";
 import LyricsReview from "./pages/lyrics-review";
 import LyricsSubmissions from "./pages/lyrics-submissions";
 import MiniPlayer from "./pages/mini-player";
@@ -22,6 +23,8 @@ import PlayRanking from "./pages/play-ranking";
 import Search from "./pages/search";
 import Settings from "./pages/settings";
 import Share from "./pages/share";
+import ShareFolder from "./pages/share/folder";
+import ShareLocal from "./pages/share/local";
 import UserProfile from "./pages/user-profile";
 import Folder from "./pages/video-collection";
 import LocalFavorites from "./pages/video-collection/local-favorites";
@@ -54,6 +57,10 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "lyrics-review",
         element: <LyricsReview />,
+      },
+      {
+        path: "feedback-review",
+        element: <FeedbackReview />,
       },
       {
         path: "lyrics-submissions",
@@ -90,6 +97,14 @@ export const createRoutes = (web = isWeb): RouteObject[] => [
       {
         path: "local-music",
         element: web && !isStaticDemo ? <Navigate replace to="/" /> : <LocalMusicPage />,
+      },
+      {
+        path: "share/folder/:id",
+        element: <ShareFolder />,
+      },
+      {
+        path: "share/local/:code",
+        element: <ShareLocal />,
       },
       {
         path: "share/:bvid",
