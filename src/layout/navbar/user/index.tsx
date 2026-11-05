@@ -13,6 +13,7 @@ import {
 import {
   RiExternalLinkLine,
   RiFeedbackLine,
+  RiLightbulbLine,
   RiLoginCircleLine,
   RiLogoutCircleLine,
   RiProfileLine,
@@ -157,6 +158,13 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
           });
         }
       },
+    },
+    {
+      key: "feature-request",
+      label: "功能建议",
+      startContent: <RiLightbulbLine size={18} />,
+      endContent: <RiExternalLinkLine size={18} />,
+      onPress: () => platform.openExternal("https://github.com/wood3n/biu/issues/new?template=feature-request.yml"),
     },
     {
       key: "feedback",
