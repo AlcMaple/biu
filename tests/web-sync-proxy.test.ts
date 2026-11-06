@@ -45,7 +45,9 @@ describe("Web local-playlist sync BFF", () => {
   let appServer: Server;
   let authCalls = 0;
   let failFirstSync = false;
+  let switchIdentityOnRefresh = false;
   let issuedCookie = "";
+  let sessions: WebSessionStore;
   let syncCalls = 0;
   let syncOrigin = "";
   let syncServer: Server;
@@ -54,6 +56,7 @@ describe("Web local-playlist sync BFF", () => {
   beforeEach(async () => {
     authCalls = 0;
     failFirstSync = false;
+    switchIdentityOnRefresh = false;
     syncCalls = 0;
     upstreamRequests = [];
 
@@ -69,11 +72,14 @@ describe("Web local-playlist sync BFF", () => {
 
         if (request.method === "POST" && request.url === "/api/auth/exchange") {
           authCalls += 1;
-          sendJson(response, 200, { mid: "42", token: `server-sync-token-${authCalls}` });
+          sendJson(response, 200, {
+            mid: body.includes("second-fixture-session") || (switchIdentityOnRefresh && authCalls > 1) ? "99" : "42",
+            token: `server-sync-token-${authCalls}`,
+          });
           return;
         }
 
-        if (request.method === "GET" && request.url === "/api/sync/favorites") {
+        if (["GET", "POST"].includes(request.method ?? "") && request.url === "/api/sync/favorites") {
           syncCalls += 1;
           if (failFirstSync && syncCalls === 1) {
             sendJson(response, 401, { error: "expired" });
@@ -95,7 +101,8 @@ describe("Web local-playlist sync BFF", () => {
     });
     syncOrigin = await listen(syncServer);
 
-    const sessions = new WebSessionStore({ randomToken: () => "s".repeat(32) });
+    let sessionId = 0;
+    sessions = new WebSessionStore({ randomToken: () => String(++sessionId).padStart(32, "s") });
     issuedCookie = sessions
       .createSession({
         cookies: [
@@ -179,5 +186,79 @@ describe("Web local-playlist sync BFF", () => {
     expect(response.status).toBe(403);
     expect(authCalls).toBe(0);
     expect(syncCalls).toBe(0);
+  });
+  it("在真实BFF边界拒绝旧账号提示，不向同步数据接口转发", async () => {
+    const response = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, {
+      method: "POST",
+      headers: {
+        Cookie: issuedCookie,
+        Origin: appOrigin,
+        "Content-Type": "application/json",
+        "X-Biu-Expected-Mid": "99",
+      },
+      body: JSON.stringify({ baseVersion: 0, ops: [] }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: -409, message: "账号已变化，原账号同步未提交" });
+    expect(upstreamRequests.filter(request => request.path === "/api/sync/favorites")).toHaveLength(0);
+  });
+  it("匹配期望账号正常转发，账号标记不是额外认证凭据", async () => {
+    const ok = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, {
+      headers: { Cookie: issuedCookie, "X-Biu-Expected-Mid": "42" },
+    });
+    expect(ok.status).toBe(200);
+    const anon = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, { headers: { "X-Biu-Expected-Mid": "42" } });
+    expect(anon.status).toBe(401);
+  });
+  it("浏览器会话已换B时，A的旧差异不会被B凭据转发", async () => {
+    const second = sessions
+      .createSession({
+        cookies: [
+          { domain: "bilibili.com", hostOnly: false, name: "SESSDATA", path: "/", value: "second-fixture-session" },
+        ],
+      })
+      .cookieHeader.split(";", 1)[0];
+    const response = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, {
+      method: "POST",
+      headers: { Cookie: second, Origin: appOrigin, "Content-Type": "application/json", "X-Biu-Expected-Mid": "42" },
+      body: JSON.stringify({ baseVersion: 0, ops: [{ type: "upsert", key: "A-old", payload: { title: "A" } }] }),
+    });
+    console.info(
+      JSON.stringify({
+        scenario: "cookie-B_expected-A",
+        status: response.status,
+        dataRequests: upstreamRequests.filter(request => request.path === "/api/sync/favorites").length,
+        body: await response.clone().json(),
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect(upstreamRequests.filter(request => request.path === "/api/sync/favorites")).toHaveLength(0);
+    expect(upstreamRequests[0].body).toContain("second-fixture-session");
+  });
+  it("BFF自身401换票后身份改变也不重放原请求", async () => {
+    failFirstSync = true;
+    switchIdentityOnRefresh = true;
+    const response = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, {
+      method: "POST",
+      headers: {
+        Cookie: issuedCookie,
+        Origin: appOrigin,
+        "Content-Type": "application/json",
+        "X-Biu-Expected-Mid": "42",
+      },
+      body: JSON.stringify({ baseVersion: 0, ops: [{ type: "upsert", key: "A" }] }),
+    });
+    console.info(
+      JSON.stringify({
+        scenario: "server_401_changes_identity",
+        status: response.status,
+        authExchanges: authCalls,
+        dataRequests: upstreamRequests.filter(request => request.path === "/api/sync/favorites").length,
+        body: await response.clone().json(),
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect(authCalls).toBe(2);
+    expect(upstreamRequests.filter(request => request.path === "/api/sync/favorites")).toHaveLength(1);
   });
 });

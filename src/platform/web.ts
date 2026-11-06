@@ -18,8 +18,24 @@ import {
 import { StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
+import type { PlaylistPartitionData } from "./web-playlist-partition";
 
 import { installWebLogTransport, reportWebLog } from "./web-log-transport";
+import { createLegacyPlaylistRecovery } from "./web-playlist-legacy";
+import { createIndexedDBPlaylistPartitionStore } from "./web-playlist-partition";
+import {
+  failWebPlaylistStartup,
+  readWebPlaylistPartition,
+  startWebPlaylistSession,
+  writeWebPlaylistPartition,
+} from "./web-playlist-runtime";
+
+const playlistNames = {
+  [StoreNameMap.LocalFavorites]: "favorites",
+  [StoreNameMap.LocalFavItems]: "items",
+  [StoreNameMap.Tags]: "tags",
+} as const;
+const isPlaylistStore = (name: StoreName): name is keyof typeof playlistNames => name in playlistNames;
 
 const STORE_KEY_PREFIX = isSandbox ? "biu-sandbox:" : isOfflineDemo ? "biu-demo:" : "biu:";
 const WEB_STORE_DATABASE = isSandbox ? "biu-sandbox-web-store" : isOfflineDemo ? "biu-demo-web-store" : "biu-web-store";
@@ -133,6 +149,10 @@ function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefi
 }
 
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
+  if (process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true" && isPlaylistStore(name)) {
+    // 历史 StoreDataMap 未描述分区字段；桥接只限上面已收窄的三个收藏 store。
+    return readWebPlaylistPartition(playlistNames[name]) as unknown as Promise<StoreDataMap[N]>;
+  }
   // 沙盒里设置、歌单都要能改、能存下来，只有登录用户跟着页面选的身份走
   if (process.env.BIU_SANDBOX === "true" && name === StoreNameMap.UserLoginInfo) {
     const { sandboxUser } = await import("@/common/sandbox-fixtures");
@@ -173,6 +193,12 @@ async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N
 }
 
 async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N]): Promise<void> {
+  if (process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true" && isPlaylistStore(name)) {
+    return writeWebPlaylistPartition<keyof PlaylistPartitionData>(
+      playlistNames[name],
+      value as PlaylistPartitionData[keyof PlaylistPartitionData],
+    );
+  }
   try {
     if (highCapacityStores.has(name)) {
       const database = await openDatabase();
@@ -191,6 +217,15 @@ async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N])
 }
 
 async function webClearStore(name: StoreName): Promise<void> {
+  if (process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true" && isPlaylistStore(name)) {
+    const empty = {
+      favorites: { createdFavorites: [], createdOrder: [], collectedOrder: [] },
+      items: { folderItems: {}, replaceLogs: {} },
+      tags: { tags: [], itemTags: {} },
+    };
+    const field = playlistNames[name];
+    return writeWebPlaylistPartition(field, empty[field]);
+  }
   try {
     if (highCapacityStores.has(name)) {
       const database = await openDatabase();
@@ -203,6 +238,26 @@ async function webClearStore(name: StoreName): Promise<void> {
     getStorage()?.removeItem(storageKey(name));
   } catch (err) {
     console.error(`[web.clearStore] ${String(name)}:`, err);
+  }
+}
+
+export async function prepareWebPlaylistSession(mid: number | null) {
+  try {
+    const database = await openDatabase();
+    if (!database) throw new Error("浏览器收藏存储暂不可用");
+    const session = startWebPlaylistSession(createIndexedDBPlaylistPartitionStore(database, STORE_KEY_PREFIX), mid);
+    const legacy = createLegacyPlaylistRecovery(
+      database,
+      STORE_KEY_PREFIX,
+      session.scope,
+      readLegacyStore,
+      session.checkActive,
+    );
+    const legacyOffer = await legacy.inspect();
+    return { ...session, legacy, legacyOffer };
+  } catch (error) {
+    failWebPlaylistStartup(error);
+    throw error;
   }
 }
 

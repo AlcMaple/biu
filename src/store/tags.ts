@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { randomTagColor } from "@/common/constants/tag-colors";
+import { getItemTagKey } from "@/common/utils/item-identity";
 import platform from "@/platform";
 import { StoreNameMap } from "@shared/store";
 
@@ -35,30 +36,7 @@ interface Action {
   setItemTags: (target: TagItemRef, tagIds: number[]) => void;
 }
 
-const encodeTagPart = (value: string | number) => encodeURIComponent(String(value));
-
-// 标签归属键：本地文件、在线音频、整稿视频和视频分集使用互不相同的命名空间。
-// 视频优先使用 bvid；分集再追加 cid，避免 aid/cid/auid 数值碰撞。
-export const getItemTagKey = (target: TagItemTarget): string => {
-  const rid = encodeTagPart(target.rid);
-
-  if (target.source === "local") {
-    return `local:${rid}`;
-  }
-
-  if (target.type === 2) {
-    const videoKey = target.bvid?.trim() ? `bvid:${encodeTagPart(target.bvid.trim())}` : `aid:${rid}`;
-    return target.cid !== undefined && target.cid !== null
-      ? `video:${videoKey}:cid:${encodeTagPart(target.cid)}`
-      : `video:${videoKey}`;
-  }
-
-  if (target.type === 12) {
-    return `audio:sid:${rid}`;
-  }
-
-  return `type:${target.type ?? "unknown"}:${rid}`;
-};
+export { getItemTagKey } from "@/common/utils/item-identity";
 
 const resolveTagRef = (target: TagItemRef) => {
   if (typeof target === "object") {

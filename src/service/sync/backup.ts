@@ -13,14 +13,11 @@ import type { LiveSnapshot, SyncStoreName } from "./types";
 
 import { SYNC_BACKUP_KEEP } from "./config";
 
-/**
- * 把某个 store 的当前本地快照压入备份队列（最新在前，超出保留数的丢弃）。
- *
- * 与上一份内容相同时跳过，避免每次启动的空跑把有价值的历史挤出保留窗口。
- * 备份失败绝不能阻断同步本身，调用方无需处理异常。
- */
-export async function pushLocalBackup(mid: string, store: SyncStoreName, snapshot: LiveSnapshot): Promise<void> {
-  try {
+// 多个store共用备份账本，串行重读避免并发写入覆盖其他账号或store的副本。
+let backupWrites: Promise<void> = Promise.resolve();
+
+export function pushLocalBackup(mid: string, store: SyncStoreName, snapshot: LiveSnapshot): Promise<void> {
+  const operation = backupWrites.then(async () => {
     const all = ((await platform.getStore(StoreNameMap.PlaylistSyncBackups)) ?? {}) as PlaylistSyncBackupsData;
     const userBackups = all[mid] ?? {};
     const queue = userBackups[store] ?? [];
@@ -32,7 +29,9 @@ export async function pushLocalBackup(mid: string, store: SyncStoreName, snapsho
       ...all,
       [mid]: { ...userBackups, [store]: next },
     });
-  } catch (err) {
+  });
+  backupWrites = operation.catch(err => {
     log.warn(`[sync] ${store} local backup failed`, err);
-  }
+  });
+  return backupWrites;
 }

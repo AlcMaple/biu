@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="680" viewBox="0 0 1040 680"><style>text{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}.title{font-size:19px;font-weight:700;fill:#282529}.subtitle{font-size:12.5px;fill:#756f73}.section{font-size:14px;font-weight:700;fill:#282529}.card-title{font-size:12.5px;font-weight:700}.body{font-size:11px}</style><rect x="1" y="1" width="1038" height="678" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+<text x="26" y="34" class="title">换账号后，旧同步留在原账号（阶段 5 · 图稿待审）</text>
+<text x="26" y="59" class="subtitle">本地 HTTP 已验证：错账号请求不转发；真实登录、多标签与跨设备仍待验收，生产分区继续关闭。</text>
+<text x="26" y="98" class="section">用户期待：换到 B，不把 A 的收藏写进去</text>
+<rect x="26" y="119" width="306" height="96" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="42" y="145" class="card-title" fill="#36566d">账号 A 正在同步收藏</text>
+<text x="42" y="169" class="body" fill="#36566d">A 的本地改动留在 A</text>
+<text x="42" y="191" class="body" fill="#36566d">不因切换账号清空收藏</text>
+<rect x="366" y="119" width="306" height="96" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="382" y="145" class="card-title" fill="#36566d">切换到账号 B</text>
+<text x="382" y="169" class="body" fill="#36566d">B 的收藏与基线独立</text>
+<text x="382" y="191" class="body" fill="#36566d">不借用 A 的“已见过非空”记录</text>
+<rect x="706" y="119" width="306" height="96" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="722" y="145" class="card-title" fill="#316247">A 的迟到结果被忽略</text>
+<text x="722" y="169" class="body" fill="#316247">不应用到 B 的页面</text>
+<text x="722" y="191" class="body" fill="#316247">旧定时器与已发出请求一起取消</text>
+<path d="M340 166 h16 m-5 -5 5 5 -5 5" fill="none" stroke="#91adc1" stroke-width="1.5"/>
+<path d="M680 166 h16 m-5 -5 5 5 -5 5" fill="none" stroke="#91adc1" stroke-width="1.5"/>
+<text x="26" y="250" class="section">本地协议实测：为什么只换一张票还不够</text>
+<rect x="26" y="270" width="478" height="150" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+<text x="42" y="296" class="card-title" fill="#96434f">原件：旧请求跟着新身份走</text>
+<text x="42" y="320" class="body" fill="#96434f">请求声明 A，服务端会话已是 B</text>
+<text x="42" y="342" class="body" fill="#96434f">原件 HTTP 200；数据转发 1 次</text>
+<text x="42" y="364" class="body" fill="#96434f">服务端 401 换成 B 后：数据请求共 2 次</text>
+<rect x="534" y="270" width="478" height="150" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="550" y="296" class="card-title" fill="#316247">修改后：身份不一致即拦截</text>
+<text x="550" y="320" class="body" fill="#316247">请求声明 A，服务端会话已是 B</text>
+<text x="550" y="342" class="body" fill="#316247">新版 HTTP 409；数据转发 0 次</text>
+<text x="550" y="364" class="body" fill="#316247">服务端 401 换成 B 后：仅保留首次请求，不重放</text>
+<text x="26" y="458" class="section">边界与容易改错的地方</text>
+<rect x="26" y="478" width="478" height="144" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="42" y="504" class="card-title" fill="#36566d">账号标记 ≠ 登录凭据</text>
+<text x="42" y="528" class="body" fill="#36566d">仍由服务端会话认证，浏览器标记仅做一致性检查。</text>
+<text x="42" y="550" class="body" fill="#36566d">同账号 401 可换票一次，换成别的账号则停止。</text>
+<text x="42" y="572" class="body" fill="#36566d">取消旧请求和忽略迟到结果互不替代，二者都保留。</text>
+<rect x="534" y="478" width="478" height="144" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+<text x="550" y="504" class="card-title" fill="#7a6234">尚未验收，保持生产分区关闭</text>
+<text x="550" y="528" class="body" fill="#7a6234">真实登录 / 退出、多标签账本原子性、停手状态持久化。</text>
+<text x="550" y="550" class="body" fill="#7a6234">跨设备、更多旧数据格式另列验收。</text>
+<text x="550" y="572" class="body" fill="#7a6234">本图是本地协议证据，不是生产账号隔离验收结果。</text>
+<text x="26" y="654" class="body" fill="#756f73">常见情况：同账号正常收藏与同步流程保持；拦截仅针对账号变化后仍在途的旧操作。</text>
+</svg>

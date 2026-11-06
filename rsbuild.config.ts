@@ -67,6 +67,9 @@ export default defineConfig(({ command }) => {
         // `process` object. Rsbuild replaces the complete expression at build time.
         "process.env.BIU_OFFLINE_DEMO": JSON.stringify(isDemoTarget ? "true" : "false"),
         "process.env.BIU_SANDBOX": JSON.stringify(isSandboxTarget ? "true" : "false"),
+        "process.env.BIU_WEB_PLAYLIST_PARTITIONS": JSON.stringify(
+          isSandboxTarget && process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true" ? "true" : "false",
+        ),
         __BIU_SENTRY_ENABLED__: JSON.stringify(Boolean(isWebProduction && process.env.VITE_SENTRY_DSN?.trim())),
         "import.meta.env.VITE_SENTRY_DSN": JSON.stringify(process.env.VITE_SENTRY_DSN?.trim() || ""),
         "import.meta.env.VITE_SENTRY_ENVIRONMENT": JSON.stringify(process.env.VITE_SENTRY_ENVIRONMENT?.trim() || ""),

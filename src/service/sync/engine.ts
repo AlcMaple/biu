@@ -17,12 +17,28 @@ async function readMeta(): Promise<PlaylistSyncMetaData> {
   return (await platform.getStore(StoreNameMap.PlaylistSyncMeta)) ?? {};
 }
 
-async function writeMeta(meta: PlaylistSyncMetaData): Promise<void> {
-  await platform.setStore(StoreNameMap.PlaylistSyncMeta, meta);
+let metaWrites: Promise<void> = Promise.resolve();
+
+function updateUserMeta(
+  mid: string,
+  update: (latest: PlaylistSyncMetaData[string]) => PlaylistSyncMetaData[string],
+  isCurrent: () => boolean,
+): Promise<void> {
+  // 三个store共享账本；排队后重读并只更新本账号本字段，避免旧全量副本覆盖其他写入。
+  const operation = metaWrites.then(async () => {
+    if (!isCurrent()) return;
+    const latest = await readMeta();
+    if (!isCurrent()) return;
+    const next = update(latest[mid] ?? { versions: {}, snapshots: {} });
+    await platform.setStore(StoreNameMap.PlaylistSyncMeta, { ...latest, [mid]: next });
+  });
+  metaWrites = operation.catch(() => undefined);
+  return operation;
 }
 
 export interface SyncBinding {
   store: SyncStoreName;
+  isCurrent?: (mid: string) => boolean;
   /**
    * 等这个 store 的持久化数据 rehydrate 完成。
    *
@@ -48,6 +64,8 @@ export class StoreSyncController {
   /** 本轮防抖里第一次未处理变更的时间，用于计算是否已到最长等待上限 */
   private firstPendingAt: number | null = null;
   private running = false;
+  private generation = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingRerun = false;
   /** 本轮失败是否已经补过一次重试，防止失败时无限重试打请求 */
   private retriedOnce = false;
@@ -152,6 +170,20 @@ export class StoreSyncController {
     void this.runSync();
   }
 
+  resetSession(): void {
+    this.generation += 1;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.debounceTimer = null;
+    this.retryTimer = null;
+    this.firstPendingAt = null;
+    this.pendingRerun = false;
+    this.retriedOnce = false;
+    this.witnessedNonEmpty = false;
+    this.remoteVersionHint = null;
+    this.lastSyncedVersion = -1;
+  }
+
   private async runSync(): Promise<void> {
     if (this.running) {
       // 上一轮还没跑完又有新变更：记下来，这一轮跑完后再补跑一次，不丢变更
@@ -160,10 +192,11 @@ export class StoreSyncController {
     }
     this.running = true;
 
+    const generation = this.generation;
     const startedAt = Date.now();
     let ok = false;
     try {
-      ok = await this.syncOnce();
+      ok = await this.syncOnce(generation);
     } catch (err) {
       log.warn(`[sync] ${this.binding.store} sync failed`, err);
     } finally {
@@ -179,12 +212,15 @@ export class StoreSyncController {
       if (this.pendingRerun) {
         this.pendingRerun = false;
         void this.runSync();
-      } else if (!ok && !this.retriedOnce) {
+      } else if (generation === this.generation && !ok && !this.retriedOnce) {
         // 传输层失败（超时/断网）补一次，且只补一次：本地变更此刻还没上云，
         // 不重试的话要等到用户下次操作才会再推，中间这段时间另一台设备看不到。
         // 单次重试是 AI_GUIDELINES 允许的"瞬时抖动"范畴，不是失败轮询。
         this.retriedOnce = true;
-        setTimeout(() => void this.runSync(), SYNC_RETRY_DELAY_MS);
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = null;
+          void this.runSync();
+        }, SYNC_RETRY_DELAY_MS);
       } else {
         this.retriedOnce = false;
       }
@@ -192,14 +228,18 @@ export class StoreSyncController {
   }
 
   /** @returns false 表示传输层失败（拉取/推送没成功），调用方据此决定要不要补一次重试 */
-  private async syncOnce(): Promise<boolean> {
+  private async syncOnce(generation: number): Promise<boolean> {
     const mid = await getCurrentMid();
     if (!mid) return true; // 未登录，本地歌单同步依附登录态，跳过不算失败
+    const isCurrent = () => generation === this.generation && this.binding.isCurrent?.(mid) !== false;
+    if (!isCurrent()) return true;
 
     // 必须在任何 encodeNow 之前：读盘没完成时的空状态不能进入 diff（见 SyncBinding.waitReady）
     await this.binding.waitReady();
+    if (!isCurrent()) return true;
 
     const meta = await readMeta();
+    if (!isCurrent()) return true;
     const userMeta = meta[mid] ?? { versions: {}, snapshots: {} };
     // 世代号对不上 = 从有已知缺陷的旧版本升上来，基线不可信：作废一次，走只增不删的迁移
     const baselineUsable = userMeta.epoch === SYNC_META_EPOCH;
@@ -210,7 +250,7 @@ export class StoreSyncController {
     }
 
     if (!hasSyncedBefore) {
-      return this.migrate(mid, meta, userMeta);
+      return this.migrate(mid, userMeta, isCurrent);
     }
 
     const baseline = (userMeta.snapshots[this.binding.store] ?? {}) as FlatSnapshot;
@@ -246,8 +286,10 @@ export class StoreSyncController {
     if (ops.length > 0) {
       // 推送前留一份本地现状：这是数据被意外清空后唯一能回溯到"最近状态"的地方
       await pushLocalBackup(mid, this.binding.store, localFlat);
+      if (!isCurrent()) return true;
 
-      const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe);
+      const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe, mid);
+      if (!isCurrent()) return true;
       if (!pushed) return false; // 网络/鉴权失败：由 runSync 补一次重试
       envelope = pushed;
     } else {
@@ -256,14 +298,16 @@ export class StoreSyncController {
       if (this.remoteVersionHint !== null && this.remoteVersionHint <= baseVersion) {
         return true; // 云端不比基线新，无事可做
       }
-      const pulled = await pullSnapshot(this.binding.store);
+      const pulled = await pullSnapshot(this.binding.store, mid);
+      if (!isCurrent()) return true;
       if (!pulled) return false;
       if (pulled.version === baseVersion) return true; // 两边都没动，不写回本地，避免空转
       envelope = pulled;
     }
 
+    if (!isCurrent()) return true;
     this.applyRemote(envelope.data);
-    await this.persistMeta(mid, meta, userMeta, envelope.version, envelope.data);
+    await this.persistMeta(mid, envelope.version, envelope.data, isCurrent);
     return true;
   }
 
@@ -274,10 +318,11 @@ export class StoreSyncController {
    */
   private async migrate(
     mid: string,
-    meta: PlaylistSyncMetaData,
     userMeta: PlaylistSyncMetaData[string],
+    isCurrent: () => boolean,
   ): Promise<boolean> {
-    const remote = await pullSnapshot(this.binding.store);
+    const remote = await pullSnapshot(this.binding.store, mid);
+    if (!isCurrent()) return true;
     if (!remote) return false; // 拉取失败：绝不能在没见过云端数据的情况下就往上推
 
     const localFlat = this.binding.encodeNow();
@@ -286,44 +331,55 @@ export class StoreSyncController {
     // 就算下面的合并/写回逻辑有 bug 把本地 store 搞坏了，这份快照也在磁盘上，
     // 能手动从 PlaylistSyncMeta 文件里把数据抄回来。只写一次，不随后续同步更新。
     if (!userMeta.preMigrationBackups?.[this.binding.store]) {
-      const backedUpMeta: PlaylistSyncMetaData[string] = {
-        ...userMeta,
-        preMigrationBackups: { ...userMeta.preMigrationBackups, [this.binding.store]: localFlat },
-      };
-      await writeMeta({ ...meta, [mid]: backedUpMeta });
-      userMeta = backedUpMeta;
+      await updateUserMeta(
+        mid,
+        latest => ({
+          ...latest,
+          preMigrationBackups: {
+            ...latest.preMigrationBackups,
+            [this.binding.store]: latest.preMigrationBackups?.[this.binding.store] ?? localFlat,
+          },
+        }),
+        isCurrent,
+      );
+      if (!isCurrent()) return true;
     }
 
     await pushLocalBackup(mid, this.binding.store, localFlat);
+    if (!isCurrent()) return true;
 
     const migrationOps = diffForMigration(remote.data, localFlat, Date.now());
 
     let finalEnvelope = remote;
     if (migrationOps.length > 0) {
-      const pushed = await pushOps(this.binding.store, remote.version, migrationOps);
+      const pushed = await pushOps(this.binding.store, remote.version, migrationOps, false, mid);
+      if (!isCurrent()) return true;
       if (!pushed) return false; // 推送失败：不落地"已迁移"标记，下次会完整重试这套迁移流程
       finalEnvelope = pushed;
     }
 
+    if (!isCurrent()) return true;
     this.applyRemote(finalEnvelope.data);
-    await this.persistMeta(mid, meta, userMeta, finalEnvelope.version, finalEnvelope.data);
+    await this.persistMeta(mid, finalEnvelope.version, finalEnvelope.data, isCurrent);
     return true;
   }
 
   private async persistMeta(
     mid: string,
-    meta: PlaylistSyncMetaData,
-    userMeta: PlaylistSyncMetaData[string],
     version: number,
     snapshot: FlatSnapshot,
+    isCurrent: () => boolean,
   ): Promise<void> {
-    this.lastSyncedVersion = version;
-    const nextUserMeta: PlaylistSyncMetaData[string] = {
-      ...userMeta,
-      epoch: SYNC_META_EPOCH,
-      versions: { ...userMeta.versions, [this.binding.store]: version },
-      snapshots: { ...userMeta.snapshots, [this.binding.store]: snapshot },
-    };
-    await writeMeta({ ...meta, [mid]: nextUserMeta });
+    await updateUserMeta(
+      mid,
+      latest => ({
+        ...latest,
+        epoch: SYNC_META_EPOCH,
+        versions: { ...latest.versions, [this.binding.store]: version },
+        snapshots: { ...latest.snapshots, [this.binding.store]: snapshot },
+      }),
+      isCurrent,
+    );
+    if (isCurrent()) this.lastSyncedVersion = version;
   }
 }

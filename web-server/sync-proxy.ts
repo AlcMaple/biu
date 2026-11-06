@@ -239,7 +239,9 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
 
     const method = request.method ?? "GET";
-    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
+    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind)
+      ? new Set(["GET", "POST"])
+      : new Set(["GET"]);
     if (!allowedMethods.has(method)) {
       response.setHeader("Allow", [...allowedMethods].join(", "));
       jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
@@ -274,6 +276,15 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
       }
 
       let credential = await tokenCache.get(session, controller.signal);
+      const requestMid = credential.mid;
+      const expectedMid = request.headers["x-biu-expected-mid"];
+      if (
+        expectedMid !== undefined &&
+        (typeof expectedMid !== "string" || !/^\d+$/.test(expectedMid) || expectedMid !== credential.mid)
+      ) {
+        jsonResponse(response, 409, { code: -409, message: "账号已变化，原账号同步未提交" });
+        return true;
+      }
       if (route.kind === "session") {
         jsonResponse(response, 200, { code: 0, data: { mid: credential.mid }, message: "0" });
         return true;
@@ -301,6 +312,10 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
         await upstream.body?.cancel();
         tokenCache.invalidate(session.sessionId);
         credential = await tokenCache.get(session, controller.signal);
+        if (credential.mid !== requestMid) {
+          jsonResponse(response, 409, { code: -409, message: "账号已变化，原账号同步未提交" });
+          return true;
+        }
         upstream = await requestSyncService(target, {
           body,
           headers: requestHeaders(request, credential.token, body),

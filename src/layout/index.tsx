@@ -27,6 +27,8 @@ import { SideDrawerContext } from "./side-drawer-context";
 // 直接写环境变量表达式（原因见 offline-demo.ts）：非沙盒构建里这条分支连同 import() 一起被删掉
 const SandboxIdentitySwitcher =
   process.env.BIU_SANDBOX === "true" ? lazy(() => import("@/components/sandbox-identity")) : null;
+const PlaylistPreviewBoundary =
+  process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true" ? lazy(() => import("@/components/web-playlist-boundary")) : null;
 
 const Layout = () => {
   const updateUser = useUser(state => state.updateUser);
@@ -41,9 +43,11 @@ const Layout = () => {
   const closeSideDrawer = useCallback(() => setSideDrawerOpen(false), []);
 
   useEffect(() => {
-    void updateUser().catch(error => {
-      log.warn("[startup] 更新用户信息失败", error);
-    });
+    if (process.env.BIU_WEB_PLAYLIST_PARTITIONS !== "true") {
+      void updateUser().catch(error => {
+        log.warn("[startup] 更新用户信息失败", error);
+      });
+    }
 
     // Web 通过同源 BFF 在服务端换取同步权限；浏览器不接触 B 站 Cookie 或同步 JWT。
     initLocalPlaylistSync();
@@ -142,4 +146,14 @@ const Layout = () => {
   );
 };
 
-export default Layout;
+export default function LayoutEntry() {
+  return PlaylistPreviewBoundary ? (
+    <Suspense>
+      <PlaylistPreviewBoundary>
+        <Layout />
+      </PlaylistPreviewBoundary>
+    </Suspense>
+  ) : (
+    <Layout />
+  );
+}
