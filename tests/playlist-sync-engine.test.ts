@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Envelope, LiveSnapshot, SyncOp } from "@/service/sync/types";
 
 const store: Record<string, unknown> = {};
+let currentMid = "12345";
 
 vi.mock("@/platform", () => ({
   default: {
@@ -22,13 +23,21 @@ vi.mock("@/platform", () => ({
 }));
 
 const pushOps =
-  vi.fn<(store: string, baseVersion: number, ops: SyncOp[], allowFullDelete?: boolean) => Promise<Envelope | null>>();
-const pullSnapshot = vi.fn<() => Promise<Envelope | null>>();
+  vi.fn<
+    (
+      store: string,
+      baseVersion: number,
+      ops: SyncOp[],
+      allowFullDelete?: boolean,
+      expectedMid?: string,
+    ) => Promise<Envelope | null>
+  >();
+const pullSnapshot = vi.fn<(store?: string, mid?: string) => Promise<Envelope | null>>();
 
 vi.mock("@/service/sync/client", () => ({
-  getCurrentMid: async () => "12345",
-  pullSnapshot: () => pullSnapshot(),
-  pushOps: (s: string, b: number, o: SyncOp[], a?: boolean) => pushOps(s, b, o, a),
+  getCurrentMid: async () => currentMid,
+  pullSnapshot: (s?: string, mid?: string) => pullSnapshot(s, mid),
+  pushOps: (s: string, b: number, o: SyncOp[], a?: boolean, mid?: string) => pushOps(s, b, o, a, mid),
 }));
 
 const { StoreSyncController } = await import("@/service/sync/engine");
@@ -61,6 +70,7 @@ async function runSync(controller: { scheduleSync: () => void }) {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  currentMid = "12345";
   for (const key of Object.keys(store)) delete store[key];
   pushOps.mockReset();
   pullSnapshot.mockReset();
@@ -356,5 +366,173 @@ describe("同步引擎的数据保护", () => {
 
     expect(pullSnapshot).not.toHaveBeenCalled();
     expect(pushOps).not.toHaveBeenCalled();
+  });
+  it("等待hydration时换身份，不编码旧会话或请求新账号", async () => {
+    seedSyncedMeta();
+    let release!: () => void;
+    const ready = new Promise<void>(done => {
+      release = done;
+    });
+    const encode = vi.fn(() => SONG);
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: () => ready,
+      encodeNow: encode,
+      applyRemote: vi.fn(),
+      isCurrent: mid => mid === currentMid,
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    currentMid = "54321";
+    controller.resetSession?.();
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(encode).not.toHaveBeenCalled();
+    expect(pushOps).not.toHaveBeenCalled();
+    expect(pullSnapshot).not.toHaveBeenCalled();
+  });
+  it("首次迁移的迟到A快照不和B数据合并或写回B", async () => {
+    let release!: (value: Envelope) => void;
+    pullSnapshot.mockReturnValueOnce(
+      new Promise(done => {
+        release = done;
+      }),
+    );
+    const applyRemote = vi.fn();
+    const encode = vi.fn(() => SONG);
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: encode,
+      applyRemote,
+      isCurrent: mid => mid === currentMid,
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    currentMid = "54321";
+    controller.resetSession?.();
+    release({ version: 7, updatedAt: 0, data: SONG });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pushOps).not.toHaveBeenCalled();
+    expect(applyRemote).not.toHaveBeenCalled();
+    expect(store[StoreNameMap.PlaylistSyncMeta]).toBeUndefined();
+  });
+  it("增量推送捕获A账号，迟到响应不会应用或推进新会话", async () => {
+    seedSyncedMeta();
+    let release!: (value: Envelope) => void;
+    pushOps.mockReturnValueOnce(
+      new Promise(done => {
+        release = done;
+      }),
+    );
+    const changed = { ...SONG, "-1:222": { updatedAt: 1, payload: { folderId: -1, item: { rid: 222 } } } };
+    const applyRemote = vi.fn();
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: () => changed,
+      applyRemote,
+      isCurrent: mid => mid === currentMid,
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pushOps.mock.calls[0][4]).toBe("12345");
+    currentMid = "54321";
+    controller.resetSession?.();
+    release({ version: 8, updatedAt: 1, data: changed });
+    await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
+    expect(applyRemote).not.toHaveBeenCalled();
+    expect((store[StoreNameMap.PlaylistSyncMeta] as PlaylistSyncMetaData)["12345"].versions["fav-items"]).toBe(3);
+  });
+  it("换账号重置非空见证，B首次空状态不借A见证删除云端", async () => {
+    seedSyncedMeta();
+    let local: LiveSnapshot = SONG;
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: () => local,
+      applyRemote: vi.fn(),
+      isCurrent: mid => mid === currentMid,
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    controller.resetSession?.();
+    currentMid = "54321";
+    local = {};
+    (store[StoreNameMap.PlaylistSyncMeta] as PlaylistSyncMetaData)["54321"] = {
+      epoch: SYNC_META_EPOCH,
+      versions: { "fav-items": 3 },
+      snapshots: { "fav-items": SONG },
+    };
+    pushOps.mockResolvedValue({ version: 4, updatedAt: 1, data: {} });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pushOps).not.toHaveBeenCalled();
+  });
+  it("两个store并发完成时各自基线与预迁移备份都保留", async () => {
+    const folders: LiveSnapshot = { "-1": { updatedAt: 0, payload: { id: -1, title: "A" } } };
+    pullSnapshot.mockResolvedValue({ version: 0, updatedAt: 0, data: {} });
+    pushOps.mockImplementation(async store => ({
+      version: 1,
+      updatedAt: 1,
+      data: store === "favorites" ? folders : SONG,
+    }));
+    const a = new StoreSyncController({
+      store: "favorites",
+      waitReady: async () => {},
+      encodeNow: () => folders,
+      applyRemote: vi.fn(),
+    });
+    const b = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: () => SONG,
+      applyRemote: vi.fn(),
+    });
+    a.syncNow();
+    b.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const meta = (store[StoreNameMap.PlaylistSyncMeta] as PlaylistSyncMetaData)["12345"];
+    expect(meta.versions).toEqual({ favorites: 1, "fav-items": 1 });
+    expect(Object.keys(meta.preMigrationBackups ?? {}).sort()).toEqual(["fav-items", "favorites"]);
+  });
+  it("不同账号并发备份不互相覆盖", async () => {
+    const { pushLocalBackup } = await import("@/service/sync/backup");
+    await Promise.all([pushLocalBackup("12345", "fav-items", SONG), pushLocalBackup("54321", "tags", SONG)]);
+    const all = store[StoreNameMap.PlaylistSyncBackups] as PlaylistSyncBackupsData;
+    expect(all["12345"]["fav-items"]).toHaveLength(1);
+    expect(all["54321"].tags).toHaveLength(1);
+  });
+  it("换账号不沿用A的高版本回声提示", async () => {
+    seedSyncedMeta();
+    pullSnapshot.mockResolvedValue({ version: 9, updatedAt: 1, data: SONG });
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: () => SONG,
+      applyRemote: vi.fn(),
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(controller.hasSynced(2)).toBe(true);
+    controller.resetSession?.();
+    expect(controller.hasSynced(2)).toBe(false);
+  });
+  it("换身份取消旧会话尚未执行的重试定时器", async () => {
+    seedSyncedMeta();
+    pullSnapshot.mockResolvedValue(null);
+    const controller = new StoreSyncController({
+      store: "fav-items",
+      waitReady: async () => {},
+      encodeNow: () => SONG,
+      applyRemote: vi.fn(),
+    });
+    controller.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pullSnapshot).toHaveBeenCalledTimes(1);
+    controller.resetSession?.();
+    currentMid = "54321";
+    await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
+    expect(pullSnapshot).toHaveBeenCalledTimes(1);
   });
 });

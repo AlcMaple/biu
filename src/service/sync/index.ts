@@ -1,12 +1,13 @@
 import { isOfflineDemo } from "@/common/offline-demo";
 import { log } from "@/platform";
+import { isWebPlaylistSessionCurrent } from "@/platform/web-playlist-runtime";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { resetPlayRankingSession, syncPlayRanking } from "@/store/play-ranking";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
-import { invalidateSyncToken, watchVersions } from "./client";
+import { getKnownSyncMid, invalidateSyncToken, watchVersions } from "./client";
 import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavorites, encodeTags } from "./codec";
 import { WATCH_RETRY_DELAYS_MS } from "./config";
 import { StoreSyncController } from "./engine";
@@ -33,7 +34,17 @@ function waitHydrated(...stores: HydratableStore[]): Promise<void> {
   ).then(() => undefined);
 }
 
+function isCurrentSyncMid(mid: string) {
+  const user = useUser.getState().user;
+  return (
+    Boolean(user?.isLogin) &&
+    String(user?.mid ?? "") === mid &&
+    (process.env.BIU_WEB_PLAYLIST_PARTITIONS !== "true" || isWebPlaylistSessionCurrent(mid))
+  );
+}
+
 const favoritesController = new StoreSyncController({
+  isCurrent: isCurrentSyncMid,
   store: "favorites",
   waitReady: () => waitHydrated(useFavoritesStore),
   encodeNow: () => encodeFavorites(useFavoritesStore.getState().createdFavorites),
@@ -54,6 +65,7 @@ const favoritesController = new StoreSyncController({
 });
 
 const favItemsController = new StoreSyncController({
+  isCurrent: isCurrentSyncMid,
   store: "fav-items",
   waitReady: () => waitHydrated(useLocalFavItemsStore),
   encodeNow: () => encodeFavItems(useLocalFavItemsStore.getState().folderItems),
@@ -63,6 +75,7 @@ const favItemsController = new StoreSyncController({
 });
 
 const tagsController = new StoreSyncController({
+  isCurrent: isCurrentSyncMid,
   store: "tags",
   waitReady: () => waitHydrated(useTagStore),
   encodeNow: () => encodeTags(useTagStore.getState().tags, useTagStore.getState().itemTags),
@@ -90,6 +103,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function startWatchLoop(
   onChanged: (versions: Record<string, number>) => void,
   isCurrent: () => boolean,
+  expectedMid: string,
 ): Promise<void> {
   let known: Record<string, number> = {};
   let failures = 0;
@@ -101,10 +115,12 @@ async function startWatchLoop(
     const startedAt = Date.now();
     // 失败必须留痕：这条通道是跨设备实时的唯一来源，静默吞掉异常的话，
     // 它挂了在日志上完全看不出来，只能看到"同步很慢"这种没法排查的现象。
-    const result = await watchVersions(known).catch(err => {
+    const result = await watchVersions(known, expectedMid).catch(err => {
       log.warn(`[sync/watch] 请求失败（挂了 ${Date.now() - startedAt}ms，第 ${failures + 1} 次）`, err);
       return null;
     });
+    if (!isCurrent()) return;
+    if (getKnownSyncMid() !== undefined && getKnownSyncMid() !== expectedMid) return;
 
     if (!result) {
       if (!isCurrent()) return;
@@ -174,7 +190,8 @@ export function initLocalPlaylistSync(): void {
   let watchedMid: number | undefined;
   let watchGeneration = 0;
   const ensureWatch = () => {
-    const mid = useUser.getState().user?.mid;
+    const user = useUser.getState().user;
+    const mid = user?.isLogin ? user.mid : undefined;
     if (!mid) {
       watchedMid = undefined;
       watchGeneration += 1;
@@ -196,6 +213,7 @@ export function initLocalPlaylistSync(): void {
         }
       },
       () => generation === watchGeneration && useUser.getState().user?.mid === mid,
+      String(mid),
     );
   };
 
@@ -209,7 +227,8 @@ export function initLocalPlaylistSync(): void {
 
   // 登录态从无到有时触发一次（涵盖"冷启动时本地已缓存登录态"和"刚登录"两种情况）
   useUser.subscribe((state, prev) => {
-    if (state.user?.mid === prev.user?.mid) return;
+    if (state.user?.mid === prev.user?.mid && state.user?.isLogin === prev.user?.isLogin) return;
+    allControllers.forEach(controller => controller.resetSession());
     invalidateSyncToken();
     resetPlayRankingSession();
     ensureWatch();

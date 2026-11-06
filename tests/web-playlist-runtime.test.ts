@@ -43,6 +43,23 @@ describe("Web 分区页面启动与写盘边界", () => {
   });
   beforeEach(() => vi.resetModules());
 
+  it("同步只认可已启动的匹配账号，关闭后立即失效", async () => {
+    const runtime = await import("@/platform/web-playlist-runtime");
+    expect(runtime.isWebPlaylistSessionCurrent("900001")).toBe(false);
+    runtime.startWebPlaylistSession(storage().store, 900001);
+    expect(runtime.isWebPlaylistSessionCurrent("900001")).toBe(true);
+    expect(runtime.isWebPlaylistSessionCurrent("900002")).toBe(false);
+    runtime.closeWebPlaylistSession();
+    expect(runtime.isWebPlaylistSessionCurrent("900001")).toBe(false);
+  });
+
+  it("访客分区不作为登录账号同步会话", async () => {
+    const runtime = await import("@/platform/web-playlist-runtime");
+    runtime.startWebPlaylistSession(storage().store, null);
+    expect(runtime.isWebPlaylistSessionCurrent("900001")).toBe(false);
+    expect(runtime.isWebPlaylistSessionCurrent("")).toBe(false);
+  });
+
   it("启动身份明确前不向页面返回默认空收藏", async () => {
     const runtime = await import("@/platform/web-playlist-runtime");
     const memory = storage();

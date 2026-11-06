@@ -72,6 +72,16 @@ export function closeWebPlaylistSession() {
   session?.close();
 }
 
+export function isWebPlaylistSessionCurrent(mid: string) {
+  if (!session || session.scope !== `account:${mid}`) return false;
+  try {
+    session.checkActive();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function resetWebPlaylistPrivateRoute() {
   if (window.location.hash.startsWith("#/local-collection/")) window.location.hash = "#/";
 }
