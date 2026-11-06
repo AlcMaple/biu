@@ -27,6 +27,20 @@ function storage() {
 }
 
 describe("Web 分区页面启动与写盘边界", () => {
+  it("换身份丢弃旧私有歌单路由，但不重置公共搜索路径或数据", async () => {
+    const runtime = await import("@/platform/web-playlist-runtime");
+    const old = window.location.hash;
+    try {
+      window.location.hash = "#/local-collection/-77";
+      runtime.resetWebPlaylistPrivateRoute();
+      expect(window.location.hash).toBe("#/");
+      window.location.hash = "#/search";
+      runtime.resetWebPlaylistPrivateRoute();
+      expect(window.location.hash).toBe("#/search");
+    } finally {
+      window.location.hash = old;
+    }
+  });
   beforeEach(() => vi.resetModules());
 
   it("启动身份明确前不向页面返回默认空收藏", async () => {

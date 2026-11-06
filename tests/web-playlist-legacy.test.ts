@@ -79,7 +79,10 @@ describe("旧版收藏明确恢复到空身份", () => {
       if (kind === "folder")
         target.data.favorites.createdFavorites.push({ id: -8, title: "自己的歌单", isLocal: true });
       const before = structuredClone(target);
-      expect(() => planLegacyRecovery(target, undefined, raw, "account:900001")).toThrow("已有收藏");
+      const merged = planLegacyRecovery(target, undefined, raw, "account:900001")!;
+      if (kind === "song") expect(merged.partition.data.items.folderItems[-1][0].title).toBe("账号自己的歌");
+      if (kind === "tag") expect(merged.partition.data.tags.tags[0].name).toBe("自己的标签");
+      if (kind === "folder") expect(merged.partition.data.favorites.createdFavorites.some(f => f.id === -8)).toBe(true);
       expect(target).toEqual(before);
     }
   });

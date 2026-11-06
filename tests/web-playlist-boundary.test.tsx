@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => ({
   apply: vi.fn(),
   ensure: vi.fn(),
   recover: vi.fn(),
+  inspectLegacy: vi.fn(),
 }));
 
 vi.mock("@heroui/react", () => ({
@@ -54,6 +55,7 @@ vi.mock("@/platform/web-playlist-runtime", () => ({
   flushWebPlaylistWrites: mock.flush,
   closeWebPlaylistSession: mock.closed,
   onWebPlaylistWriteError: mock.onError,
+  resetWebPlaylistPrivateRoute: vi.fn(),
 }));
 vi.mock("@/store/user", () => ({
   useUser: Object.assign((selector: (state: { user: typeof mock.user }) => unknown) => selector({ user: mock.user }), {
@@ -115,6 +117,7 @@ describe("分区预览使用原页面和明确选择", () => {
     mock.read.mockResolvedValue({ accountSnapshot: true });
     mock.onError.mockReturnValue(() => undefined);
     mock.recover.mockResolvedValue(true);
+    mock.inspectLegacy.mockResolvedValue({ raw: {}, songs: 2, folders: 2 });
   });
   afterEach(async () => {
     await act(async () => root.unmount());
@@ -201,7 +204,7 @@ describe("分区预览使用原页面和明确选择", () => {
       guestOffer: mock.offer,
       read: mock.read,
       legacyOffer: { raw: {}, songs: 2, folders: 2 },
-      legacy: { recover: mock.recover },
+      legacy: { recover: mock.recover, inspect: mock.inspectLegacy },
     });
     await mount();
     expect(container.textContent).toContain("普通 A");
@@ -222,7 +225,7 @@ describe("分区预览使用原页面和明确选择", () => {
       guestOffer: mock.offer,
       read: mock.read,
       legacyOffer: { raw: {}, songs: 2, folders: 2 },
-      legacy: { recover: mock.recover },
+      legacy: { recover: mock.recover, inspect: mock.inspectLegacy },
     });
     await mount();
     await choose("暂不恢复");
@@ -233,5 +236,37 @@ describe("分区预览使用原页面和明确选择", () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("原件");
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(mock.toast).not.toHaveBeenCalled();
+  });
+  it("非空目标明确显示合并，不当作覆盖恢复", async () => {
+    mock.offer.mockResolvedValue(null);
+    mock.prepare.mockResolvedValue({
+      scope: "account:900001",
+      guestOffer: mock.offer,
+      read: mock.read,
+      legacyOffer: { raw: {}, songs: 2, folders: 2, mergeRequired: true },
+      legacy: { recover: mock.recover, inspect: mock.inspectLegacy },
+    });
+    await mount();
+    expect(container.textContent).toContain("合并旧版收藏");
+    expect(mock.recover).not.toHaveBeenCalled();
+    await choose("合并到当前身份");
+    expect(mock.toast).toHaveBeenCalledWith({ title: "旧版收藏已合并，原件已保留", color: "success" });
+  });
+  it("头像重开刷新当前状态，不用旧空目标选择静默升级合并", async () => {
+    mock.offer.mockResolvedValue(null);
+    mock.prepare.mockResolvedValue({
+      scope: "account:900001",
+      guestOffer: mock.offer,
+      read: mock.read,
+      legacyOffer: { raw: {}, songs: 2, folders: 2 },
+      legacy: { recover: mock.recover, inspect: mock.inspectLegacy },
+    });
+    await mount();
+    await choose("暂不恢复");
+    mock.inspectLegacy.mockResolvedValue({ raw: {}, songs: 2, folders: 2, mergeRequired: true });
+    const { useLegacyRecovery } = await import("@/store/legacy-recovery");
+    await act(async () => useLegacyRecovery.getState().open?.());
+    expect(container.textContent).toContain("合并旧版收藏");
+    expect(mock.recover).not.toHaveBeenCalled();
   });
 });

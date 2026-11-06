@@ -74,15 +74,24 @@ document.getElementById("verify")!.addEventListener("click", async () => {
     assert(receipt.owner === "account:900001", "归属不是明确选择的A");
     assert(JSON.stringify(receipt.raw) === JSON.stringify(sample), "归档原件变化");
     const account = await make(db, "biu-sandbox:", 900001).session.read();
-    assert(
-      JSON.stringify(account.items.folderItems) === JSON.stringify(sample[legacyPlaylistNames[1]].folderItems),
-      "歌曲或自定义元数据变化",
-    );
-    assert(JSON.stringify(account.tags) === JSON.stringify(sample[legacyPlaylistNames[2]]), "标签归属变化");
-    assert(
-      account.favorites.createdFavorites.some(f => f.id === -77 && f.title === "旧版晚间"),
-      "自建歌单丢失",
-    );
+    const mapped = receipt as typeof receipt & { folderIds?: Record<number, number>; tagIds?: Record<number, number> };
+    if (mapped.folderIds) {
+      const liked = account.items.folderItems[-1];
+      assert(
+        liked.some(item => item.rid === 100003),
+        "当前独有歌曲丢失",
+      );
+      const duplicate = liked.filter(item => String(item.rid) === "100002");
+      assert(duplicate.length === 1 && duplicate[0].title !== "旧版·Apologize", "重复歌曲或覆盖当前标题");
+      assert(account.items.folderItems[mapped.folderIds[-77]][0].customArtist === "旧版自定歌手", "旧歌手丢失");
+      assert(account.tags.itemTags["video:bvid:BV1DEMO00003"].includes(mapped.tagIds![7]), "旧标签未追加");
+    } else {
+      assert(
+        JSON.stringify(account.items.folderItems) === JSON.stringify(sample[legacyPlaylistNames[1]].folderItems),
+        "歌曲元数据变化",
+      );
+      assert(JSON.stringify(account.tags) === JSON.stringify(sample[legacyPlaylistNames[2]]), "标签归属变化");
+    }
     const b = await make(db, "biu-sandbox:", 900002).session.read();
     assert(
       Object.values(b.items.folderItems).every(items => items.length === 0),
@@ -139,15 +148,47 @@ document.getElementById("checks")!.addEventListener("click", async () => {
       const winner = results[0].status === "fulfilled" ? a : b;
       assert((await winner.recovery.recover(ao)) === false, "重复恢复");
     });
-    await check("非空目标不覆盖，不落认领记录", async prefix => {
+    await check("旧空目标选择不隐式升级合并，新确认才继续", async prefix => {
       const a = make(db, prefix, 900001);
+      const oldOffer = (await a.recovery.inspect())!;
       await a.session.write("items", {
         folderItems: { [-1]: [{ rid: 9, type: 2, title: "自己的歌", fav_time: 1 }] },
         replaceLogs: {},
       });
-      await rejects(a.recovery.recover((await a.recovery.inspect())!));
-      assert((await a.session.read()).items.folderItems[-1][0].rid === 9, "已有内容被覆");
+      await rejects(a.recovery.recover(oldOffer));
       assert((await raw(db, prefix + "playlist-legacy-recovery:v1")) === undefined, "错误记成功");
+      const fresh = (await a.recovery.inspect())!;
+      assert(fresh.mergeRequired === true, "未更新确认方式");
+      await a.recovery.recover(fresh);
+      assert((await a.session.read()).items.folderItems[-1][0].rid === 9, "当前歌曲被覆");
+    });
+    await check("非空合并映射歌单和标签冲突，目标与旧原件均保留", async prefix => {
+      const a = make(db, prefix, 900001);
+      await a.session.write("favorites", {
+        createdFavorites: [
+          { id: -1, title: "我喜欢的音乐", isLocal: true },
+          { id: -77, title: "当前歌单", isLocal: true },
+        ],
+        createdOrder: [-1, -77],
+        collectedOrder: [],
+      });
+      await a.session.write("items", {
+        folderItems: { [-1]: [{ rid: 9, type: 2, title: "当前歌曲", fav_time: 1 }] },
+        replaceLogs: {},
+      });
+      await a.session.write("tags", { tags: [{ id: 7, name: "当前标签", color: "blue" }], itemTags: {} });
+      await a.recovery.recover((await a.recovery.inspect())!);
+      const result = await a.session.read();
+      const receipt = (await raw(db, prefix + "playlist-legacy-recovery:v1")) as {
+        folderIds: Record<number, number>;
+        tagIds: Record<number, number>;
+      };
+      assert(receipt.folderIds[-77] !== -77 && receipt.tagIds[7] !== 7, "未映射冲突");
+      assert(result.items.folderItems[-1][0].title === "当前歌曲", "丢当前歌");
+      assert(result.items.folderItems[receipt.folderIds[-77]][0].title === "旧版·梦醒时分", "丢旧歌");
+      assert(result.tags.itemTags["video:bvid:BV1DEMO00003"][0] === receipt.tagIds[7], "旧标签串绑");
+      for (const n of legacyPlaylistNames)
+        assert(JSON.stringify(await raw(db, prefix + n)) === JSON.stringify(sample[n]), "旧原件变化");
     });
     await check("原件在确认后变化则拒绝旧选择", async prefix => {
       const a = make(db, prefix, 900001),

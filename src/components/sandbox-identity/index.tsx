@@ -6,7 +6,11 @@ import { RiFlaskLine } from "@remixicon/react";
 import { currentSandboxIdentity } from "@/common/sandbox-fixtures";
 import { raiseSandboxVeil } from "@/common/sandbox-veil";
 import { clearSandboxBrowserData } from "@/platform/web";
-import { closeWebPlaylistSession, flushWebPlaylistWrites } from "@/platform/web-playlist-runtime";
+import {
+  closeWebPlaylistSession,
+  flushWebPlaylistWrites,
+  resetWebPlaylistPrivateRoute,
+} from "@/platform/web-playlist-runtime";
 import { SANDBOX_IDENTITIES, SANDBOX_IDENTITY_COOKIE, type SandboxIdentityId } from "@shared/sandbox";
 
 const CLEAR_KEY = "clear";
@@ -20,6 +24,7 @@ const SandboxIdentitySwitcher = () => {
     if (process.env.BIU_WEB_PLAYLIST_PARTITIONS === "true") {
       await flushWebPlaylistWrites();
       closeWebPlaylistSession();
+      if (key !== current.id) resetWebPlaylistPrivateRoute();
     }
     if (key === CLEAR_KEY) {
       await clearSandboxBrowserData();

@@ -8,6 +8,7 @@ import {
   closeWebPlaylistSession,
   flushWebPlaylistWrites,
   onWebPlaylistWriteError,
+  resetWebPlaylistPrivateRoute,
 } from "@/platform/web-playlist-runtime";
 import { applyWebPlaylistPartition } from "@/service/web-playlist-view";
 import { ensureLikedFolder, useFavoritesStore } from "@/store/favorite";
@@ -86,22 +87,37 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
 
   useEffect(() => {
     useLegacyRecovery.setState({
-      open: legacyOffer
-        ? () => {
-            setError(undefined);
-            setLegacyOpen(true);
-          }
-        : undefined,
+      open:
+        legacyOffer && session
+          ? () => {
+              void session.legacy
+                .inspect()
+                .then(next => {
+                  if (mounted.current) {
+                    setError(undefined);
+                    setLegacyOffer(next);
+                    setLegacyOpen(Boolean(next));
+                  }
+                })
+                .catch(error => {
+                  if (mounted.current) {
+                    setLegacyOpen(true);
+                    setError(error instanceof Error ? error.message : "旧版收藏读取失败");
+                  }
+                });
+            }
+          : undefined,
     });
     return () => {
       useLegacyRecovery.setState({ open: undefined });
     };
-  }, [legacyOffer]);
+  }, [legacyOffer, session]);
 
   useEffect(() => {
     if (!session || session.scope === expectedScope) return;
     // 身份变更用完整启动边界重载；旧页面的请求、默认歌单与输入状态不带入新身份。
     closeWebPlaylistSession();
+    resetWebPlaylistPrivateRoute();
     window.location.reload();
   }, [expectedScope, session]);
 
@@ -138,7 +154,10 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
       if (mounted.current) {
         setLegacyOpen(false);
         setLegacyOffer(null);
-        addToast({ title: "旧版收藏已恢复，原件已保留", color: "success" });
+        addToast({
+          title: legacyOffer.mergeRequired ? "旧版收藏已合并，原件已保留" : "旧版收藏已恢复，原件已保留",
+          color: "success",
+        });
       }
     } catch (error) {
       if (mounted.current) setError(error instanceof Error ? error.message : "恢复失败，原件已保留");
@@ -160,10 +179,11 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
       {children}
       <Modal isOpen={legacyOpen} hideCloseButton isDismissable={false} isKeyboardDismissDisabled>
         <ModalContent>
-          <ModalHeader>恢复旧版收藏</ModalHeader>
+          <ModalHeader>{legacyOffer?.mergeRequired ? "合并旧版收藏" : "恢复旧版收藏"}</ModalHeader>
           <ModalBody>
             <p>
-              将旧版 {legacyOffer?.folders} 个歌单、{legacyOffer?.songs} 首歌曲恢复到「{user?.uname ?? "访客"}」
+              将旧版 {legacyOffer?.folders} 个歌单、{legacyOffer?.songs} 首歌曲
+              {legacyOffer?.mergeRequired ? "合并" : "恢复"}到「{user?.uname ?? "访客"}」
             </p>
             {error ? <p role="alert">{error}</p> : null}
           </ModalBody>
@@ -179,7 +199,7 @@ export default function WebPlaylistBoundary({ children }: { children: ReactNode 
               暂不恢复
             </Button>
             <Button color="primary" isLoading={busy} onPress={() => void recoverLegacy()}>
-              恢复到当前身份
+              {legacyOffer?.mergeRequired ? "合并到当前身份" : "恢复到当前身份"}
             </Button>
           </ModalFooter>
         </ModalContent>

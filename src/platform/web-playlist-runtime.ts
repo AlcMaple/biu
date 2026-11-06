@@ -71,3 +71,7 @@ export async function flushWebPlaylistWrites() {
 export function closeWebPlaylistSession() {
   session?.close();
 }
+
+export function resetWebPlaylistPrivateRoute() {
+  if (window.location.hash.startsWith("#/local-collection/")) window.location.hash = "#/";
+}

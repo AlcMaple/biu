@@ -7,6 +7,7 @@ import { StoreNameMap } from "@shared/store";
 
 import type { PlaylistPartition, PlaylistPartitionData, PlaylistScope } from "./web-playlist-partition";
 
+import { mergeLegacyPlaylists } from "./web-playlist-merge";
 import { parsePlaylistPartition, webPlaylistPartitionKey } from "./web-playlist-partition";
 
 export const legacyPlaylistNames = [
@@ -21,11 +22,14 @@ interface Receipt {
   owner: PlaylistScope;
   raw: LegacyRaw;
   at: number;
+  folderIds?: Record<number, number>;
+  tagIds?: Record<number, number>;
 }
 export interface LegacyOffer {
   raw: LegacyRaw;
   songs: number;
   folders: number;
+  mergeRequired?: boolean;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -129,17 +133,27 @@ export function planLegacyRecovery(
     if (receipt.owner === scope) return null;
     throw new Error("旧版收藏已恢复到另一身份，原件已保留");
   }
-  if (!emptyTarget(target)) throw new Error("当前身份已有收藏，请先保留旧版原件");
   const data = decodeLegacyPlaylists(raw);
   if (!data) return null;
+  const merged = target && !emptyTarget(target) ? mergeLegacyPlaylists(target.data, data) : undefined;
+  const nextData = merged?.data ?? data;
+  const likedChanged =
+    JSON.stringify(nextData.items.folderItems[LIKED_FOLDER_ID] ?? []) !==
+    JSON.stringify(target?.data.items.folderItems[LIKED_FOLDER_ID] ?? []);
   return {
     partition: {
       ...target,
       schema: 1 as const,
-      likedVersion: data.items.folderItems[LIKED_FOLDER_ID]?.length ? 1 : 0,
-      data,
+      likedVersion: (target?.likedVersion ?? 0) + Number(likedChanged),
+      data: nextData,
     },
-    receipt: { schema: 1 as const, owner: scope, raw: structuredClone(raw), at: Date.now() },
+    receipt: {
+      schema: 1 as const,
+      owner: scope,
+      raw: structuredClone(raw),
+      at: Date.now(),
+      ...(merged ? { folderIds: merged.folderIds, tagIds: merged.tagIds } : {}),
+    },
   };
 }
 
@@ -192,7 +206,7 @@ export function createLegacyPlaylistRecovery(
     });
   return {
     inspect: () =>
-      transact("readonly", (_, raw, _target, receipt): LegacyOffer | null => {
+      transact("readonly", (_, raw, target, receipt): LegacyOffer | null => {
         if (receipt) {
           if (JSON.stringify(receipt.raw) !== JSON.stringify(raw))
             throw new Error("旧版原件在恢复后又有改动，原件已保留");
@@ -204,12 +218,15 @@ export function createLegacyPlaylistRecovery(
               raw: structuredClone(raw),
               songs: Object.values(data.items.folderItems).reduce((sum, items) => sum + items.length, 0),
               folders: data.favorites.createdFavorites.length,
+              mergeRequired: !emptyTarget(target),
             }
           : null;
       }),
     recover: (offer: LegacyOffer) =>
       transact("readwrite", (store, raw, target, receipt) => {
         if (JSON.stringify(raw) !== JSON.stringify(offer.raw)) throw new Error("旧版原件已变化，请重新载入后确认");
+        if (!receipt && Boolean(offer.mergeRequired) !== !emptyTarget(target))
+          throw new Error("当前收藏已变化，请重新打开后确认恢复或合并");
         const next = planLegacyRecovery(target, receipt, raw, scope);
         if (!next) return false;
         // 归属、原样副本和目标快照一起提交；任一步失败都不删除或改写未分区原件。
