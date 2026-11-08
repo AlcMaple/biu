@@ -79,6 +79,22 @@ beforeEach(() => {
 });
 
 describe("同步引擎的数据保护", () => {
+  it("滚动备份写入失败时不推送，也不应用远端或推进基线", async () => {
+    seedSyncedMeta();
+    const platform = (await import("@/platform")).default;
+    vi.mocked(platform.setStore).mockRejectedValueOnce(new Error("backup disk full"));
+    const before = structuredClone(store[StoreNameMap.PlaylistSyncMeta]);
+    const { controller, applyRemote } = makeController({
+      waitReady: async () => {},
+      encodeNow: () => ({ ...SONG, "-1:222": { updatedAt: 0, payload: { rid: 222 } } }),
+    });
+    await runSync(controller);
+    expect(pushOps).not.toHaveBeenCalled();
+    expect(applyRemote).not.toHaveBeenCalled();
+    expect(store[StoreNameMap.PlaylistSyncMeta]).toEqual(before);
+    controller.resetSession();
+  });
+
   it("rehydrate 未完成时不 encode，等读盘完成后才用真实数据 diff", async () => {
     seedSyncedMeta();
     let hydrated = false;

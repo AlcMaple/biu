@@ -15,7 +15,7 @@ import {
   type RankingLocalAction,
   type RankingLocalState,
 } from "@shared/play-ranking";
-import { StoreNameMap } from "@shared/store";
+import { isSyncSafetyStore, StoreNameMap } from "@shared/store";
 
 import type { Logger, Platform } from "./types";
 import type { PlaylistPartitionData } from "./web-playlist-partition";
@@ -128,7 +128,10 @@ function readIndexedValue<T>(database: IDBDatabase, key: string): Promise<T | un
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(WEB_STORE_OBJECT_STORE, "readonly");
     const request = transaction.objectStore(WEB_STORE_OBJECT_STORE).get(key);
-    request.onsuccess = () => resolve(request.result as T | undefined);
+    // 请求成功后事务仍可能取消；同步基线必须等整个读取事务提交。
+    transaction.oncomplete = () => resolve(request.result as T | undefined);
+    transaction.onabort = () => reject(transaction.error ?? new Error("存储读取已取消"));
+    transaction.onerror = () => reject(transaction.error ?? new Error("存储读取失败"));
     request.onerror = () => reject(request.error);
   });
 }
@@ -144,7 +147,9 @@ function writeIndexedValue(database: IDBDatabase, key: string, value: unknown): 
 }
 
 function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefined {
-  const value = getStorage()?.getItem(storageKey(name));
+  const storage = getStorage();
+  if (!storage && isSyncSafetyStore(name)) throw new Error("同步安全记录的旧存储不可用");
+  const value = storage?.getItem(storageKey(name));
   return value == null ? undefined : (JSON.parse(value) as StoreDataMap[N]);
 }
 
@@ -175,6 +180,7 @@ async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N
     if (!highCapacityStores.has(name)) return readLegacyStore(name);
 
     const database = await openDatabase();
+    if (!database && isSyncSafetyStore(name)) throw new Error("同步安全记录的IndexedDB不可用");
     if (!database) return readLegacyStore(name);
 
     const value = await readIndexedValue<StoreDataMap[N] | null>(database, storageKey(name));
@@ -188,6 +194,7 @@ async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N
     return legacy;
   } catch (err) {
     console.error(`[web.getStore] ${String(name)}:`, err);
+    if (isSyncSafetyStore(name)) throw new Error("同步安全记录读取失败，本地数据未提交");
     return undefined;
   }
 }
@@ -200,8 +207,12 @@ async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N])
     );
   }
   try {
+    if (isSyncSafetyStore(name) && (value === null || value === undefined)) {
+      throw new Error("同步安全记录无效");
+    }
     if (highCapacityStores.has(name)) {
       const database = await openDatabase();
+      if (!database && isSyncSafetyStore(name)) throw new Error("同步安全记录的IndexedDB不可用");
       if (database) {
         await writeIndexedValue(database, storageKey(name), value);
         getStorage()?.removeItem(storageKey(name));
@@ -213,6 +224,7 @@ async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N])
     if (serialized !== undefined) getStorage()?.setItem(storageKey(name), serialized);
   } catch (err) {
     console.error(`[web.setStore] ${String(name)}:`, err);
+    if (isSyncSafetyStore(name)) throw new Error("同步安全记录写入失败，本地数据未提交");
   }
 }
 

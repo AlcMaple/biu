@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import log from "electron-log";
 
 import { updateRankingLocal, type RankingLocalAction } from "@shared/play-ranking";
-import { StoreNameMap } from "@shared/store";
+import { isSyncSafetyStore, StoreNameMap } from "@shared/store";
 
 import {
   appSettingsStore,
@@ -43,8 +43,12 @@ async function setStoreWithRetry(name: string, store: { set: (value: any) => voi
 
   const delays = [0, 200, 500, 1000, 2000];
   for (let i = 0; i < delays.length; i++) {
-    if (writeSeq.get(name) !== seq) return;
     if (delays[i]) await sleep(delays[i]);
+    if (writeSeq.get(name) !== seq) {
+      // 等待期间可能已有新记录落盘；旧基线被替代不等于本次保存成功。
+      if (isSyncSafetyStore(name)) throw new Error("同步安全记录已被更新，本次写入未提交");
+      return;
+    }
     try {
       store.set(value);
       return;
@@ -126,6 +130,7 @@ export function registerStoreHandlers() {
     try {
       // 确保 value 是有效对象，防止 electron-store 报错
       if (value === null || value === undefined) {
+        if (isSyncSafetyStore(name)) throw new Error("同步安全记录无效");
         log.warn(`[store:set] Received invalid value for ${String(name)}:`, value);
         return;
       }
@@ -183,6 +188,7 @@ export function registerStoreHandlers() {
       }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
+      if (isSyncSafetyStore(name)) throw new Error("同步安全记录写入失败，本地数据未提交");
     }
   });
 

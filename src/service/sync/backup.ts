@@ -33,5 +33,6 @@ export function pushLocalBackup(mid: string, store: SyncStoreName, snapshot: Liv
   backupWrites = operation.catch(err => {
     log.warn(`[sync] ${store} local backup failed`, err);
   });
-  return backupWrites;
+  // 队列可以继续接收后续操作，但当前推送必须知道备份没有落盘。
+  return operation;
 }
