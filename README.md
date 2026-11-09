@@ -21,7 +21,7 @@
 >
 > - 🌐 **Web 版**：浏览器 / 手机端可用，含 iOS 分段流式播放与锁屏续播适配
 > - 🎤 **歌词增强**：网易云 / LrcLib 歌词搜索与采用、桌面歌词
-> - 🎵 **听歌识曲**（Shazam）与 **私人 FM / 心动模式**
+> - 🎵 **听歌识曲**（Shazam）与 **相似推荐（根据收藏无限推荐）**
 > - ☁️ **云同步服务**（可选）：[`biu-sync-server`](./biu-sync-server/README.md)，歌单与听歌排行跨设备同步
 > - 🎯 **歌词对齐服务**（可选）：[`biu-align-server`](./biu-align-server/README.md)，自动生成逐字歌词时间轴；需要 Python 和约 1.3 GB 模型
 >
