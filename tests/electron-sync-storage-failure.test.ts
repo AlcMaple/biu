@@ -20,6 +20,8 @@ const h = vi.hoisted(() => {
     "userStore",
   ];
   return {
+    safety: undefined as unknown,
+    writeSafety: vi.fn(),
     handlers: new Map<string, (...args: unknown[]) => Promise<unknown>>(),
     stores: Object.fromEntries(names.map(name => [name, { store: {}, set: vi.fn(), clear: vi.fn() }])),
   };
@@ -28,18 +30,62 @@ vi.mock("electron", () => ({
   ipcMain: { handle: (key: string, fn: (...args: unknown[]) => Promise<unknown>) => h.handlers.set(key, fn) },
 }));
 vi.mock("electron-log", () => ({ default: { warn: vi.fn(), error: vi.fn() } }));
-vi.mock("../electron/store", () => h.stores);
+vi.mock("../electron/store", () => ({
+  ...h.stores,
+  getSyncSafetyStore: () => ({
+    get store() {
+      return h.safety ?? {};
+    },
+    set store(value: unknown) {
+      h.writeSafety(value);
+    },
+  }),
+}));
 
 beforeEach(async () => {
   vi.resetModules();
   vi.useFakeTimers();
   h.handlers.clear();
+  h.safety = undefined;
+  h.writeSafety.mockImplementation(value => {
+    h.safety = value;
+  });
   const { registerStoreHandlers } = await import("../electron/ipc/store");
   registerStoreHandlers();
 });
 afterEach(() => vi.useRealTimers());
 
 const write = (name: StoreName, value: unknown) => h.handlers.get("store:set")!(null, name, value);
+
+describe("Electron多窗口暂停原子操作", () => {
+  const apply = (action: unknown) => h.handlers.get("store:sync-safety")!(null, action);
+
+  it("两窗口新暂停与旧恢复排队后保留新暂停", async () => {
+    await apply({ kind: "hold", signal: 503, at: 1 });
+    const newer = apply({ kind: "hold", signal: 429, at: 2 });
+    const staleResume = apply({ kind: "resume", expectedRevision: 1 });
+    await newer;
+    await expect(staleResume).resolves.toMatchObject({ revision: 2, hold: { signal: 429 } });
+  });
+
+  it("恢复写盘失败保持原暂停，并向窗口报告错误", async () => {
+    await apply({ kind: "hold", signal: 503, at: 1 });
+    h.writeSafety.mockImplementationOnce(() => {
+      throw new Error("disk failed");
+    });
+    await expect(apply({ kind: "resume", expectedRevision: 1 })).rejects.toThrow("disk failed");
+    await expect(apply({ kind: "read" })).resolves.toMatchObject({ revision: 1, hold: { signal: 503 } });
+  });
+
+  it("持久化暂停跨处理器重建保留，未知操作不写盘", async () => {
+    await apply({ kind: "hold", signal: 503, at: 1 });
+    const { registerStoreHandlers } = await import("../electron/ipc/store");
+    registerStoreHandlers();
+    await expect(apply({ kind: "read" })).resolves.toMatchObject({ revision: 1, hold: { signal: 503 } });
+    await expect(apply({ kind: "clear" })).rejects.toThrow();
+    expect(h.writeSafety).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("Electron同步安全记录", () => {
   it.each([

@@ -29,6 +29,7 @@ import {
   startWebPlaylistSession,
   writeWebPlaylistPartition,
 } from "./web-playlist-runtime";
+import { updateWebSyncSafety } from "./web-sync-safety";
 
 const playlistNames = {
   [StoreNameMap.LocalFavorites]: "favorites",
@@ -310,6 +311,11 @@ async function rankingLocal(action: RankingLocalAction): Promise<RankingLocalSta
 
 const platform: Platform = {
   rankingLocal,
+  syncSafety: async action => {
+    const database = await openDatabase();
+    if (!database) throw new Error("同步暂停记录的IndexedDB不可用");
+    return updateWebSyncSafety(database, action);
+  },
   getStore: webGetStore,
   setStore: webSetStore,
   clearStore: webClearStore,

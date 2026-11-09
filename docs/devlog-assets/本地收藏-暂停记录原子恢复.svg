@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="580" viewBox="0 0 960 580">
+<rect x="1" y="1" width="958" height="578" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+<g font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" fill="#282529">
+<text x="26" y="37" font-size="19" font-weight="700">同步暂停：旧确认不清掉新限制（图稿待审）</text>
+<text x="26" y="63" font-size="12.5" fill="#756f73">已完成暂停记录与恢复确认的事务基础；自动请求和产品恢复按钮尚未接通。</text>
+<text x="26" y="104" font-size="14" font-weight="700">用户会遇到什么？</text>
+<rect x="26" y="121" width="276" height="130" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<rect x="342" y="121" width="276" height="130" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+<rect x="658" y="121" width="276" height="130" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<g font-size="12.5" font-weight="700"><text x="42" y="148" fill="#36566d">先看到一次暂停</text><text x="358" y="148" fill="#7a6234">另一页面又遇到限制</text><text x="674" y="148" fill="#316247">旧页面的恢复确认到达</text></g>
+<g font-size="11"><text x="42" y="176">用户准备处理眼前这次暂停。</text><text x="42" y="200">背后：记下这次暂停的版本。</text><text x="358" y="176">新的服务限制也必须保留。</text><text x="358" y="200">背后：同类错误也生成新版本。</text><text x="674" y="176">结果：新的暂停仍然保留。</text><text x="674" y="200">背后：版本不符，不解除暂停。</text></g>
+<path d="M307 183H335m-6-5 6 5-6 5M623 183H651m-6-5 6 5-6 5" fill="none" stroke="#91adc1" stroke-width="2"/>
+<text x="26" y="291" font-size="14" font-weight="700">为什么不直接清空暂停？</text>
+<rect x="26" y="307" width="440" height="132" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+<text x="42" y="334" font-size="12.5" font-weight="700" fill="#96434f">旧确认不是“忽略以后所有限制”</text>
+<g font-size="11"><text x="42" y="361">读取、核对、保存一起完成，避免两个页面互相覆盖。</text><text x="42" y="385">恢复保存失败：保留原暂停，并明确返回失败。</text><text x="42" y="409">记录损坏：停止读取，不猜测为“没有暂停”。</text></g>
+<rect x="490" y="307" width="444" height="132" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="506" y="334" font-size="12.5" font-weight="700" fill="#36566d">验证到了哪里？</text>
+<g font-size="11"><text x="506" y="361">真实浏览器数据库：9项检查通过。</text><text x="506" y="385">覆盖双连接、重开、旧确认和失败回滚。</text><text x="506" y="409">工程检查不是生产同步或真实账号验收。</text></g>
+<rect x="26" y="467" width="908" height="86" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+<text x="42" y="494" font-size="12.5" font-weight="700" fill="#4a4450">常见情况与下一步</text>
+<text x="42" y="521" font-size="11">正常收藏路径不变。下一步接入实际请求与恢复界面；保存失败后刷新仍停的边界还需验证。</text>
+</g></svg>

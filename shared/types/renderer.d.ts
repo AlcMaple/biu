@@ -14,6 +14,9 @@ declare global {
   }
 
   interface ElectronAPI {
+    syncSafety: (
+      action: import("../sync-safety").SyncSafetyAction,
+    ) => Promise<import("../sync-safety").SyncSafetyState>;
     rankingLocal: (
       action: import("../play-ranking").RankingLocalAction,
     ) => Promise<import("../play-ranking").RankingLocalState>;

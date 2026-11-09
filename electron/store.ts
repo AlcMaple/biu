@@ -6,10 +6,22 @@ import { PLAY_RANKING_LOCAL_KEY, type RankingLocalState } from "@shared/play-ran
 import { defaultAppSettings } from "@shared/settings/app-settings";
 import { defaultShortcutSettings } from "@shared/settings/shortcut-settings";
 import { StoreNameMap } from "@shared/store";
+import { readSyncSafetyState, type SyncSafetyState } from "@shared/sync-safety";
 
 import type { FullMediaDownloadTask } from "./ipc/download/types";
 
 import { getUserDataPath } from "./utils";
+
+let syncSafetyStore: Store<SyncSafetyState> | undefined;
+
+export function getSyncSafetyStore() {
+  // 不用defaults补齐损坏记录，也不让新增记录的读取故障阻断整个应用启动。
+  return (syncSafetyStore ??= new Store<SyncSafetyState>({
+    name: "sync-safety",
+    cwd: getUserDataPath(),
+    deserialize: value => readSyncSafetyState(JSON.parse(value)),
+  }));
+}
 
 export const appSettingsStore = new Store<{ appSettings: AppSettings }>({
   name: StoreNameMap.AppSettings,

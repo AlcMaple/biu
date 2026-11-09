@@ -3,9 +3,11 @@ import log from "electron-log";
 
 import { updateRankingLocal, type RankingLocalAction } from "@shared/play-ranking";
 import { isSyncSafetyStore, StoreNameMap } from "@shared/store";
+import { readSyncSafetyState, updateSyncSafetyState } from "@shared/sync-safety";
 
 import {
   appSettingsStore,
+  getSyncSafetyStore,
   heartbeatFavSeedsStore,
   heartbeatServedStore,
   heartbeatSessionStore,
@@ -60,6 +62,23 @@ async function setStoreWithRetry(name: string, store: { set: (value: any) => voi
 }
 
 export function registerStoreHandlers() {
+  let safetyQueue: Promise<unknown> = Promise.resolve();
+  ipcMain.handle(channel.store.syncSafety, (_event, action: unknown) => {
+    const operation = safetyQueue.then(() => {
+      const syncSafetyStore = getSyncSafetyStore();
+      const saved = syncSafetyStore.store;
+      // 仅确实未建文件时Conf返回空对象；已存在文件先经过严格deserialize。
+      const current = readSyncSafetyState(Object.keys(saved).length ? saved : undefined);
+      const next = updateSyncSafetyState(current, action);
+      if (next.revision !== current.revision) {
+        syncSafetyStore.store = next;
+      }
+      return next;
+    });
+    // IPC窗口共用主进程队列；本次错误要返回，不能污染之后的独立操作。
+    safetyQueue = operation.catch(() => undefined);
+    return operation;
+  });
   let rankingQueue: Promise<unknown> = Promise.resolve();
   ipcMain.handle(channel.store.rankingLocal, (_event, action: RankingLocalAction) => {
     const run = rankingQueue.then(async () => {
