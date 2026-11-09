@@ -5,7 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import type { SyncSafetyView } from "@/service/sync/safety-gate";
 
-const h = vi.hoisted(() => ({ view: { abandonedIds: [] } as SyncSafetyView, read: vi.fn(), resume: vi.fn() }));
+const h = vi.hoisted(() => ({
+  staticDemo: false,
+  view: { abandonedIds: [] } as SyncSafetyView,
+  read: vi.fn(),
+  resume: vi.fn(),
+}));
 vi.mock("@/common/offline-demo", () => ({
   get isStaticDemo() {
     return h.staticDemo;
