@@ -14,6 +14,7 @@ import FullScreenPlayer from "@/components/full-screen-player";
 import LyricsBroadcaster from "@/components/lyrics/broadcaster";
 import PlayListDrawer from "@/components/music-playlist-drawer";
 import ReleaseNoteModal from "@/components/release-note-modal";
+import SyncSafetyNotice from "@/components/sync-safety-notice";
 import VideoPagesDownloadSelectModal from "@/components/video-pages-download-select-modal";
 import PlayBar from "@/layout/playbar";
 import { isWeb, log } from "@/platform";
@@ -106,6 +107,7 @@ const Layout = () => {
               >
                 <Navbar />
               </div>
+              <SyncSafetyNotice />
               {/* 根文档滚动时播放栏是 fixed 的，底部留出它的常量高度，最后一行才能滚到它上面 */}
               <div
                 className={clx("flex-1", {

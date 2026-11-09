@@ -25,6 +25,7 @@ describe("同步暂停记录协议", () => {
     expect(updateSyncSafetyState(later, { kind: "resume", expectedRevision: later.revision })).toEqual({
       schema: 1,
       revision: 3,
+      resumedAtRevision: 3,
       hold: null,
     });
   });

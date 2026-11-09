@@ -60,7 +60,7 @@ async function waitForUser() {
 
 function describeFailure(error: unknown) {
   const response = (error as { response?: { status?: number; data?: { error?: string } } })?.response;
-  if (response?.status === 429) return "同步请求受限，记录已保存在本机，请稍后再打开本页或重新登录";
+  if (response?.status === 429) return "同步请求受限，记录已保存在本机，请在暂停提示中确认恢复";
   if (response?.status === 404) return "云端尚未启用听歌排行，请先更新同步服务和 Web 服务";
   if (response?.status === 401) return "登录状态已失效，请重新登录；待同步记录已保留";
   return response?.data?.error || (error instanceof Error ? error.message : "同步失败，待同步记录已保留");

@@ -7,6 +7,7 @@ import { pushLocalBackup } from "./backup";
 import { getCurrentMid, pullSnapshot, pushOps } from "./client";
 import { diffForMigration, diffSnapshots } from "./codec";
 import { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH, SYNC_RETRY_DELAY_MS, SYNC_SLOW_LOG_MS } from "./config";
+import { isSyncPausedError } from "./safety-gate";
 
 /** 快照里还活着的条目数（墓碑不算） */
 function liveCount(flat: FlatSnapshot): number {
@@ -184,6 +185,13 @@ export class StoreSyncController {
     this.lastSyncedVersion = -1;
   }
 
+  resumeAfterPause(): void {
+    // 同账号人工恢复不能忘记本会话亲眼见过的内容，否则真实“删光”会被永久误拦。
+    const witnessed = this.witnessedNonEmpty;
+    this.resetSession();
+    this.witnessedNonEmpty = witnessed;
+  }
+
   private async runSync(): Promise<void> {
     if (this.running) {
       // 上一轮还没跑完又有新变更：记下来，这一轮跑完后再补跑一次，不丢变更
@@ -195,9 +203,11 @@ export class StoreSyncController {
     const generation = this.generation;
     const startedAt = Date.now();
     let ok = false;
+    let paused = false;
     try {
       ok = await this.syncOnce(generation);
     } catch (err) {
+      paused = isSyncPausedError(err);
       log.warn(`[sync] ${this.binding.store} sync failed`, err);
     } finally {
       this.running = false;
@@ -209,7 +219,12 @@ export class StoreSyncController {
         log.warn(`[sync] ${this.binding.store} 本轮耗时 ${elapsed}ms（正常应在 1s 内）`);
       }
 
-      if (this.pendingRerun) {
+      if (paused) {
+        this.pendingRerun = false;
+        if (this.retryTimer) clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        this.retriedOnce = false;
+      } else if (this.pendingRerun) {
         this.pendingRerun = false;
         void this.runSync();
       } else if (generation === this.generation && !ok && !this.retriedOnce) {

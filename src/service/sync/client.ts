@@ -7,6 +7,7 @@ import type { Envelope, SyncOp, SyncStoreName } from "./types";
 
 import { WATCH_REQUEST_TIMEOUT_MS } from "./config";
 import { syncHttp } from "./http";
+import { isSyncPausedError } from "./safety-gate";
 
 interface CachedToken {
   token: string;
@@ -38,6 +39,7 @@ class SyncRequestError extends Error {
 }
 
 function safeSyncError(error: unknown) {
+  if (isSyncPausedError(error)) return error;
   if (error instanceof SyncRequestError) return error;
   const status = (error as { response?: { status?: number } })?.response?.status;
   const message =
@@ -73,6 +75,7 @@ async function exchangeToken(): Promise<CachedToken | null> {
       const mid = res.data?.mid;
       return res.code === 0 && typeof mid === "string" && /^\d+$/.test(mid) ? { token: "", mid, signal } : null;
     } catch (err) {
+      if (isSyncPausedError(err)) throw err;
       if (signal.aborted) return null;
       log.warn("[sync/client] Web sync session unavailable", safeSyncError(err));
       return null;
@@ -96,6 +99,7 @@ async function exchangeToken(): Promise<CachedToken | null> {
     );
     return { token: res.token, mid: res.mid, signal };
   } catch (err) {
+    if (isSyncPausedError(err)) throw err;
     if (signal.aborted) return null;
     log.warn("[sync/client] token exchange failed", safeSyncError(err));
     return null;

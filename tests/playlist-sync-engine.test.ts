@@ -79,6 +79,30 @@ beforeEach(() => {
 });
 
 describe("同步引擎的数据保护", () => {
+  it("同账号人工恢复保留真实删除见证，不把删光操作误拦", async () => {
+    seedSyncedMeta();
+    let local = SONG;
+    const { controller } = makeController({ waitReady: async () => {}, encodeNow: () => local });
+    await runSync(controller);
+    local = {};
+    pushOps.mockRejectedValueOnce({ code: "BIU_SYNC_PAUSED" });
+    await runSync(controller);
+    controller.resumeAfterPause();
+    pushOps.mockResolvedValue({ version: 4, updatedAt: 1, data: {} });
+    await runSync(controller);
+    expect(pushOps).toHaveBeenLastCalledWith("fav-items", 3, expect.any(Array), true, "12345");
+    controller.resetSession();
+  });
+  it("持久化暂停错误不排自动补试", async () => {
+    seedSyncedMeta();
+    pullSnapshot.mockRejectedValueOnce({ code: "BIU_SYNC_PAUSED", message: "同步已暂停" });
+    const { controller } = makeController({ waitReady: async () => {}, encodeNow: () => SONG });
+    await runSync(controller);
+    await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 4);
+    expect(pullSnapshot).toHaveBeenCalledTimes(1);
+    controller.resetSession();
+  });
+
   it("滚动备份写入失败时不推送，也不应用远端或推进基线", async () => {
     seedSyncedMeta();
     const platform = (await import("@/platform")).default;

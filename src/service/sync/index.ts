@@ -11,6 +11,8 @@ import { getKnownSyncMid, invalidateSyncToken, watchVersions } from "./client";
 import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavorites, encodeTags } from "./codec";
 import { WATCH_RETRY_DELAYS_MS } from "./config";
 import { StoreSyncController } from "./engine";
+import { onSyncSafetyResumed } from "./safety";
+import { isSyncPausedError } from "./safety-gate";
 
 /** zustand persist 暴露的 rehydrate 状态，三个歌单 store 都由 persist 中间件包着 */
 type HydratableStore = {
@@ -98,7 +100,8 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  *
  * 起始 `known` 故意留空——第一轮必然立刻返回 `changed: true`，等于"启动/登录后先看看
  * 有没有落下的通知"，有就拉。断线时按 2s→5s→15s→30s 退避重连：瞬断能立刻恢复
- * （否则每次断线都留一个几十秒的通知盲区），服务真挂了也不会空转打请求。
+ * （否则每次断线都留一个几十秒的通知盲区）。已收到限制或5xx时由持久化闸门结束循环，
+ * 不走退避；只有明确人工恢复才重新启动。
  */
 async function startWatchLoop(
   onChanged: (versions: Record<string, number>) => void,
@@ -115,11 +118,13 @@ async function startWatchLoop(
     const startedAt = Date.now();
     // 失败必须留痕：这条通道是跨设备实时的唯一来源，静默吞掉异常的话，
     // 它挂了在日志上完全看不出来，只能看到"同步很慢"这种没法排查的现象。
+    let paused = false;
     const result = await watchVersions(known, expectedMid).catch(err => {
+      paused = isSyncPausedError(err);
       log.warn(`[sync/watch] 请求失败（挂了 ${Date.now() - startedAt}ms，第 ${failures + 1} 次）`, err);
       return null;
     });
-    if (!isCurrent()) return;
+    if (paused || !isCurrent()) return;
     if (getKnownSyncMid() !== undefined && getKnownSyncMid() !== expectedMid) return;
 
     if (!result) {
@@ -224,6 +229,15 @@ export function initLocalPlaylistSync(): void {
   // 变了，无脑三个全跑等于每次通知多打两倍请求，两台设备叠加很容易撞满服务端限流。
   // 系统休眠唤醒后挂着的连接可能已经死了但还没超时，回到前台补一次，成本可忽略
   window.addEventListener("focus", syncAllNow);
+  onSyncSafetyResumed(() => {
+    watchGeneration += 1;
+    watchedMid = undefined;
+    allControllers.forEach(controller => controller.resumeAfterPause());
+    invalidateSyncToken();
+    resetPlayRankingSession();
+    ensureWatch();
+    syncAllNow();
+  });
 
   // 登录态从无到有时触发一次（涵盖"冷启动时本地已缓存登录态"和"刚登录"两种情况）
   useUser.subscribe((state, prev) => {
