@@ -66,16 +66,16 @@
 - ❌ 只留「一次性」备份（写一次就永不更新）当数据安全网
   后果：真实事故——`preMigrationBackups` 只在首次迁移那天写一次，出事时只能找回几天前的状态，之后新增的数据全部无解
 
-- ❌ 新增持久化状态时只接一端（只写 Electron 的 `electron-store`，忘了 Android）
-  后果：同一份状态 Android 上不落盘，重启即丢
+- ❌ 新增持久化状态时只接一端（只写 Electron 的 `electron-store`，忘了 Web 的 IndexedDB）
+  后果：同一份状态 Web 上不落盘，刷新即丢
 
 # UI / 样式
 
 - ❌ 把只有局部静态画面、临时底部导航或虚构交互的页面称为「原型」，再直接据此改 React
   后果：设计图和真实页面不是同一套状态机；实施时必须重新设计，桌面 / 平板 / 手机会各自漂移，评审也无法发现缺失交互
 
-- ❌ 把 `isNativeMobile` 当作所有窄屏布局的判断，或为了 Web 响应式复制出第二套路由树
-  后果：普通手机浏览器仍落在桌面壳中横向裁切；平台能力和页面形态混在一起，Android / iOS / Web 后续必然漂移
+- ❌ 用平台判断（`isWeb` / `isElectron`）代替窄屏布局判断，或为了 Web 响应式复制出第二套路由树
+  后果：手机浏览器仍落在桌面壳中横向裁切；平台能力和页面形态混在一起，桌面与手机布局后续必然漂移
 
 - ❌ 用 `isMobileLayout ? <移动壳><Outlet /> : <桌面壳><Outlet />` 之类的两套 JSX 结构切换断点
   后果：窗口在手机 / 平板间变化时会重挂 `Outlet`，推荐列表、滚动位置、未完成输入和页面内请求都会被重置；响应式切换必须只改变同一棵组件树的布局和 className。
@@ -100,14 +100,11 @@
 
 # 平台抽象与 IPC
 
-- ❌ 运行时用 `BIU_TARGET` 判断当前是不是 Android / Web，或继续把所有非 Electron 环境都当成 Android
-  后果：`BIU_TARGET` 只是 Rsbuild 插件的**构建期**变量；普通浏览器会误用 Capacitor HTTP 和移动端布局，Android 浏览器也会被误认为原生 App
+- ❌ 运行时用 `BIU_TARGET` 判断当前是 Electron 还是 Web
+  后果：`BIU_TARGET` 只是 Rsbuild 插件的**构建期**变量，运行时读不到；平台一律走 `src/platform` 的检测结果
 
 - ❌ 新增 IPC channel 只改一两处
-  后果：类型对不上、preload 没暴露、或 Android 上调到不存在的方法直接崩
-
-- ❌ 假设原生移动平台层某个 native 能力已经通了
-  后果：storage / cookie / HTTP 已接入，但 Shazam、MediaSession（后台播放 / 通知 / 锁屏 / 耳机键 / AudioFocus）、字体、窗口控制、下载等**仍是 noop**，当成能用会静默无效果
+  后果：类型对不上、preload 没暴露、或 Web 上调到不存在的方法直接崩
 
 # 桌面歌词窗口（严格规则）
 
@@ -149,12 +146,12 @@
 
 # 技术栈与架构边界
 
-- 构建不换 webpack / Vite——一套配置管三窗 + Android + iOS + Web
+- 构建不换 webpack / Vite——一套配置管 Electron 三窗 + Web
 - TypeScript 5 `strict`，不关 strict、不甩 `any`
 - UI不加新 UI 库 / CSS-in-JS / class 组件——两套风格混用心智翻倍。动画统一 framer-motion
 - 状态管理不另起一套状态库 / 直接读写 localStorage
-- HTTP：主进程 `got` v14；渲染进程 `axios`（`src/service/request/`）；Android / iOS 走 `native-adapter`（Capacitor HTTP）。抓取需要 cookie / UA 的走 IPC，不在渲染进程裸发
-- 一份渲染 bundle 跑 3 个 Electron 窗（main / mini-player / desktop-lyrics）+ Android / iOS WebView + Web，靠 hash route（`/`、`#mini-player`、`#desktop-lyrics`）区分；跨窗同步用 `BroadcastChannel`（渲染 ↔ 渲染）+ IPC 事件（主 ↔ 渲染），不自造第二套通道
+- HTTP：主进程 `got` v14；渲染进程 `axios`（`src/service/request/`）；Web 版走同源 BFF（`web-server/`）。抓取需要 cookie / UA 的走 IPC，不在渲染进程裸发
+- 一份渲染 bundle 跑 3 个 Electron 窗（main / mini-player / desktop-lyrics）+ Web，靠 hash route（`/`、`#mini-player`、`#desktop-lyrics`）区分；跨窗同步用 `BroadcastChannel`（渲染 ↔ 渲染）+ IPC 事件（主 ↔ 渲染），不自造第二套通道
 - 测试用 Vitest + jsdom（`tests/`，globals 开启，`tests/setup.ts` mock 了 MediaSession / audio），新测试放 `tests/`
 - 渲染进程不碰网络 / 文件 / Node API，一律走 IPC——渲染层只能请求 IPC 写死的能力，读任意文件 / 执行任意命令这种做不到，是安全边界
 - 不为不存在的需求（多租户、插件系统等）预留扩展点——YAGNI
