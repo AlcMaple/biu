@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { MediaSafetyPausedError, MediaSafetyStore } from "./media-safety-store.js";
 
-export type MediaSafetyGate = Pick<MediaSafetyStore, "begin" | "finish">;
+export type MediaSafetyGate = Pick<MediaSafetyStore, "begin" | "finish" | "abandon">;
 
 export function resolveMediaSafetyFile(
   mode: "production" | "development",
@@ -41,6 +41,7 @@ export function createPersistentMediaSafetyGate(file: string): MediaSafetyGate {
   };
   return {
     begin: () => getStore().begin(),
+    abandon: id => getStore().abandon(id),
     finish: (id, status, riskControl) => getStore().finish(id, status, riskControl),
   };
 }

@@ -164,6 +164,26 @@ export class MediaSafetyStore {
     if (reason) throw new MediaSafetyPausedError(reason);
   }
 
+  abandon(id: string): void {
+    if (!this.active.has(id)) throw new MediaSafetyPausedError("unconfirmed");
+    try {
+      this.transaction(record => {
+        // 人工确认后才收到的坏响应仍须留痕，不能被旧确认覆盖。
+        if (!record.pending.includes(id)) {
+          if (record.pending.length < MAX_PENDING) record.pending.push(id);
+          else record.reason = "upstream-error";
+        }
+        record.revision += 1;
+        if (!Number.isSafeInteger(record.revision)) throw new Error("media safety revision exhausted");
+      });
+    } catch {
+      this.failed = true;
+      throw new MediaSafetyPausedError("storage");
+    } finally {
+      this.active.delete(id);
+    }
+  }
+
   resume(expectedRevision: number): MediaSafetyRecord {
     const result = this.transaction(record => {
       if (record.revision !== expectedRevision) throw new Error("media pause changed; inspect the latest record");

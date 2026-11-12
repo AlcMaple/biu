@@ -21,6 +21,7 @@ import { getAudioSongInfo } from "@/service/audio-song-info";
 import { getPlayerPagelist } from "@/service/player-pagelist";
 import { getWebInterfaceView } from "@/service/web-interface-view";
 import { isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
+import { isMediaSafetyError } from "@shared/media-safety-error";
 
 import { useLocalFavItemsStore } from "./local-fav-items";
 import { usePlayProgress } from "./play-progress";
@@ -314,6 +315,12 @@ const primeAudioForGesture = () => {
 };
 
 const handlePlayError = (error: any) => {
+  if (isMediaSafetyError(error)) {
+    if (!audio.paused) audio.pause();
+    usePlayList.setState({ isPlaying: false });
+    toastError("播放服务已暂停，请联系站点管理员恢复");
+    return;
+  }
   const errorName = error?.name || "";
   const errorMsg = error?.message || errorName || "";
   // AbortError（"The operation was aborted."）是换源/切歌时 load() 打断了上一次 play()，
@@ -444,22 +451,22 @@ const playAudioSafely = async () => {
     return;
   }
 
+  const requestedPlayId = usePlayList.getState().playId;
+  const attemptedSource = currentSourceUrl || audio.src;
   try {
     await audio.play();
   } catch (error) {
+    if (usePlayList.getState().playId !== requestedPlayId || (currentSourceUrl || audio.src) !== attemptedSource)
+      return;
     if ((error as DOMException)?.name === "NotSupportedError") {
       // 这条路会静默地重新取址并重新挂载音频源。线上排查「播到一半无声」时，
       // 缺了这行日志就只能看到一次没头没尾的 setAudioSource，无从判断起因。
       log.warn("play() 被拒（NotSupportedError），重新获取播放地址并重挂", describeAudioState());
-      const refreshed = await refreshCurrentAudioSource();
-      if (refreshed) {
-        try {
-          await audio.play();
-          return;
-        } catch (retryError) {
-          handlePlayError(retryError);
-          return;
-        }
+      try {
+        const refreshed = await refreshCurrentAudioSource();
+        if (refreshed && usePlayList.getState().playId === requestedPlayId) await audio.play();
+      } catch (retryError) {
+        if (usePlayList.getState().playId === requestedPlayId) handlePlayError(retryError);
       }
       return;
     }
@@ -971,6 +978,8 @@ export const usePlayList = create<State & Action>()(
               failureHandlingId = playId;
               try {
                 await runPlaybackFailure(playId, failedSrc, errInfo, probe);
+              } catch (error) {
+                if (get().playId === playId) handlePlayError(error);
               } finally {
                 if (failureHandlingId === playId) failureHandlingId = undefined;
               }
@@ -2301,6 +2310,7 @@ async function resolveCurrentAudioSource(requestedPlayId: string, playItem: Play
       }
     }
   } catch (refreshError) {
+    if (isMediaSafetyError(refreshError)) throw refreshError;
     log.error("刷新播放链接失败", {
       playItem,
       refreshError,

@@ -33,13 +33,15 @@ export function createBilibiliProxyHandler(options: BilibiliProxyHandlerOptions 
   const mediaSessions = options.mediaSessions ?? new MediaSessionStore();
   const mediaTokens = options.mediaTokens ?? new MediaTokenStore();
   const runtime = { mediaSessions, mediaTokens };
+  const safetyStore = options.mediaSafetyFile ? createPersistentMediaSafetyGate(options.mediaSafetyFile) : undefined;
   const mediaHandler = createBilibiliMediaProxyHandler({
-    safetyStore: options.mediaSafetyFile ? createPersistentMediaSafetyGate(options.mediaSafetyFile) : undefined,
+    safetyStore,
     ...runtime,
     logger: options.logger,
     mapUpstreamForTest: options.mapUpstreamForTest,
   });
   const apiHandler = createBilibiliApiProxyHandler({
+    mediaSafetyStore: safetyStore,
     logger: options.logger,
     mapUpstreamForTest: options.mapUpstreamForTest,
     publicOrigin: options.publicOrigin,

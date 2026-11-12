@@ -6,6 +6,7 @@ import { getPlayerPlayurl, type DashAudio } from "@/service/player-playurl";
 import { useUser } from "@/store/user";
 import { collectStreamUrls } from "@shared/bilibili-stream";
 import { getBilibiliMediaProxyExpiry, isBilibiliMediaProxyUrl } from "@shared/bilibili-web-proxy";
+import { isMediaSafetyError } from "@shared/media-safety-error";
 
 import { audioQualitySort } from "../constants/audio";
 import { VideoFnval } from "../constants/video";
@@ -120,6 +121,7 @@ export async function getDashUrl(
       videoResolution,
     };
   } catch (error) {
+    if (isMediaSafetyError(error)) throw error;
     log.error("[Get video play url error]", error);
     return {
       isLossless: false,

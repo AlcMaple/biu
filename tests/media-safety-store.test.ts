@@ -129,3 +129,22 @@ test("意图写入故障不返回发送许可", () => {
   expect(readFileSync(file)).toEqual(before);
   expect(store.read().pending).toEqual([]);
 });
+
+test("未确认响应撤销本进程存活标记并推进版本", () => {
+  const store = new MediaSafetyStore(file);
+  const id = store.begin();
+  const revision = store.read().revision;
+  store.abandon(id);
+  expect(() => store.begin()).toThrow(MediaSafetyPausedError);
+  expect(() => store.resume(revision)).toThrow("changed");
+  expect(store.read().pending).toContain(id);
+});
+
+test("旧请求在人工恢复后才给出未知结果仍重新停手", () => {
+  const store = new MediaSafetyStore(file);
+  const id = store.begin();
+  store.resume(store.read().revision);
+  store.abandon(id);
+  expect(() => store.begin()).toThrow(MediaSafetyPausedError);
+  expect(new MediaSafetyStore(file).read().pending).toContain(id);
+});
