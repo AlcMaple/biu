@@ -1,3 +1,4 @@
+import { symlinkSync } from "node:fs";
 // @vitest-environment node
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -60,4 +61,15 @@ test("查询锁不授予恢复权限，恢复仍拒绝占用锁且保留原件",
   ).toThrow();
   expect(readFileSync(file)).toEqual(before);
   expect(existsSync(`${file}.lock`)).toBe(true);
+});
+
+test("损坏符号链接仍占用锁路径，查询不误报无锁", () => {
+  new MediaSafetyStore(file);
+  symlinkSync(path.join(directory, "missing-target"), `${file}.lock`);
+  const before = readFileSync(file);
+  expect(runMediaSafetyCommand(["status", "--file", file])).toMatchObject({
+    storageLockPresent: true,
+    pausedOrUnconfirmed: true,
+  });
+  expect(readFileSync(file)).toEqual(before);
 });

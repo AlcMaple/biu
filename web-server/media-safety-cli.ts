@@ -1,8 +1,19 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { resolveMediaSafetyFile } from "./media-safety-runtime.js";
 import { MediaSafetyStore, parseMediaSafetyRecord, type MediaSafetyRecord } from "./media-safety-store.js";
+
+function hasStorageLock(file: string): boolean {
+  try {
+    // mkdir也会被损坏符号链接挡住；只看路径本身，不跟随链接判断目标。
+    lstatSync(`${file}.lock`);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
 
 export function runMediaSafetyCommand(args: string[], environment: NodeJS.ProcessEnv = process.env) {
   const [command, ...rest] = args;
@@ -32,7 +43,7 @@ export function runMediaSafetyCommand(args: string[], environment: NodeJS.Proces
     record = parseMediaSafetyRecord(readFileSync(file, "utf8"));
   } catch (error) {
     if (command === "status" && (error as NodeJS.ErrnoException).code === "ENOENT")
-      return { file, initialized: false as const, storageLockPresent: existsSync(`${file}.lock`) };
+      return { file, initialized: false as const, storageLockPresent: hasStorageLock(file) };
     throw error;
   }
   if (command === "resume") {
@@ -42,7 +53,7 @@ export function runMediaSafetyCommand(args: string[], environment: NodeJS.Proces
     if (options.get("--confirm") !== "resume-media") throw new Error("Explicit --confirm resume-media is required");
     record = new MediaSafetyStore(file, { initialize: false }).resume(Number(rawRevision));
   }
-  const storageLockPresent = existsSync(`${file}.lock`);
+  const storageLockPresent = hasStorageLock(file);
   return {
     file,
     initialized: true as const,
