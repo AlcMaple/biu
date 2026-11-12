@@ -31,7 +31,11 @@ describe("媒体运行配置与本机恢复", () => {
   test("初始化惰性，status不会创建不存在的账本", () => {
     createPersistentMediaSafetyGate(file);
     expect(existsSync(file)).toBe(false);
-    expect(runMediaSafetyCommand(["status", "--file", file])).toEqual({ file, initialized: false });
+    expect(runMediaSafetyCommand(["status", "--file", file])).toEqual({
+      file,
+      initialized: false,
+      storageLockPresent: false,
+    });
     expect(existsSync(file)).toBe(false);
   });
   test("旧确认和缺少明确确认均拒绝；本机恢复后活跃服务继续使用", () => {

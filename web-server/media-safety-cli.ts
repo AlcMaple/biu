@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { resolveMediaSafetyFile } from "./media-safety-runtime.js";
@@ -32,7 +32,7 @@ export function runMediaSafetyCommand(args: string[], environment: NodeJS.Proces
     record = parseMediaSafetyRecord(readFileSync(file, "utf8"));
   } catch (error) {
     if (command === "status" && (error as NodeJS.ErrnoException).code === "ENOENT")
-      return { file, initialized: false as const };
+      return { file, initialized: false as const, storageLockPresent: existsSync(`${file}.lock`) };
     throw error;
   }
   if (command === "resume") {
@@ -42,13 +42,15 @@ export function runMediaSafetyCommand(args: string[], environment: NodeJS.Proces
     if (options.get("--confirm") !== "resume-media") throw new Error("Explicit --confirm resume-media is required");
     record = new MediaSafetyStore(file, { initialize: false }).resume(Number(rawRevision));
   }
+  const storageLockPresent = existsSync(`${file}.lock`);
   return {
     file,
     initialized: true as const,
+    storageLockPresent,
     revision: record.revision,
     reason: record.reason,
     pendingCount: record.pending.length,
-    pausedOrUnconfirmed: Boolean(record.reason || record.pending.length),
+    pausedOrUnconfirmed: Boolean(record.reason || record.pending.length || storageLockPresent),
     resumed: command === "resume",
     ...(command === "resume" ? { restartAfterStorageFailure: true } : {}),
   };
