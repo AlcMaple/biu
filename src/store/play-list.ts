@@ -639,38 +639,6 @@ const logMediaCapabilityOnce = () => {
   });
 };
 
-/**
- * 用页面 fetch 探测媒体地址的真实响应，回传到服务端日志。
- * 目的：iOS 的 <audio> 走独立媒体加载器，若页面 fetch 能拿到 206+字节而元素却失败，
- * 就能定性为「元素加载器问题」而非网络/代理问题。
- */
-async function probeMediaResponse(url: string): Promise<Record<string, unknown>> {
-  if (typeof fetch !== "function") return { probe: "no-fetch" };
-  try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      credentials: "same-origin",
-      headers: { Range: "bytes=0-65535" },
-      method: "GET",
-    });
-    let bytes = 0;
-    try {
-      const buf = await res.arrayBuffer();
-      bytes = buf.byteLength;
-    } catch {
-      /* 读取正文失败也无妨，状态码更重要 */
-    }
-    return {
-      probeStatus: res.status,
-      probeContentType: res.headers.get("content-type"),
-      probeContentRange: res.headers.get("content-range"),
-      probeBytes: bytes,
-    };
-  } catch (error) {
-    return { probe: "fetch-threw", probeError: String(error) };
-  }
-}
-
 export const usePlayList = create<State & Action>()(
   persist(
     immer((set, get) => {
@@ -959,15 +927,15 @@ export const usePlayList = create<State & Action>()(
                   return;
                 }
                 // 无可见进度：先探一次真实 HTTP 状态。iOS 原生加载器在缓冲大文件时
-                // currentTime/buffered 会长时间都是 0，但只要页面 fetch 拿得到字节、
+                // currentTime/buffered 会长时间都是 0，但只要页面 fetch 返回成功状态、
                 // 且元素还在 LOADING，就是「还没缓冲够」而不是「卡死」——延长等待，别误杀。
                 // MSE 下 audio.src 是 blob:，必须用逻辑地址，否则探测与「token 失效先重新取址」都会漏判
                 const stalledSrc = currentSourceUrl || audio.src;
-                void probeMediaResponse(stalledSrc)
+                void probePlaybackStatus(stalledSrc)
                   .then(probe => {
                     if (get().playId !== playId || audio.paused) return;
                     const stillLoading = audio.networkState === NETWORK_LOADING && !audio.error;
-                    const sourceHealthy = probe.probeStatus === 200 || probe.probeStatus === 206;
+                    const sourceHealthy = probe.status === 200 || probe.status === 206;
                     if (stillLoading && sourceHealthy && stallGraceUsed < MAX_STALL_GRACE) {
                       stallGraceUsed += 1;
                       log.warn("播放暂无进度但源正常且仍在加载，延长等待", {
@@ -980,7 +948,7 @@ export const usePlayList = create<State & Action>()(
                       return;
                     }
                     log.warn("播放长时间无进度，触发换源自救", { playId, ...describeAudioState(), ...probe });
-                    void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
+                    void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" }, probe);
                   })
                   .catch(() => {
                     void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
@@ -997,11 +965,12 @@ export const usePlayList = create<State & Action>()(
               playId: string,
               failedSrc: string,
               errInfo: { code?: number; message?: string },
+              probe?: Awaited<ReturnType<typeof probePlaybackStatus>>,
             ) => {
               if (failureHandlingId === playId) return;
               failureHandlingId = playId;
               try {
-                await runPlaybackFailure(playId, failedSrc, errInfo);
+                await runPlaybackFailure(playId, failedSrc, errInfo, probe);
               } finally {
                 if (failureHandlingId === playId) failureHandlingId = undefined;
               }
@@ -1011,13 +980,14 @@ export const usePlayList = create<State & Action>()(
               playId: string,
               failedSrc: string,
               errInfo: { code?: number; message?: string },
+              probe?: Awaited<ReturnType<typeof probePlaybackStatus>>,
             ) => {
               clearStallWatchdog();
               // 浏览器在等新手势（NotAllowed）：任何自动 play() 都注定被拒，停手等用户再点一次，
               // 否则就是 NotAllowed 刷屏 + 请求风暴
               if (awaitingUserGesture) return;
               // 对齐官方播放器的容错：先换备用地址/重新取地址自救
-              if (await tryFailoverAudioSource(playId, failedSrc)) return;
+              if (await tryFailoverAudioSource(playId, failedSrc, probe)) return;
               // 自救期间用户已切歌：不再处理
               if (get().playId !== playId) return;
 
@@ -1152,15 +1122,7 @@ export const usePlayList = create<State & Action>()(
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
               const erroredSrc = currentSourceUrl || audio.src;
-              void probeMediaResponse(erroredSrc).then(probe => {
-                log.warn("音频元素报错", {
-                  playId,
-                  code: err.code,
-                  message: err.message,
-                  ...describeAudioState(),
-                  ...probe,
-                });
-              });
+              log.warn("音频元素报错", { playId, code: err.code, message: err.message, ...describeAudioState() });
               void handlePlaybackFailure(playId, erroredSrc, { code: err.code, message: err.message });
             };
 
@@ -2071,10 +2033,10 @@ const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
  * 手机上没法开开发者工具看 Network，媒体元素的 onerror 又只给 code=2/3/4 这种
  * 笼统分类，排查时等于瞎子。这里对失败地址发一个 1 字节 Range 请求，把状态码
  * 写进日志和提示里（404 = 代理 token 失效、403 = 上游拒绝、0 = 网络不通）。
- * 每首歌只在重新取址那一步探一次，不会增加请求压力。
+ * 同一次失败仅由自救链路诊断，日志不再另发一个媒体请求。
  */
-async function probePlaybackStatus(url: string): Promise<number | undefined> {
-  if (typeof fetch !== "function") return undefined;
+async function probePlaybackStatus(url: string): Promise<{ status?: number; riskControl: boolean }> {
+  if (typeof fetch !== "function") return { riskControl: false };
   try {
     const res = await fetch(url, {
       cache: "no-store",
@@ -2084,9 +2046,9 @@ async function probePlaybackStatus(url: string): Promise<number | undefined> {
     });
     // 只关心状态码，正文立刻丢弃
     void res.body?.cancel();
-    return res.status;
+    return { status: res.status, riskControl: Boolean(res.headers.get("x-bili-gaia-vvoucher")) };
   } catch {
-    return 0; // 请求根本没发出去 / 被网络层掐断
+    return { status: 0, riskControl: false };
   }
 }
 
@@ -2104,7 +2066,11 @@ async function waitFailoverSlot() {
  * 候选用尽后再重新向 B 站取一次新地址；都失败才返回 false，由调用方跳下一首兜底。
  * 只在真实播放失败时触发，每个地址最多试一次、新地址最多重取一次，不会产生轮询压力。
  */
-async function tryFailoverAudioSource(playId: string, failedSrc: string): Promise<boolean> {
+async function tryFailoverAudioSource(
+  playId: string,
+  failedSrc: string,
+  knownProbe?: Awaited<ReturnType<typeof probePlaybackStatus>>,
+): Promise<boolean> {
   if (failoverPlayId !== playId) {
     failoverPlayId = playId;
     failoverTriedUrls = new Set();
@@ -2126,6 +2092,20 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
   // 本地文件没有备用源可换
   if (!playItem || playItem.source === "local") return false;
 
+  const probe = knownProbe ?? (await probePlaybackStatus(failedSrc));
+  if (usePlayList.getState().playId !== playId) return true;
+  const status = probe.status;
+  if (
+    status === 423 ||
+    status === 429 ||
+    (status !== undefined && status >= 500 && status <= 599) ||
+    probe.riskControl
+  ) {
+    if (!audio.paused) audio.pause();
+    usePlayList.setState({ isPlaying: false });
+    toastError(status === 423 ? "播放服务已暂停，请联系站点管理员恢复" : "播放源暂时拒绝请求，已停止自动重试");
+    return true;
+  }
   const resumeTime = usePlayProgress.getState().currentTime || 0;
 
   // 网页版所有候选地址都是同一个同源代理会话签出的 token，token 失效（服务重启 / 过期 /
@@ -2150,8 +2130,7 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
   if (!failoverRefreshed) {
     failoverRefreshed = true;
     failoverAttempts += 1;
-    const status = await probePlaybackStatus(failedSrc);
-    log.warn("音频播放失败，重新获取播放地址重试", { playId, failedSrc, httpStatus: status });
+    log.warn("音频播放失败，重新获取播放地址重试", { playId, httpStatus: status });
     if (status === 0) {
       toastInfo("播放源连不上，请检查网络");
     } else if (status !== undefined && status >= 400) {
