@@ -41,7 +41,8 @@
     "knip": "knip --no-exit-code --max-show-issues 5 --reporter github-actions",
     "release": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail",
     "release:beta": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail --prerelease beta",
-    "release:alpha": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail --prerelease alpha"
+    "release:alpha": "git fetch --tags --force && changelogen --release --push --hideAuthorEmail --prerelease alpha",
+    "media:safety": "node dist/server/web-server/media-safety-cli.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

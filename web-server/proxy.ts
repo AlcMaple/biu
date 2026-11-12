@@ -9,6 +9,7 @@ import {
 import { resolveSession } from "./auth/handler.js";
 import { createGaiaApiResponseTransformer } from "./gaia-response.js";
 import { createBilibiliMediaProxyHandler, createMediaApiResponseTransformer } from "./media-proxy.js";
+import { createPersistentMediaSafetyGate } from "./media-safety-runtime.js";
 import { MediaSessionStore } from "./media-session-store.js";
 import { MediaTokenStore } from "./media-token-store.js";
 import { sendProxyJson, type ProxyNext } from "./proxy-common.js";
@@ -17,6 +18,7 @@ export interface BilibiliProxyHandlerOptions extends Pick<
   BilibiliApiProxyHandlerOptions,
   "logger" | "mapUpstreamForTest" | "publicOrigin" | "sessionProvider"
 > {
+  mediaSafetyFile?: string;
   mediaSessions?: MediaSessionStore;
   mediaTokens?: MediaTokenStore;
 }
@@ -32,6 +34,7 @@ export function createBilibiliProxyHandler(options: BilibiliProxyHandlerOptions 
   const mediaTokens = options.mediaTokens ?? new MediaTokenStore();
   const runtime = { mediaSessions, mediaTokens };
   const mediaHandler = createBilibiliMediaProxyHandler({
+    safetyStore: options.mediaSafetyFile ? createPersistentMediaSafetyGate(options.mediaSafetyFile) : undefined,
     ...runtime,
     logger: options.logger,
     mapUpstreamForTest: options.mapUpstreamForTest,

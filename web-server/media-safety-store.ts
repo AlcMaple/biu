@@ -23,7 +23,7 @@ const emptyRecord = (): MediaSafetyRecord => ({ version: 1, revision: 0, reason:
 const reasons = new Set<unknown>([null, "rate-limit", "upstream-error", "risk-control"]);
 const MAX_PENDING = 128;
 
-function parseRecord(text: string): MediaSafetyRecord {
+export function parseMediaSafetyRecord(text: string): MediaSafetyRecord {
   const value: unknown = JSON.parse(text);
   if (!value || typeof value !== "object") throw new Error("invalid media safety record");
   const record = value as Partial<MediaSafetyRecord>;
@@ -59,9 +59,12 @@ export class MediaSafetyStore {
   private readonly active = new Set<string>();
   private failed = false;
 
-  constructor(private readonly file: string) {
-    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    this.transaction(record => record, true);
+  constructor(
+    private readonly file: string,
+    options: { initialize?: boolean } = {},
+  ) {
+    if (options.initialize !== false) mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    this.transaction(record => record, options.initialize !== false);
   }
 
   private transaction<T>(operation: (record: MediaSafetyRecord) => T, initialize = false): T {
@@ -71,7 +74,7 @@ export class MediaSafetyStore {
       let record: MediaSafetyRecord;
       let created = false;
       try {
-        record = parseRecord(readFileSync(this.file, "utf8"));
+        record = parseMediaSafetyRecord(readFileSync(this.file, "utf8"));
       } catch (error) {
         if (!initialize || (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
         record = emptyRecord();

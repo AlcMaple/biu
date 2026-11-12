@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ApiResponseTransformer } from "./api-proxy.js";
+import type { MediaSafetyGate } from "./media-safety-runtime.js";
 
 import { BILIBILI_MEDIA_PROXY_PREFIX } from "../shared/bilibili-web-proxy.js";
 import { resolveMediaRate } from "./media-pacer.js";
 import { isBilibiliMediaResponse, rewriteBilibiliMediaPayload } from "./media-response.js";
-import { MediaSafetyPausedError, type MediaSafetyStore } from "./media-safety-store.js";
+import { MediaSafetyPausedError } from "./media-safety-store.js";
 import { MediaSessionStore } from "./media-session-store.js";
 import { MediaTokenStore } from "./media-token-store.js";
 import {
@@ -33,7 +34,7 @@ export interface MediaProxyRuntime {
 
 export interface BilibiliMediaProxyHandlerOptions extends MediaProxyRuntime {
   logger?: ProxyLogger;
-  safetyStore?: MediaSafetyStore;
+  safetyStore?: MediaSafetyGate;
   /** 单条媒体流的速率上限（字节/秒）；0 关闭限速 */
   maxMediaRateBytes?: number;
   mapUpstreamForTest?: UpstreamMapper;

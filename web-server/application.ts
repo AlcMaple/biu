@@ -22,6 +22,7 @@ export interface WebApplicationHandlerOptions {
   clientLogMaxTotalBytes?: number;
   clientLogRetentionDays?: number;
   lyricsProxyHandler?: WebLyricsProxyHandler;
+  mediaSafetyFile?: string;
   proxyHandler?: BilibiliProxyHandler;
   publicOrigin?: string;
   syncProxyHandler?: BiuSyncProxyHandler;
@@ -38,7 +39,8 @@ export function createWebApplicationHandler(options: WebApplicationHandlerOption
   const acmeChallengeHandler = options.acmeChallengeHandler ?? createAcmeChallengeProxyHandler();
   const authHandler =
     options.authHandler ?? createWebAuthHandler({ clientIpHeader: options.clientIpHeader, publicOrigin });
-  const proxyHandler = options.proxyHandler ?? createBilibiliProxyHandler({ publicOrigin });
+  const proxyHandler =
+    options.proxyHandler ?? createBilibiliProxyHandler({ publicOrigin, mediaSafetyFile: options.mediaSafetyFile });
   const clientLogHandler =
     options.clientLogHandler ??
     (options.clientLogDir
