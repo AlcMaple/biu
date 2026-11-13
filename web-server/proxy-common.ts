@@ -254,13 +254,25 @@ export function requestAndRelayStream(
   input: UpstreamRequestInput,
   downstream: ServerResponse,
   options: {
+    beforeRequest?: () =>
+      | {
+          onResponse: (response: IncomingMessage) => void;
+          onTransportError: () => void;
+        }
+      | undefined;
     redirectsLeft?: number;
     validateRedirect?: (target: URL) => boolean;
   } = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (input.signal.aborted) {
+      reject(new Error("request aborted before upstream admission"));
+      return;
+    }
+    const observer = options.beforeRequest?.();
     const upstreamRequest = openUpstream(input, upstream => {
       void (async () => {
+        observer?.onResponse(upstream);
         const status = upstream.statusCode ?? 502;
         const location = firstHeader(upstream.headers.location);
 
@@ -278,8 +290,19 @@ export function requestAndRelayStream(
         }
 
         await relayUpstreamStream(upstream, downstream, input);
-      })().then(resolve, reject);
+      })().then(resolve, error => {
+        upstream.destroy();
+        reject(error);
+      });
     });
-    upstreamRequest.once("error", reject);
+    upstreamRequest.once("error", error => {
+      try {
+        observer?.onTransportError();
+      } catch (storageError) {
+        reject(storageError);
+        return;
+      }
+      reject(error);
+    });
   });
 }

@@ -1,10 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ApiResponseTransformer } from "./api-proxy.js";
+import type { MediaSafetyGate } from "./media-safety-runtime.js";
 
 import { BILIBILI_MEDIA_PROXY_PREFIX } from "../shared/bilibili-web-proxy.js";
 import { resolveMediaRate } from "./media-pacer.js";
 import { isBilibiliMediaResponse, rewriteBilibiliMediaPayload } from "./media-response.js";
+import { MediaSafetyPausedError } from "./media-safety-store.js";
 import { MediaSessionStore } from "./media-session-store.js";
 import { MediaTokenStore } from "./media-token-store.js";
 import {
@@ -32,6 +34,7 @@ export interface MediaProxyRuntime {
 
 export interface BilibiliMediaProxyHandlerOptions extends MediaProxyRuntime {
   logger?: ProxyLogger;
+  safetyStore?: MediaSafetyGate;
   /** 单条媒体流的速率上限（字节/秒）；0 关闭限速 */
   maxMediaRateBytes?: number;
   mapUpstreamForTest?: UpstreamMapper;
@@ -109,6 +112,25 @@ export function createBilibiliMediaProxyHandler(options: BilibiliMediaProxyHandl
         target: record.target,
       };
       await requestAndRelayStream(input, response, {
+        beforeRequest: () => {
+          const safetyStore = options.safetyStore;
+          if (!safetyStore) return undefined;
+          const admission = safetyStore.begin();
+          let settled = false;
+          return {
+            onResponse: upstream => {
+              if (settled) return;
+              settled = true;
+              const riskControl = Boolean(upstream.headers["x-bili-gaia-vvoucher"]);
+              safetyStore.finish(admission, upstream.statusCode ?? 502, riskControl);
+            },
+            onTransportError: () => {
+              if (settled) return;
+              settled = true;
+              safetyStore.finish(admission, "network");
+            },
+          };
+        },
         redirectsLeft: MAX_MEDIA_REDIRECTS,
         validateRedirect: isAllowedBilibiliMediaUrl,
       });
@@ -116,6 +138,14 @@ export function createBilibiliMediaProxyHandler(options: BilibiliMediaProxyHandl
       if (controller.signal.aborted || response.writableEnded) return true;
       if (response.headersSent) {
         response.destroy(error instanceof Error ? error : undefined);
+        return true;
+      }
+      if (error instanceof MediaSafetyPausedError) {
+        sendProxyJson(response, 423, {
+          code: "BIU_MEDIA_PAUSED",
+          reason: error.reason,
+          message: "播放服务已暂停，请联系站点管理员恢复",
+        });
         return true;
       }
       if (error instanceof ProxyRequestError) {

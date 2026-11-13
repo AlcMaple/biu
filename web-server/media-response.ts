@@ -5,7 +5,12 @@ const MEDIA_URL_ARRAY_KEYS = new Set(["backupUrl", "backup_url", "cdns"]);
 const MEDIA_RESPONSE_PATHS = new Set(["/audio/music-service-c/url", "/x/player/playurl", "/x/player/wbi/playurl"]);
 
 export function isBilibiliMediaResponse(target: URL) {
-  return MEDIA_RESPONSE_PATHS.has(target.pathname);
+  try {
+    const pathname = decodeURIComponent(target.pathname).replace(/\/+/g, "/").replace(/\/$/, "");
+    return MEDIA_RESPONSE_PATHS.has(pathname);
+  } catch {
+    return false;
+  }
 }
 
 export function rewriteBilibiliMediaPayload(

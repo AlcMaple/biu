@@ -3,6 +3,7 @@ import axios, { isAxiosError, type AxiosAdapter, type CreateAxiosDefaults } from
 import { isOfflineDemo } from "@/common/offline-demo";
 import { isWeb } from "@/platform/detect";
 import { resolveBilibiliBaseURL } from "@shared/bilibili-web-proxy";
+import { isMediaSafetyError } from "@shared/media-safety-error";
 
 import { requestInterceptors } from "./request-interceptors";
 import { geetestInterceptors } from "./response-interceptors";
@@ -63,6 +64,7 @@ apiRequest.interceptors.response.use(geetestInterceptors);
 
 // axios 原文「timeout of 10000ms exceeded」会被页面直接 toast 出来，用户看不懂也分不清是断网还是服务慢
 const describeRequestError = (error: unknown) => {
+  if (isAxiosError(error) && isMediaSafetyError(error)) error.message = "播放服务已暂停，请联系站点管理员恢复";
   if (isAxiosError(error) && (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")) {
     error.message = isWeb
       ? "服务器响应超时：可能正在缓冲音频或网络较慢，稍后再试"

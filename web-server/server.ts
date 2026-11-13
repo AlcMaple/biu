@@ -8,6 +8,7 @@ import { pipeline } from "node:stream/promises";
 
 import { createWebApplicationHandler } from "./application.js";
 import { gzipBody, markGzipped, shouldGzip } from "./compression.js";
+import { resolveMediaSafetyFile } from "./media-safety-runtime.js";
 import { captureWebRequestError, ensureWebRequestId, withWebRequestMonitoring } from "./monitoring.js";
 import { sendProxyJson } from "./proxy-common.js";
 
@@ -49,6 +50,7 @@ export interface ProductionWebServerOptions {
   clientLogMaxTotalBytes?: number;
   clientLogRetentionDays?: number;
   publicOrigin?: string;
+  mediaSafetyFile?: string;
   staticRoot: string;
 }
 
@@ -187,6 +189,7 @@ export async function createStaticWebHandler(staticRoot: string) {
 
 export async function createProductionWebServer(options: ProductionWebServerOptions): Promise<Server> {
   const application = createWebApplicationHandler({
+    mediaSafetyFile: options.mediaSafetyFile ?? resolveMediaSafetyFile("production"),
     clientIpHeader: options.clientIpHeader,
     clientLogDir: options.clientLogDir,
     clientLogMaxTotalBytes: options.clientLogMaxTotalBytes,
