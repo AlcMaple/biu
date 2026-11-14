@@ -46,6 +46,8 @@ vi.mock("@heroui/react", () => {
     }) => <input type="checkbox" checked={isSelected} onChange={onChange} onClick={onClick} aria-label={label} />,
   };
 });
+// 这里测的是弹窗本身；网页版未登录不能收藏的拦截另有用例
+vi.mock("@/platform", async importOriginal => ({ ...(await importOriginal<object>()), isWeb: false }));
 vi.mock("@/common/hooks/use-responsive", () => ({ useIsMobileLayout: () => false }));
 vi.mock("@/components/scroll-container", () => ({
   default: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,

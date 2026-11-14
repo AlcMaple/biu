@@ -20,6 +20,7 @@ import { StoreNameMap } from "@shared/store";
 import type { Logger, Platform } from "./types";
 
 import { installWebLogTransport, reportWebLog } from "./web-log-transport";
+import { planAccountPlaylists } from "./web-playlist-account";
 
 const STORE_KEY_PREFIX = isSandbox ? "biu-sandbox:" : isOfflineDemo ? "biu-demo:" : "biu:";
 const WEB_STORE_DATABASE = isSandbox ? "biu-sandbox-web-store" : isOfflineDemo ? "biu-demo-web-store" : "biu-web-store";
@@ -132,7 +133,71 @@ function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefi
   return value == null ? undefined : (JSON.parse(value) as StoreDataMap[N]);
 }
 
+const accountPlaylistStores = [StoreNameMap.LocalFavorites, StoreNameMap.LocalFavItems, StoreNameMap.Tags] as const;
+const isAccountPlaylistStore = (name: StoreName) =>
+  !isOfflineDemo && (accountPlaylistStores as readonly StoreName[]).includes(name);
+const accountKey = (mid: number, name: string) => `${STORE_KEY_PREFIX}account:${mid}:${name}`;
+const legacyClaimKey = `${STORE_KEY_PREFIX}legacy-playlists-claimed`;
+
+// 网页版本地歌单按账号各存一份，未登录时没有歌单（读出空、写入丢弃）。
+// 换账号必须先把 owner 置空再清内存、再切到新账号重读（见 switchPlaylistAccount），
+// 否则旧账号还在内存里的数据会以新账号的名义写盘。
+let playlistOwner: number | null = null;
+const accountPreparations = new Map<number, Promise<IDBDatabase>>();
+
+export function setWebPlaylistOwner(mid: number | null) {
+  playlistOwner = mid;
+}
+
+function prepareAccountPlaylists(mid: number): Promise<IDBDatabase> {
+  const existing = accountPreparations.get(mid);
+  if (existing) return existing;
+  const preparation = (async () => {
+    const database = await openDatabase();
+    if (!database) throw new Error("浏览器存储不可用，本地歌单暂时无法读取");
+    const readyKey = accountKey(mid, "ready");
+    if (await readIndexedValue(database, readyKey)) return database;
+
+    const meta = (await readSharedStore(StoreNameMap.PlaylistSyncMeta)) ?? {};
+    const plan = planAccountPlaylists(meta, mid, (await readIndexedValue(database, legacyClaimKey)) !== undefined);
+    if (plan.copyLegacy) {
+      for (const name of accountPlaylistStores) {
+        const value = await readSharedStore(name);
+        if (value !== undefined) await writeIndexedValue(database, accountKey(mid, name), value);
+      }
+      await writeIndexedValue(database, legacyClaimKey, mid);
+    }
+    if (plan.resetBaseline) {
+      // 同步基线记的是更新前那份共用收藏；新的账号收藏和它对不上，拿它比对会把云端歌单算成删除。
+      // 清掉基线让同步走首次合并（只增不删），滚动备份和迁移前备份保留。
+      const entry = meta[String(mid)];
+      await webSetStore(StoreNameMap.PlaylistSyncMeta, {
+        ...meta,
+        [String(mid)]: { ...entry, versions: {}, snapshots: {} },
+      });
+    }
+    await writeIndexedValue(database, readyKey, true);
+    return database;
+  })();
+  accountPreparations.set(mid, preparation);
+  preparation.catch(() => accountPreparations.delete(mid));
+  return preparation;
+}
+
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
+  if (isAccountPlaylistStore(name)) {
+    const owner = playlistOwner;
+    if (owner === null) return undefined;
+    const database = await prepareAccountPlaylists(owner);
+    const value = await readIndexedValue<StoreDataMap[N] | null>(database, accountKey(owner, name));
+    // 读盘期间又换了账号：这份结果属于上一个账号，交给 rehydrate 会以新账号的名义留在内存里
+    if (playlistOwner !== owner) throw new Error("账号已切换，放弃上一个账号的歌单读取");
+    return value ?? undefined;
+  }
+  return readSharedStore(name);
+}
+
+async function readSharedStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
   if (isOfflineDemo) {
     const { DEMO_STORE_DATA } = await import("@/common/offline-demo-fixtures");
     const demoStores: Partial<Record<StoreName, unknown>> = {
@@ -168,6 +233,13 @@ async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N
 }
 
 async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N]): Promise<void> {
+  if (isAccountPlaylistStore(name)) {
+    const owner = playlistOwner;
+    if (owner === null) return;
+    const database = await prepareAccountPlaylists(owner);
+    await writeIndexedValue(database, accountKey(owner, name), value);
+    return;
+  }
   try {
     if (highCapacityStores.has(name)) {
       const database = await openDatabase();
@@ -186,6 +258,13 @@ async function webSetStore<N extends StoreName>(name: N, value: StoreDataMap[N])
 }
 
 async function webClearStore(name: StoreName): Promise<void> {
+  if (isAccountPlaylistStore(name)) {
+    const owner = playlistOwner;
+    if (owner === null) return;
+    const database = await prepareAccountPlaylists(owner);
+    await writeIndexedValue(database, accountKey(owner, name), null);
+    return;
+  }
   try {
     if (highCapacityStores.has(name)) {
       const database = await openDatabase();

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="633" viewBox="0 0 1240 633" role="img">
+<title>网页版本地歌单按账号分开（2/2）：为什么这样做，哪里容易改错</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="631" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">网页版本地歌单按账号分开（2/2）：为什么这样做，哪里容易改错</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：两处顺序是这次最容易被改坏的地方：换账号的三步顺序，以及新账号第一次同步只增不删。另外说明为什么不保留访客收藏、不弹「恢复旧收藏」的窗。</text>
+<rect x="24" y="93" width="1192" height="167" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="122.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 两处必须这样做的顺序</text>
+<rect x="44.0" y="136" width="569.0" height="104" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="160.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">换账号：先停存盘，再清空，再读新账号</text>
+<text x="58.0" y="181.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">页面上还留着 A 的歌单。如果先切到 B 再清空，A 的歌单或清空后的空歌单会以 B 的名义存</text>
+<text x="58.0" y="198.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">下去，把 B 的歌单盖掉。测试里调换顺序会立刻失败</text>
+<rect x="627.0" y="136" width="569.0" height="104" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="641.0" y="160.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">新账号第一次同步：只增不删</text>
+<text x="641.0" y="181.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">同步靠对比「上次同步时有什么」来判断删除。浏览器记着的是更新前那份，新账号这份对不上，</text>
+<text x="641.0" y="198.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">一对比就会把服务器上的歌单算成被删。在旧代码上已复现：两个自建歌单被当成删除推上去。</text>
+<text x="641.0" y="215.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">所以先清掉旧记录，第一次只把服务器的拿下来，再补传本机多出来的</text>
+<rect x="24" y="276" width="1192" height="167" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 为什么不那样做</text>
+<rect x="44.0" y="319" width="374.7" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="343.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不保留访客收藏</text>
+<text x="58.0" y="364.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">主流音乐产品（YouTube Music、网易云、QQ 音乐）都要登</text>
+<text x="58.0" y="381.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">录才能收藏。有访客收藏就得回答归谁、并不并、什么时候再</text>
+<text x="58.0" y="398.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">问，之前的复杂度几乎都来自它</text>
+<rect x="432.7" y="319" width="374.7" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="446.7" y="343.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不弹「恢复旧收藏」的窗</text>
+<text x="446.7" y="364.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">已经登录了，同步记录里也写着这份收藏属于谁，没有需要用</text>
+<text x="446.7" y="381.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">户判断的事</text>
+<rect x="821.3" y="319" width="374.7" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="343.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不把旧收藏给每个登录的账号</text>
+<text x="835.3" y="364.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">从没同步过的旧收藏只属于一个人；给了第二个账号就等于把</text>
+<text x="835.3" y="381.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">别人的歌单传进他的服务器</text>
+<rect x="24" y="459" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="488.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">③ 改错红线</text>
+<rect x="44.0" y="502" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="526.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">读写本地歌单都要跟着当前账号</text>
+<text x="58.0" y="547.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">新增读写歌单、歌曲、标签的地方，不能绕过账号直接写公共</text>
+<text x="58.0" y="564.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">位置</text>
+<rect x="432.7" y="502" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="446.7" y="526.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">换账号的三步顺序不能换</text>
+<text x="446.7" y="547.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">先停存盘、再清空、再读新账号</text>
+<rect x="821.3" y="502" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="835.3" y="526.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">不能用旧同步记录对比新账号那份</text>
+<text x="835.3" y="547.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">新账号那份刚建出来时，必须走只增不删的第一次同步</text>
+</svg>

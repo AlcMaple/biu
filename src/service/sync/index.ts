@@ -11,6 +11,8 @@ import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavo
 import { WATCH_RETRY_DELAYS_MS } from "./config";
 import { StoreSyncController } from "./engine";
 
+import "@/store/playlist-account";
+
 /** zustand persist 暴露的 rehydrate 状态，三个歌单 store 都由 persist 中间件包着 */
 type HydratableStore = {
   persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void };

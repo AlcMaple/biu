@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 
 import type { StateCreator } from "zustand";
 
+import { addToast } from "@heroui/react";
+
+import { isWeb } from "@/platform";
+import { useUser } from "@/store/user";
+
 export interface FavSelectModalData {
   /** 资源id */
   rid: string | number;
@@ -51,7 +56,14 @@ export interface FavSelectModalState {
 export const createFavSelectModalSlice: StateCreator<FavSelectModalState> = set => ({
   isFavSelectModalOpen: false,
   favSelectModalData: null,
-  onOpenFavSelectModal: data => set({ isFavSelectModalOpen: true, favSelectModalData: data }),
+  onOpenFavSelectModal: data => {
+    // 网页版本地歌单按账号存，未登录时没有可收进去的歌单
+    if (isWeb && !useUser.getState().user?.isLogin) {
+      addToast({ title: "登录后才能收藏", color: "warning" });
+      return;
+    }
+    set({ isFavSelectModalOpen: true, favSelectModalData: data });
+  },
   onFavSelectModalOpenChange: isOpen => set({ isFavSelectModalOpen: isOpen }),
   onCloseFavSelectModal: () => set({ isFavSelectModalOpen: false }),
 });

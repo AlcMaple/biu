@@ -14,11 +14,12 @@ import {
 import { isOfflineDemo } from "@/common/offline-demo";
 import { addOnlineItemToLocalFav, getLocalFavMedia } from "@/common/utils/fav";
 import { songKey, type SongCandidate } from "@/common/utils/pure-song";
-import platform from "@/platform";
+import platform, { isWeb } from "@/platform";
 import { buildCandidatePool, clearHeartbeatCache, type Seed } from "@/service/heartbeat/candidate-engine";
 import { getFavSeeds, recordFavoritedSong, type FavSeed } from "@/service/heartbeat/fav-seeds";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList, type PlayItem } from "@/store/play-list";
+import { useUser } from "@/store/user";
 import { StoreNameMap } from "@shared/store";
 
 /** start() 的结果，交给页面决定提示文案 */
@@ -386,6 +387,7 @@ export const useHeartbeat = create<HeartbeatState>((set, get) => ({
   toggleLikeCurrent: () => {
     const cur = usePlayList.getState().getPlayItem();
     if (!cur || cur.type !== "mv" || !cur.bvid) return null;
+    if (isWeb && !useUser.getState().user?.isLogin) return null;
 
     const store = useLocalFavItemsStore.getState();
     const rid = cur.aid ? Number(cur.aid) : cur.bvid;
