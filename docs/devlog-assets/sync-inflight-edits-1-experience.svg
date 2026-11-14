@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="643" viewBox="0 0 1240 643" role="img">
+<title>同步途中的改动不再丢（1/2）：收藏了又没了是怎么发生的</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="641" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">同步途中的改动不再丢（1/2）：收藏了又没了是怎么发生的</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：同步请求还没回来时做的收藏、删歌、改标签，以前会被服务器返回的结果整份盖掉，之后也再传不上去；现在写回本机前先把这些改动补回去，再接着传。桌面版和网页版都受</text>
+<text x="34.0" y="85.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">影响，也都修好了。</text>
+<rect x="24" y="112" width="1192" height="276" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="141.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 以前：用户看到的，和背后在做的</text>
+<text x="44.0" y="169.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">用户看到的</text>
+<rect x="44.0" y="177" width="270.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">给一首歌加标签「通勤」</text>
+<text x="58.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">操作和平时一样</text>
+<line x1="318.0" y1="212.0" x2="334.0" y2="212.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="177" width="270.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="352.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">马上又把另一首收进「睡前」</text>
+<text x="352.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">界面立刻显示已收藏</text>
+<line x1="612.0" y1="212.0" x2="628.0" y2="212.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="177" width="270.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="646.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">一两秒后，那首从「睡前」消失</text>
+<text x="646.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">标签有时也会这样消失</text>
+<line x1="906.0" y1="212.0" x2="922.0" y2="212.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="177" width="270.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="940.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">换台设备也看不到</text>
+<text x="940.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">只能自己再收藏一次</text>
+<text x="44.0" y="273.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">背后在做的</text>
+<rect x="44.0" y="281" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">停手 0.8 秒后开始同步</text>
+<text x="58.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">把「加了标签」发给服务器</text>
+<line x1="318.0" y1="324.5" x2="334.0" y2="324.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="281" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="352.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">请求还在路上</text>
+<text x="352.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">本机又多了一首，服务器还不知道</text>
+<line x1="612.0" y1="324.5" x2="628.0" y2="324.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="281" width="270.0" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="646.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">结果回来，整份写回本机</text>
+<text x="646.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">服务器结果里没有这首，本机这首被盖掉</text>
+<line x1="906.0" y1="324.5" x2="922.0" y2="324.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="281" width="270.0" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="940.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">再同步一轮</text>
+<text x="940.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">本机已经没有这首了，没东西可传，这次收</text>
+<text x="940.0" y="343.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">藏彻底丢失</text>
+<rect x="24" y="404" width="1192" height="215" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="433.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 现在：写回本机前，先把路上新做的改动补回去</text>
+<rect x="44.0" y="447" width="270.0" height="70" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="471.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">服务器结果回来</text>
+<text x="58.0" y="492.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">里面有别的设备的改动，也有这次发出去的</text>
+<line x1="318.0" y1="482.0" x2="334.0" y2="482.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="447" width="270.0" height="70" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="352.0" y="471.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">找出路上新做的改动</text>
+<text x="352.0" y="492.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">对比「发请求时的本机」和「现在的本机」</text>
+<line x1="612.0" y1="482.0" x2="628.0" y2="482.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="447" width="270.0" height="70" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="646.0" y="471.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">叠在服务器结果上写回</text>
+<text x="646.0" y="492.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">别的设备的改动和刚做的改动都在</text>
+<line x1="906.0" y1="482.0" x2="922.0" y2="482.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="447" width="270.0" height="70" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="940.0" y="471.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">马上再同步一轮</text>
+<text x="940.0" y="492.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">把刚做的改动传上去，其他设备随后收到</text>
+<rect x="44.0" y="529" width="569.0" height="70" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="553.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">路上删掉的也算</text>
+<text x="58.0" y="574.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">请求途中删掉的歌，不会被服务器结果「复活」；新加、删除、改标签三种都按同样方式补回</text>
+<rect x="627.0" y="529" width="569.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="641.0" y="553.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">不影响平时的速度</text>
+<text x="641.0" y="574.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">没有路上改动时和以前完全一样，一轮同步仍然只发一个请求</text>
+</svg>
