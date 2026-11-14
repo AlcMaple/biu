@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="917" viewBox="0 0 1240 917" role="img">
+<title>本地沙盒接真实链路（2/2）：能造的故障、测不到的事、为什么不那样做</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="915" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">本地沙盒接真实链路（2/2）：能造的故障、测不到的事、为什么不那样做</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：沙盒验证的是「我们自己的逻辑对不对」，验证不了「真 B 站今天是什么样」。发版前仍要用真账号走一遍登录、收藏、播放、跨设备。</text>
+<rect x="24" y="97" width="1192" height="343" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="126.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 菜单里能打开的故障（对所有窗口生效）</text>
+<rect x="44" y="141" width="1152" height="31" fill="#f4f2f5" stroke="#e2dcdf" />
+<text x="58.0" y="161.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">菜单里的文案</text>
+<text x="346.0" y="161.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">假 B 站会怎么做</text>
+<text x="730.0" y="161.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">用来确认什么</text>
+<rect x="44" y="172" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="192.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">收藏夹接口断开</text>
+<text x="346.0" y="192.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">收藏夹请求直接断线</text>
+<text x="730.0" y="192.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">页面给出具体原因，而不是空白或一直转圈</text>
+<rect x="44" y="203" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="223.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">播放地址被风控（412）</text>
+<text x="346.0" y="223.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">取播放地址时返回「被风控」</text>
+<text x="730.0" y="223.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">用户看到的是风控提示，不是「网络请求失败」</text>
+<rect x="44" y="234" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="254.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">搜索被限流（429）</text>
+<text x="346.0" y="254.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">搜索返回「请求太频繁」</text>
+<text x="730.0" y="254.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">不会自动重试把限流打得更狠</text>
+<rect x="44" y="265" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="285.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">视频详情 5xx</text>
+<text x="346.0" y="285.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">视频详情返回服务器错误</text>
+<text x="730.0" y="285.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">错误被如实展示，没有被悄悄吞掉</text>
+<rect x="44" y="296" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="316.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">用户信息超时</text>
+<text x="346.0" y="316.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">查「当前是谁」一直不回</text>
+<text x="730.0" y="316.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">登录状态不会被误判成「已退出」</text>
+<rect x="44" y="327" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="347.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">播放主地址给 PCDN</text>
+<text x="346.0" y="347.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">播放地址的第一个是容易卡死的节点</text>
+<text x="730.0" y="347.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">选流时会避开它，改用后面的正常节点</text>
+<rect x="44" y="358" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="378.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">收藏夹播放量返回 0</text>
+<text x="346.0" y="378.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">收藏夹里的播放量全是 0</text>
+<text x="730.0" y="378.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">页面不会把 0 当真实播放量展示</text>
+<rect x="44" y="389" width="1152" height="31" fill="#ffffff" stroke="#e2dcdf" />
+<text x="58.0" y="409.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#4a4450">清除所有故障</text>
+<text x="346.0" y="409.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">全部恢复正常</text>
+<text x="730.0" y="409.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">—</text>
+<rect x="24" y="456" width="1192" height="219" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="485.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 沙盒测不到的</text>
+<rect x="44.0" y="500" width="374.7" height="63" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="524.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">B 站改了接口</text>
+<text x="58.0" y="545.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">假 B 站是照今天的格式写的，不会跟着 B 站变</text>
+<rect x="432.7" y="500" width="374.7" height="63" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="446.7" y="524.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">真实的风控和限流</text>
+<text x="446.7" y="545.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">能手动打开故障，但不知道真 B 站什么时候、对谁触发</text>
+<rect x="821.3" y="500" width="374.7" height="63" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="835.3" y="524.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">真实音频能不能播</text>
+<text x="835.3" y="545.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">沙盒放的是合成的测试音，不是 B 站的真实音频流</text>
+<rect x="44.0" y="575" width="374.7" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="599.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">短信登录</text>
+<text x="58.0" y="620.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">要过人机验证，那是第三方组件，本机造不出来。沙盒里点了</text>
+<text x="58.0" y="637.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">会明确提示「沙盒不支持短信登录」</text>
+<rect x="432.7" y="575" width="374.7" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="446.7" y="599.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">桌面应用</text>
+<text x="446.7" y="620.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">沙盒只跑网页版，桌面应用访问 B 站不走这条路</text>
+<rect x="821.3" y="575" width="374.7" height="80" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="835.3" y="599.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">线上部署环境</text>
+<text x="835.3" y="620.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">不经过线上的域名、加密连接和反向代理，那一层的限流和缓</text>
+<text x="835.3" y="637.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">存问题看不到</text>
+<rect x="24" y="691" width="1192" height="202" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="720.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">③ 为什么不那样做</text>
+<rect x="44.0" y="735" width="569.0" height="63" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="759.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不在页面里直接返回假数据</text>
+<text x="58.0" y="780.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">上一版就是这么做的：登录、服务端、同步一行都没跑，测通了也说明不了线上会不会通</text>
+<rect x="627.0" y="735" width="569.0" height="63" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="641.0" y="759.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不给服务端加一个「沙盒模式」</text>
+<text x="641.0" y="780.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">每多一个分支，沙盒跑的就离线上远一步。现在只改「请求发到哪」这一处，其余一行不分叉</text>
+<rect x="44.0" y="810" width="569.0" height="63" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="834.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么短信登录直接报错，不假装通过</text>
+<text x="58.0" y="855.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">假装通过会让人以为这条路测过了，而真正难的人机验证根本没碰</text>
+<rect x="627.0" y="810" width="569.0" height="63" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="641.0" y="834.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么改投开关只认本机地址，线上设了就拒绝启动</text>
+<text x="641.0" y="855.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">它能把所有用户的登录请求导到别处。只认本机、线上拒启，配置写错也出不了事</text>
+</svg>

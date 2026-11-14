@@ -133,12 +133,7 @@ function readLegacyStore<N extends StoreName>(name: N): StoreDataMap[N] | undefi
 }
 
 async function webGetStore<N extends StoreName>(name: N): Promise<StoreDataMap[N] | undefined> {
-  // 沙盒里设置、歌单都要能改、能存下来，只有登录用户跟着页面选的身份走
-  if (process.env.BIU_SANDBOX === "true" && name === StoreNameMap.UserLoginInfo) {
-    const { sandboxUser } = await import("@/common/sandbox-fixtures");
-    return sandboxUser() as StoreDataMap[N] | undefined;
-  }
-  if (isOfflineDemo && !isSandbox) {
+  if (isOfflineDemo) {
     const { DEMO_STORE_DATA } = await import("@/common/offline-demo-fixtures");
     const demoStores: Partial<Record<StoreName, unknown>> = {
       [StoreNameMap.AppSettings]: { appSettings: DEMO_STORE_DATA.appSettings },
@@ -266,19 +261,9 @@ const platform: Platform = {
   navigate: unsubscribe,
   getCookie: async () => undefined,
   setCookie: asyncNoop,
-  searchNeteaseSongs: async params => {
-    if (process.env.BIU_SANDBOX === "true") {
-      return (await import("@/common/sandbox-fixtures")).sandboxNeteaseSearch(params.s ?? "");
-    }
-    return isOfflineDemo ? {} : searchWebNeteaseSongs(params);
-  },
+  searchNeteaseSongs: async params => (isOfflineDemo ? {} : searchWebNeteaseSongs(params)),
   getNeteaseSimilarSongs: async () => ({}),
-  getNeteaseLyrics: async params => {
-    if (process.env.BIU_SANDBOX === "true") {
-      return (await import("@/common/sandbox-fixtures")).sandboxNeteaseLyrics(params.id);
-    }
-    return isOfflineDemo ? {} : getWebNeteaseLyrics(params);
-  },
+  getNeteaseLyrics: async params => (isOfflineDemo ? {} : getWebNeteaseLyrics(params)),
   neteaseAudioMatch: async params => (isOfflineDemo ? {} : matchWebNeteaseAudio(params)),
   searchLrclibLyrics: async params => (isOfflineDemo ? [] : searchWebLrclibLyrics(params)),
   searchProviderLyrics: async params => (isOfflineDemo ? { ok: true, data: [] } : searchWebProviderLyrics(params)),

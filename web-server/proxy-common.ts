@@ -12,6 +12,7 @@ import { pipeline } from "node:stream/promises";
 import { constants, createGzip } from "node:zlib";
 
 import { createMediaPacer } from "./media-pacer.js";
+import { mapToSandboxUpstream } from "./sandbox-upstream.js";
 
 export const BILIBILI_PROXY_REQUEST_HEADERS = {
   "Accept-Encoding": "identity",
@@ -199,7 +200,8 @@ export function openUpstream(
   input: UpstreamRequestInput,
   onResponse: (response: IncomingMessage) => void,
 ): ClientRequest {
-  const actualTarget = input.mapUpstreamForTest?.(new URL(input.target), input.kind) ?? input.target;
+  const actualTarget =
+    input.mapUpstreamForTest?.(new URL(input.target), input.kind) ?? mapToSandboxUpstream(input.target);
   const request = requestTransport(actualTarget).request(
     actualTarget,
     {

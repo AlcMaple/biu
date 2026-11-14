@@ -8,6 +8,7 @@ import { createSessionPersistence } from "./auth/session-persistence.js";
 import { DEFAULT_CLIENT_LOG_MAX_TOTAL_BYTES, DEFAULT_CLIENT_LOG_RETENTION_DAYS } from "./client-log-store.js";
 import { captureWebStartupError, isWebMonitoringEnabled } from "./monitoring.js";
 import { normalizePublicOrigin } from "./proxy-common.js";
+import { readSandboxUpstreamOrigin } from "./sandbox-upstream.js";
 import { closeProductionWebServer, createProductionWebServer } from "./server.js";
 
 const DEFAULT_WEB_HOST = "127.0.0.1";
@@ -51,6 +52,7 @@ export interface WebServerEnvironment {
 export function readWebServerEnvironment(environment: NodeJS.ProcessEnv = process.env): WebServerEnvironment {
   const host = environment.BIU_WEB_HOST || DEFAULT_WEB_HOST;
   const publicOrigin = normalizePublicOrigin(environment.BIU_WEB_PUBLIC_ORIGIN);
+  readSandboxUpstreamOrigin(environment);
   if (!publicOrigin && (environment.NODE_ENV === "production" || !isLoopbackHost(host))) {
     throw new Error(
       "BIU_WEB_PUBLIC_ORIGIN is required for production or non-loopback binding (for example https://biu.example)",

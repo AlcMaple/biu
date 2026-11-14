@@ -18,7 +18,7 @@ export class InvalidCookieError extends Error {}
  * 永远以这次向 B 站官方接口验证拿到的为准。
  */
 export async function resolveMidFromCookie(cookie: string): Promise<string> {
-  const res = await axios.get<BilibiliNavResponse>("https://api.bilibili.com/x/web-interface/nav", {
+  const res = await axios.get<BilibiliNavResponse>(config.bilibiliNavUrl, {
     headers: {
       Cookie: cookie,
       "User-Agent": "Mozilla/5.0",

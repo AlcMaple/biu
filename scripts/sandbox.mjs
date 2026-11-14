@@ -1,7 +1,7 @@
 // 本地沙盒：不用 B 站账号测整条链路（设计见 docs/ideas/008-本地沙盒测试.md）。
-// 一起起两个进程：mock 模式的对齐服务 + BIU_TARGET=sandbox 的 Web dev；任一退出就全部退出。
+// 一起起四个进程：假 B 站 + 真同步服务 + mock 模式的对齐服务 + BIU_TARGET=sandbox 的 Web dev（内含真 BFF）；任一退出就全部退出。
 // 用法：pnpm sandbox            启动
-//       pnpm sandbox --reset    先清空对齐服务的沙盒数据（报错、提交、对齐结果）再启动
+//       pnpm sandbox --reset    先清空同步、对齐服务的沙盒数据再启动
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { rmSync } from "node:fs";
@@ -11,10 +11,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
+const BILIBILI_PORT = 3010;
+const SYNC_PORT = 3012;
 const ALIGN_PORT = 3013;
-// 放在用户目录而不是系统临时目录：重启电脑后沙盒里造的报错、提交还在，只有 --reset 才清
+const BILIBILI_ORIGIN = `http://127.0.0.1:${BILIBILI_PORT}`;
+// 放在用户目录而不是系统临时目录：重启电脑后沙盒里造的数据还在，只有 --reset 才清
 const DATA_ROOT = join(homedir(), ".biu-sandbox");
-// 和 shared/sandbox.ts 里「管理员」身份的 mid 一致（这里是纯 JS，读不了那份 TS）
+// 和 shared/sandbox.ts 里「管理员」身份的 mid 一致（这里是纯 JS，读不了那份 TS）。
+// 管理员和线上一样靠服务端 ADMIN_MIDS 认出来，不在页面里短路
 const ADMIN_MID = "900009";
 
 if (process.argv.includes("--reset")) {
@@ -22,7 +26,7 @@ if (process.argv.includes("--reset")) {
   console.log(`[sandbox] 已清空 ${DATA_ROOT}`);
 }
 
-// 每次启动随机生成：签出来的 token 只在本次的两个进程之间有效，泄露了也冒充不了线上用户
+// 同步服务签 token、对齐服务验 token，线上两者共用一个密钥；这里每次启动随机生成
 const jwtSecret = randomBytes(32).toString("hex");
 
 const children = [];
@@ -40,11 +44,23 @@ function run(name, command, args, options) {
   children.push(child);
 }
 
+const baseEnv = { ...process.env, NODE_ENV: "development", BIU_SANDBOX_UPSTREAM_ORIGIN: BILIBILI_ORIGIN };
+
+// 借同步服务装好的 tsx 跑假 B 站，cwd 用仓库根目录，tsconfig 的路径别名才认得
+run("假 B 站", join(ROOT, "biu-sync-server", "node_modules", ".bin", "tsx"), ["scripts/sandbox-bilibili/server.ts"], {
+  cwd: ROOT,
+  env: { ...baseEnv, PORT: String(BILIBILI_PORT) },
+});
+
+run("同步服务", "npx", ["tsx", "src/index.ts"], {
+  cwd: join(ROOT, "biu-sync-server"),
+  env: { ...baseEnv, PORT: String(SYNC_PORT), JWT_SECRET: jwtSecret, DATA_DIR: join(DATA_ROOT, "sync-data") },
+});
+
 run("对齐服务", "npx", ["tsx", "src/index.ts", "--mock"], {
   cwd: join(ROOT, "biu-align-server"),
   env: {
-    ...process.env,
-    NODE_ENV: "development",
+    ...baseEnv,
     PORT: String(ALIGN_PORT),
     JWT_SECRET: jwtSecret,
     ADMIN_MIDS: ADMIN_MID,
@@ -57,13 +73,13 @@ run("对齐服务", "npx", ["tsx", "src/index.ts", "--mock"], {
 run("Web", "corepack", ["pnpm", "exec", "rsbuild", "dev"], {
   cwd: ROOT,
   env: {
-    ...process.env,
+    ...baseEnv,
     BIU_TARGET: "sandbox",
-    BIU_SANDBOX_JWT_SECRET: jwtSecret,
-    BIU_SANDBOX_ALIGN_ORIGIN: `http://127.0.0.1:${ALIGN_PORT}`,
+    BIU_SYNC_INTERNAL_ORIGIN: `http://127.0.0.1:${SYNC_PORT}`,
+    BIU_ALIGN_INTERNAL_ORIGIN: `http://127.0.0.1:${ALIGN_PORT}`,
   },
 });
 
-console.log("[sandbox] 打开 http://localhost:5679 ，顶栏中间切换身份");
+console.log("[sandbox] 打开 http://localhost:5679 ，顶栏中间「沙盒」菜单切换身份、开关故障");
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
