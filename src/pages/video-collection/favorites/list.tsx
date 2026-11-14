@@ -22,6 +22,7 @@ interface FavoriteListProps {
   isCreatedBySelf: boolean;
   onMenuAction: (key: string, item: FavMedia) => void;
   onItemPress: (item: FavMedia) => void;
+  emptyTitle?: React.ReactNode;
 }
 
 const FavoriteList: React.FC<FavoriteListProps> = ({
@@ -35,6 +36,7 @@ const FavoriteList: React.FC<FavoriteListProps> = ({
   isCreatedBySelf,
   onMenuAction,
   onItemPress,
+  emptyTitle,
 }) => {
   const displayMode = useSettings(state => state.displayMode);
   const isCompact = displayMode === "compact";
@@ -46,6 +48,7 @@ const FavoriteList: React.FC<FavoriteListProps> = ({
         items={items}
         hasMore={hasMore}
         loading={loading}
+        emptyTitle={emptyTitle}
         onLoadMore={onLoadMore}
         scrollToIndexRef={scrollToIndexRef}
         highlightIndex={highlightIndex}

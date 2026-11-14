@@ -64,6 +64,7 @@ const Favorites = () => {
     setHasMoreState(value);
   }, []);
   const [listLoading, setListLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string>();
   const [activeTagIds, setActiveTagIds] = useState<number[]>([]);
 
   const itemTags = useTagStore(s => s.itemTags);
@@ -224,6 +225,7 @@ const Favorites = () => {
       }
 
       setListLoading(true);
+      setLoadError(undefined);
       try {
         const pageData = await fetchFilledPage(targetPage, keywordValue, orderValue);
         if (currentQueryRef.current !== query) return;
@@ -247,10 +249,10 @@ const Favorites = () => {
         }
       } catch (error) {
         if (currentQueryRef.current !== query) return;
-        addToast({
-          title: error instanceof Error ? error.message : "获取收藏夹内容失败",
-          color: "danger",
-        });
+        const message = error instanceof Error ? error.message : "获取收藏夹内容失败";
+        // 列表处写明失败原因：只弹 toast 的话几秒后就只剩「暂无内容」，用户会以为收藏夹真的空了
+        if (targetPage === 1) setLoadError(message);
+        addToast({ title: message, color: "danger" });
         setHasMore(false);
       } finally {
         setListLoading(false);
@@ -702,6 +704,7 @@ const Favorites = () => {
           isCreatedBySelf={isCreatedBySelf}
           onMenuAction={handleMenuAction}
           onItemPress={handleItemPress}
+          emptyTitle={loadError}
         />
       ) : (
         <FavoriteList
@@ -713,6 +716,7 @@ const Favorites = () => {
           isCreatedBySelf={isCreatedBySelf}
           onMenuAction={handleMenuAction}
           onItemPress={handleItemPress}
+          emptyTitle={loadError}
         />
       )}
       <FavoritesEditModal

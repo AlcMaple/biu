@@ -21,6 +21,7 @@ export interface VirtualGridPageListProps<T> {
   loading: boolean;
   scrollToIndexRef?: React.MutableRefObject<((index: number) => void) | null>;
   highlightIndex?: number | null;
+  emptyTitle?: React.ReactNode;
 }
 
 const ROW_GAP = 16;
@@ -37,6 +38,7 @@ const VirtualGridPageList = <T,>({
   loading,
   scrollToIndexRef,
   highlightIndex,
+  emptyTitle,
 }: VirtualGridPageListProps<T>) => {
   const scrollEl = useScrollElement(getScrollElement);
   const getResolvedScrollElement = useCallback(() => scrollEl, [scrollEl]);
@@ -183,7 +185,7 @@ const VirtualGridPageList = <T,>({
   }, [loading, hasMore]);
 
   if (!items.length && !loading) {
-    return <Empty className="min-h-20" />;
+    return <Empty className="min-h-20" title={emptyTitle} />;
   }
 
   const totalSize = rowVirtualizer.getTotalSize();
