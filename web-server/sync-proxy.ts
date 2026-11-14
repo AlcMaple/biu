@@ -39,6 +39,7 @@ export class SyncProxyError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly retryAfter?: string,
   ) {
     super(message);
   }
@@ -157,6 +158,14 @@ export class SyncTokenCache {
       await upstream.body?.cancel();
       throw new SyncProxyError("B 站登录态已失效，请重新登录", 401);
     }
+    if (upstream.status === 503 || upstream.status === 429) {
+      await upstream.body?.cancel();
+      throw new SyncProxyError(
+        "B 站暂时拒绝验证登录态，请稍后再试",
+        503,
+        upstream.headers.get("retry-after") ?? undefined,
+      );
+    }
     if (!upstream.ok) {
       await upstream.body?.cancel();
       throw new SyncProxyError("本地歌单同步服务暂不可用", 502);
@@ -239,7 +248,9 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
 
     const method = request.method ?? "GET";
-    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
+    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind)
+      ? new Set(["GET", "POST"])
+      : new Set(["GET"]);
     if (!allowedMethods.has(method)) {
       response.setHeader("Allow", [...allowedMethods].join(", "));
       jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
@@ -314,6 +325,7 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     } catch (error) {
       if (response.writableEnded || response.destroyed || controller.signal.aborted) return true;
       if (error instanceof SyncProxyError) {
+        if (error.retryAfter) response.setHeader("Retry-After", error.retryAfter);
         jsonResponse(response, error.status, { code: -error.status, message: error.message });
         return true;
       }

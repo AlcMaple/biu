@@ -20,6 +20,37 @@ interface WebSyncSessionResponse {
 
 let cached: CachedToken | null = null;
 /** 避免同一时刻多个 store 并发触发同步时，重复发起多次换 token 请求 */
+// 换 token 会让同步服务器（网页版经 BFF）去问 B 站「这是谁」，所有用户共用服务器的出口 IP。
+// 失败后如果每次重连、每次回到前台都再换一次，B 站风控期间就是全体用户一起硬闯，
+// 所以失败后按服务器给的 Retry-After 停手，期间直接当作没有 token，不发请求。
+const EXCHANGE_FAILED_WAIT_MS = 60_000;
+const EXCHANGE_REJECTED_WAIT_MS = 5 * 60_000;
+const COOKIE_INVALID_WAIT_MS = 10 * 60_000;
+let exchangeBlockedUntil = 0;
+
+export function retryAfterMs(err: unknown): number | undefined {
+  const header = (err as { response?: { headers?: Record<string, unknown> } })?.response?.headers?.["retry-after"];
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}
+
+function blockExchange(err: unknown) {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  const wait =
+    retryAfterMs(err) ??
+    (status === 401
+      ? COOKIE_INVALID_WAIT_MS
+      : status === 503 || status === 429
+        ? EXCHANGE_REJECTED_WAIT_MS
+        : EXCHANGE_FAILED_WAIT_MS);
+  exchangeBlockedUntil = Date.now() + wait;
+  log.warn(`[sync/client] 换取同步凭证失败（${status ?? "网络错误"}），${Math.round(wait / 1000)}s 内不再尝试`);
+}
+
+export function syncBlockedForMs(): number {
+  return Math.max(0, exchangeBlockedUntil - Date.now());
+}
+
 let exchangeInFlight: Promise<CachedToken | null> | null = null;
 let tokenGeneration = 0;
 
@@ -31,6 +62,7 @@ async function exchangeToken(): Promise<CachedToken | null> {
       return res.code === 0 && typeof mid === "string" && /^\d+$/.test(mid) ? { token: "", mid } : null;
     } catch (err) {
       log.warn("[sync/client] Web sync session unavailable", err);
+      blockExchange(err);
       return null;
     }
   }
@@ -48,12 +80,14 @@ async function exchangeToken(): Promise<CachedToken | null> {
     return { token: res.token, mid: res.mid };
   } catch (err) {
     log.warn("[sync/client] token exchange failed", err);
+    blockExchange(err);
     return null;
   }
 }
 
 async function getToken(): Promise<CachedToken | null> {
   if (cached) return cached;
+  if (syncBlockedForMs() > 0) return null;
   const generation = tokenGeneration;
   if (!exchangeInFlight) {
     const request = exchangeToken().finally(() => {
@@ -67,7 +101,8 @@ async function getToken(): Promise<CachedToken | null> {
   return cached;
 }
 
-export function invalidateSyncToken() {
+export function invalidateSyncToken({ clearBlock = false } = {}) {
+  if (clearBlock) exchangeBlockedUntil = 0;
   tokenGeneration += 1;
   exchangeInFlight = null;
   cached = null;
@@ -170,7 +205,9 @@ export interface SharePublishPayload {
   items: unknown[];
 }
 
-export async function publishFolderShare(payload: SharePublishPayload): Promise<{ code: string; count: number } | null> {
+export async function publishFolderShare(
+  payload: SharePublishPayload,
+): Promise<{ code: string; count: number } | null> {
   return withAuthRetry(token => {
     const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
     return syncHttp.post<{ code: string; count: number }>("/share", payload, { headers });

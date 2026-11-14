@@ -45,6 +45,7 @@ describe("Web local-playlist sync BFF", () => {
   let appServer: Server;
   let authCalls = 0;
   let failFirstSync = false;
+  let rejectExchange = false;
   let issuedCookie = "";
   let syncCalls = 0;
   let syncOrigin = "";
@@ -54,6 +55,7 @@ describe("Web local-playlist sync BFF", () => {
   beforeEach(async () => {
     authCalls = 0;
     failFirstSync = false;
+    rejectExchange = false;
     syncCalls = 0;
     upstreamRequests = [];
 
@@ -69,6 +71,11 @@ describe("Web local-playlist sync BFF", () => {
 
         if (request.method === "POST" && request.url === "/api/auth/exchange") {
           authCalls += 1;
+          if (rejectExchange) {
+            response.setHeader("Retry-After", "240");
+            sendJson(response, 503, { error: "B 站暂时拒绝验证登录态", retryAfter: 240 });
+            return;
+          }
           sendJson(response, 200, { mid: "42", token: `server-sync-token-${authCalls}` });
           return;
         }
@@ -167,6 +174,16 @@ describe("Web local-playlist sync BFF", () => {
     expect(authCalls).toBe(2);
     expect(syncCalls).toBe(2);
     expect(upstreamRequests.at(-1)?.authorization).toBe("Bearer server-sync-token-2");
+  });
+
+  it("passes the sync server's Bilibili cooldown through with its Retry-After", async () => {
+    rejectExchange = true;
+
+    const response = await fetch(`${appOrigin}/__biu_sync/watch?versions=`, { headers: { Cookie: issuedCookie } });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("240");
+    expect(syncCalls).toBe(0);
   });
 
   it("rejects cross-site mutations before contacting the sync service", async () => {

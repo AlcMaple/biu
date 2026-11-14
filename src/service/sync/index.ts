@@ -6,10 +6,10 @@ import { resetPlayRankingSession, syncPlayRanking } from "@/store/play-ranking";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
-import { invalidateSyncToken, watchVersions } from "./client";
+import { invalidateSyncToken, retryAfterMs, syncBlockedForMs, watchVersions } from "./client";
 import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavorites, encodeTags } from "./codec";
-import { WATCH_RETRY_DELAYS_MS } from "./config";
 import { StoreSyncController } from "./engine";
+import { watchRetryDelay } from "./watch-backoff";
 
 import "@/store/playlist-account";
 
@@ -103,14 +103,16 @@ async function startWatchLoop(
     const startedAt = Date.now();
     // 失败必须留痕：这条通道是跨设备实时的唯一来源，静默吞掉异常的话，
     // 它挂了在日志上完全看不出来，只能看到"同步很慢"这种没法排查的现象。
+    let serverAskedMs: number | undefined;
     const result = await watchVersions(known).catch(err => {
       log.warn(`[sync/watch] 请求失败（挂了 ${Date.now() - startedAt}ms，第 ${failures + 1} 次）`, err);
+      serverAskedMs = retryAfterMs(err);
       return null;
     });
 
     if (!result) {
       if (!isCurrent()) return;
-      const delay = WATCH_RETRY_DELAYS_MS[Math.min(failures, WATCH_RETRY_DELAYS_MS.length - 1)];
+      const delay = watchRetryDelay(failures, serverAskedMs, syncBlockedForMs());
       log.warn(`[sync/watch] ${delay}ms 后重连`);
       await sleep(delay);
       failures += 1;
@@ -212,7 +214,8 @@ export function initLocalPlaylistSync(): void {
   // 登录态从无到有时触发一次（涵盖"冷启动时本地已缓存登录态"和"刚登录"两种情况）
   useUser.subscribe((state, prev) => {
     if (state.user?.mid === prev.user?.mid) return;
-    invalidateSyncToken();
+    // 换了账号就是换了 cookie，上一个账号的失败不该拖住它；服务器仍在冷却的话会再回 503，只打到自家服务器
+    invalidateSyncToken({ clearBlock: true });
     resetPlayRankingSession();
     ensureWatch();
     if (state.user?.mid) syncAllNow();

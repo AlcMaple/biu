@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="635" viewBox="0 0 1240 635" role="img">
+<title>B 站拒绝验证时，同步不再反复去问（2/2）：重连节奏、为什么这样做、改错红线</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="633" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">B 站拒绝验证时，同步不再反复去问（2/2）：重连节奏、为什么这样做、改错红线</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：通知通道断线后仍然先快后慢地重连，保证偶发断线时实时性不受影响；连续失败才逐步拉长到 5 分钟封顶，并加随机抖动。真正保护 IP 的是服务器那道统一刹车，客户端的</text>
+<text x="34.0" y="85.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">等待只是不去撞它。</text>
+<rect x="24" y="112" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="141.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 通知通道断线后的重连间隔</text>
+<rect x="44.0" y="155" width="374.7" height="87" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">以前</text>
+<text x="58.0" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">2 秒 → 5 秒 → 15 秒 → 30 秒 → 之后每 30 秒一次，永</text>
+<text x="58.0" y="217.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">远不停</text>
+<rect x="432.7" y="155" width="374.7" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">现在</text>
+<text x="446.7" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">2 秒 → 5 秒 → 15 秒 → 30 秒 → 1 分钟 → 2 分钟 → 5 </text>
+<text x="446.7" y="217.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">分钟封顶；每档上下浮动 20%</text>
+<rect x="821.3" y="155" width="374.7" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="835.3" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">服务器说了要等多久时</text>
+<text x="835.3" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">按服务器给的时间和上面的间隔中更长的那个等</text>
+<rect x="24" y="278" width="1192" height="167" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="307.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 为什么不那样做</text>
+<rect x="44.0" y="321" width="277.5" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么刹车装在服务器，不只靠客户端</text>
+<text x="58.0" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">没升级的老版本客户端照样会反复问；只有</text>
+<text x="58.0" y="383.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">服务器这一处能保证不管多少台设备、多旧</text>
+<text x="58.0" y="400.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">的版本，打到 B 站的都是 0 次</text>
+<rect x="335.5" y="321" width="277.5" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="349.5" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么一台失败就让所有人一起停</text>
+<text x="349.5" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">B 站拦的是服务器这个 IP，不是某个用户；</text>
+<text x="349.5" y="383.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">别人接着问只会把 IP 打进黑名单</text>
+<rect x="627.0" y="321" width="277.5" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="641.0" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么单个用户登录失效不触发刹车</text>
+<text x="641.0" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">那是这个人的 cookie 过期，B 站正常回答</text>
+<text x="641.0" y="383.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">了；全站停手会误伤其他人。这种情况只让</text>
+<text x="641.0" y="400.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">这台设备自己停 10 分钟</text>
+<rect x="918.5" y="321" width="277.5" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="932.5" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不让用户手动恢复</text>
+<text x="932.5" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">改动先存本机，恢复后自动补传；让用户点</text>
+<text x="932.5" y="383.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">按钮只会让人反复点，等于又多问一次</text>
+<rect x="24" y="461" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="490.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">③ 改错红线</text>
+<rect x="44.0" y="504" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="528.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">任何会让服务器去问 B 站的入口都要先看刹车</text>
+<text x="58.0" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">新增的换凭证、查身份接口不能绕过冷却直接请求 B 站</text>
+<rect x="432.7" y="504" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="446.7" y="528.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">设备换凭证失败必须停手</text>
+<text x="446.7" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">不能在重连、回到前台、每轮同步里各自再换一次；只有换账</text>
+<text x="446.7" y="566.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">号时才清掉等待</text>
+<rect x="821.3" y="504" width="374.7" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="835.3" y="528.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">重连不能回到固定间隔</text>
+<text x="835.3" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">固定间隔 + 没有上限 + 没有抖动，就是所有离线设备一起持</text>
+<text x="835.3" y="566.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">续硬闯</text>
+</svg>

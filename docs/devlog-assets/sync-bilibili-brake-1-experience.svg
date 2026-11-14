@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="677" viewBox="0 0 1240 677" role="img">
+<title>B 站拒绝验证时，同步不再反复去问（1/2）：以前和现在</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="675" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">B 站拒绝验证时，同步不再反复去问（1/2）：以前和现在</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：每台设备换同步凭证时，都由我们的服务器替它去问 B 站「这是谁」，所有用户共用服务器同一个 IP。以前 B 站一拒绝，每台设备每 30 秒就再问一次、永不停；现在服务器</text>
+<text x="34.0" y="85.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">拒绝一次就统一停 5 分钟，设备按服务器给的时间等。改动照常先存本机，恢复后自动补传。</text>
+<rect x="24" y="112" width="1192" height="259" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="141.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 以前：B 站风控期间</text>
+<text x="44.0" y="169.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">用户看到的</text>
+<rect x="44.0" y="177" width="368.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">正常收藏、听歌</text>
+<text x="58.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">界面和平时一样</text>
+<line x1="416.0" y1="212.0" x2="432.0" y2="212.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="436.0" y="177" width="368.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="450.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">另一台设备迟迟收不到</text>
+<text x="450.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">没有任何提示</text>
+<line x1="808.0" y1="212.0" x2="824.0" y2="212.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="828.0" y="177" width="368.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="842.0" y="201.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">最坏：全站同步一起停</text>
+<text x="842.0" y="222.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">服务器 IP 被 B 站封掉，所有人都换不到凭证</text>
+<text x="44.0" y="273.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">背后在做的</text>
+<rect x="44.0" y="281" width="368.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">B 站拒绝验证（风控 412 / 限流 429）</text>
+<text x="58.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">服务器把失败转给设备</text>
+<line x1="416.0" y1="316.0" x2="432.0" y2="316.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="436.0" y="281" width="368.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="450.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">每台设备每 30 秒重连一次</text>
+<text x="450.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">没有上限；每次回到前台再多问一次</text>
+<line x1="808.0" y1="316.0" x2="824.0" y2="316.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="828.0" y="281" width="368.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="842.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">每次都让服务器再去问 B 站</text>
+<text x="842.0" y="326.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">100 台设备 = 每分钟约 200 次，全从同一个 IP 发出</text>
+<rect x="24" y="387" width="1192" height="266" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="416.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 现在：服务器统一刹车，设备听话等待</text>
+<rect x="44.0" y="430" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="454.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">服务器第一次被 B 站拒绝</text>
+<text x="58.0" y="475.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">记下：风控 / 限流停 5 分钟，B 站超时</text>
+<text x="58.0" y="492.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">或出错停 1 分钟</text>
+<line x1="318.0" y1="473.5" x2="334.0" y2="473.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="430" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="352.0" y="454.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">冷却期内一律直接回「请稍后」</text>
+<text x="352.0" y="475.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">不再碰 B 站，并告诉设备还要等几秒</text>
+<line x1="612.0" y1="473.5" x2="628.0" y2="473.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="430" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="646.0" y="454.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">设备按服务器给的时间等</text>
+<text x="646.0" y="475.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">期间重连、回到前台都不发请求</text>
+<line x1="906.0" y1="473.5" x2="922.0" y2="473.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="430" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="940.0" y="454.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">冷却结束自动恢复</text>
+<text x="940.0" y="475.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">本机攒下的改动自动补传，不用用户操作</text>
+<rect x="44.0" y="529" width="569.0" height="104" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="553.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">沙盒实测</text>
+<text x="58.0" y="574.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">打开「B 站风控」后连发 5 次换凭证：B 站只被问了 1 次，其余 4 次直接回 503 + 等 300</text>
+<text x="58.0" y="591.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234"> 秒。网页端登录后只发 1 次，随即按服务器说的 215 秒等待；期间切回前台 2 次，0 个新</text>
+<text x="58.0" y="608.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">请求</text>
+<rect x="627.0" y="529" width="569.0" height="104" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="641.0" y="553.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">不受影响的</text>
+<text x="641.0" y="574.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">已经换到凭证的设备（2 小时有效）照常同步；只有正好要换凭证的那一下会等</text>
+</svg>
