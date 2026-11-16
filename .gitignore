@@ -75,6 +75,8 @@ jspm_packages/
 # Private production inventory, deployment mappings, and cryptographic material
 ops/production.env
 ops/private/
+# 服务器整体备份：含用户数据与密钥，只留在本机
+server-backups/
 *.pem
 *.key
 *.p12
