@@ -14,6 +14,7 @@ const BILIBILI_NAV_URL = "https://api.bilibili.com/x/web-interface/nav";
 const MAX_SYNC_BODY_BYTES = 2 * 1024 * 1024;
 const SYNC_TOKEN_CACHE_MS = 100 * 60 * 1000;
 const SYNC_UPSTREAM_TIMEOUT_MS = 70_000;
+const SHARE_CODE_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const SYNC_STORES = new Set(["favorites", "fav-items", "tags"]);
 
 interface CachedSyncToken {
@@ -223,6 +224,12 @@ function allowedSyncRoute(url: URL) {
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/play-ranking`) return { kind: "ranking" as const };
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/share`) return { kind: "share" as const };
 
+  const sharePrefix = `${BIU_SYNC_PROXY_ROOT}/share/`;
+  if (url.pathname.startsWith(sharePrefix)) {
+    const code = url.pathname.slice(sharePrefix.length);
+    return SHARE_CODE_PATTERN.test(code) ? { kind: "share-read" as const, code } : undefined;
+  }
+
   const prefix = `${BIU_SYNC_PROXY_ROOT}/sync/`;
   if (!url.pathname.startsWith(prefix)) return undefined;
   const store = url.pathname.slice(prefix.length);
@@ -266,6 +273,28 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
     if (route.kind === "watch" && [...url.searchParams.keys()].some(name => name !== "versions")) {
       jsonResponse(response, 400, { code: -400, message: "同步请求参数不合法" });
+      return true;
+    }
+
+    // 分享链接的收听者不一定登录，读取歌单不需要会话，也不带任何凭证上去
+    if (route.kind === "share-read") {
+      if (method !== "GET") {
+        response.setHeader("Allow", "GET");
+        jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
+        return true;
+      }
+      try {
+        const upstream = await requestSyncService(pathFor(origin, `/api/share/${route.code}`), {
+          headers: { Accept: "application/json", "User-Agent": "Biu-Web-Sync-BFF/1.0" },
+          method,
+          signal: AbortSignal.timeout(15_000),
+        });
+        await relaySyncResponse(request, response, upstream, AbortSignal.timeout(15_000));
+      } catch (error) {
+        if (response.writableEnded || response.destroyed) return true;
+        const status = error instanceof SyncProxyError ? error.status : 502;
+        jsonResponse(response, status, { error: "分享服务暂时连不上" });
+      }
       return true;
     }
 

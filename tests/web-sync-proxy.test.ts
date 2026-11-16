@@ -80,6 +80,11 @@ describe("Web local-playlist sync BFF", () => {
           return;
         }
 
+        if (request.method === "GET" && request.url === "/api/share/viponp0YYDY") {
+          sendJson(response, 200, { code: "viponp0YYDY", items: [] });
+          return;
+        }
+
         if (request.method === "GET" && request.url === "/api/sync/favorites") {
           syncCalls += 1;
           if (failFirstSync && syncCalls === 1) {
@@ -147,6 +152,17 @@ describe("Web local-playlist sync BFF", () => {
       body: JSON.stringify({ cookie: "SESSDATA=server-only-bilibili-session" }),
       path: "/api/auth/exchange",
     });
+  });
+
+  it("serves a public share without any login session or credentials upstream", async () => {
+    const ok = await fetch(`${appOrigin}/__biu_sync/share/viponp0YYDY`);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ code: "viponp0YYDY" });
+    expect(authCalls).toBe(0);
+    expect(upstreamRequests[0]).toMatchObject({ authorization: undefined, cookie: undefined });
+
+    expect((await fetch(`${appOrigin}/__biu_sync/share/bad`)).status).toBe(404);
+    expect((await fetch(`${appOrigin}/__biu_sync/share/viponp0YYDY`, { method: "POST" })).status).toBe(405);
   });
 
   it("uses the server token upstream and ignores browser-supplied authorization", async () => {
