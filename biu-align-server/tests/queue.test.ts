@@ -54,6 +54,22 @@ const job = (mid: string, lyricsHash: string, origin: JobOrigin = "auto") => ({
 const flush = () => new Promise(r => setTimeout(r, 20));
 
 describe("AlignQueue", () => {
+  it("只有管理员手动重跑和上传才允许 worker 忽略对不上的原时间；自动对齐不放宽", async () => {
+    const { queue, release, runWorker } = await setup();
+    await queue.submit(job("1", "loose-auto"));
+    await vi.waitFor(() => expect(runWorker).toHaveBeenCalledTimes(1));
+    expect(runWorker.mock.calls[0][3]).toEqual({ looseTimes: false });
+    release.shift()!();
+    await queue.submit(job("1", "loose-manual", "manual"));
+    await vi.waitFor(() => expect(runWorker).toHaveBeenCalledTimes(2));
+    expect(runWorker.mock.calls[1][3]).toEqual({ looseTimes: true });
+    release.shift()!();
+    await queue.submit(job("1", "loose-upload", "upload"));
+    await vi.waitFor(() => expect(runWorker).toHaveBeenCalledTimes(3));
+    expect(runWorker.mock.calls[2][3]).toEqual({ looseTimes: true });
+    release.shift()!();
+  });
+
   it("同时只跑一个；同一份歌词重复提交复用同一任务；完成后命中缓存不再排队", async () => {
     const { queue, release, runWorker } = await setup();
     const a = await queue.submit(job("1", "h1"));
