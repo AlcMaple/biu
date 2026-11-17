@@ -9,6 +9,7 @@ import { getPlayModeList, PlayMode } from "@/common/constants/audio";
 import { isStaticDemo } from "@/common/offline-demo";
 import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/common/utils/audio";
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
+import { BILI_RATE_LIMIT_MESSAGE, isBiliRateLimitError, isBiliRateLimitStatus } from "@/common/utils/bili-rate-limit";
 import { tryBv2av } from "@/common/utils/bv";
 import { attachMediaSourceAudio, shouldUseMediaSource, type MediaSourceController } from "@/common/utils/media-source";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
@@ -295,6 +296,23 @@ let audioGestureUnlocked = false;
  */
 let awaitingUserGesture = false;
 
+/**
+ * 取址或拉流被 B 站限流（412/429/-412/-352）时置位。
+ *
+ * 置位后自动换源、重新取址、失效检测、自动跳歌和预取全部停手，停在当前这首等用户自己点播放：
+ * 惩罚窗口里每多一次自动请求都会把限流拉得更长。用户手势或成功开播时复位。
+ */
+let rateLimitHold = false;
+
+const enterRateLimitHold = (detail: string) => {
+  const firstHit = !rateLimitHold;
+  rateLimitHold = true;
+  if (firstHit) log.warn("被 B 站限流，停止自动重试", { detail });
+  if (!audio.paused) audio.pause();
+  usePlayList.setState({ isPlaying: false });
+  toastError(BILI_RATE_LIMIT_MESSAGE);
+};
+
 // 分享链接打开时的自动播放本来就可能被浏览器拦下，页面上有显眼的播放按钮，不再弹「被阻止」的提示
 let suppressAutoplayBlockedToast = false;
 export const setSuppressAutoplayBlockedToast = (value: boolean) => {
@@ -304,6 +322,7 @@ export const setSuppressAutoplayBlockedToast = (value: boolean) => {
 const primeAudioForGesture = () => {
   // 真实用户手势到达：解除「等待手势」闸门，让后续换源/续播恢复
   awaitingUserGesture = false;
+  rateLimitHold = false;
   if (audioGestureUnlocked) return;
   audioGestureUnlocked = true;
   if (audio.src) return;
@@ -315,6 +334,10 @@ const primeAudioForGesture = () => {
 };
 
 const handlePlayError = (error: any) => {
+  if (isBiliRateLimitError(error)) {
+    enterRateLimitHold(error.detail);
+    return;
+  }
   const errorName = error?.name || "";
   const errorMsg = error?.message || errorName || "";
   // AbortError（"The operation was aborted."）是换源/切歌时 load() 打断了上一次 play()，
@@ -982,7 +1005,10 @@ export const usePlayList = create<State & Action>()(
                       return;
                     }
                     log.warn("播放长时间无进度，触发换源自救", { playId, ...describeAudioState(), ...probe });
-                    void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
+                    void handlePlaybackFailure(playId, stalledSrc, {
+                      message: "stall watchdog timeout",
+                      httpStatus: typeof probe.probeStatus === "number" ? probe.probeStatus : undefined,
+                    });
                   })
                   .catch(() => {
                     void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
@@ -998,7 +1024,7 @@ export const usePlayList = create<State & Action>()(
             const handlePlaybackFailure = async (
               playId: string,
               failedSrc: string,
-              errInfo: { code?: number; message?: string },
+              errInfo: { code?: number; message?: string; httpStatus?: number },
             ) => {
               if (failureHandlingId === playId) return;
               failureHandlingId = playId;
@@ -1012,16 +1038,24 @@ export const usePlayList = create<State & Action>()(
             const runPlaybackFailure = async (
               playId: string,
               failedSrc: string,
-              errInfo: { code?: number; message?: string },
+              errInfo: { code?: number; message?: string; httpStatus?: number },
             ) => {
               clearStallWatchdog();
               // 浏览器在等新手势（NotAllowed）：任何自动 play() 都注定被拒，停手等用户再点一次，
               // 否则就是 NotAllowed 刷屏 + 请求风暴
-              if (awaitingUserGesture) return;
-              // 对齐官方播放器的容错：先换备用地址/重新取地址自救
-              if (await tryFailoverAudioSource(playId, failedSrc)) return;
-              // 自救期间用户已切歌：不再处理
+              if (awaitingUserGesture || rateLimitHold) return;
+              // 媒体元素只给笼统错误码，限流要靠真实状态码认出来；每次失败只探这一次，换源时复用
+              const httpStatus = errInfo.httpStatus ?? (await probePlaybackStatus(failedSrc));
+              log.warn("音频播放失败", { playId, ...errInfo, httpStatus, ...describeAudioState() });
               if (get().playId !== playId) return;
+              if (isBiliRateLimitStatus(httpStatus)) {
+                enterRateLimitHold(`media HTTP ${httpStatus}`);
+                return;
+              }
+              // 对齐官方播放器的容错：先换备用地址/重新取地址自救
+              if (await tryFailoverAudioSource(playId, failedSrc, httpStatus)) return;
+              // 自救期间用户已切歌，或重新取址时被限流：不再处理
+              if (get().playId !== playId || rateLimitHold) return;
 
               // 换源都救不回来：若确认稿件已被删除/下架，直接从列表移除并续播（自然跳过失效歌曲）
               const failedItem = get().list.find(item => item.id === playId);
@@ -1052,7 +1086,7 @@ export const usePlayList = create<State & Action>()(
               toastError("当前歌曲无法播放，已自动跳过");
               // 退避后再跳：避免一秒内连锁跳过多首、瞬间打出大量请求
               await delay(AUTO_SKIP_DELAY_MS);
-              if (get().playId !== playId) return;
+              if (get().playId !== playId || rateLimitHold) return;
               void get().next();
             };
 
@@ -1105,6 +1139,7 @@ export const usePlayList = create<State & Action>()(
               // 播放是用户手势：借机恢复可能被浏览器自动挂起的音频图，确保音量增强生效
               resumeAudioGraph();
               consecutiveErrorCount = 0; // 成功开始播放，重置失败计数
+              rateLimitHold = false;
               set({ isPlaying: true });
               updatePlaybackState();
               updatePositionState();
@@ -1162,15 +1197,6 @@ export const usePlayList = create<State & Action>()(
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
               const erroredSrc = currentSourceUrl || audio.src;
-              void probeMediaResponse(erroredSrc).then(probe => {
-                log.warn("音频元素报错", {
-                  playId,
-                  code: err.code,
-                  message: err.message,
-                  ...describeAudioState(),
-                  ...probe,
-                });
-              });
               void handlePlaybackFailure(playId, erroredSrc, { code: err.code, message: err.message });
             };
 
@@ -2080,8 +2106,8 @@ const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
  *
  * 手机上没法开开发者工具看 Network，媒体元素的 onerror 又只给 code=2/3/4 这种
  * 笼统分类，排查时等于瞎子。这里对失败地址发一个 1 字节 Range 请求，把状态码
- * 写进日志和提示里（404 = 代理 token 失效、403 = 上游拒绝、0 = 网络不通）。
- * 每首歌只在重新取址那一步探一次，不会增加请求压力。
+ * 写进日志和提示里（404 = 代理 token 失效、403 = 上游拒绝、412/429 = 被限流、0 = 网络不通）。
+ * 每次失败处理只探这一次（取代原先报错时另拉 64KB 的诊断），换源和限流判断共用结果。
  */
 async function probePlaybackStatus(url: string): Promise<number | undefined> {
   if (typeof fetch !== "function") return undefined;
@@ -2114,7 +2140,7 @@ async function waitFailoverSlot() {
  * 候选用尽后再重新向 B 站取一次新地址；都失败才返回 false，由调用方跳下一首兜底。
  * 只在真实播放失败时触发，每个地址最多试一次、新地址最多重取一次，不会产生轮询压力。
  */
-async function tryFailoverAudioSource(playId: string, failedSrc: string): Promise<boolean> {
+async function tryFailoverAudioSource(playId: string, failedSrc: string, httpStatus?: number): Promise<boolean> {
   if (failoverPlayId !== playId) {
     failoverPlayId = playId;
     failoverTriedUrls = new Set();
@@ -2122,7 +2148,7 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
     failoverAttempts = 0;
   }
   // 浏览器在等新手势：换源同样要 play()，注定被拒，直接停手
-  if (awaitingUserGesture) return false;
+  if (awaitingUserGesture || rateLimitHold) return false;
   // 本曲自救次数用尽：不再继续换源，避免坏源上无休止地重试
   if (failoverAttempts >= FAILOVER_MAX_ATTEMPTS) return false;
   if (failedSrc) {
@@ -2160,7 +2186,7 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string): Promis
   if (!failoverRefreshed) {
     failoverRefreshed = true;
     failoverAttempts += 1;
-    const status = await probePlaybackStatus(failedSrc);
+    const status = httpStatus;
     log.warn("音频播放失败，重新获取播放地址重试", { playId, failedSrc, httpStatus: status });
     if (status === 0) {
       toastInfo("播放源连不上，请检查网络");
@@ -2443,6 +2469,7 @@ async function prefetchAudioSource(targetPlayId: string) {
   // 本地文件无需解析；地址还没过期也不用重取
   if (playItem.source === "local") return;
   if (isUrlValid(playItem.audioUrl)) return;
+  if (rateLimitHold) return;
 
   const applyToItem = (patch: Partial<PlayData>) => {
     usePlayList.setState(state => {

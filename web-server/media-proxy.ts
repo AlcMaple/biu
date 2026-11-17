@@ -47,7 +47,10 @@ export function createMediaApiResponseTransformer(runtime: MediaProxyRuntime): A
   return {
     matches: isBilibiliMediaResponse,
     maxBytes: MAX_MEDIA_JSON_BYTES,
-    transform(body, { request, response }) {
+    transform(body, { request, response, status }) {
+      // 风控 412 / 限流 429 回的是 HTML，不是 JSON；原样带着上游状态码交给前端，前端才能认出限流并停手，
+      // 改成 502 会被当成普通故障继续重试
+      if (status < 200 || status >= 300) return body;
       let payload: unknown;
       try {
         payload = JSON.parse(body.toString("utf8"));

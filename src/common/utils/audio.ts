@@ -9,6 +9,7 @@ import { getBilibiliMediaProxyExpiry, isBilibiliMediaProxyUrl } from "@shared/bi
 
 import { audioQualitySort } from "../constants/audio";
 import { VideoFnval } from "../constants/video";
+import { assertNotRateLimitedResponse, toBiliRateLimitError } from "./bili-rate-limit";
 import { getUrlParams } from "./url";
 
 /**
@@ -71,6 +72,7 @@ export async function getDashUrl(
       },
       config,
     );
+    assertNotRateLimitedResponse(getUrlInfoRes, "playurl");
 
     const bestVideoInfo = getUrlInfoRes?.data?.dash?.video?.[0];
     const videoResolution = `${bestVideoInfo?.width}x${bestVideoInfo?.height}`;
@@ -120,6 +122,9 @@ export async function getDashUrl(
       videoResolution,
     };
   } catch (error) {
+    // 限流必须让调用方知道并停手；其余失败沿用「拿不到地址」的旧语义
+    const rateLimited = toBiliRateLimitError(error, "playurl");
+    if (rateLimited) throw rateLimited;
     log.error("[Get video play url error]", error);
     return {
       isLossless: false,
@@ -131,16 +136,22 @@ export async function getDashUrl(
  * 登录情况下获取音乐播放链接
  */
 export const getAudioUrl = async (sid: number | string, config?: { signal?: AbortSignal }) => {
-  const res = await getAudioWebStreamUrl(
-    {
-      songid: sid,
-      quality: useUser.getState().user?.vipStatus ? 3 : 2,
-      privilege: 2,
-      mid: useUser.getState().user?.mid || 0,
-      platform: "web",
-    },
-    config,
-  );
+  let res: Awaited<ReturnType<typeof getAudioWebStreamUrl>>;
+  try {
+    res = await getAudioWebStreamUrl(
+      {
+        songid: sid,
+        quality: useUser.getState().user?.vipStatus ? 3 : 2,
+        privilege: 2,
+        mid: useUser.getState().user?.mid || 0,
+        platform: "web",
+      },
+      config,
+    );
+  } catch (error) {
+    throw toBiliRateLimitError(error, "audio-url") ?? error;
+  }
+  assertNotRateLimitedResponse(res, "audio-url");
 
   const isFlac = res?.data?.type === 3;
   const audioUrlCandidates = collectStreamUrls(undefined, res?.data?.cdns);
