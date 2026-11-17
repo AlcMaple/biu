@@ -2,8 +2,26 @@ import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
+const PORT_FLAGS = {
+  "--port": "port",
+  "--bilibili-port": "bilibiliPort",
+  "--sync-port": "syncPort",
+  "--align-port": "alignPort",
+};
+
+export const sandboxPorts = options => [options.port, options.bilibiliPort, options.syncPort, options.alignPort];
+
 export function parseSandboxOptions(args, cwd = process.cwd(), home = homedir()) {
-  const options = { port: 5679, alignPort: 3013, dataRoot: join(home, ".biu-sandbox"), reset: false, help: false };
+  const options = {
+    port: 5679,
+    bilibiliPort: 3010,
+    syncPort: 3012,
+    alignPort: 3013,
+    // 放在用户目录而不是系统临时目录：重启电脑后沙盒里造的数据还在，只有 --reset 才清
+    dataRoot: join(home, ".biu-sandbox"),
+    reset: false,
+    help: false,
+  };
   const seen = new Set();
   for (let index = 0; index < args.length; index += 1) {
     const [flag, ...inline] = args[index].split("=");
@@ -14,7 +32,7 @@ export function parseSandboxOptions(args, cwd = process.cwd(), home = homedir())
       options[flag === "--reset" ? "reset" : "help"] = true;
       continue;
     }
-    if (!["--port", "--align-port", "--data-dir"].includes(flag)) throw new Error(`未知参数：${flag}`);
+    if (!(flag in PORT_FLAGS) && flag !== "--data-dir") throw new Error(`未知参数：${flag}`);
     const value = inline.length ? inline.join("=") : args[++index];
     if (!value || value.startsWith("--")) throw new Error(`${flag} 需要参数值`);
     if (flag === "--data-dir") {
@@ -23,17 +41,17 @@ export function parseSandboxOptions(args, cwd = process.cwd(), home = homedir())
       if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 65535) {
         throw new Error(`${flag} 需要 1–65535 的整数端口`);
       }
-      options[flag === "--port" ? "port" : "alignPort"] = Number(value);
+      options[PORT_FLAGS[flag]] = Number(value);
     }
   }
-  if (options.port === options.alignPort) throw new Error("Web 与对齐服务需要不同端口");
+  if (new Set(sandboxPorts(options)).size !== 4) throw new Error("Web、假 B 站、同步、对齐服务需要四个不同端口");
   // 自定义目录可能含其他用途的文件，不让一个新增路径参数扩大旧清理命令的删除范围。
   if (options.reset && seen.has("--data-dir")) throw new Error("--reset 不与 --data-dir 同用；请换用新的专用沙箱目录");
   return options;
 }
 
 export async function checkSandboxPorts(options) {
-  for (const port of [options.port, options.alignPort]) {
+  for (const port of sandboxPorts(options)) {
     await new Promise((done, reject) => {
       const server = createServer();
       server.once("error", error => {
@@ -47,10 +65,10 @@ export async function checkSandboxPorts(options) {
 export const sandboxWebOrigin = port => `http://${port === 5679 ? "localhost" : "127.0.0.1"}:${port}`;
 
 export const sandboxHelp = `Biu 本地沙箱
-用法：pnpm sandbox [--port <Web端口>] [--align-port <对齐端口>] [--data-dir <服务数据目录>]
-默认：Web 5679；对齐服务 3013；数据 ~/.biu-sandbox；仅监听 127.0.0.1
+用法：pnpm sandbox [--port <Web端口>] [--bilibili-port <假B站端口>] [--sync-port <同步端口>] [--align-port <对齐端口>] [--data-dir <服务数据目录>]
+默认：Web 5679；假 B 站 3010；同步服务 3012；对齐服务 3013；数据 ~/.biu-sandbox；仅监听 127.0.0.1
 --help, -h  显示帮助，不启动服务
---reset     清空默认沙箱的对齐数据，不与 --data-dir 同用
+--reset     清空默认沙箱的同步、对齐数据，不与 --data-dir 同用
 同一角色续用原 Web 端口和数据目录；全新会话使用新的 Web 端口。
-端口隔离浏览器本地存储，数据目录隔离 mock 对齐服务数据。
+端口隔离浏览器本地存储，数据目录隔离同步、对齐服务数据。
 同主机不同端口仍共享 Cookie；独立身份用不同 localhost 主机名或浏览器 profile，不等于生产账号隔离。`;

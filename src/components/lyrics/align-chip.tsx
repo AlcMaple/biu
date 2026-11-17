@@ -104,7 +104,7 @@ const AlignChip = ({ onSearchLyrics, onOpenChange }: Props) => {
       body:
         (queued && job.position ? `前面还有 ${job.position} 首。` : "") +
         "好了之后歌词会自动变成逐字点亮，不用手动操作。" +
-        (mode === "manual" ? "这是管理员重跑，好了先试听再决定是否采用。" : ""),
+        (mode === "manual" ? "这是管理员重跑，好了先试听再决定是否发布。" : ""),
     };
   } else if (active && phase.kind === "failed") {
     // 歌词配错时原样重试只会再配错一次，所以只给管理员「换一份歌词」；被下线的那份重跑也一样。
@@ -135,12 +135,14 @@ const AlignChip = ({ onSearchLyrics, onOpenChange }: Props) => {
       title: phase.restored ? "正在试听上次重新对齐的结果" : "正在试听这次的对齐结果",
       body:
         (phase.restored ? "还没发布，所有人在用的仍是原来那份。" : "") +
-        (offsetText(phase.alignment.offsetSec) ?? "确认没问题就采用，不满意可以放弃或再跑一遍。"),
+        (phase.alignment.quality.timesIgnored
+          ? "原歌词的时间轴和音频对不上，已忽略，时间全部来自音频；请听一遍再发布。"
+          : (offsetText(phase.alignment.offsetSec) ?? "确认没问题就发布给所有人，不满意可以放弃或再跑一遍。")),
       actions: (
         <>
           {act("放弃", session.discard)}
           {act("再跑一遍", () => void session.rerun())}
-          {act("采用", () => run(session.adopt), true)}
+          {act("发布给所有人", () => run(session.adoptAndPublish), true)}
         </>
       ),
     };
@@ -201,7 +203,7 @@ const AlignChip = ({ onSearchLyrics, onOpenChange }: Props) => {
           {view.dot}
           <span className="font-medium text-white">{view.label}</span>
           {view.hint && !isMobileLayout ? <span className="text-white/50">{view.hint}</span> : null}
-          {view.caution ? <RiArrowDownSLine size={12} className="text-white/50" /> : null}
+          {view.caution || view.actions ? <RiArrowDownSLine size={12} className="text-white/50" /> : null}
           {view.progress ? (
             <motion.span
               className="absolute bottom-0 left-0 h-0.5 w-1/3 bg-[#1ed760]"

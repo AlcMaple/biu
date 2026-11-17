@@ -40,7 +40,7 @@ export const DefaultMenuList: DefaultMenuItem[] = [
     activeIcon: RiDiscFill,
   },
   {
-    title: "私人FM",
+    title: "相似推荐",
     href: "/heartbeat",
     icon: RiHeartPulseLine,
     activeIcon: RiHeartPulseFill,

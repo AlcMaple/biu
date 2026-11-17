@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="601" viewBox="0 0 1240 601" role="img">
+<title>同步途中的改动不再丢（2/2）：同步进度互相抹掉，以及别改错的地方</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="599" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">同步途中的改动不再丢（2/2）：同步进度互相抹掉，以及别改错的地方</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：歌单、歌曲、标签三份数据共用一本「同步进度」，以前同时记账会互相抹掉，实测歌曲那份一直记不上、每次打开都从头比对；现在排队记账。下面也写明了为什么不用更简单</text>
+<text x="34.0" y="85.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">的办法。</text>
+<rect x="24" y="112" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="141.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 同步进度为什么会丢</text>
+<rect x="44.0" y="155" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">三份数据各自同步</text>
+<text x="58.0" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">开始时各读一次「同步进度」本子</text>
+<line x1="318.0" y1="198.5" x2="334.0" y2="198.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="155" width="270.0" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="352.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">各自拿开头读到的旧本子整本写回</text>
+<text x="352.0" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">后写的那份不知道先写的改了什么</text>
+<line x1="612.0" y1="198.5" x2="628.0" y2="198.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="155" width="270.0" height="87" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="646.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">先写的那一格被抹掉</text>
+<text x="646.0" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">沙盒实测：歌单、标签记上了，歌曲那格没</text>
+<text x="646.0" y="217.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">有</text>
+<line x1="906.0" y1="198.5" x2="922.0" y2="198.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="155" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="940.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">现在：排队写，写前重读</text>
+<text x="940.0" y="200.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">每次只改自己那一格，三格都记得住</text>
+<rect x="24" y="278" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="307.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 为什么不那样做</text>
+<rect x="44.0" y="321" width="374.7" height="87" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不在同步途中禁止操作</text>
+<text x="58.0" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">网络慢时一卡就是几秒，用户点了没反应会以为坏了；同步应</text>
+<text x="58.0" y="383.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">该是看不见的</text>
+<rect x="432.7" y="321" width="374.7" height="87" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="446.7" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不以本机为准覆盖服务器</text>
+<text x="446.7" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">另一台设备刚做的改动会被抹掉，问题只是换了个方向</text>
+<rect x="821.3" y="321" width="374.7" height="87" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="345.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">为什么不干脆不写回服务器结果</text>
+<text x="835.3" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">那样别的设备的改动永远同步不过来</text>
+<rect x="24" y="444" width="1192" height="133" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="473.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">③ 改错红线</text>
+<rect x="44.0" y="487" width="569.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="58.0" y="511.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">写回本机前必须补回路上的改动</text>
+<text x="58.0" y="532.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">任何把服务器结果写进本机的地方都要先补回，否则又会出现收藏了又没了</text>
+<rect x="627.0" y="487" width="569.0" height="70" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="641.0" y="511.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">写同步进度必须排队、写前重读</text>
+<text x="641.0" y="532.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">不能拿一开始读到的副本整本写回，三份数据会互相抹掉</text>
+</svg>

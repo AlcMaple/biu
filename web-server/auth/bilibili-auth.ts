@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, publicEncrypt } from "node:crypto";
 
+import { sandboxAwareFetch } from "../sandbox-upstream.js";
 import {
   type BilibiliCookie,
   type WebSessionRecord,
@@ -295,7 +296,7 @@ export class BilibiliAuthClient {
   private readonly now: () => number;
 
   constructor(options: BilibiliAuthClientOptions = {}) {
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    this.fetchImpl = options.fetch ?? sandboxAwareFetch;
     this.now = options.now ?? Date.now;
   }
 

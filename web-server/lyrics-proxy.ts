@@ -11,6 +11,7 @@ import {
   type ProxyLogger,
   type ProxyNext,
 } from "./proxy-common.js";
+import { sandboxAwareFetch } from "./sandbox-upstream.js";
 
 const NETEASE_ORIGIN = "https://interface.music.163.com";
 const LRCLIB_ORIGIN = "https://lrclib.net";
@@ -200,7 +201,7 @@ function upstreamHeaders(target: URL): HeadersInit {
 }
 
 export function createWebLyricsProxyHandler(options: WebLyricsProxyHandlerOptions = {}): WebLyricsProxyHandler {
-  const fetchUpstream = options.fetch ?? fetch;
+  const fetchUpstream = options.fetch ?? sandboxAwareFetch;
   const logger = options.logger ?? console;
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
 

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="822" viewBox="0 0 1240 822" role="img">
+<title>接口出错时的提示对照表</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="820" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">接口出错时的提示对照表</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：接口出错时不再显示「Request failed with status code 502」这类英文原文，而是写明是限流、风控、B 站出错还是断网；收藏夹打不开时，原因直接写在列表里，不再</text>
+<text x="34.0" y="85.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">只剩一个「暂无内容」。</text>
+<rect x="24" y="112" width="1192" height="686" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="141.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">每条提示：什么情况出现、用户当时能做什么</text>
+<rect x="44.0" y="155" width="374.7" height="53" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">什么情况</text>
+<rect x="432.7" y="155" width="374.7" height="53" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="446.7" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">用户看到的原文</text>
+<rect x="821.3" y="155" width="374.7" height="53" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="835.3" y="179.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">用户能做什么</text>
+<rect x="44.0" y="220" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="244.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">被 B 站限流（429）</text>
+<rect x="432.7" y="220" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="244.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">请求太频繁，被 B 站暂时限流（429），请过几分钟再试</text>
+<rect x="821.3" y="220" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="244.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">等几分钟；别反复刷新，越刷越久</text>
+<rect x="44.0" y="281" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">被 B 站风控（412）</text>
+<rect x="432.7" y="281" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">被 B 站风控拦截（412），请过一会儿再试</text>
+<rect x="821.3" y="281" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="305.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">过一会儿再试</text>
+<rect x="44.0" y="342" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">网页版：服务器连不上 B 站（502 / 504）</text>
+<rect x="432.7" y="342" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">服务器暂时连不上 B 站（502），请稍后再试</text>
+<rect x="821.3" y="342" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="366.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">稍后再试，不是自己网络的问题</text>
+<rect x="44.0" y="403" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="427.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">桌面版：B 站没响应（502 / 504）</text>
+<rect x="432.7" y="403" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="427.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">B 站暂时没有响应（502），请稍后再试</text>
+<rect x="821.3" y="403" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="427.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">稍后再试</text>
+<rect x="44.0" y="464" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="488.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">B 站其他服务错误（5xx）</text>
+<rect x="432.7" y="464" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="488.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">B 站服务暂时出错（500），请稍后再试</text>
+<rect x="821.3" y="464" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="488.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">稍后再试</text>
+<rect x="44.0" y="525" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">网页版：断网</text>
+<rect x="432.7" y="525" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">连不上服务器，请检查网络</text>
+<rect x="821.3" y="525" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="549.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">检查网络</text>
+<rect x="44.0" y="586" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="610.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">桌面版：断网或代理不通</text>
+<rect x="432.7" y="586" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="610.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">连不上 B 站，请检查网络或代理设置</text>
+<rect x="821.3" y="586" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="610.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">检查网络或代理</text>
+<rect x="44.0" y="647" width="374.7" height="49" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="671.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">超时（原有，未改）</text>
+<rect x="432.7" y="647" width="374.7" height="49" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="671.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">服务器响应超时：可能正在缓冲音频或网络较慢，稍后再试</text>
+<rect x="821.3" y="647" width="374.7" height="49" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="835.3" y="671.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">稍后再试</text>
+<rect x="44.0" y="708" width="1152.0" height="70" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="732.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">出现在哪</text>
+<text x="58.0" y="753.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">所有调用 B 站接口失败的提示框；收藏夹第一页加载失败时，同一句话也写在列表空白处。其他状态码（如 404）仍显示原始信息</text>
+</svg>

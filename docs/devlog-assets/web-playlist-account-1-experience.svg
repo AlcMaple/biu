@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="576" viewBox="0 0 1240 576" role="img">
+<title>网页版本地歌单按账号分开（1/2）：用户会经历什么</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="574" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">网页版本地歌单按账号分开（1/2）：用户会经历什么</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：网页版的本地歌单跟着 B 站账号走，没登录就没有本地歌单、也不能收藏；换了账号只看到自己的。更新前存在浏览器公共位置的收藏会自动归位，不弹窗。桌面版不变。</text>
+<rect x="24" y="93" width="1192" height="293" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="122.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 用户看到的，和背后在做的</text>
+<text x="44.0" y="150.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">用户看到的</text>
+<rect x="44.0" y="158" width="270.0" height="87" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="182.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">没登录</text>
+<text x="58.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">能听歌；播放栏没有收藏按钮，侧栏没有本</text>
+<text x="58.0" y="220.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">地歌单</text>
+<line x1="318.0" y1="201.5" x2="334.0" y2="201.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="158" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="352.0" y="182.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">登录 A</text>
+<text x="352.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">看到 A 的歌单、歌曲和标签</text>
+<line x1="612.0" y1="201.5" x2="628.0" y2="201.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="158" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="646.0" y="182.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">退出，登录 B</text>
+<text x="646.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">只看到 B 自己的，A 的一首都看不到</text>
+<line x1="906.0" y1="201.5" x2="922.0" y2="201.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="158" width="270.0" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="940.0" y="182.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">再登录 A</text>
+<text x="940.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">A 的歌单都还在</text>
+<text x="44.0" y="271.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">背后在做的</text>
+<rect x="44.0" y="279" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="303.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">浏览器里每个账号各存一份</text>
+<text x="58.0" y="324.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">没登录时读出来是空的，写入直接丢掉</text>
+<line x1="318.0" y1="322.5" x2="334.0" y2="322.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="279" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="352.0" y="303.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">按 A 的那份读出来</text>
+<text x="352.0" y="324.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">同步时只和服务器上 A 的那份对</text>
+<line x1="612.0" y1="322.5" x2="628.0" y2="322.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="279" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="646.0" y="303.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">换账号分三步</text>
+<text x="646.0" y="324.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">先停掉存盘，再清空页面上的歌单，最后读</text>
+<text x="646.0" y="341.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d"> B 那份</text>
+<line x1="906.0" y1="322.5" x2="922.0" y2="322.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="279" width="270.0" height="87" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="940.0" y="303.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">服务器本来就按账号分</text>
+<text x="940.0" y="324.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">浏览器和服务器两边一一对应</text>
+<rect x="24" y="402" width="1192" height="150" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="431.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 更新前留在浏览器公共位置的收藏怎么办</text>
+<rect x="44.0" y="445" width="374.7" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="469.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">以前登录同步过（最常见）</text>
+<text x="58.0" y="490.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">服务器上已经有完整一份；登录后直接从服务器拿，第一次同</text>
+<text x="58.0" y="507.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">步只增不删</text>
+<rect x="432.7" y="445" width="374.7" height="87" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="446.7" y="469.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">以前从没同步过</text>
+<text x="446.7" y="490.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">只存在这个浏览器里；交给第一个登录的账号并传上服务器，</text>
+<text x="446.7" y="507.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">之后的账号不再拿</text>
+<rect x="821.3" y="445" width="374.7" height="87" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="835.3" y="469.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">公共位置的原件</text>
+<text x="835.3" y="490.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">原样留着不改不删，当作备份</text>
+</svg>

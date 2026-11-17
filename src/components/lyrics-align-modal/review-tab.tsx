@@ -187,15 +187,21 @@ const SubmissionDetail = ({ id, onDone }: { id: string; onDone: () => void }) =>
             {/* 外语歌靠「和原歌词时间吻合多少」判断歌词配没配错；纯文本外语歌词服务端判不了，只能靠审核员试听 */}
             {alignment.quality.lang && alignment.quality.lang !== "zh" ? (
               <span>
-                {typeof alignment.quality.timelineMatch === "number"
-                  ? `${Math.round(alignment.quality.timelineMatch * 100)}% 的行和原歌词时间吻合`
-                  : "外语纯文本歌词，服务端判断不了配没配错，请试听确认"}
+                {alignment.quality.timesIgnored
+                  ? "服务端判断不了配没配错，请试听确认"
+                  : typeof alignment.quality.timelineMatch === "number"
+                    ? `${Math.round(alignment.quality.timelineMatch * 100)}% 的行和原歌词时间吻合`
+                    : "外语纯文本歌词，服务端判断不了配没配错，请试听确认"}
               </span>
             ) : null}
             {/* 带时间的原歌词才有：整体偏得多说明投稿有片头，或者歌词对应的是另一个版本。
                 纯文本上传服务端给的偏移恒为 0，照样显示会读成「和原歌词基本一致」 */}
             <span>
-              {submission.lines.some(l => l.t) ? offsetText(alignment.offsetSec) : "上传的是纯文本，时间全部来自音频"}
+              {alignment.quality.timesIgnored
+                ? "原歌词的时间轴和音频对不上，已忽略，时间全部来自音频"
+                : submission.lines.some(l => l.t)
+                  ? offsetText(alignment.offsetSec)
+                  : "上传的是纯文本，时间全部来自音频"}
             </span>
             <span>{currentText(current, currentSource)}，通过后替换它</span>
           </div>
@@ -279,6 +285,7 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
     : report.kind === "other"
       ? report.otherType !== "timeline" && report.otherType !== "lyrics"
       : true;
+  const canWithdraw = stillInUse && !contentOnly;
   const range = report.fromLine && report.toLine ? { from: report.fromLine, to: report.toLine } : undefined;
   const busyAny = Boolean(busy) || realign.running;
 
@@ -359,40 +366,25 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
         >
           没问题，驳回
         </Button>
-        {stillInUse && !contentOnly ? (
-          <>
-            <Button
-              color="danger"
-              variant="flat"
-              isDisabled={busyAny}
-              isLoading={busy === "withdraw"}
-              onPress={() =>
-                act(
-                  "withdraw",
-                  () => resolveReport(id, { withdraw: true, reason: reason.trim() || undefined }),
-                  "已下线，所有人退回原来的歌词；这份不会再被自动对齐换回来",
-                )
-              }
-            >
-              下线，退回原歌词
-            </Button>
-            <Button
-              color="success"
-              isDisabled={!draft || busyAny}
-              isLoading={busy === "replace"}
-              onPress={() =>
-                act(
-                  "replace",
-                  () => publishAlignment({ bvid: report.bvid, cid: report.cid, lyricsHash: report.lyricsHash }),
-                  "已换成重新对齐的结果，所有人打开这首歌都会用它；这首歌的报错已一并关闭",
-                )
-              }
-            >
-              用重跑结果替换
-            </Button>
-          </>
+        {canWithdraw ? (
+          <Button
+            color="danger"
+            variant="flat"
+            isDisabled={busyAny}
+            isLoading={busy === "withdraw"}
+            onPress={() =>
+              act(
+                "withdraw",
+                () => resolveReport(id, { withdraw: true, reason: reason.trim() || undefined }),
+                "已下线，所有人退回原来的歌词；这份不会再被自动对齐换回来",
+              )
+            }
+          >
+            下线，退回原歌词
+          </Button>
         ) : (
           <Button
+            variant={draft ? "flat" : "solid"}
             color="success"
             isDisabled={busyAny}
             isLoading={busy === "close"}
@@ -411,6 +403,22 @@ const ReportDetail = ({ id, onDone }: { id: string; onDone: () => void }) => {
             {contentOnly && stillInUse ? "已处理，关闭报错" : "已换过版本，关闭报错"}
           </Button>
         )}
+        {draft || canWithdraw ? (
+          <Button
+            color="success"
+            isDisabled={!draft || busyAny}
+            isLoading={busy === "replace"}
+            onPress={() =>
+              act(
+                "replace",
+                () => publishAlignment({ bvid: report.bvid, cid: report.cid, lyricsHash: draft!.lyricsHash }),
+                "已换成重新对齐的结果，所有人打开这首歌都会用它；这首歌的报错已一并关闭",
+              )
+            }
+          >
+            用重跑结果替换
+          </Button>
+        ) : null}
       </div>
     </div>
   );

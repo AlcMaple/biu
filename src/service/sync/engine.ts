@@ -17,8 +17,23 @@ async function readMeta(): Promise<PlaylistSyncMetaData> {
   return (await platform.getStore(StoreNameMap.PlaylistSyncMeta)) ?? {};
 }
 
-async function writeMeta(meta: PlaylistSyncMetaData): Promise<void> {
-  await platform.setStore(StoreNameMap.PlaylistSyncMeta, meta);
+let metaWrites: Promise<void> = Promise.resolve();
+
+// 三个 store 共用一本同步账本。各自拿开头读到的旧副本整本写回，后写的会抹掉先写的
+// （实测：歌单和标签记上了，歌曲那条丢了，于是每次都重走首次同步）。所以排队、写前重读、只改自己那一格。
+function updateUserMeta(
+  mid: string,
+  update: (latest: PlaylistSyncMetaData[string]) => PlaylistSyncMetaData[string],
+): Promise<void> {
+  const operation = metaWrites.then(async () => {
+    const latest = await readMeta();
+    await platform.setStore(StoreNameMap.PlaylistSyncMeta, {
+      ...latest,
+      [mid]: update(latest[mid] ?? { versions: {}, snapshots: {} }),
+    });
+  });
+  metaWrites = operation.catch(() => undefined);
+  return operation;
 }
 
 export interface SyncBinding {
@@ -110,6 +125,25 @@ export class StoreSyncController {
     } finally {
       this.applyingRemote = false;
     }
+  }
+  // 请求在路上时用户可能又改了本机（收藏、加标签）。服务端结果里没有这些改动，直接整份
+  // 写回会把它们抹掉，而补跑那轮再编码时本机已经没有了，改动就永久丢失（真实现象：
+  // 「收藏了又没了」「标签消失」）。所以写回前把 sent→现在 的差异叠回去，并补跑一轮推上去。
+  private applyRemoteKeepingEdits(sent: LiveSnapshot, remote: FlatSnapshot): void {
+    const edits = diffSnapshots(sent, this.binding.encodeNow(), Date.now());
+    if (edits.length === 0) {
+      this.applyRemote(remote);
+      return;
+    }
+    const merged: FlatSnapshot = { ...remote };
+    for (const op of edits) {
+      merged[op.id] =
+        op.type === "upsert"
+          ? { updatedAt: op.updatedAt, payload: op.payload }
+          : { __deleted: true, updatedAt: op.updatedAt };
+    }
+    this.applyRemote(merged);
+    this.pendingRerun = true;
   }
 
   /**
@@ -210,7 +244,7 @@ export class StoreSyncController {
     }
 
     if (!hasSyncedBefore) {
-      return this.migrate(mid, meta, userMeta);
+      return this.migrate(mid, userMeta);
     }
 
     const baseline = (userMeta.snapshots[this.binding.store] ?? {}) as FlatSnapshot;
@@ -262,8 +296,8 @@ export class StoreSyncController {
       envelope = pulled;
     }
 
-    this.applyRemote(envelope.data);
-    await this.persistMeta(mid, meta, userMeta, envelope.version, envelope.data);
+    this.applyRemoteKeepingEdits(localFlat, envelope.data);
+    await this.persistMeta(mid, envelope.version, envelope.data);
     return true;
   }
 
@@ -272,11 +306,7 @@ export class StoreSyncController {
    * 也可能已经有别的设备同步过的数据。两种情况都不能互相覆盖——本地数据要迁移上云，
    * 云端已有数据要合并进本地，谁都不能因为"对面没见过"就被当成删除。
    */
-  private async migrate(
-    mid: string,
-    meta: PlaylistSyncMetaData,
-    userMeta: PlaylistSyncMetaData[string],
-  ): Promise<boolean> {
+  private async migrate(mid: string, userMeta: PlaylistSyncMetaData[string]): Promise<boolean> {
     const remote = await pullSnapshot(this.binding.store);
     if (!remote) return false; // 拉取失败：绝不能在没见过云端数据的情况下就往上推
 
@@ -286,12 +316,14 @@ export class StoreSyncController {
     // 就算下面的合并/写回逻辑有 bug 把本地 store 搞坏了，这份快照也在磁盘上，
     // 能手动从 PlaylistSyncMeta 文件里把数据抄回来。只写一次，不随后续同步更新。
     if (!userMeta.preMigrationBackups?.[this.binding.store]) {
-      const backedUpMeta: PlaylistSyncMetaData[string] = {
-        ...userMeta,
-        preMigrationBackups: { ...userMeta.preMigrationBackups, [this.binding.store]: localFlat },
-      };
-      await writeMeta({ ...meta, [mid]: backedUpMeta });
-      userMeta = backedUpMeta;
+      const store = this.binding.store;
+      await updateUserMeta(mid, latest => ({
+        ...latest,
+        preMigrationBackups: {
+          ...latest.preMigrationBackups,
+          [store]: latest.preMigrationBackups?.[store] ?? localFlat,
+        },
+      }));
     }
 
     await pushLocalBackup(mid, this.binding.store, localFlat);
@@ -305,25 +337,19 @@ export class StoreSyncController {
       finalEnvelope = pushed;
     }
 
-    this.applyRemote(finalEnvelope.data);
-    await this.persistMeta(mid, meta, userMeta, finalEnvelope.version, finalEnvelope.data);
+    this.applyRemoteKeepingEdits(localFlat, finalEnvelope.data);
+    await this.persistMeta(mid, finalEnvelope.version, finalEnvelope.data);
     return true;
   }
 
-  private async persistMeta(
-    mid: string,
-    meta: PlaylistSyncMetaData,
-    userMeta: PlaylistSyncMetaData[string],
-    version: number,
-    snapshot: FlatSnapshot,
-  ): Promise<void> {
+  private async persistMeta(mid: string, version: number, snapshot: FlatSnapshot): Promise<void> {
     this.lastSyncedVersion = version;
-    const nextUserMeta: PlaylistSyncMetaData[string] = {
-      ...userMeta,
+    const store = this.binding.store;
+    await updateUserMeta(mid, latest => ({
+      ...latest,
       epoch: SYNC_META_EPOCH,
-      versions: { ...userMeta.versions, [this.binding.store]: version },
-      snapshots: { ...userMeta.snapshots, [this.binding.store]: snapshot },
-    };
-    await writeMeta({ ...meta, [mid]: nextUserMeta });
+      versions: { ...latest.versions, [store]: version },
+      snapshots: { ...latest.snapshots, [store]: snapshot },
+    }));
   }
 }

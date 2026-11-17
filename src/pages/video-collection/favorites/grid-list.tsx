@@ -19,6 +19,7 @@ interface FavoriteGridListProps {
   isCreatedBySelf: boolean;
   onMenuAction: (key: string, item: FavMedia) => void;
   onItemPress: (item: FavMedia) => void;
+  emptyTitle?: React.ReactNode;
 }
 
 const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
@@ -32,6 +33,7 @@ const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
   isCreatedBySelf,
   onMenuAction,
   onItemPress,
+  emptyTitle,
 }) => {
   const renderGridItem = useCallback(
     (item: FavMedia) => {
@@ -66,6 +68,7 @@ const FavoriteGridList: React.FC<FavoriteGridListProps> = ({
       items={items}
       hasMore={hasMore}
       loading={loading}
+      emptyTitle={emptyTitle}
       itemKey="id"
       renderItem={renderGridItem}
       getScrollElement={getScrollElement}

@@ -61,7 +61,7 @@ const Heartbeat = () => {
     else if (r === "removed") addToast({ title: `已移出「${LIKED_FOLDER_TITLE}」`, color: "default" });
   };
 
-  const title = current ? current.pageTitle || current.title : "私人FM";
+  const title = current ? current.pageTitle || current.title : "相似推荐";
   const cover = current ? current.pageCover || current.cover : "";
   const owner = current?.customArtist || current?.ownerName || "";
   const next = usePlayList(s => s.next);
@@ -88,7 +88,7 @@ const Heartbeat = () => {
 
       <div className="text-primary relative flex items-center gap-1.5 text-xs tracking-widest">
         <RiHeartPulseFill size={14} />
-        私人FM
+        相似推荐
       </div>
 
       <motion.div

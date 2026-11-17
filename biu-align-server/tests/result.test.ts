@@ -77,6 +77,21 @@ describe("looksMismatched", () => {
     // 外语纯文本歌词不判，交给人工审核
     expect(looksMismatched(fq("en", 0.05, 0, null), false)).toBe(false);
   });
+  it("管理员给的时间被忽略后按纯文本判：外语不再因时间吻合度低被拦，中文仍按置信度拦", () => {
+    const ignored = (lang: "ja" | "zh", medianScore: number) => ({
+      quality: {
+        lang,
+        medianScore,
+        repairedLines: 0,
+        lowScoreLines: 0,
+        timelineMatch: 0.2,
+        timesIgnored: true as const,
+      },
+    });
+    expect(looksMismatched(ignored("ja", 0.3), true)).toBe(false);
+    expect(looksMismatched(ignored("zh", 0.15), true)).toBe(true);
+    expect(looksMismatched(ignored("zh", 0.3), true)).toBe(false);
+  });
   it("按 15 首对得上 / 4 组配错的实测边界判定", () => {
     expect(looksMismatched(q(0.277, 2), true)).toBe(false);
     expect(looksMismatched(q(0.215, 4), true)).toBe(true);

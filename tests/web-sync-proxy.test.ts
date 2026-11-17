@@ -45,6 +45,7 @@ describe("Web local-playlist sync BFF", () => {
   let appServer: Server;
   let authCalls = 0;
   let failFirstSync = false;
+  let rejectExchange = false;
   let issuedCookie = "";
   let syncCalls = 0;
   let syncOrigin = "";
@@ -54,6 +55,7 @@ describe("Web local-playlist sync BFF", () => {
   beforeEach(async () => {
     authCalls = 0;
     failFirstSync = false;
+    rejectExchange = false;
     syncCalls = 0;
     upstreamRequests = [];
 
@@ -69,7 +71,17 @@ describe("Web local-playlist sync BFF", () => {
 
         if (request.method === "POST" && request.url === "/api/auth/exchange") {
           authCalls += 1;
+          if (rejectExchange) {
+            response.setHeader("Retry-After", "240");
+            sendJson(response, 503, { error: "B 站暂时拒绝验证登录态", retryAfter: 240 });
+            return;
+          }
           sendJson(response, 200, { mid: "42", token: `server-sync-token-${authCalls}` });
+          return;
+        }
+
+        if (request.method === "GET" && request.url === "/api/share/viponp0YYDY") {
+          sendJson(response, 200, { code: "viponp0YYDY", items: [] });
           return;
         }
 
@@ -142,6 +154,17 @@ describe("Web local-playlist sync BFF", () => {
     });
   });
 
+  it("serves a public share without any login session or credentials upstream", async () => {
+    const ok = await fetch(`${appOrigin}/__biu_sync/share/viponp0YYDY`);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ code: "viponp0YYDY" });
+    expect(authCalls).toBe(0);
+    expect(upstreamRequests[0]).toMatchObject({ authorization: undefined, cookie: undefined });
+
+    expect((await fetch(`${appOrigin}/__biu_sync/share/bad`)).status).toBe(404);
+    expect((await fetch(`${appOrigin}/__biu_sync/share/viponp0YYDY`, { method: "POST" })).status).toBe(405);
+  });
+
   it("uses the server token upstream and ignores browser-supplied authorization", async () => {
     const response = await fetch(`${appOrigin}/__biu_sync/sync/favorites`, {
       headers: { Authorization: "Bearer attacker-token", Cookie: issuedCookie },
@@ -167,6 +190,16 @@ describe("Web local-playlist sync BFF", () => {
     expect(authCalls).toBe(2);
     expect(syncCalls).toBe(2);
     expect(upstreamRequests.at(-1)?.authorization).toBe("Bearer server-sync-token-2");
+  });
+
+  it("passes the sync server's Bilibili cooldown through with its Retry-After", async () => {
+    rejectExchange = true;
+
+    const response = await fetch(`${appOrigin}/__biu_sync/watch?versions=`, { headers: { Cookie: issuedCookie } });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("240");
+    expect(syncCalls).toBe(0);
   });
 
   it("rejects cross-site mutations before contacting the sync service", async () => {

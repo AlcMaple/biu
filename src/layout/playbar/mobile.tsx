@@ -7,6 +7,7 @@ import IconButton from "@/components/icon-button";
 import Image from "@/components/image";
 import MusicPlayMode from "@/components/music-play-mode";
 import OpenPlaylistDrawerButton from "@/components/open-playlist-drawer-button";
+import SleepTimerButton from "@/components/sleep-timer";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
@@ -70,7 +71,7 @@ const MobilePlayBar = () => {
             </span>
           </div>
         </div>
-        {/* 顺序：上一首 / 播放 / 下一首 / 播放顺序 / 播放列表 */}
+        {/* 顺序：上一首 / 播放 / 下一首 / 定时关闭 / 播放顺序 / 播放列表 */}
         <div className="flex flex-none items-center">
           <IconButton radius="md" onPress={prev} isDisabled={isEmptyPlayList || isSingle} aria-label="上一首">
             <RiSkipBackFill size={22} />
@@ -87,6 +88,7 @@ const MobilePlayBar = () => {
           <IconButton radius="md" onPress={next} isDisabled={isEmptyPlayList || isSingle} aria-label="下一首">
             <RiSkipForwardFill size={22} />
           </IconButton>
+          <SleepTimerButton />
           <MusicPlayMode />
           <OpenPlaylistDrawerButton />
         </div>

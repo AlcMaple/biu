@@ -170,7 +170,8 @@ export class AlignQueue {
       const audio = path.join(dir, "audio.m4a");
       await this.deps.downloadAudio(page, audio);
       job.stage = "align";
-      const out = await this.deps.runWorker(audio, job.lines, dir);
+      // 自动对齐的歌词来自五个渠道，时间可信，对不上就说明配错了歌；管理员给的歌词时间可能是估的
+      const out = await this.deps.runWorker(audio, job.lines, dir, { looseTimes: job.origin !== "auto" });
       const alignment = buildAlignment(job, page, job.lines, out);
       if (
         looksMismatched(
