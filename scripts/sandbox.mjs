@@ -2,26 +2,37 @@
 // 一起起四个进程：假 B 站 + 真同步服务 + mock 模式的对齐服务 + BIU_TARGET=sandbox 的 Web dev（内含真 BFF）；任一退出就全部退出。
 // 用法：pnpm sandbox            启动
 //       pnpm sandbox --reset    先清空同步、对齐服务的沙盒数据再启动
+//       pnpm sandbox --help     多套沙箱并行时的端口、数据目录参数
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { rmSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { checkSandboxPorts, parseSandboxOptions, sandboxHelp, sandboxWebOrigin } from "./sandbox-options.mjs";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
-const BILIBILI_PORT = 3010;
-const SYNC_PORT = 3012;
-const ALIGN_PORT = 3013;
-const BILIBILI_ORIGIN = `http://127.0.0.1:${BILIBILI_PORT}`;
-// 放在用户目录而不是系统临时目录：重启电脑后沙盒里造的数据还在，只有 --reset 才清
-const DATA_ROOT = join(homedir(), ".biu-sandbox");
 // 和 shared/sandbox.ts 里「管理员」身份的 mid 一致（这里是纯 JS，读不了那份 TS）。
 // 管理员和线上一样靠服务端 ADMIN_MIDS 认出来，不在页面里短路
 const ADMIN_MID = "900009";
 
-if (process.argv.includes("--reset")) {
+let options;
+try {
+  options = parseSandboxOptions(process.argv.slice(2));
+  if (options.help) {
+    console.log(sandboxHelp);
+    process.exit(0);
+  }
+  await checkSandboxPorts(options);
+} catch (error) {
+  console.error(`[sandbox] ${error.message}`);
+  process.exit(1);
+}
+const { port, bilibiliPort: BILIBILI_PORT, syncPort: SYNC_PORT, alignPort: ALIGN_PORT, dataRoot: DATA_ROOT } = options;
+const BILIBILI_ORIGIN = `http://127.0.0.1:${BILIBILI_PORT}`;
+
+if (options.reset) {
   rmSync(DATA_ROOT, { recursive: true, force: true });
   console.log(`[sandbox] 已清空 ${DATA_ROOT}`);
 }
@@ -30,13 +41,35 @@ if (process.argv.includes("--reset")) {
 const jwtSecret = randomBytes(32).toString("hex");
 
 const children = [];
+let closing = false;
 const shutdown = code => {
-  for (const child of children) if (child.exitCode === null) child.kill();
+  if (closing) return;
+  closing = true;
+  for (const child of children) {
+    if (child.exitCode !== null) continue;
+    // 各子进程独立成组，只结束本次启动的 pnpm/tsx/rsbuild 后代，不按端口杀其他沙箱。
+    if (!isWindows && child.pid) {
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch (error) {
+        if (error.code !== "ESRCH") console.error(`[sandbox] 关闭子进程失败：${error.code}`);
+      }
+    } else child.kill();
+  }
   process.exit(code);
 };
 
 function run(name, command, args, options) {
-  const child = spawn(isWindows ? `${command}.cmd` : command, args, { stdio: "inherit", shell: isWindows, ...options });
+  const child = spawn(isWindows ? `${command}.cmd` : command, args, {
+    stdio: "inherit",
+    shell: isWindows,
+    detached: !isWindows,
+    ...options,
+  });
+  child.on("error", error => {
+    console.error(`[sandbox] ${name} 启动失败：${error.code}`);
+    shutdown(1);
+  });
   child.on("exit", code => {
     console.log(`[sandbox] ${name} 已退出（${code ?? "signal"}），关闭沙盒`);
     shutdown(code ?? 1);
@@ -57,7 +90,7 @@ run("同步服务", "npx", ["tsx", "src/index.ts"], {
   env: { ...baseEnv, PORT: String(SYNC_PORT), JWT_SECRET: jwtSecret, DATA_DIR: join(DATA_ROOT, "sync-data") },
 });
 
-run("对齐服务", "npx", ["tsx", "src/index.ts", "--mock"], {
+run("对齐服务", "corepack", ["pnpm", "exec", "tsx", "src/index.ts", "--mock"], {
   cwd: join(ROOT, "biu-align-server"),
   env: {
     ...baseEnv,
@@ -70,7 +103,7 @@ run("对齐服务", "npx", ["tsx", "src/index.ts", "--mock"], {
   },
 });
 
-run("Web", "corepack", ["pnpm", "exec", "rsbuild", "dev"], {
+run("Web", "corepack", ["pnpm", "exec", "rsbuild", "dev", "--host", "127.0.0.1", "--port", String(port)], {
   cwd: ROOT,
   env: {
     ...baseEnv,
@@ -80,6 +113,9 @@ run("Web", "corepack", ["pnpm", "exec", "rsbuild", "dev"], {
   },
 });
 
-console.log("[sandbox] 打开 http://localhost:5679 ，顶栏中间「沙盒」菜单切换身份、开关故障");
+console.log(`[sandbox] 打开 ${sandboxWebOrigin(port)} ，顶栏中间「沙盒」菜单切换身份、开关故障`);
+console.log(
+  `[sandbox] 假 B 站 ${BILIBILI_ORIGIN}；同步 http://127.0.0.1:${SYNC_PORT}；对齐 http://127.0.0.1:${ALIGN_PORT}；服务数据 ${DATA_ROOT}`,
+);
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));

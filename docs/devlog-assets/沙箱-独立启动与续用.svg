@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="530" viewBox="0 0 1000 530"><style>text{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}.title{font-size:19px;font-weight:700;fill:#282529}.sub{font-size:12.5px;fill:#756f73}.heading{font-size:14px;font-weight:700;fill:#282529}.ct{font-size:12.5px;font-weight:700}.body{font-size:11px}</style><rect x="1" y="1" width="998" height="528" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+<text x="24" y="34" class="title" fill="#282529">沙箱可独立启动和续用（图稿待审）</text>
+<text x="24" y="58" class="sub" fill="#756f73">一条命令选择端口与服务目录；只监听本机，停止一个运行实例不影响另一个。</text>
+<rect x="24" y="86" width="464" height="104" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+<text x="40" y="111" class="ct" fill="#96434f">之前：复制启动脚本才能换一套环境</text>
+<text x="40" y="134" class="body" fill="#96434f">启动入口固定两个端口、同一服务目录。</text>
+<text x="40" y="155" class="body" fill="#96434f">多角色与异常测试依赖临时脚本，容易混用运行状态。</text>
+<rect x="512" y="86" width="464" height="104" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="528" y="111" class="ct" fill="#316247">现在：明确选择端口与目录，再启动</text>
+<text x="528" y="134" class="body" fill="#316247">端口占用或参数不对，先报错，不起后台服务。</text>
+<text x="528" y="155" class="body" fill="#316247">正常退出只结束本次启动的进程组。</text>
+<text x="24" y="222" class="heading" fill="#282529">实测的是两个运行实例，不是两个生产账号</text>
+<rect x="24" y="240" width="464" height="104" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="40" y="265" class="ct" fill="#316247">运行实例 A（普通用户 A）</text>
+<text x="40" y="288" class="body" fill="#316247">本地合成反馈 1 条；重启后同一条仍保留。</text>
+<text x="40" y="309" class="body" fill="#316247">同一浏览器来源的歌曲与 00:12 进度仍在。</text>
+<rect x="512" y="240" width="464" height="104" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="528" y="265" class="ct" fill="#316247">运行实例 B（同为普通用户 A）</text>
+<text x="528" y="288" class="body" fill="#316247">专用服务目录中合成反馈 0 条。</text>
+<text x="528" y="309" class="body" fill="#316247">停止 A 时 B 仍返回 HTTP 200，数据不受影响。</text>
+<rect x="24" y="366" width="464" height="108" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="40" y="391" class="ct" fill="#36566d">完整浏览器来源 ≠ 身份 Cookie</text>
+<text x="40" y="414" class="body" fill="#36566d">本地存储按主机名和端口；Cookie 不按端口隔离。</text>
+<text x="40" y="435" class="body" fill="#36566d">多身份还需不同本机主机名或独立浏览器档案。</text>
+<rect x="512" y="366" width="464" height="108" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+<text x="528" y="391" class="ct" fill="#7a6234">浏览器数据 ≠ 服务目录数据</text>
+<text x="528" y="414" class="body" fill="#7a6234">换目录不清浏览器历史，换来源不分开服务数据。</text>
+<text x="528" y="435" class="body" fill="#7a6234">自定义目录不与重置组合，原有目录继续保留。</text>
+<text x="24" y="507" class="body" fill="#756f73">仅本机合成沙箱验收；真实身份隔离与同步停手仍沿 PR4，未从本图推断通过。</text>
+</svg>
