@@ -2566,10 +2566,11 @@ usePlayList.subscribe(async (state, prevState) => {
       }
 
       const nextPlayItem = state.playId ? state.list.find(item => item.id === state.playId) : undefined;
+      // 网络音频的预取地址属于下一首，不应受上一首是否暂停影响；本地文件保留原暂停门槛。
       // 地址已就绪（本地文件 / 已预取且未过期）：这条路是**纯同步**的，
       // 下面会立刻 setAudioSource + play()。手机锁屏后能否续播就取决于这里不出现异步空档。
       const readyUrl =
-        nextPlayItem && audio.paused
+        nextPlayItem && (nextPlayItem.source !== "local" || audio.paused)
           ? nextPlayItem.source === "local"
             ? nextPlayItem.audioUrl
             : isUrlValid(nextPlayItem.audioUrl)

@@ -1,0 +1,55 @@
+{
+  "kind": "synthetic_loopback_acceptance_not_production_metrics",
+  "scenario": "目标网络地址已经预取完成，上一曲仍在播放，通过可见下一首切歌",
+  "resolver_requests_for_same_target": {
+    "native_before": 2,
+    "native_after": 1,
+    "engineering_before": 2,
+    "engineering_after": 1
+  },
+  "comparison_window": "从预取开始到切歌后暂停；页面刷新重新取址不计入该窗口",
+  "scope_preserved": [
+    "目标项和URL有效性检查",
+    "旧音频暂停/清源顺序",
+    "本地文件原先playing/paused分支",
+    "token发行/会话绑定/权限与取消策略"
+  ],
+  "unresolved": {
+    "prefetch_still_inflight_then_select": {
+      "before": 2,
+      "after": 2,
+      "implemented": false
+    },
+    "shared_flight_or_new_cache_layer": false
+  },
+  "controls": {
+    "completed_prefetch_previous_paused_engineering": 1,
+    "native_paused_control_excluded": "prefetched and selected target did not align",
+    "expired_or_missing_target_address": "normal fresh resolving preserved",
+    "late_prefetch": "does not replace currently selected song",
+    "background_500": "no automatic retry; previous song continues",
+    "local_audio": "original two behavior branches preserved"
+  },
+  "verification": {
+    "new_behavior_tests": 9,
+    "related_tests": 120,
+    "lint_exit_status": 0,
+    "official_build_exit_status": 0,
+    "types_before": 247,
+    "types_after": 247,
+    "type_exit_status": 2,
+    "type_diagnostics_identical": true,
+    "new_master_rate_limit_tests": 16,
+    "new_master_bff_status_tests": 3,
+    "latest_master_compatibility": "新限流与BFF状态透传代码及测试保留，受影响用例已重跑；原生截图来自先前58e2+同一窄条件"
+  },
+  "limits": [
+    "目录、身份与音频为合成；真实网络/音质/设备未验",
+    "截图仅证明同目标起播状态，不用于耗时比较",
+    "不将单个场景2到1扩写成全站请求减半",
+    "部分浏览器网络buffer截断；取址次数使用完整本机上游observer流水",
+    "观察hook已还原，不进入生产源码"
+  ],
+  "native_browser_base": "58e2c48bc61fc68dbf2ad82d860df49f92db2878",
+  "final_shared_base": "d4fe5996bff8b69a3b2d5953e5570fbcd665a48d"
+}
