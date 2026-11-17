@@ -10,6 +10,7 @@ import MusicPlayMode from "@/components/music-play-mode";
 import MusicRate from "@/components/music-rate";
 import MusicVolume from "@/components/music-volume";
 import OpenPlaylistDrawerButton from "@/components/open-playlist-drawer-button";
+import SleepTimerButton from "@/components/sleep-timer";
 import platform, { isElectron } from "@/platform";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -42,6 +43,7 @@ const RightControl = () => {
       {!isTabletLayout && Boolean(playId) && getPlayItem()?.source !== "local" && <MusicDownloadButton />}
       <OpenPlaylistDrawerButton />
       {!isTabletLayout && <MusicVolume />}
+      <SleepTimerButton />
       {!isTabletLayout && <MusicRate />}
       {/* 「词」是歌词总入口：Electron 下点开选「歌词页面」或「桌面歌词」，没有桌面歌词的平台直接进歌词页面 */}
       {isElectron && !isTabletLayout ? (

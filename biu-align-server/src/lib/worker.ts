@@ -13,9 +13,15 @@ import { readJson } from "./json-file.js";
 // src/lib 和 dist/lib 都在包根下两层
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../worker/align.py");
 
-export type RunWorker = (audio: string, lines: LyricLine[], workdir: string) => Promise<WorkerOutput>;
+// looseTimes：歌词的时间不一定可信（管理员手动重跑、上传），对不上时 worker 改按纯文本对齐，而不是判成「歌词对不上」
+export type RunWorker = (
+  audio: string,
+  lines: LyricLine[],
+  workdir: string,
+  opts?: { looseTimes?: boolean },
+) => Promise<WorkerOutput>;
 
-export const runWorker: RunWorker = async (audio, lines, workdir) => {
+export const runWorker: RunWorker = async (audio, lines, workdir, opts) => {
   const lyricsFile = path.join(workdir, "lyrics.json");
   const outFile = path.join(workdir, "out.json");
   await writeFile(
@@ -27,7 +33,7 @@ export const runWorker: RunWorker = async (audio, lines, workdir) => {
     const child = spawn(config.pythonBin, [SCRIPT, audio, lyricsFile, outFile, workdir], {
       stdio: ["ignore", "ignore", "pipe"],
       // 模型权重缓存在部署用户的 ~/.cache/torch，worker 继承同一个 HOME
-      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      env: { ...process.env, PYTHONUNBUFFERED: "1", ...(opts?.looseTimes ? { BIU_ALIGN_LOOSE_TIMES: "1" } : {}) },
     });
     const timer = setTimeout(() => {
       child.kill("SIGKILL");

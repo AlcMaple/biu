@@ -29,6 +29,10 @@ rows = json.load(open(lyrics_path, encoding='utf-8'))
 if not rows: fail('LYRICS_EMPTY', '歌词为空')
 lines, orig_t = [r['text'] for r in rows], [float(r.get('t') or 0) for r in rows]
 LANG = detect(lines)
+# 管理员手动重跑 / 上传的歌词，时间常是 AI 估的或别处抄的。歌词对、时间不对时，两种局部重对齐都会把行往错的原时间上拉，
+# 吻合度判据也会把整份歌词判成「对不上」。所以先看一遍：整首对齐后吻合度不到一半，就当纯文本歌词，时间全部来自音频
+LOOSE_TIMES = os.environ.get('BIU_ALIGN_LOOSE_TIMES') == '1'
+times_ignored, match_before = False, None
 if LANG is None: fail('LYRICS_UNSUPPORTED', '歌词里没有可对齐的中文、日文、韩文或英文')
 
 # 离线评测时用已分离好的人声，跳过 1.5 min 的 Demucs；服务里不设这个变量
@@ -60,9 +64,18 @@ if not vocals:
 if not os.path.exists(vocals): fail('SEPARATION_FAILED', '没有生成人声轨')
 
 
+def drop_bad_times(out):
+    global orig_t, times_ignored, match_before
+    if not LOOSE_TIMES or not any(orig_t): return
+    m = timeline_match(out, orig_t)
+    if m is not None and m < 0.5:
+        orig_t, times_ignored, match_before = [0.0] * len(orig_t), True, m
+
+
 def write_output(out, offset, frame_ms):
     json.dump({'lang': LANG, 'lines': out, 'offset': round(offset, 3), 'frameMs': frame_ms,
-               'timelineMatch': timeline_match(out, orig_t)},
+               'timelineMatch': match_before if times_ignored else timeline_match(out, orig_t),
+               **({'timesIgnored': True} if times_ignored else {})},
               open(out_path, 'w', encoding='utf-8'), ensure_ascii=False)
 
 
@@ -82,6 +95,7 @@ if LANG == 'en':
         out.append({'text': text, 'chars': chars, 't': ts or [last] * len(chars),
                     'score': round(float(np.mean(sc)), 4) if sc else 0.0, 't0': ts[0] if ts else None})
         if out[-1]['t']: last = out[-1]['t'][-1]
+    drop_bad_times(out)
     offset = 0.0
     if any(orig_t):
         offset = float(np.median([o['t0'] - t for o, t in zip(out, orig_t) if o['t0'] is not None]))
@@ -168,6 +182,7 @@ for li, (fr, sc) in res.items():
     out[li]['t'] = fill([None if f is None else round(f * spf, 3) for f in fr])
     out[li]['score'] = round(float(np.mean(sc)), 4) if sc else 0.0
     out[li]['t0'] = out[li]['t'][0] if out[li]['t'] else None
+drop_bad_times(out)
 
 
 def squeezed(ts, chars, ws):

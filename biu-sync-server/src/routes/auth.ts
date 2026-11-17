@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { InvalidCookieError, resolveMidFromCookie, signToken } from "../lib/auth.js";
+import { BilibiliUnavailableError, InvalidCookieError, resolveMidFromCookie, signToken } from "../lib/auth.js";
 
 export function createAuthRouter(): Router {
   const router = Router();
@@ -19,6 +19,11 @@ export function createAuthRouter(): Router {
     } catch (err) {
       if (err instanceof InvalidCookieError) {
         res.status(401).json({ error: err.message });
+        return;
+      }
+      if (err instanceof BilibiliUnavailableError) {
+        res.setHeader("Retry-After", String(err.retryAfterSeconds));
+        res.status(503).json({ error: err.message, retryAfter: err.retryAfterSeconds });
         return;
       }
       console.error("[auth/exchange] failed", err);

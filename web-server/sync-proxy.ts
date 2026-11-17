@@ -14,6 +14,7 @@ const BILIBILI_NAV_URL = "https://api.bilibili.com/x/web-interface/nav";
 const MAX_SYNC_BODY_BYTES = 2 * 1024 * 1024;
 const SYNC_TOKEN_CACHE_MS = 100 * 60 * 1000;
 const SYNC_UPSTREAM_TIMEOUT_MS = 70_000;
+const SHARE_CODE_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const SYNC_STORES = new Set(["favorites", "fav-items", "tags"]);
 
 interface CachedSyncToken {
@@ -39,6 +40,7 @@ export class SyncProxyError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly retryAfter?: string,
   ) {
     super(message);
   }
@@ -157,6 +159,14 @@ export class SyncTokenCache {
       await upstream.body?.cancel();
       throw new SyncProxyError("B 站登录态已失效，请重新登录", 401);
     }
+    if (upstream.status === 503 || upstream.status === 429) {
+      await upstream.body?.cancel();
+      throw new SyncProxyError(
+        "B 站暂时拒绝验证登录态，请稍后再试",
+        503,
+        upstream.headers.get("retry-after") ?? undefined,
+      );
+    }
     if (!upstream.ok) {
       await upstream.body?.cancel();
       throw new SyncProxyError("本地歌单同步服务暂不可用", 502);
@@ -214,6 +224,12 @@ function allowedSyncRoute(url: URL) {
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/play-ranking`) return { kind: "ranking" as const };
   if (url.pathname === `${BIU_SYNC_PROXY_ROOT}/share`) return { kind: "share" as const };
 
+  const sharePrefix = `${BIU_SYNC_PROXY_ROOT}/share/`;
+  if (url.pathname.startsWith(sharePrefix)) {
+    const code = url.pathname.slice(sharePrefix.length);
+    return SHARE_CODE_PATTERN.test(code) ? { kind: "share-read" as const, code } : undefined;
+  }
+
   const prefix = `${BIU_SYNC_PROXY_ROOT}/sync/`;
   if (!url.pathname.startsWith(prefix)) return undefined;
   const store = url.pathname.slice(prefix.length);
@@ -239,7 +255,9 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
 
     const method = request.method ?? "GET";
-    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind) ? new Set(["GET", "POST"]) : new Set(["GET"]);
+    const allowedMethods = ["sync", "ranking", "share"].includes(route.kind)
+      ? new Set(["GET", "POST"])
+      : new Set(["GET"]);
     if (!allowedMethods.has(method)) {
       response.setHeader("Allow", [...allowedMethods].join(", "));
       jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
@@ -255,6 +273,28 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     }
     if (route.kind === "watch" && [...url.searchParams.keys()].some(name => name !== "versions")) {
       jsonResponse(response, 400, { code: -400, message: "同步请求参数不合法" });
+      return true;
+    }
+
+    // 分享链接的收听者不一定登录，读取歌单不需要会话，也不带任何凭证上去
+    if (route.kind === "share-read") {
+      if (method !== "GET") {
+        response.setHeader("Allow", "GET");
+        jsonResponse(response, 405, { code: -405, message: "请求方法不被允许" });
+        return true;
+      }
+      try {
+        const upstream = await requestSyncService(pathFor(origin, `/api/share/${route.code}`), {
+          headers: { Accept: "application/json", "User-Agent": "Biu-Web-Sync-BFF/1.0" },
+          method,
+          signal: AbortSignal.timeout(15_000),
+        });
+        await relaySyncResponse(request, response, upstream, AbortSignal.timeout(15_000));
+      } catch (error) {
+        if (response.writableEnded || response.destroyed) return true;
+        const status = error instanceof SyncProxyError ? error.status : 502;
+        jsonResponse(response, status, { error: "分享服务暂时连不上" });
+      }
       return true;
     }
 
@@ -314,6 +354,7 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
     } catch (error) {
       if (response.writableEnded || response.destroyed || controller.signal.aborted) return true;
       if (error instanceof SyncProxyError) {
+        if (error.retryAfter) response.setHeader("Retry-After", error.retryAfter);
         jsonResponse(response, error.status, { code: -error.status, message: error.message });
         return true;
       }

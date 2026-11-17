@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>定时关闭原型</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#000;--content:#18181b;--content2:#27272a;--content3:#3f3f46;--fg:#ecedee;--fg5:#a1a1aa;--primary:#1ed760}
+body{margin:0;min-height:100vh;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#111113}
+button{font-family:inherit}
+.ctl{position:fixed;left:16px;top:16px;z-index:50;display:flex;flex-direction:column;gap:8px;background:rgb(40 40 44/.92);padding:12px;border-radius:12px;font-size:12px;width:260px}
+.ctl b{font-size:12px;margin-top:4px}
+.ctl .row{display:flex;gap:6px;flex-wrap:wrap}
+.ctl button{background:#3a3a3e;color:#ddd;border:0;border-radius:99px;padding:5px 10px;cursor:pointer;font-size:12px}
+.ctl button.on{background:var(--primary);color:#000}
+.ctl .st{color:#aaa;line-height:1.5}
+
+/* 视口框：桌面 / 手机 */
+.stage{display:flex;justify-content:center;align-items:flex-start;padding:40px 20px 40px 300px}
+.vp{position:relative;background:var(--bg);overflow:hidden;border-radius:12px;border:1px solid #2a2a2e;display:flex;flex-direction:column}
+.vp.desk{width:1100px;height:680px}
+.vp.mob{width:375px;height:760px}
+.page{flex:1;padding:24px;color:var(--fg5);font-size:14px}
+.page .ph{height:120px;border-radius:12px;background:var(--content);margin-bottom:12px}
+
+/* 桌面播放栏（对齐 layout/playbar：88px、三列） */
+.bar{height:88px;background:var(--content);box-shadow:0 -1px 3px rgb(0 0 0/.4);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr) minmax(0,1fr);padding:0 16px;align-items:center}
+.left{display:flex;align-items:center;gap:10px;min-width:0}
+.cov{width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#7c6a58,#3a3634);flex:none}
+.meta{min-width:0}.meta .t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta .a{font-size:12px;color:var(--fg5)}
+.center{display:flex;flex-direction:column;align-items:center;gap:6px}
+.btns{display:flex;align-items:center;gap:14px}
+.prog{display:flex;align-items:center;gap:8px;width:80%;font-size:12px;color:var(--fg5)}
+.track{flex:1;height:4px;background:var(--content3);border-radius:2px;position:relative}
+.track i{position:absolute;left:0;top:0;bottom:0;background:var(--primary);border-radius:2px}
+.right{display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.ib{height:32px;min-width:32px;padding:0 6px;border:0;border-radius:8px;background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:16px}
+.ib:hover{background:rgb(255 255 255/.06)}
+.ib svg{width:20px;height:20px;fill:currentColor}
+.ib.active{color:var(--primary)}
+.ib .cd{font-size:12px;font-variant-numeric:tabular-nums;min-width:38px;text-align:left}
+.play svg{width:40px;height:40px}
+
+/* 桌面 Popover */
+.pop{position:absolute;z-index:20;width:340px;padding:12px;border-radius:14px;background:var(--content);box-shadow:0 10px 30px rgb(0 0 0/.6);display:none}
+.pop.open{display:block}
+
+/* 面板（桌面 Popover 与手机抽屉共用同一内容） */
+.ph-title{font-size:14px;color:var(--fg5);padding:2px 4px 10px}
+.card{background:var(--content2);border-radius:12px}
+.card .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px}
+.card .hd .ttl{font-size:15px;font-weight:600}
+.card .hd .ttl small{display:block;font-size:12px;font-weight:400;color:var(--primary);margin-top:2px;font-variant-numeric:tabular-nums;min-height:16px}
+.sw{width:44px;height:26px;border-radius:99px;background:var(--content3);position:relative;cursor:pointer;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}
+.sw.on{background:var(--primary)}.sw.on::after{transform:translateX(18px)}
+.chips{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:2px 14px 14px}
+.chip{aspect-ratio:1;border-radius:50%;border:0;background:var(--content3);color:var(--fg);font-size:15px;cursor:pointer;font-variant-numeric:tabular-nums}
+.chip.sel{background:var(--primary);color:#000}
+.custom{border-top:1px solid var(--content3);padding:10px 14px;display:flex;align-items:center;justify-content:center;min-height:46px;font-size:14px;color:var(--fg5);cursor:pointer;gap:8px}
+.custom.sel{color:var(--primary)}
+.custom.editing{justify-content:space-between;gap:10px}
+.field{flex:1;display:flex;align-items:center;height:34px;padding:0 14px;border-radius:99px;background:var(--content3);box-shadow:inset 0 0 0 1px transparent;transition:box-shadow .15s}
+.field:focus-within{box-shadow:inset 0 0 0 1px var(--primary)}
+.field input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font-size:15px;font-variant-numeric:tabular-nums;outline:none;padding:0;-moz-appearance:textfield;appearance:textfield}
+.field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.field input::placeholder{color:var(--fg5)}
+.field span{font-size:13px;color:var(--fg5);flex:none}
+.custom .ok{height:34px;padding:0 16px;border-radius:99px;border:0;background:var(--primary);color:#000;cursor:pointer;font-size:13px;font-weight:600;flex:none}
+.custom .ok:disabled{background:var(--content3);color:var(--fg5);cursor:default}
+.custom .cancel{height:34px;padding:0 4px;border:0;background:transparent;color:var(--fg5);cursor:pointer;font-size:13px;flex:none}
+.wait{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 4px 4px;font-size:13px;color:var(--fg);cursor:pointer;user-select:none}
+.ck{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--fg5);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ck.on{background:var(--primary);border-color:var(--primary)}
+.ck.on::after{content:"";width:5px;height:9px;border:solid #000;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+
+/* 手机播放栏（对齐 layout/playbar/mobile.tsx） */
+.mbar{height:88px;background:var(--content);box-shadow:0 -1px 3px rgb(0 0 0/.4);padding:4px 8px 0;display:flex;flex-direction:column;gap:4px}
+.mbar .track{flex:none;height:2px;margin:0 4px}
+.mrow{display:flex;align-items:center;gap:8px;flex:1;min-height:0}
+.mrow .cov{width:44px;height:44px}
+.mrow .ib{min-width:34px;padding:0 4px}
+.mask{position:absolute;inset:0;background:rgb(0 0 0/.5);z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+.mask.open{opacity:1;pointer-events:auto}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:31;background:var(--content);border-radius:16px 16px 0 0;padding:14px 16px 28px;transform:translateY(100%);transition:transform .25s ease-out}
+.drawer.open{transform:none}
+.drawer .chips{gap:6px;padding:2px 12px 14px}
+.toast{position:absolute;left:50%;bottom:110px;transform:translate(-50%,8px);opacity:0;transition:all .3s;background:rgb(39 39 42/.96);border:1px solid rgb(255 255 255/.1);padding:9px 14px;border-radius:12px;font-size:13px;z-index:40;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style></head><body>
+
+<div class="ctl">
+ <b>视口</b>
+ <div class="row"><button id="vDesk" class="on">桌面 / 平板</button><button id="vMob">手机</button></div>
+ <b>模拟时间</b>
+ <div class="row"><button id="ff1">快进 1 分钟</button><button id="ffEnd">直接到时间</button><button id="songEnd">本首播完</button></div>
+ <div class="row"><button id="speed">倒计时 ×60</button></div>
+ <div class="st" id="st"></div>
+</div>
+
+<div class="stage"><div class="vp desk" id="vp">
+ <div class="page"><div class="ph"></div><div class="ph"></div><div class="ph" style="height:80px"></div></div>
+ <div id="barHost"></div>
+ <div class="pop" id="pop"></div>
+ <div class="mask" id="mask"></div>
+ <div class="drawer" id="drawer"></div>
+ <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+const IC={
+ timer:'<svg viewBox="0 0 24 24"><path d="M17.618 5.968l1.453-1.453 1.414 1.414-1.453 1.453A9 9 0 1 1 12 4a8.962 8.962 0 0 1 5.618 1.968zM12 20a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM11 8h2v6h-2V8zM8 1h8v2H8V1z"/></svg>',
+ play:'<svg viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM10.622 8.415a.4.4 0 0 0-.622.332v6.506a.4.4 0 0 0 .622.332l4.879-3.252a.4.4 0 0 0 0-.666l-4.88-3.252z"/></svg>',
+ pause:'<svg viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM9 9v6h2V9H9zm4 0v6h2V9h-2z"/></svg>',
+ prev:'<svg viewBox="0 0 24 24"><path d="M8 11.333l10.223-6.815a.5.5 0 0 1 .777.416v14.132a.5.5 0 0 1-.777.416L8 12.667V19a1 1 0 0 1-2 0V5a1 1 0 1 1 2 0v6.333z"/></svg>',
+ next:'<svg viewBox="0 0 24 24"><path d="M16 12.667L5.777 19.482A.5.5 0 0 1 5 19.066V4.934a.5.5 0 0 1 .777-.416L16 11.333V5a1 1 0 0 1 2 0v14a1 1 0 0 1-2 0v-6.333z"/></svg>',
+ order:'<svg viewBox="0 0 24 24"><path d="M8 20v1.932a.5.5 0 0 1-.82.385l-4.12-3.433A.5.5 0 0 1 3.382 18H18a2 2 0 0 0 2-2V8h2v8a4 4 0 0 1-4 4H8zm8-16V2.068a.5.5 0 0 1 .82-.385l4.12 3.433a.5.5 0 0 1-.321.884H6a2 2 0 0 0-2 2v8H2V8a4 4 0 0 1 4-4h10z"/></svg>',
+ list:'<svg viewBox="0 0 24 24"><path d="M22 18v2H2v-2h20zM2 3.5l8 5-8 5v-10zM22 11v2H12v-2h10zm0-7v2H12V4h10z"/></svg>',
+ vol:'<svg viewBox="0 0 24 24"><path d="M10 7.22L6.603 10H3v4h3.603L10 16.78V7.22zM5.889 16H2a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h3.889l5.294-4.332a.5.5 0 0 1 .817.387v15.89a.5.5 0 0 1-.817.387L5.89 16zm13.517 4.134l-1.416-1.416A8.978 8.978 0 0 0 21 12a8.982 8.982 0 0 0-3.304-6.968l1.42-1.42A10.976 10.976 0 0 1 23 12c0 3.223-1.386 6.122-3.594 8.134z"/></svg>',
+};
+const PRESETS=[10,20,30,45,60,90];
+const SONG=245;
+const S={mobile:false,endAt:null,minutes:null,custom:false,editing:false,waitEnd:true,pending:false,playing:true,pos:92,speed:1,open:false,now:0};
+
+const fmt=s=>{s=Math.max(0,Math.ceil(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+const remain=()=>S.endAt==null?0:(S.endAt-S.now)/1000;
+const active=()=>S.endAt!=null||S.pending;
+
+function timerBtn(){
+ const cls='ib'+(active()?' active':'');
+ let cd='';
+ if(!S.mobile&&active()) cd=`<span class="cd">${S.pending?'本首后':fmt(remain())}</span>`;
+ return `<button class="${cls}" id="tbtn" aria-label="定时关闭">${IC.timer}${cd}</button>`;
+}
+function bar(){
+ const pct=(S.pos/SONG*100).toFixed(2)+'%';
+ if(S.mobile) return `<div class="mbar"><div class="track"><i style="width:${pct}"></i></div><div class="mrow">
+  <div class="cov"></div><div class="meta" style="flex:1"><div class="t">那些你很冒险的梦</div><div class="a">林俊杰</div></div>
+  <div style="display:flex;align-items:center">
+   <button class="ib">${IC.prev}</button><button class="ib play" id="pp" style="font-size:0">${S.playing?IC.pause:IC.play}</button><button class="ib">${IC.next}</button>
+   ${timerBtn()}<button class="ib">${IC.order}</button><button class="ib">${IC.list}</button></div></div></div>`;
+ return `<div class="bar">
+  <div class="left"><div class="cov"></div><div class="meta"><div class="t">那些你很冒险的梦</div><div class="a">林俊杰</div></div></div>
+  <div class="center"><div class="btns"><button class="ib">${IC.prev}</button><button class="ib play" id="pp">${S.playing?IC.pause:IC.play}</button><button class="ib">${IC.next}</button></div>
+   <div class="prog"><span>${fmt(S.pos)}</span><span class="track"><i style="width:${pct}"></i></span><span>${fmt(SONG)}</span></div></div>
+  <div class="right"><button class="ib">${IC.order}</button><button class="ib">${IC.list}</button><button class="ib">${IC.vol}</button>${timerBtn()}<button class="ib">1x</button><button class="ib">词</button></div>
+ </div>`;
+}
+function panel(){
+ const on=active();
+ let sub='';
+ if(S.pending) sub='播完这首后暂停';
+ else if(S.endAt!=null) sub=fmt(remain())+' 后暂停';
+ const chips=PRESETS.map(m=>`<button class="chip${on&&!S.custom&&S.minutes===m?' sel':''}" data-m="${m}">${m}</button>`).join('');
+ let custom;
+ if(S.editing) custom=`<div class="custom editing" style="cursor:default"><label class="field"><input id="cin" type="number" min="1" max="999" inputmode="numeric" placeholder="1–999" value="${S.custom&&S.minutes?S.minutes:''}"><span>分钟</span></label><button class="cancel" id="ccl">取消</button><button class="ok" id="cok">确定</button></div>`;
+ else if(on&&S.custom) custom=`<div class="custom sel" id="cedit">自定义 · ${S.minutes} 分钟</div>`;
+ else custom=`<div class="custom" id="cedit">自定义</div>`;
+ return `<div class="ph-title">定时关闭</div>
+  <div class="card"><div class="hd"><div class="ttl">选择时间<small>${sub}</small></div><div class="sw${on?' on':''}" id="sw"></div></div>
+  <div class="chips">${chips}</div>${custom}</div>
+  <div class="wait" id="wt"><span class="ck${S.waitEnd?' on':''}"></span>播完整首歌再停止播放</div>`;
+}
+function render(){
+ const vp=document.getElementById('vp');
+ vp.className='vp '+(S.mobile?'mob':'desk');
+ document.getElementById('barHost').innerHTML=bar();
+ const pop=document.getElementById('pop'),dr=document.getElementById('drawer'),mask=document.getElementById('mask');
+ const full=panel();
+ const sub=(full.match(/<small>(.*?)<\/small>/)||[])[1]||'';
+ const html=full.replace(/<small>.*?<\/small>/,'<small></small>');
+ const host=S.mobile?dr:pop,other=S.mobile?pop:dr;
+ if(other.innerHTML){other.innerHTML='';other.dataset.k=''}
+ const rebuilt=host.dataset.k!==html;
+ if(rebuilt){host.innerHTML=html;host.dataset.k=html}
+ host.querySelector('.ttl small').textContent=sub;
+ if(S.mobile){pop.className='pop';dr.className='drawer'+(S.open?' open':'');mask.className='mask'+(S.open?' open':'')}
+ else{dr.className='drawer';mask.className='mask';pop.className='pop'+(S.open?' open':'');
+  const b=document.getElementById('tbtn').getBoundingClientRect(),v=vp.getBoundingClientRect();
+  pop.style.left=Math.min(b.left-v.left+b.width/2-170,v.width-352)+'px';pop.style.bottom=(v.bottom-b.top+8)+'px'}
+ const ok=document.getElementById('cok');if(ok&&rebuilt){const i=document.getElementById('cin');const f=()=>{const n=+i.value;ok.disabled=!(Number.isInteger(n)&&n>=1&&n<=999)};f();i.oninput=f}
+ document.getElementById('st').textContent=`状态：${S.playing?'播放中':'已暂停'} · ${S.pending?'等本首播完':S.endAt!=null?'剩 '+fmt(remain()):'未定时'}`;
+}
+function start(m,custom){S.minutes=m;S.custom=custom;S.editing=false;S.pending=false;S.endAt=S.now+m*60000;render()}
+function cancel(){S.endAt=null;S.pending=false;S.minutes=null;S.custom=false;S.editing=false;render()}
+let tt;function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2500)}
+function stop(){S.playing=false;S.endAt=null;S.pending=false;S.minutes=null;S.custom=false;render();toast('定时关闭已暂停播放')}
+function check(){
+ if(S.endAt!=null&&S.now>=S.endAt){
+  if(S.waitEnd&&S.playing){S.endAt=null;S.pending=true}
+  else stop();
+ }
+}
+function songEnded(){
+ if(S.pending){S.pos=SONG;stop();return}
+ S.pos=0;toast('下一首');
+}
+
+document.addEventListener('click',e=>{
+ const t=e.target.closest('[id],[data-m]');
+ const inPanel=e.target.closest('#pop,#drawer');
+ if(!t){if(!inPanel&&!e.target.closest('.ctl')&&S.open){S.open=false;S.editing=false;render()}return}
+ if(t.dataset.m){start(+t.dataset.m,false);return}
+ switch(t.id){
+  case 'tbtn':S.open=!S.open;S.editing=false;render();break;
+  case 'mask':S.open=false;S.editing=false;render();break;
+  case 'pp':S.playing=!S.playing;render();break;
+  case 'sw':if(active())cancel();else start(S.minutes||30,S.custom);break;
+  case 'cedit':S.editing=true;render();document.getElementById('cin').focus();break;
+  case 'cok':{const n=+document.getElementById('cin').value;if(n>=1&&n<=999)start(n,true);break}
+  case 'ccl':S.editing=false;render();break;
+  case 'wt':S.waitEnd=!S.waitEnd;if(!S.waitEnd&&S.pending)stop();else render();break;
+  case 'vDesk':S.mobile=false;S.open=false;document.getElementById('vDesk').className='on';document.getElementById('vMob').className='';render();break;
+  case 'vMob':S.mobile=true;S.open=false;document.getElementById('vMob').className='on';document.getElementById('vDesk').className='';render();break;
+  case 'ff1':S.now+=60000;check();render();break;
+  case 'ffEnd':if(S.endAt!=null){S.now=S.endAt;check();render()}break;
+  case 'songEnd':songEnded();render();break;
+  case 'speed':S.speed=S.speed===1?60:1;t.className=S.speed>1?'on':'';break;
+ }
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.activeElement?.id==='cin')document.getElementById('cok').click();if(e.key==='Escape'&&S.open){S.open=false;S.editing=false;render()}});
+let last=performance.now();
+setInterval(()=>{const n=performance.now(),d=(n-last)*S.speed;last=n;S.now+=d;
+ if(S.playing){S.pos+=d/1000;if(S.pos>=SONG){songEnded()}}
+ check();render()},250);
+render();
+</script>
+</body></html>

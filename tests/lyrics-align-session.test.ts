@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   realignByHash: vi.fn(),
   isLogin: true,
   isAdmin: false,
+  adminListeners: [] as Array<(s: { isAdmin: boolean }, p: { isAdmin: boolean }) => void>,
 }));
 
 vi.mock("@heroui/react", () => ({ addToast: vi.fn() }));
@@ -36,7 +37,10 @@ vi.mock("@/service/lyrics-align", () => ({
 }));
 
 vi.mock("@/store/align-review", () => ({
-  useAlignReview: { getState: () => ({ isAdmin: h.isAdmin, refresh: vi.fn() }) },
+  useAlignReview: {
+    getState: () => ({ isAdmin: h.isAdmin, refresh: vi.fn() }),
+    subscribe: (fn: (s: { isAdmin: boolean }, p: { isAdmin: boolean }) => void) => h.adminListeners.push(fn),
+  },
 }));
 
 vi.mock("@/store/user", () => ({
@@ -224,6 +228,28 @@ describe("admin re-align drafts", () => {
 
     await useLyricsAlignSession.getState().publish();
     expect(h.publishAlignment).toHaveBeenCalledWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyricsHash: "h1" });
+  });
+
+  it("restores the trial once the admin identity arrives after the song loaded", async () => {
+    h.isAdmin = false;
+    await useLyricsAlignSession.getState().restoreDraft();
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
+
+    h.isAdmin = true;
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    h.adminListeners.forEach(fn => fn({ isAdmin: true }, { isAdmin: false }));
+    await settle(10);
+    expect(useLyricsAlignSession.getState().phase).toMatchObject({ kind: "preview", restored: true });
+  });
+
+  it("adoptAndPublish adopts here and publishes in one step", async () => {
+    h.isAdmin = true;
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    h.publishAlignment.mockResolvedValue({ ok: true });
+    await useLyricsAlignSession.getState().restoreDraft();
+    await useLyricsAlignSession.getState().adoptAndPublish();
+    expect(h.publishAlignment).toHaveBeenCalledWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyricsHash: "h1" });
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
   });
 
   it("goes straight back to 'ready to publish' when the draft was already adopted here", async () => {

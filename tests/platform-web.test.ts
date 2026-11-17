@@ -40,15 +40,19 @@ describe("Web platform adapter", () => {
   });
 
   it("persists platform stores in browser storage", async () => {
-    const favorites = { "-1": [{ id: 1, title: "Biu" }] };
+    const settings = { appSettings: { fontFamily: "Biu" } } as never;
 
-    await webPlatform.setStore(StoreNameMap.LocalFavorites, favorites);
+    await webPlatform.setStore(StoreNameMap.AppSettings, settings);
 
-    await expect(webPlatform.getStore(StoreNameMap.LocalFavorites)).resolves.toEqual(favorites);
-    expect(localStorage.getItem("biu:local-favorites")).toBe(JSON.stringify(favorites));
+    await expect(webPlatform.getStore(StoreNameMap.AppSettings)).resolves.toEqual(settings);
+    expect(localStorage.getItem("biu:app-settings")).toBe(JSON.stringify(settings));
+  });
 
-    await webPlatform.clearStore(StoreNameMap.LocalFavorites);
+  it("未登录时本地歌单读出为空、写入丢弃，不落进共用存储", async () => {
+    await webPlatform.setStore(StoreNameMap.LocalFavorites, { createdFavorites: [] } as never);
+
     await expect(webPlatform.getStore(StoreNameMap.LocalFavorites)).resolves.toBeUndefined();
+    expect(localStorage.getItem("biu:local-favorites")).toBeNull();
   });
 
   it("opens only HTTP links with opener isolation", async () => {

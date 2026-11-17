@@ -26,6 +26,7 @@ import { useLocalFavItemsStore } from "./local-fav-items";
 import { usePlayProgress } from "./play-progress";
 import { recordPlayCount } from "./play-ranking";
 import { createPlayRankingTracker } from "./play-ranking-tracker";
+import { bindSleepTimer, consumeSleepTimerOnEnded } from "./sleep-timer";
 
 export type PlayDataType = "mv" | "audio";
 
@@ -913,6 +914,7 @@ export const usePlayList = create<State & Action>()(
             audio.muted = get().isMuted;
             audio.playbackRate = get().rate;
             audio.loop = get().playMode === PlayMode.Single;
+            bindSleepTimer({ audio, isSingleLoop: () => get().playMode === PlayMode.Single });
 
             // 连续播放失败计数：自动跳过坏曲时，避免整个列表都失效时无限循环 next()
             let consecutiveErrorCount = 0;
@@ -1124,6 +1126,14 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onended = () => {
+              if (consumeSleepTimerOnEnded()) {
+                const playItem = get().getPlayItem?.();
+                if (shouldReportPlayRecord(playItem)) {
+                  void reportHeartbeat(playItem, audio.duration, audio.duration, 4);
+                  endPlayReport();
+                }
+                return;
+              }
               if (get().playMode === PlayMode.Single) {
                 return;
               }

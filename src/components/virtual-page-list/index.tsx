@@ -35,6 +35,7 @@ export interface VirtualListProps<T> {
   scrollToIndexRef?: MutableRefObject<((index: number) => void) | null>;
   /** 需要短暂高亮的行 */
   highlightIndex?: number | null;
+  emptyTitle?: ReactNode;
 }
 
 export default function VirtualList<T>({
@@ -48,6 +49,7 @@ export default function VirtualList<T>({
   loading,
   scrollToIndexRef,
   highlightIndex,
+  emptyTitle,
 }: VirtualListProps<T>) {
   const scrollEl = useScrollElement(getScrollElement);
   const getResolvedScrollElement = useCallback(() => scrollEl, [scrollEl]);
@@ -175,7 +177,7 @@ export default function VirtualList<T>({
   }, [loading, checkFill]);
 
   if (items.length === 0 && !hasMore && !loading) {
-    return <Empty />;
+    return <Empty title={emptyTitle} />;
   }
 
   return (

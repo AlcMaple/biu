@@ -38,6 +38,8 @@ interface LyricsAlignment {
     lowScoreLines: number;
     repairedLines: number;
     timelineMatch?: number | null;
+    // 原歌词的时间和音频对不上，已忽略、按纯文本对齐（只出现在管理员手动重跑 / 上传）
+    timesIgnored?: true;
   };
   offsetSec: number;
   lrc: string;

@@ -12,9 +12,9 @@ import { SANDBOX_VEIL_BOOT } from "./shared/sandbox";
 import { UMAMI_HOST, UMAMI_WEBSITE_ID } from "./shared/umami";
 
 const isSandboxTarget = process.env.BIU_TARGET === "sandbox";
-// 沙盒复用离线 Demo 的 B 站假数据，所以 Demo 的判断都对它成立；它只用于本机 dev，见 scripts/sandbox.mjs
-const isDemoTarget = process.env.BIU_TARGET === "demo" || isSandboxTarget;
-const isWebTarget = process.env.BIU_TARGET === "web" || isDemoTarget;
+const isDemoTarget = process.env.BIU_TARGET === "demo";
+// 沙盒就是真实 Web 构建 + 真实 BFF，只是 BFF 的上游被 scripts/sandbox.mjs 指到本机假 B 站
+const isWebTarget = process.env.BIU_TARGET === "web" || isDemoTarget || isSandboxTarget;
 
 function resolveSentryRelease() {
   const explicit = process.env.VITE_SENTRY_RELEASE?.trim() || process.env.SENTRY_RELEASE?.trim();
@@ -175,13 +175,8 @@ export default defineConfig(({ command }) => {
         ? {
             setupMiddlewares: ({ unshift }) => {
               unshift(createBilibiliWebMiddleware());
-            },
-          }
-        : {}),
-      ...(isSandboxTarget
-        ? {
-            setupMiddlewares: ({ unshift }) => {
-              unshift(createSandboxMiddleware());
+              // unshift 插到最前：沙盒控制面要排在 BFF 前面
+              if (isSandboxTarget) unshift(createSandboxMiddleware());
             },
           }
         : {}),

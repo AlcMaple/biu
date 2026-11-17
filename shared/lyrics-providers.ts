@@ -1,5 +1,5 @@
-// QQ / 酷狗 / AMLL 取词：只在持有网络能力的一侧运行（Electron 主进程、Web BFF、手机 App 的原生 HTTP），
-// 浏览器页面只拿规范化结果。不用 Node 专有 API，手机 WebView 里也能跑。
+// QQ / 酷狗 / AMLL 取词：只在持有网络能力的一侧运行（Electron 主进程、Web BFF），
+// 浏览器页面只拿规范化结果。不用 Node 专有 API，两侧共用同一份代码。
 // 请求形态对照 docs/lyrics/多源歌词渠道-实测报告.md 里跑通的链路；上游 SDK 不引入，免得带进它们内置的自动重试。
 // 429 / 5xx / 非零业务码都原样报给调用方，这里不重试、不探测恢复。
 
@@ -389,7 +389,7 @@ async function searchKugou(transport: ProviderTransport, params: ProviderLyricsS
   });
 }
 
-// DecompressionStream 在 Node 18+、Electron、Android WebView 与 iOS 16.4+ 都有，解压时边读边数字节，超过上限就停
+// DecompressionStream 在 Node 18+ 与 Electron 都有，解压时边读边数字节，超过上限就停
 async function inflateLimited(payload: Uint8Array<ArrayBuffer>, limit: number) {
   const stream = new Blob([payload]).stream().pipeThrough(new DecompressionStream("deflate"));
   const reader = stream.getReader();

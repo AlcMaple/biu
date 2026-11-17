@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="847" viewBox="0 0 1240 847" role="img">
+<title>本地沙盒接真实链路（1/2）：谁是真的，登录和同步怎么走</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8f8792" /></marker></defs>
+<rect x="1" y="1" width="1238" height="845" rx="14" fill="#fbfafb" stroke="#e2dcdf" />
+<text x="34.0" y="42.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="19" font-weight="700" fill="#282529">本地沙盒接真实链路（1/2）：谁是真的，登录和同步怎么走</text>
+<text x="34.0" y="66.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" fill="#756f73">结论：沙盒里只有「B 站服务器」是假的，页面、网页服务端、同步服务跑的都是线上那套代码。沙盒里测通的登录、分账号、同步、管理员判断，换成真账号同样成立。</text>
+<rect x="24" y="97" width="1192" height="253" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="126.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">① 谁是真的，谁是假的</text>
+<rect x="44.0" y="141" width="270.0" height="97" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="58.0" y="165.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">页面：真的</text>
+<text x="58.0" y="186.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">登录、收藏、切账号、播放，和线上网页版</text>
+<text x="58.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">是同一份代码，里面没有任何「沙盒专用」</text>
+<text x="58.0" y="220.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">的假数据</text>
+<line x1="318.0" y1="189.5" x2="334.0" y2="189.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="141" width="270.0" height="97" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="352.0" y="165.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">网页服务端：真的</text>
+<text x="352.0" y="186.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">登录凭据怎么存、哪些地址允许访问、音频</text>
+<text x="352.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">怎么转发、出错怎么回，全是线上逻辑</text>
+<line x1="612.0" y1="189.5" x2="628.0" y2="189.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="141" width="270.0" height="97" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="646.0" y="165.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">同步服务：真的</text>
+<text x="646.0" y="186.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">向 B 站核实「你是谁」之后才按账号存</text>
+<text x="646.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">取，和线上同一条路</text>
+<line x1="906.0" y1="189.5" x2="922.0" y2="189.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="141" width="270.0" height="97" rx="9" fill="#fdeef0" stroke="#d99aa5" />
+<text x="940.0" y="165.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#96434f">B 站服务器：假的</text>
+<text x="940.0" y="186.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f">本机模拟的一台「假 B 站」。服务端发往</text>
+<text x="940.0" y="203.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#96434f"> B 站的请求在发出时被改投过来</text>
+<rect x="44.0" y="250" width="374.7" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="58.0" y="274.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">歌词对齐服务：一半真</text>
+<text x="58.0" y="295.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">登录校验、管理员名单、限流是真的；对齐结果是模拟出来</text>
+<text x="58.0" y="312.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">的，不跑真实的识别</text>
+<rect x="432.7" y="250" width="374.7" height="80" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="446.7" y="274.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">三个测试账号</text>
+<text x="446.7" y="295.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">普通用户 A、普通用户 B、管理员。管理员和线上一样由服务</text>
+<text x="446.7" y="312.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">端的名单认出，不是页面自己说了算</text>
+<rect x="821.3" y="250" width="374.7" height="80" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="835.3" y="274.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">假 B 站里的数据</text>
+<text x="835.3" y="295.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">只读内容沿用离线演示那批歌；收藏夹按账号分开、能增删，</text>
+<text x="835.3" y="312.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">存在内存里，重启沙盒即恢复原样</text>
+<rect x="24" y="366" width="1192" height="297" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="395.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">② 切一次身份、收藏一首歌，发生了什么</text>
+<text x="44.0" y="424.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">用户看到的</text>
+<rect x="44.0" y="432" width="270.0" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="456.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">点顶栏「沙盒」菜单</text>
+<text x="58.0" y="477.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">在「切换身份（走真实扫码登录）」下选「</text>
+<text x="58.0" y="494.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">普通用户 A」</text>
+<line x1="318.0" y1="472.0" x2="334.0" y2="472.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="432" width="270.0" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="352.0" y="456.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">页面刷新</text>
+<text x="352.0" y="477.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">右上角变成 A 的头像，看到的是 A 自己</text>
+<text x="352.0" y="494.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">的收藏</text>
+<line x1="612.0" y1="472.0" x2="628.0" y2="472.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="432" width="270.0" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="646.0" y="456.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">收藏一首歌</text>
+<text x="646.0" y="477.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">和线上操作完全一样</text>
+<line x1="906.0" y1="472.0" x2="922.0" y2="472.0" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="432" width="270.0" height="80" rx="9" fill="#edf7f1" stroke="#7fad91" />
+<text x="940.0" y="456.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#316247">另一个浏览器里也出现</text>
+<text x="940.0" y="477.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">另一个浏览器同样登录 A，这首歌自动出</text>
+<text x="940.0" y="494.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#316247">现；换成 B 则看不到</text>
+<text x="44.0" y="538.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="700" fill="#756f73">背后在做的</text>
+<rect x="44.0" y="546" width="270.0" height="97" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="58.0" y="570.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">退出当前登录，要一张二维码</text>
+<text x="58.0" y="591.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">走的是线上的扫码登录流程，二维码由假 </text>
+<text x="58.0" y="608.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">B 站发出</text>
+<line x1="318.0" y1="594.5" x2="334.0" y2="594.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="338.0" y="546" width="270.0" height="97" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="352.0" y="570.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">假 B 站替你「扫码确认」</text>
+<text x="352.0" y="591.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">省掉的只有掏手机这一步；页面照常轮询，</text>
+<text x="352.0" y="608.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">拿到登录凭据</text>
+<line x1="612.0" y1="594.5" x2="628.0" y2="594.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="632.0" y="546" width="270.0" height="97" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="646.0" y="570.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">服务端查出「这是 A」</text>
+<text x="646.0" y="591.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">拿凭据去问（假）B 站当前是谁，之后所</text>
+<text x="646.0" y="608.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">有请求都带着 A 的身份</text>
+<line x1="906.0" y1="594.5" x2="922.0" y2="594.5" stroke="#8f8792" stroke-width="1.5" marker-end="url(#ah)" />
+<rect x="926.0" y="546" width="270.0" height="97" rx="9" fill="#eef4f8" stroke="#91adc1" />
+<text x="940.0" y="570.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#36566d">同步服务再核实一次</text>
+<text x="940.0" y="591.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">不信页面报的账号，自己拿凭据再问一遍，</text>
+<text x="940.0" y="608.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">然后把这首歌记到 A 名下并通知 A 的其</text>
+<text x="940.0" y="625.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#36566d">他设备</text>
+<rect x="24" y="679" width="1192" height="144" rx="10" fill="#ffffff" stroke="#c3bcc6" />
+<text x="44.0" y="708.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#282529">③ 常见用法</text>
+<rect x="44.0" y="723" width="374.7" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="58.0" y="747.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">日常：点菜单切身份</text>
+<text x="58.0" y="768.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">不用手机、不用真账号，几秒切到另一个人，适合反复测「A </text>
+<text x="58.0" y="785.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">的东西 B 看不看得到」</text>
+<rect x="432.7" y="723" width="374.7" height="80" rx="9" fill="#fff8e8" stroke="#d9bd85" />
+<text x="446.7" y="747.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#7a6234">测跨设备同步：要两个浏览器</text>
+<text x="446.7" y="768.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">同一个浏览器的两个标签页共用一份登录，等于同一台设备。</text>
+<text x="446.7" y="785.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#7a6234">要用两个互不相干的浏览器各登一次</text>
+<rect x="821.3" y="723" width="374.7" height="80" rx="9" fill="#f4f2f5" stroke="#c3bcc6" />
+<text x="835.3" y="747.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="12.5" font-weight="700" fill="#4a4450">也可以真的走一遍扫码</text>
+<text x="835.3" y="768.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">二维码里的地址能直接在浏览器打开，在假 B 站的页面上选</text>
+<text x="835.3" y="785.0" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#4a4450">账号、点确认</text>
+</svg>

@@ -57,6 +57,7 @@ interface AlignSessionState {
   adopt: () => Promise<void>;
   discard: () => void;
   publish: () => Promise<void>;
+  adoptAndPublish: () => Promise<void>;
   dismiss: () => void;
 }
 
@@ -346,6 +347,12 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       }
     },
 
+    // 试听满意就一步发布：本机先换上，再发给所有人；发布失败时停在「待发布」，可以直接重试
+    adoptAndPublish: async () => {
+      await get().adopt();
+      if (get().phase.kind === "adopted") await get().publish();
+    },
+
     // 只收起提示，不取消服务器上的任务：对齐中关掉的话，好了照样会换上 / 进试听
     dismiss: () => {
       if (get().phase.kind === "working") {
@@ -368,4 +375,10 @@ usePlayList.subscribe((state, prevState) => {
   stop();
   useLyricsState.getState().setPreview(null);
   useLyricsAlignSession.setState(idle);
+});
+
+// 冷启动时审核员身份是异步查回来的，歌曲加载那一刻 restoreDraft 看到的还是「非管理员」直接跳过，
+// 上次没发布的试听就丢了；身份确认后补一次
+useAlignReview.subscribe((state, prevState) => {
+  if (state.isAdmin && !prevState.isAdmin) void useLyricsAlignSession.getState().restoreDraft();
 });
