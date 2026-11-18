@@ -146,6 +146,109 @@ describe("iOS 分段播放保留原缓冲续取", () => {
     },
   );
 
+  test.each([
+    ["missing-range", "Content-Range", () => new Response(data.slice(cut), { status: 206 })],
+    ["malformed-range", "Content-Range", () => partial(cut, undefined, { "Content-Range": "invalid-secret-value" })],
+    ["encoded-range", "Content-Encoding", () => partial(cut, undefined, { "Content-Encoding": "gzip" })],
+    ["wrong-start", "Content-Range.start", () => partial(cut - 1)],
+    [
+      "invalid-end",
+      "Content-Range.end",
+      () => partial(cut, undefined, { "Content-Range": `bytes ${cut}-${data.length}/${data.length}` }),
+    ],
+    [
+      "invalid-total",
+      "Content-Range.total",
+      () => partial(cut, undefined, { "Content-Range": `bytes ${cut}-${cut}/0` }),
+    ],
+    [
+      "changed-total",
+      "Content-Range.total",
+      () => partial(cut, undefined, { "Content-Range": `bytes ${cut}-${data.length}/${data.length + 1}` }),
+    ],
+    ["invalid-length", "Content-Length", () => partial(cut, undefined, { "Content-Length": "not-a-number" })],
+    ["wrong-length", "Content-Length", () => partial(cut, undefined, { "Content-Length": "17" })],
+    ["changed-validator", "ETag", () => partial(cut, undefined, { ETag: '"private-etag"' })],
+    ["range-ignored", "HTTP.status", () => new Response(data.slice())],
+  ] as const)("%s：技术日志指出具体字段和期望/实值，不记录完整头", async (reason, field, reply) => {
+    const { log } = await import("@/platform");
+    vi.mocked(log.warn).mockClear();
+    const { first, failed } = await mount({ repair: reply });
+    first.error(new TypeError("offline"));
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    expect(failed.mock.calls[0][0].message).toContain(field);
+    expect(log.warn).toHaveBeenCalledWith(
+      "[mse] 音频 MSE 加载失败",
+      expect.objectContaining({
+        reason,
+        field,
+        requestedStart: cut,
+        expected: expect.anything(),
+        actual: expect.anything(),
+      }),
+    );
+    expect(JSON.stringify(vi.mocked(log.warn).mock.calls)).not.toMatch(/invalid-secret-value|private-etag/);
+  });
+
+  test.each([true, false])("合法短段接到文件尾，不重置播放器（有验证头：%s）", async withTag => {
+    const { first, appended, eos, failed } = await mount({
+      firstHeaders: withTag ? undefined : { "Content-Length": String(data.length) },
+      repair: (start, n) => {
+        const end = n === 2 ? cut + 32767 : data.length - 1;
+        const headers: Record<string, string> = {
+          "Content-Range": `bytes ${start}-${end}/${data.length}`,
+          "Content-Length": String(end - start + 1),
+        };
+        if (withTag) headers.ETag = tag;
+        return new Response(data.slice(start, end + 1), { status: 206, headers });
+      },
+    });
+    first.error(new TypeError("Load failed"));
+    await vi.waitFor(() => expect(eos).toHaveBeenCalledOnce());
+    const overlap = withTag ? 0 : 32;
+    expect(ranges).toEqual(["initial", `bytes=${cut - overlap}-`, `bytes=${cut + 32768 - overlap}-`]);
+    expect(Buffer.compare(flatten(appended), data)).toBe(0);
+    expect(failed).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
+  test("按原 Last-Modified 比较：额外的 ETag 不算版本变化，变更的日期写明字段", async () => {
+    const date = "Wed, 18 Nov 2026 06:00:00 GMT";
+    const next = await mount({
+      firstHeaders: { "Content-Length": String(data.length), "Last-Modified": date },
+      repair: start => partial(start, undefined, { "Last-Modified": date }),
+    });
+    next.first.error(new TypeError("offline"));
+    await vi.waitFor(() => expect(next.eos).toHaveBeenCalledOnce());
+    expect(ifRanges[1]).toBe(date);
+    expect(next.failed).not.toHaveBeenCalled();
+    ranges.length = 0;
+    const changed = await mount({
+      firstHeaders: { "Last-Modified": date },
+      repair: start => partial(start, undefined, { "Last-Modified": "Fri, 20 Nov 2026 00:00:00 GMT" }),
+    });
+    changed.first.error(new TypeError("offline"));
+    await vi.waitFor(() => expect(changed.failed).toHaveBeenCalledOnce());
+    expect(changed.failed.mock.calls[0][0].details).toMatchObject({
+      field: "Last-Modified",
+      reason: "changed-validator",
+    });
+  });
+
+  test("连续只送极小分段时有上限，不制造请求循环", async () => {
+    const { first, failed, eos } = await mount({
+      repair: start =>
+        partial(start, data.slice(start, start + 1), {
+          "Content-Range": `bytes ${start}-${start}/${data.length}`,
+        }),
+    });
+    first.error(new TypeError("offline"));
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    expect(failed.mock.calls[0][0].message).toContain("excessive partial responses");
+    expect(ranges).toHaveLength(3);
+    expect(eos).not.toHaveBeenCalled();
+  });
+
   test.each([412, 429, 503])("续流返回 HTTP %i，原状态交给播放器，不再重试", async status => {
     const { first, failed } = await mount({ repair: () => new Response(null, { status }) });
     first.error(new TypeError("Load failed"));

@@ -1,6 +1,6 @@
 import { log } from "@/platform";
 
-import { MediaFetchError, streamMediaBytes } from "./media-byte-stream";
+import { MediaFetchError, MediaHeaderMismatch, streamMediaBytes } from "./media-byte-stream";
 
 export { MediaFetchError };
 
@@ -564,6 +564,7 @@ export function attachMediaSourceAudio(
         currentTime: audio.currentTime,
         paused: audio.paused,
         error: String(error),
+        ...(error instanceof MediaHeaderMismatch ? error.details : {}),
       });
       fail(error);
     }

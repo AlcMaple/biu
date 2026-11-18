@@ -710,7 +710,7 @@ const logMediaCapabilityOnce = () => {
   mediaCapabilityLogged = true;
   const w = window as unknown as { ManagedMediaSource?: unknown; MediaSource?: unknown };
   log.warn("媒体能力探测", {
-    buildId: typeof process !== "undefined" ? (process.env.BIU_BUILD_ID ?? "unknown") : "unknown",
+    buildId: process.env.BIU_BUILD_ID ?? "unknown",
     hasManagedMediaSource: typeof w.ManagedMediaSource !== "undefined",
     hasMediaSource: typeof w.MediaSource !== "undefined",
     maxTouchPoints: typeof navigator !== "undefined" ? navigator.maxTouchPoints : undefined,

@@ -8,6 +8,27 @@ export class MediaFetchError extends Error {
 
 class InvalidMediaRange extends Error {}
 
+type Comparison = string | number;
+export class MediaHeaderMismatch extends InvalidMediaRange {
+  constructor(
+    readonly details: {
+      reason: string;
+      field: string;
+      expected: Comparison;
+      actual: Comparison;
+      status: number;
+      requestedStart: number;
+      expectedTotal: number | null;
+      returnedStart: number | null;
+      returnedEnd: number | null;
+      returnedTotal: number | null;
+      contentLength: number | null;
+    },
+  ) {
+    super(`${details.field}: expected ${details.expected}, got ${details.actual} [${details.reason}]`);
+  }
+}
+
 const parseLength = (value: string | null) => {
   if (!value || !/^\d+$/.test(value)) return undefined;
   const size = Number(value);
@@ -26,36 +47,92 @@ function checkResponse(
   rangeRequested: boolean,
   validator?: string,
 ) {
-  if (!response.ok || !response.body) throw new MediaFetchError(response.status);
-  const encoding = response.headers.get("content-encoding");
-  const identity = !encoding || encoding.toLowerCase() === "identity";
-  const length = parseLength(response.headers.get("content-length"));
+  if (!response.ok) throw new MediaFetchError(response.status);
+  if (!response.body) throw new InvalidMediaRange(`HTTP ${response.status}: missing response body`);
+  const encoding = response.headers.get("content-encoding")?.toLowerCase();
+  const identity = !encoding || encoding === "identity";
+  const rawLength = response.headers.get("content-length");
+  const length = parseLength(rawLength);
+  const rawRange = response.headers.get("content-range");
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/i.exec(rawRange ?? "");
+  const start = parseLength(match?.[1] ?? null);
+  const end = parseLength(match?.[2] ?? null);
+  const size = parseLength(match?.[3] ?? null);
   const observedValidator = mediaValidator(response.headers);
+  // 白名单中的数字和分类足以重放判断；原始 ETag、异常头文本和签名 URL 不进日志。
+  const mismatch = (reason: string, field: string, expected: Comparison, actual: Comparison) =>
+    new MediaHeaderMismatch({
+      reason,
+      field,
+      expected,
+      actual,
+      status: response.status,
+      requestedStart: offset,
+      expectedTotal: total ?? null,
+      returnedStart: start ?? null,
+      returnedEnd: end ?? null,
+      returnedTotal: size ?? null,
+      contentLength: length ?? null,
+    });
+
   if (response.status === 206) {
-    const match = /^bytes (\d+)-(\d+)\/(\d+)$/i.exec(response.headers.get("content-range") ?? "");
-    const end = parseLength(match?.[2] ?? null);
-    const size = parseLength(match?.[3] ?? null);
-    if (
-      !match ||
-      !identity ||
-      Number(match[1]) !== offset ||
-      size === undefined ||
-      size <= offset ||
-      end !== size - 1 ||
-      (length !== undefined && length !== size - offset) ||
-      (total !== undefined && total !== size) ||
-      (validator && observedValidator && observedValidator !== validator)
-    ) {
-      throw new InvalidMediaRange("续流位置或文件版本不匹配");
+    if (rawRange === null) throw mismatch("missing-range", "Content-Range", "bytes start-end/total", "missing");
+    if (!match)
+      throw mismatch(
+        "malformed-range",
+        "Content-Range",
+        "bytes start-end/total",
+        /^bytes \d+-\d+\/\*$/i.test(rawRange) ? "unknown total (*)" : "invalid syntax",
+      );
+    if (!identity)
+      throw mismatch(
+        "encoded-range",
+        "Content-Encoding",
+        "identity",
+        ["gzip", "br", "zstd", "deflate"].includes(encoding!) ? encoding! : "other encoding",
+      );
+    if (start !== offset) throw mismatch("wrong-start", "Content-Range.start", offset, start ?? "not a safe integer");
+    if (size === undefined || size <= offset)
+      throw mismatch("invalid-total", "Content-Range.total", `> ${offset}`, size ?? "not a safe integer");
+    if (end === undefined || end < offset || end >= size)
+      throw mismatch("invalid-end", "Content-Range.end", `${offset}..${size - 1}`, end ?? "not a safe integer");
+    if (total !== undefined && total !== size) throw mismatch("changed-total", "Content-Range.total", total, size);
+    const partLength = end - offset + 1;
+    if (rawLength !== null && length === undefined)
+      throw mismatch("invalid-length", "Content-Length", partLength, "not a non-negative safe integer");
+    if (length !== undefined && length !== partLength)
+      throw mismatch("wrong-length", "Content-Length", partLength, length);
+    if (validator) {
+      // If-Range 发的是日期就比日期。续段额外带了强 ETag 并不代表文件变了。
+      const field = validator.startsWith('"') ? "ETag" : "Last-Modified";
+      const comparable = response.headers.get(field);
+      if (comparable !== null && comparable !== validator) {
+        throw mismatch("changed-validator", field, `unchanged ${field}`, `changed ${field}`);
+      }
+      if (comparable === null && observedValidator) {
+        throw mismatch(
+          "missing-validator",
+          field,
+          `unchanged ${field}`,
+          observedValidator.startsWith('"') ? "only ETag returned" : "only Last-Modified returned",
+        );
+      }
     }
-    return { body: response.body, identity, total: size, validator: validator ?? observedValidator };
+    return {
+      body: response.body,
+      identity,
+      total: size,
+      endExclusive: end + 1,
+      validator: validator ?? observedValidator,
+    };
   }
-  // Range 被忽略（或 If-Range 的文件版本已变）时，整文件绝不能拼在旧数据后面。
-  if (rangeRequested || response.status !== 200) throw new InvalidMediaRange("播放源未返回请求的字节范围");
+  if (rangeRequested) throw mismatch("range-ignored", "HTTP.status", 206, response.status);
+  if (response.status !== 200) throw mismatch("unexpected-status", "HTTP.status", 200, response.status);
   return {
     body: response.body,
     identity,
     total: identity ? length : undefined,
+    endExclusive: identity ? length : undefined,
     validator: identity ? observedValidator : undefined,
   };
 }
@@ -76,11 +153,13 @@ export async function* streamMediaBytes(
   let total = options.total;
   let validator: string | undefined;
   let repairs = 0;
+  let shortParts = 0;
+  let previousPartWasTiny = false;
   let identity = true;
   let tail = new Uint8Array(0);
   const hasRepairBudget = () => !signal.aborted && repairs < MAX_REPAIRS && offset > options.start && identity;
 
-  while (!signal.aborted) {
+  responses: while (!signal.aborted) {
     const request = new AbortController();
     const abort = () => request.abort();
     signal.addEventListener("abort", abort, { once: true });
@@ -91,11 +170,13 @@ export async function* streamMediaBytes(
       const headers: Record<string, string> = {};
       // 没有 ETag / 修改时间的源重读至多 32 字节，确认接缝匹配后只交付新的字节。
       // 编码传输的解码后位置不是 HTTP 偏移，因此不尝试续接。
-      const overlap = repairs && !validator ? tail : new Uint8Array(0);
+      const continuation = repairs > 0 || shortParts > 0;
+      const overlap = continuation && !validator ? tail : new Uint8Array(0);
       let verified = 0;
+      const previousOffset = offset;
       const from = offset - overlap.length;
       if (offset > 0) headers.Range = `bytes=${from}-`;
-      if (repairs && validator) headers["If-Range"] = validator;
+      if (continuation && validator) headers["If-Range"] = validator;
       // 首次取流沿用播放器的起播宽限。续流则已有可播放的缓冲，不无限等响应头。
       if (repairs) timer = setTimeout(abort, Math.max(1.5, Math.min(8, (bufferSeconds() ?? 0) - 2)) * 1000);
       const response = await fetch(url, {
@@ -128,8 +209,22 @@ export async function* streamMediaBytes(
         if (idle) throw new Error("媒体响应停止送数");
         if (done) {
           if (verified !== overlap.length) throw new InvalidMediaRange("续流接缝不完整");
-          if (total !== undefined && offset !== total) throw new Error("音频响应提前结束");
-          return;
+          if (checked.endExclusive !== undefined && offset !== checked.endExclusive) {
+            throw new Error(`音频响应提前结束：预期下一字节 ${checked.endExclusive}，实际 ${offset}`);
+          }
+          if (total === undefined || offset === total) return;
+          // 206 可以只覆盖剩余文件的一段；只有整段已验收、且净游标前进，才取下一段。
+          // 限制微小分段以及总次数，异常源不能靠持续返回几个字节制造请求风暴。
+          const advanced = offset - previousOffset;
+          if (advanced <= 0) throw new InvalidMediaRange(`Content-Range.end: no new bytes after overlap at ${offset}`);
+          if ((previousPartWasTiny && advanced < 16384) || ++shortParts > 32) {
+            throw new InvalidMediaRange(
+              `Content-Range: excessive partial responses at ${offset}, last advance ${advanced}`,
+            );
+          }
+          previousPartWasTiny = advanced < 16384;
+          if (shortParts === 1) log.warn("[mse] 已验证短分段，继续取下一段", { from, nextOffset: offset, total });
+          continue responses;
         }
         const skip = Math.min(value.byteLength, overlap.length - verified);
         for (let i = 0; i < skip; i++) {
@@ -138,7 +233,11 @@ export async function* streamMediaBytes(
         verified += skip;
         const bytes = value.subarray(skip);
         if (!bytes.byteLength) continue;
-        if (total !== undefined && offset + bytes.byteLength > total) throw new InvalidMediaRange("音频超出声明的范围");
+        if (checked.endExclusive !== undefined && offset + bytes.byteLength > checked.endExclusive) {
+          throw new InvalidMediaRange(
+            `响应正文超出声明范围：预期末端 ${checked.endExclusive}（不含），实际至少 ${offset + bytes.byteLength}`,
+          );
+        }
         // 游标含调用方尚未凑够一次 append 的字节；修复请求不会重复或遗漏半个 MP4 分片。
         if (identity && !validator) {
           if (bytes.byteLength >= 32) tail = bytes.slice(-32);
