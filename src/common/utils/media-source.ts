@@ -1,5 +1,9 @@
 import { log } from "@/platform";
 
+import { MediaFetchError, streamMediaBytes } from "./media-byte-stream";
+
+export { MediaFetchError };
+
 /**
  * iOS 专用：通过 MSE 分段流式喂流播放 B 站的纯音频流（DASH audio baseUrl，本质是分片 MP4）。
  *
@@ -153,12 +157,6 @@ export const findFragmentStart = (chunk: Uint8Array): number | undefined => {
   }
   return undefined;
 };
-
-export class MediaFetchError extends Error {
-  constructor(readonly status: number) {
-    super(`media fetch failed: ${status}`);
-  }
-}
 
 export interface MediaSourceController {
   /** 中止本次加载并释放资源（切歌/换源时调用） */
@@ -444,20 +442,16 @@ export function attachMediaSourceAudio(
       // 定位时顺手读的那一段已经到文件尾了（跳到歌曲末尾附近时很常见）：
       // 再发一次 `bytes=<文件大小>-` 是越界请求，真实服务端会回 416，白白掉回直连。
       const alreadyComplete = mediaStartByte > 0 && totalSize > 0 && streamFrom >= totalSize;
-      const reader = alreadyComplete
-        ? undefined
-        : await (async () => {
-            const response = await fetch(url, {
-              cache: "no-store",
-              credentials: "same-origin",
-              headers: mediaStartByte > 0 ? { Range: `bytes=${streamFrom}-` } : undefined,
-              signal: controller.signal,
-            });
-            if ((!response.ok && response.status !== 206) || !response.body) {
-              throw new MediaFetchError(response.status);
-            }
-            return response.body.getReader();
-          })();
+      const bufferSeconds = () => {
+        if (audio.paused || audio.ended) return undefined;
+        const ranges = sb.buffered;
+        if (!ranges.length || pendingSeek > 0) return undefined;
+        const t = audio.currentTime;
+        for (let i = 0; i < ranges.length; i++) {
+          if (ranges.start(i) <= t && t <= ranges.end(i)) return (ranges.end(i) - t) / audio.playbackRate;
+        }
+        return 0;
+      };
 
       // 分段策略：小片喂（~64KB，约 5 秒音频），粒度细才能把总缓冲严格压在配额之下。
       // iPhone 的 ManagedMediaSource 配额很小：一个 256KB 的 append 就能解码出 ~20 秒音频，
@@ -532,19 +526,22 @@ export function attachMediaSourceAudio(
         if (aborted) return;
       }
 
-      for (; reader; ) {
-        const { done, value } = await reader.read();
-        if (aborted) return;
-        if (done) break;
-        if (value) {
+      if (!alreadyComplete) {
+        for await (const value of streamMediaBytes(url, {
+          start: streamFrom,
+          total: totalSize || undefined,
+          signal: controller.signal,
+          bufferSeconds,
+        })) {
           pending.push(value);
           pendingBytes += value.byteLength;
           received += value.byteLength;
           opts.onProgress?.(received);
-        }
-        if (pendingBytes >= APPEND_THRESHOLD) {
-          await flushPending();
-          if (aborted) return;
+          // 快吃完时优先喂已有字节，别让一个还没凑满 64 KiB 的网络包挡住已经完整的音频帧。
+          if (pendingBytes >= APPEND_THRESHOLD || (firstAppendLogged && (bufferSeconds() ?? Infinity) < 4)) {
+            await flushPending();
+            if (aborted) return;
+          }
         }
       }
 
@@ -561,8 +558,8 @@ export function attachMediaSourceAudio(
       }
       log.warn("[mse] 全部喂入完成", { totalBytes: received, bufferedEnd: Math.round(bufEnd(sb) * 100) / 100 });
     } catch (error) {
-      // AbortError 是我们自己在切歌时中止的，不算失败
-      if ((error as { name?: string })?.name === "AbortError") return;
+      // 只有本次挂载被主动撤销才是切歌；浏览器自身中断连接也可能抛 AbortError。
+      if (aborted) return;
       log.warn("[mse] 音频 MSE 加载失败", {
         currentTime: audio.currentTime,
         paused: audio.paused,
