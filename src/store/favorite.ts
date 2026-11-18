@@ -1,8 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { isOfflineDemo } from "@/common/offline-demo";
 import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
-import platform from "@/platform";
+import {
+  clearPlaylistStore,
+  mergePlaylistState,
+  readPlaylistState,
+  readPlaylistStore,
+  writePlaylistStore,
+  usePlaylistSession,
+} from "./playlist-session";
 import { getFavFolderCollectedList } from "@/service/fav-folder-collected-list";
 import { getFavFolderCreatedList } from "@/service/fav-folder-created-list";
 import { getSpaceNavnum } from "@/service/space-navnum";
@@ -69,23 +77,18 @@ const reorderList = <T extends { id: number }>(list: T[], activeId: number, over
   return next;
 };
 
-/**
- * 等待 persist 的 rehydrate 完成。
- *
- * Why: 若 rehydrate 未完成就 merge 远程数据，`createdFavorites` 内存态还是 [],
- * `filter(isLocal)` 取到空数组，会把本地歌单元数据覆盖丢失（真实事故发生过一次）。
- */
-const waitForHydration = () =>
-  new Promise<void>(resolve => {
-    if (useFavoritesStore.persist.hasHydrated()) {
-      resolve();
-      return;
-    }
-    const unsub = useFavoritesStore.persist.onFinishHydration(() => {
-      unsub();
-      resolve();
+async function readyForFavorites(mid: number | string) {
+  const current = usePlaylistSession.getState();
+  if (current.mid !== Number(mid) || current.error) return undefined;
+  if (current.ready) return current;
+  return new Promise<typeof current | undefined>(resolve => {
+    const unsubscribe = usePlaylistSession.subscribe(next => {
+      if (next === current) return;
+      unsubscribe();
+      resolve(next.mid === Number(mid) && next.ready ? next : undefined);
     });
   });
+}
 
 export const useFavoritesStore = create<State & Action>()(
   persist(
@@ -95,11 +98,12 @@ export const useFavoritesStore = create<State & Action>()(
       createdOrder: [],
       collectedOrder: [],
       updateCreatedFavorites: async (userMid: number | string) => {
-        await waitForHydration();
+        const session = await readyForFavorites(userMid);
+        if (!session) return;
 
         const result = await getAllCreatedFavorites(userMid);
         // 远程拉取失败时绝不覆写本地状态 —— 避免本地歌单被空数据冲掉
-        if (!result.ok) return;
+        if (!result.ok || session !== usePlaylistSession.getState()) return;
 
         const localItems = get().createdFavorites.filter(item => item.isLocal);
         const combined = [...localItems, ...result.list];
@@ -153,10 +157,11 @@ export const useFavoritesStore = create<State & Action>()(
           };
         }),
       updateCollectedFavorites: async (userMid: number | string) => {
-        await waitForHydration();
+        const session = await readyForFavorites(userMid);
+        if (!session) return;
 
         const result = await getAllCollectedFavorites(userMid);
-        if (!result.ok) return;
+        if (!result.ok || session !== usePlaylistSession.getState()) return;
 
         const ordered = applySavedOrder(result.list, get().collectedOrder);
 
@@ -199,13 +204,12 @@ export const useFavoritesStore = create<State & Action>()(
     }),
     {
       name: "favorites-order",
+      merge: mergePlaylistState,
       storage: {
-        getItem: async () => {
-          const store = await platform.getStore(StoreNameMap.LocalFavorites);
-          return store ? { state: store } : null;
-        },
+        getItem: () => readPlaylistState(StoreNameMap.LocalFavorites),
         setItem: async (_, value) => {
-          if (!value.state) return;
+          const active = usePlaylistSession.getState();
+          if (!value.state || (!active.ready && !isOfflineDemo)) return;
           const next = value.state as { createdFavorites?: FavoriteItem[]; [key: string]: unknown };
 
           // 防覆盖保险：当要写入的本地收藏夹为空、但磁盘上原本非空、且歌曲数据(folderItems)
@@ -216,21 +220,23 @@ export const useFavoritesStore = create<State & Action>()(
           if (nextLocal.length === 0) {
             const hasFolderItems = Object.keys(useLocalFavItemsStore.getState().folderItems ?? {}).length > 0;
             if (hasFolderItems) {
-              const prev = (await platform.getStore(StoreNameMap.LocalFavorites)) as
+              const session = usePlaylistSession.getState();
+              const prev = (await readPlaylistStore(StoreNameMap.LocalFavorites)) as
                 | { createdFavorites?: FavoriteItem[] }
                 | undefined;
+              if (session !== usePlaylistSession.getState()) return;
               const prevLocal = (prev?.createdFavorites ?? []).filter(item => item.isLocal);
               if (prevLocal.length > 0) {
-                await platform.setStore(StoreNameMap.LocalFavorites, { ...next, createdFavorites: prevLocal });
+                await writePlaylistStore(StoreNameMap.LocalFavorites, { ...next, createdFavorites: prevLocal });
                 return;
               }
             }
           }
 
-          await platform.setStore(StoreNameMap.LocalFavorites, next);
+          await writePlaylistStore(StoreNameMap.LocalFavorites, next);
         },
         removeItem: async () => {
-          await platform.clearStore(StoreNameMap.LocalFavorites);
+          await clearPlaylistStore(StoreNameMap.LocalFavorites);
         },
       },
       partialize: state => ({
@@ -292,28 +298,6 @@ export function ensureLikedFolder() {
     useFavoritesStore.getState().rmCreatedFavorite(Number(d.id));
   });
 }
-
-/** 等待多个持久化 store 全部 rehydrate 后执行一次回调 */
-function whenAllHydrated(
-  stores: { persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void } }[],
-  cb: () => void,
-) {
-  const pending = new Set(stores.filter(s => !s.persist.hasHydrated()));
-  if (pending.size === 0) {
-    cb();
-    return;
-  }
-  pending.forEach(store => {
-    const unsub = store.persist.onFinishHydration(() => {
-      unsub();
-      pending.delete(store);
-      if (pending.size === 0) cb();
-    });
-  });
-}
-
-// 依赖 folderItems，故须等 favorites 与 local-fav-items 两个 store 都 hydrate 完成
-whenAllHydrated([useFavoritesStore, useLocalFavItemsStore], ensureLikedFolder);
 
 /** 远程拉取结果 —— ok=false 代表请求链路失败，调用方必须拒绝覆写本地状态 */
 type FetchResult = { ok: true; list: FavoriteItem[] } | { ok: false };

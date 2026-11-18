@@ -146,11 +146,15 @@ async function withAuthRetry<T>(fn: (token: CachedToken) => Promise<T>): Promise
   }
 }
 
-export async function pullSnapshot(store: SyncStoreName): Promise<Envelope | null> {
-  return withAuthRetry(token => {
-    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
-    return syncHttp.get<Envelope>(`/sync/${store}`, { headers });
-  });
+function playlistHeaders(token: CachedToken, expectedMid: string) {
+  if (token.mid !== expectedMid) throw new Error("歌单账号已变化，已停止本次同步");
+  return { "X-Biu-Playlist-Mid": expectedMid, ...(token.token ? { Authorization: `Bearer ${token.token}` } : {}) };
+}
+
+export async function pullSnapshot(store: SyncStoreName, expectedMid: string): Promise<Envelope | null> {
+  return withAuthRetry(token =>
+    syncHttp.get<Envelope>(`/sync/${store}`, { headers: playlistHeaders(token, expectedMid) }),
+  );
 }
 
 /**
@@ -162,10 +166,11 @@ export async function pushOps(
   store: SyncStoreName,
   baseVersion: number,
   ops: SyncOp[],
-  allowFullDelete = false,
+  allowFullDelete: boolean,
+  expectedMid: string,
 ): Promise<Envelope | null> {
   return withAuthRetry(token => {
-    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    const headers = playlistHeaders(token, expectedMid);
     return syncHttp.post<Envelope>(`/sync/${store}`, { allowFullDelete, baseVersion, ops }, { headers });
   });
 }
@@ -207,9 +212,10 @@ export interface SharePublishPayload {
 
 export async function publishFolderShare(
   payload: SharePublishPayload,
+  expectedMid: string,
 ): Promise<{ code: string; count: number } | null> {
   return withAuthRetry(token => {
-    const headers = token.token ? { Authorization: `Bearer ${token.token}` } : undefined;
+    const headers = playlistHeaders(token, expectedMid);
     return syncHttp.post<{ code: string; count: number }>("/share", payload, { headers });
   });
 }

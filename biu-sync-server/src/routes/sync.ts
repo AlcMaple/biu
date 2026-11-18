@@ -119,6 +119,14 @@ export function createSyncRouter(): Router {
     res.json({ changed: differs(latest), versions: latest });
   }
 
+  router.use("/sync/:store", (req: AuthedRequest, res, next) => {
+    const expectedMid = req.get("x-biu-playlist-mid");
+    if (expectedMid !== undefined && expectedMid !== req.mid) {
+      res.status(409).json({ error: "歌单账号已变化" });
+      return;
+    }
+    next();
+  });
   router.get("/sync/:store", async (req: AuthedRequest, res) => {
     const { store } = req.params;
     if (!isStoreName(store)) {

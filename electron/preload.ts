@@ -7,10 +7,11 @@ let playerNextHandler: ((_: Electron.IpcRendererEvent) => void) | null = null;
 let playerToggleHandler: ((_: Electron.IpcRendererEvent) => void) | null = null;
 
 const api: ElectronAPI = {
-  getStore: name => ipcRenderer.invoke(channel.store.get, name),
+  preparePlaylistAccount: (mid, claim) => ipcRenderer.invoke(channel.store.preparePlaylistAccount, mid, claim),
+  getStore: (name, owner) => ipcRenderer.invoke(channel.store.get, name, owner),
   rankingLocal: action => ipcRenderer.invoke(channel.store.rankingLocal, action),
-  setStore: (name, value: any) => ipcRenderer.invoke(channel.store.set, name, value),
-  clearStore: name => ipcRenderer.invoke(channel.store.clear, name),
+  setStore: (name, value, owner) => ipcRenderer.invoke(channel.store.set, name, value, owner),
+  clearStore: (name, owner) => ipcRenderer.invoke(channel.store.clear, name, owner),
   selectDirectory: (title?: string) => ipcRenderer.invoke(channel.dialog.selectDirectory, title),
   selectFile: () => ipcRenderer.invoke(channel.dialog.selectFile),
   selectImages: () => ipcRenderer.invoke(channel.dialog.selectImages),

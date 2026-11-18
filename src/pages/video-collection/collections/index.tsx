@@ -14,6 +14,8 @@ import platform from "@/platform";
 import { postFavSeasonFav } from "@/service/fav-season-fav";
 import { postFavSeasonUnfav } from "@/service/fav-season-unfav";
 import { getUserVideoArchivesList, type Media } from "@/service/user-video-archives-list";
+import { playlistWriteIssue } from "@/store/playlist-write";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useFavoritesStore } from "@/store/favorite";
 import { useModalStore } from "@/store/modal";
 import { isSame, usePlayList } from "@/store/play-list";
@@ -132,6 +134,12 @@ const VideoCollections = () => {
   };
 
   const toggleFavorite = async () => {
+    const issue = playlistWriteIssue("收藏");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     if (isFavorite) {
       // 取消收藏
       const res = await postFavSeasonUnfav({
@@ -139,6 +147,7 @@ const VideoCollections = () => {
         platform: "web",
       });
 
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code === 0) {
         rmCollectedFavorite(Number(id));
       }
@@ -149,6 +158,7 @@ const VideoCollections = () => {
         platform: "web",
       });
 
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code === 0) {
         addCollectedFavorite({
           id: Number(id),

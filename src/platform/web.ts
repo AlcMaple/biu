@@ -140,8 +140,7 @@ const accountKey = (mid: number, name: string) => `${STORE_KEY_PREFIX}account:${
 const legacyClaimKey = `${STORE_KEY_PREFIX}legacy-playlists-claimed`;
 
 // 网页版本地歌单按账号各存一份，未登录时没有歌单（读出空、写入丢弃）。
-// 换账号必须先把 owner 置空再清内存、再切到新账号重读（见 switchPlaylistAccount），
-// 否则旧账号还在内存里的数据会以新账号的名义写盘。
+// switchPlaylistAccount 会先暂停三个 store 的写入，再切换 owner 并重读，避免旧内存写进新账号。
 let playlistOwner: number | null = null;
 const accountPreparations = new Map<number, Promise<IDBDatabase>>();
 
@@ -317,6 +316,7 @@ async function rankingLocal(action: RankingLocalAction): Promise<RankingLocalSta
 
 const platform: Platform = {
   rankingLocal,
+  preparePlaylistAccount: async () => false,
   getStore: webGetStore,
   setStore: webSetStore,
   clearStore: webClearStore,

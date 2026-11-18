@@ -68,6 +68,7 @@ vi.mock("@/common/hooks/use-responsive", () => ({
 
 vi.mock("@/common/utils/cookie", () => ({ getCookitFromBSite: startupMocks.getCookitFromBSite }));
 vi.mock("@/service/sync", () => ({ initLocalPlaylistSync: startupMocks.initLocalPlaylistSync }));
+vi.mock("@/store/playlist-session", () => ({ usePlaylistSession: () => null }));
 vi.mock("@/store/user", () => ({ useUser: () => startupMocks.updateUser }));
 
 vi.mock("@/components/confirm-modal", () => ({ default: "div" }));

@@ -3,6 +3,8 @@ import { log } from "@/platform";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { resetPlayRankingSession, syncPlayRanking } from "@/store/play-ranking";
+import { initPlaylistAccount } from "@/store/playlist-account";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useTagStore } from "@/store/tags";
 import { useUser } from "@/store/user";
 
@@ -10,8 +12,6 @@ import { invalidateSyncToken, retryAfterMs, syncBlockedForMs, watchVersions } fr
 import { decodeFavItems, decodeFavorites, decodeTags, encodeFavItems, encodeFavorites, encodeTags } from "./codec";
 import { StoreSyncController } from "./engine";
 import { watchRetryDelay } from "./watch-backoff";
-
-import "@/store/playlist-account";
 
 /** zustand persist 暴露的 rehydrate 状态，三个歌单 store 都由 persist 中间件包着 */
 type HydratableStore = {
@@ -36,6 +36,7 @@ function waitHydrated(...stores: HydratableStore[]): Promise<void> {
 }
 
 const favoritesController = new StoreSyncController({
+  getAccount: usePlaylistSession.getState,
   store: "favorites",
   waitReady: () => waitHydrated(useFavoritesStore),
   encodeNow: () => encodeFavorites(useFavoritesStore.getState().createdFavorites),
@@ -56,6 +57,7 @@ const favoritesController = new StoreSyncController({
 });
 
 const favItemsController = new StoreSyncController({
+  getAccount: usePlaylistSession.getState,
   store: "fav-items",
   waitReady: () => waitHydrated(useLocalFavItemsStore),
   encodeNow: () => encodeFavItems(useLocalFavItemsStore.getState().folderItems),
@@ -65,6 +67,7 @@ const favItemsController = new StoreSyncController({
 });
 
 const tagsController = new StoreSyncController({
+  getAccount: usePlaylistSession.getState,
   store: "tags",
   waitReady: () => waitHydrated(useTagStore),
   encodeNow: () => encodeTags(useTagStore.getState().tags, useTagStore.getState().itemTags),
@@ -119,6 +122,7 @@ async function startWatchLoop(
       continue;
     }
 
+    if (!isCurrent()) return;
     if (failures > 0) log.info(`[sync/watch] 已恢复（之前失败 ${failures} 次）`);
     failures = 0;
 
@@ -149,6 +153,7 @@ export function initLocalPlaylistSync(): void {
 
   if (initialized) return;
   initialized = true;
+  initPlaylistAccount();
 
   // 注意判空：applyRemote 写回本地时也会触发订阅，那轮数据刚从服务端拿到，
   // 再同步一次是纯空转，而且会让每次变更的请求量翻倍（撞限流的主因之一）。
@@ -220,6 +225,9 @@ export function initLocalPlaylistSync(): void {
     ensureWatch();
     if (state.user?.mid) syncAllNow();
     else void syncPlayRanking();
+  });
+  usePlaylistSession.subscribe((state, prev) => {
+    if (state.ready && !prev.ready) allControllers.forEach(controller => controller.syncNow());
   });
   ensureWatch();
   if (useUser.getState().user?.mid) syncAllNow();

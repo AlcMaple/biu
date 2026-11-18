@@ -22,6 +22,8 @@ vi.mock("@/platform/web", () => ({
   },
 }));
 
+const { default: platform } = await import("@/platform");
+const { usePlaylistSession } = await import("@/store/playlist-session");
 const { StoreNameMap } = await import("@shared/store");
 const { useLocalFavItemsStore } = await import("@/store/local-fav-items");
 const { switchPlaylistAccount } = await import("@/store/playlist-account");
@@ -34,6 +36,44 @@ beforeEach(() => {
 });
 
 describe("网页版本地歌单按账号存", () => {
+  it("A 的旧文件慢于 B，B 的内容仍然保留，读取失败时也禁止编辑和同步", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const pending = new Promise<void>(r => {
+      release = r;
+    });
+    const reading = new Promise<void>(r => {
+      started = r;
+    });
+    const getStore = vi.mocked(platform.getStore);
+    const original = getStore.getMockImplementation()!;
+    getStore.mockImplementation(async (name, mid) => {
+      const saved = await original(name, mid);
+      if (name === StoreNameMap.LocalFavItems && mid === 11) {
+        started();
+        await pending;
+      }
+      if (name === StoreNameMap.Tags && mid === 13) throw new Error("文件正在占用");
+      return saved;
+    });
+    try {
+      disk["11:" + StoreNameMap.LocalFavItems] = { folderItems: { "-1": [song(11)] } };
+      disk["12:" + StoreNameMap.LocalFavItems] = { folderItems: { "-1": [song(12)] } };
+      const first = switchPlaylistAccount(11);
+      await reading;
+      await switchPlaylistAccount(12);
+      release();
+      await first;
+      expect(useLocalFavItemsStore.getState().folderItems[-1].map(i => i.rid)).toEqual([12]);
+      await switchPlaylistAccount(13);
+      expect(usePlaylistSession.getState()).toMatchObject({ mid: 13, ready: false, error: "文件正在占用" });
+      expect(useLocalFavItemsStore.getState().folderItems).toEqual({});
+    } finally {
+      release();
+      getStore.mockImplementation(original);
+      await switchPlaylistAccount(null);
+    }
+  });
   it("A 的歌不会写进 B，B 登录后看到的是 B 自己的", async () => {
     disk[`1:${StoreNameMap.LocalFavItems}`] = { folderItems: { "-1": [song(1)] }, replaceLogs: {} };
     disk[`2:${StoreNameMap.LocalFavItems}`] = { folderItems: { "-1": [song(2)] }, replaceLogs: {} };

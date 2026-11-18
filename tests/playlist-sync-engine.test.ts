@@ -31,6 +31,7 @@ vi.mock("@/service/sync/client", () => ({
   pushOps: (s: string, b: number, o: SyncOp[], a?: boolean) => pushOps(s, b, o, a),
 }));
 
+const account = { mid: 12345, ready: true };
 const { StoreSyncController } = await import("@/service/sync/engine");
 const { SYNC_DEBOUNCE_MS, SYNC_MAX_WAIT_MS, SYNC_META_EPOCH, SYNC_RETRY_DELAY_MS } =
   await import("@/service/sync/config");
@@ -47,7 +48,7 @@ function seedSyncedMeta() {
 
 function makeController(opts: { waitReady: () => Promise<void>; encodeNow: () => LiveSnapshot }) {
   const applyRemote = vi.fn();
-  const controller = new StoreSyncController({ store: "fav-items", applyRemote, ...opts });
+  const controller = new StoreSyncController({ getAccount: () => account, store: "fav-items", applyRemote, ...opts });
   return { applyRemote, controller };
 }
 
@@ -69,6 +70,22 @@ beforeEach(() => {
 });
 
 describe("同步引擎的数据保护", () => {
+  it("新账号首次拉取保留云端红心歌单的自定义封面", async () => {
+    const folder = { id: -1, title: "我喜欢的音乐", type: 11, isLocal: true, isDefault: true };
+    const remote = { "-1": { updatedAt: 9, payload: { ...folder, cover: "cloud-cover" } } };
+    pullSnapshot.mockResolvedValue({ version: 8, updatedAt: 9, data: remote });
+    const applyRemote = vi.fn();
+    const controller = new StoreSyncController({
+      store: "favorites",
+      getAccount: () => account,
+      waitReady: async () => {},
+      encodeNow: () => ({ "-1": { updatedAt: 0, payload: folder } }),
+      applyRemote,
+    });
+    await runSync(controller);
+    expect(pushOps).not.toHaveBeenCalled();
+    expect(applyRemote).toHaveBeenCalledWith(remote);
+  });
   it("rehydrate 未完成时不 encode，等读盘完成后才用真实数据 diff", async () => {
     seedSyncedMeta();
     let hydrated = false;

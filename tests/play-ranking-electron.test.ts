@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("electron", () => ({
   ipcMain: { handle: (name: string, handler: (...args: unknown[]) => unknown) => mocks.handlers.set(name, handler) },
 }));
+vi.mock("../electron/playlist-accounts", () => ({ DesktopPlaylistAccounts: class {} }));
 vi.mock("electron-log", () => ({ default: { error: vi.fn(), warn: vi.fn() } }));
 vi.mock("../electron/store", () => ({
   ...Object.fromEntries(
@@ -21,16 +22,14 @@ vi.mock("../electron/store", () => ({
       "heartbeatFavSeedsStore",
       "heartbeatServedStore",
       "heartbeatSessionStore",
-      "localFavItemsStore",
-      "localFavoritesStore",
+      "legacyPlaylistSyncMeta",
       "lyricsCacheStore",
       "playlistSyncBackupsStore",
       "playlistSyncMetaStore",
       "shortcutKeyStore",
-      "tagsStore",
-      "userStore",
-    ].map(name => [name, {}]),
+    ].map(name => [name, { store: {} }]),
   ),
+  userStore: { get: () => undefined },
   playCountsStore: {
     get store() {
       return mocks.legacy;

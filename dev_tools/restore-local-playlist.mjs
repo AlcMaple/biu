@@ -9,7 +9,7 @@
  * 用法：
  *   node dev_tools/restore-local-playlist.mjs            # 只列出可用备份，不动任何文件
  *   node dev_tools/restore-local-playlist.mjs --apply    # 用最新一份备份还原（自动先备份现状）
- *   node dev_tools/restore-local-playlist.mjs --apply --pick favorites=2,fav-items=0
+ *   node dev_tools/restore-local-playlist.mjs --apply --pick=favorites=2,fav-items=0
  *
  * `--pick` 里的数字是列表中的序号（0 = 最新）；`pre` 表示用 preMigrationBackups。
  * 还原前会把现有的三个 json 复制成 *.before-restore-<时间戳>.json，不会不可逆。
@@ -47,7 +47,9 @@ function userDataDir() {
 
   const candidates = roots.flatMap(root => ["Biu", "biu", "biu-dev"].map(name => path.join(root, name)));
   // 优先选真的有同步记账文件的那个（可能同时存在生产和 dev 两份目录）
-  const withMeta = candidates.find(dir => fs.existsSync(path.join(dir, "playlist-sync-meta.json")));
+  const withMeta = candidates.find(dir =>
+    ["playlist-sync-meta-accounts.json", "playlist-sync-meta.json"].some(file => fs.existsSync(path.join(dir, file))),
+  );
   return withMeta ?? candidates.find(dir => fs.existsSync(dir)) ?? candidates[0];
 }
 
@@ -90,15 +92,19 @@ function decodeTags(snapshot) {
 }
 
 /** 汇总某个 store 所有可用的备份候选，最新在前，preMigration 垫底 */
-function candidatesFor(store, backupsData, metaData, mid) {
+function candidatesFor(store, backupsData, accountMeta, legacyMeta, mid) {
   const rolling = (backupsData?.[mid]?.[store] ?? []).map((entry, index) => ({
     key: String(index),
     label: `滚动备份 #${index}（${new Date(entry.at).toLocaleString()}）`,
     snapshot: entry.snapshot,
   }));
-  const pre = metaData?.[mid]?.preMigrationBackups?.[store];
+  const pre = accountMeta?.[mid]?.preMigrationBackups?.[store];
+  const legacy = legacyMeta?.[mid]?.preMigrationBackups?.[store];
   if (pre) {
     rolling.push({ key: "pre", label: "首次迁移前快照（preMigrationBackups，只写过一次）", snapshot: pre });
+  }
+  if (legacy) {
+    rolling.push({ key: pre ? "legacy" : "pre", label: "2.8.0 以前的首次迁移快照", snapshot: legacy });
   }
   return rolling;
 }
@@ -127,9 +133,11 @@ function main() {
   const dir = userDataDir();
   console.log(`数据目录：${dir}\n`);
 
-  const meta = readJson(path.join(dir, "playlist-sync-meta.json"));
+  const legacyMeta = readJson(path.join(dir, "playlist-sync-meta.json"));
+  const accountMeta = readJson(path.join(dir, "playlist-sync-meta-accounts.json"));
+  const meta = { ...legacyMeta, ...accountMeta };
   const backups = readJson(path.join(dir, "playlist-sync-backups.json"));
-  if (!meta && !backups) {
+  if (!legacyMeta && !accountMeta && !backups) {
     console.error("没找到 playlist-sync-meta.json / playlist-sync-backups.json，无法还原。");
     process.exit(1);
   }
@@ -139,12 +147,15 @@ function main() {
     console.error("备份文件里没有任何用户数据。");
     process.exit(1);
   }
-  const mid = mids[0];
-  if (mids.length > 1) console.log(`⚠️ 发现多个 mid（${mids.join(", ")}），使用第一个：${mid}\n`);
+  const mid = args.find(arg => arg.startsWith("--mid="))?.slice(6) ?? (mids.length === 1 ? mids[0] : undefined);
+  if (!mid || !/^\d+$/.test(mid) || !mids.includes(mid)) {
+    console.error(`请用 --mid=<UID> 选择要还原的账号：${mids.join(", ")}`);
+    process.exit(1);
+  }
 
   const chosen = {};
   for (const store of STORES) {
-    const list = candidatesFor(store, backups, meta, mid);
+    const list = candidatesFor(store, backups, accountMeta, legacyMeta, mid);
     console.log(`【${store}】`);
     if (list.length === 0) {
       console.log("  （无可用备份）\n");
@@ -166,9 +177,15 @@ function main() {
     return;
   }
 
+  const root = process.env.BIU_PLAYLIST_DIR ?? path.join(os.homedir(), "Documents", "Biu");
+  const folder = path.join(root, "accounts", mid);
+  if (!fs.existsSync(folder)) {
+    console.error("找不到该账号的目录，请先用 2.8.0 登录；文档目录已重定向时设置 BIU_PLAYLIST_DIR。");
+    process.exit(1);
+  }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   for (const [store, picked] of Object.entries(chosen)) {
-    const target = path.join(dir, TARGETS[store].file);
+    const target = path.join(folder, TARGETS[store].file);
     if (fs.existsSync(target)) {
       const backupPath = target.replace(/\.json$/, `.before-restore-${stamp}.json`);
       fs.copyFileSync(target, backupPath);
@@ -181,7 +198,7 @@ function main() {
   }
 
   console.log(
-    "\n完成。另外请把 playlist-sync-meta.json 里该 mid 的 versions / snapshots 删掉（或整个文件删掉），" +
+    "\n完成。另外请把 playlist-sync-meta-accounts.json 里该 mid 的 versions / snapshots 清空，" +
       "让下次启动走「首次迁移」的只增不删路径，避免还原后的数据被云端墓碑再删一遍。",
   );
 }

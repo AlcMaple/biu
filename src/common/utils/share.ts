@@ -116,14 +116,22 @@ export const shareLocalFolder = async (folderId: number) => {
     addToast({ title: "歌单是空的，没有可分享的内容", color: "warning" });
     return;
   }
+  const mid = useUser.getState().user?.mid;
+  if (!mid) {
+    addToast({ title: "请先登录 B 站账号再分享本地歌单", color: "warning" });
+    return;
+  }
   try {
-    const result = await publishFolderShare({
-      folderId,
-      title: folder.title,
-      cover: folder.cover,
-      ownerName: useUser.getState().user?.uname,
-      items,
-    });
+    const result = await publishFolderShare(
+      {
+        folderId,
+        title: folder.title,
+        cover: folder.cover,
+        ownerName: useUser.getState().user?.uname,
+        items,
+      },
+      String(mid),
+    );
     if (!result) {
       addToast({ title: "请先登录 B 站账号再分享本地歌单", color: "warning" });
       return;

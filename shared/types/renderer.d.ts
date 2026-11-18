@@ -17,12 +17,12 @@ declare global {
     rankingLocal: (
       action: import("../play-ranking").RankingLocalAction,
     ) => Promise<import("../play-ranking").RankingLocalState>;
-    /** 获取指定name的存储值 */
-    getStore: <N extends StoreName>(name: N) => Promise<StoreDataMap[N] | undefined>;
+    preparePlaylistAccount: (mid: number, claim?: boolean) => Promise<boolean>;
+    getStore: <N extends StoreName>(name: N, owner?: number) => Promise<StoreDataMap[N] | undefined>;
     /** 设置指定name的存储值 */
-    setStore: <N extends StoreName>(name: N, value: StoreDataMap[N]) => Promise<void>;
+    setStore: <N extends StoreName>(name: N, value: StoreDataMap[N], owner?: number) => Promise<void>;
     /** 清除指定name的存储值 */
-    clearStore: (name: StoreName) => Promise<void>;
+    clearStore: (name: StoreName, owner?: number) => Promise<void>;
     /** 打开系统目录选择对话框，返回选中的目录路径 */
     selectDirectory: (title?: string) => Promise<string | null>;
     /** 显示指定路径的文件 */

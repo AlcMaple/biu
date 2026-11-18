@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import platform from "@/platform";
+import { clearPlaylistStore, mergePlaylistState, readPlaylistState, writePlaylistStore } from "./playlist-session";
 import { StoreNameMap } from "@shared/store";
 
 /** 本地收藏夹中的媒体项 */
@@ -296,18 +296,16 @@ export const useLocalFavItemsStore = create<State & Action>()(
     }),
     {
       name: "local-fav-items",
+      merge: mergePlaylistState,
       storage: {
-        getItem: async () => {
-          const store = await platform.getStore(StoreNameMap.LocalFavItems);
-          return store ? { state: store } : null;
-        },
+        getItem: () => readPlaylistState(StoreNameMap.LocalFavItems),
         setItem: async (_, value) => {
           if (value.state) {
-            await platform.setStore(StoreNameMap.LocalFavItems, value.state);
+            await writePlaylistStore(StoreNameMap.LocalFavItems, value.state);
           }
         },
         removeItem: async () => {
-          await platform.clearStore(StoreNameMap.LocalFavItems);
+          await clearPlaylistStore(StoreNameMap.LocalFavItems);
         },
       },
       partialize: state => ({ folderItems: state.folderItems, replaceLogs: state.replaceLogs }),

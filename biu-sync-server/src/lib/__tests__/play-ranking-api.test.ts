@@ -86,6 +86,15 @@ afterEach(async () => {
 });
 
 describe("桌面直连与网页 BFF 共用云端排行", () => {
+  it("桌面带着旧账号的歌单操作不能写入新账号", async () => {
+    const response = await fetch(origin + "/api/sync/favorites", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${signToken("99")}`, "X-Biu-Playlist-Mid": "42", "Content-Type": "application/json" },
+      body: JSON.stringify({ baseVersion: 0, ops: [{ type: "upsert", id: "-1", updatedAt: 123, payload: { title: "A" } }] }),
+    });
+    expect(response.status).toBe(409);
+    expect((await getVersions("99")).favorites).toBe(0);
+  });
   it("排行变化通过原有通知通道唤醒另一端", async () => {
     const known = Object.entries(await getVersions("42"))
       .map(([store, version]) => `${store}:${version}`)

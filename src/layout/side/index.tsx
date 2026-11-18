@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import { Button, Drawer, DrawerBody, DrawerContent, useDisclosure } from "@heroui/react";
+import { addToast, Button, Drawer, DrawerBody, DrawerContent, useDisclosure } from "@heroui/react";
 import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from "@remixicon/react";
 import clx from "classnames";
 
 import { useIsMobileLayout, useIsTabletLayout } from "@/common/hooks/use-responsive";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
 import ScrollContainer from "@/components/scroll-container";
+import { playlistWriteIssue } from "@/store/playlist-write";
 import { isWeb } from "@/platform";
 import { useSettings } from "@/store/settings";
 
@@ -38,6 +39,11 @@ const SideNav = ({ isDrawerOpen, onDrawerOpenChange }: SideNavProps) => {
   const [editingFavorite, setEditingFavorite] = useState<{ id: number; isLocal?: boolean }>();
 
   const handleOpenAddFavorite = () => {
+    const issue = playlistWriteIssue("创建收藏夹");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
     setEditingFavorite(undefined);
     onOpenFavoritesEditModal();
   };

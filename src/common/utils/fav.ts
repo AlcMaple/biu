@@ -1,3 +1,4 @@
+import { usePlaylistSession } from "@/store/playlist-session";
 import { chunk } from "es-toolkit/array";
 
 import type { FavSelectModalData } from "@/store/modal/fav-select-modal";
@@ -325,7 +326,9 @@ export const fetchLocalFavPlayCount = async (item: {
 export const addOnlineItemToLocalFav = (folderId: number, item: Omit<LocalFavItem, "fav_time">): void => {
   useLocalFavItemsStore.getState().addItem(folderId, item);
   if ((item.playCount && item.duration) || item.source === "local" || ![2, 12].includes(item.type)) return;
+  const session = usePlaylistSession.getState();
   void fetchLocalFavRemoteInfo(item).then(({ playCount, duration }) => {
+    if (usePlaylistSession.getState() !== session) return;
     const store = useLocalFavItemsStore.getState();
     if (playCount > 0) {
       store.updatePlayCounts(folderId, new Map([[String(item.rid), playCount]]));

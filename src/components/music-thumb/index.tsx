@@ -7,6 +7,8 @@ import IconButton from "@/components/icon-button";
 import { postWebInterfaceArchiveLike } from "@/service/web-interface-archive-like";
 import { postWebInterfaceArchiveLikeTriple } from "@/service/web-interface-archive-like-triple";
 import { useMusicFavStore } from "@/store/music-fav";
+import { playlistWriteIssue } from "@/store/playlist-write";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { usePlayList } from "@/store/play-list";
 
 import "./index.css";
@@ -48,6 +50,12 @@ const MusicThumb = () => {
       ignoreNextPressRef.current = false;
       return;
     }
+    const issue = playlistWriteIssue("点赞");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     const nextValue = !isThumb;
     setIsThumb(nextValue);
     try {
@@ -55,11 +63,13 @@ const MusicThumb = () => {
         bvid: playItem.bvid,
         like: nextValue ? 1 : 2,
       });
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code !== 0) {
         setIsThumb(!nextValue);
         addToast({ title: "点赞失败，请稍后重试", color: "danger" });
       }
     } catch {
+      if (session !== usePlaylistSession.getState()) return;
       setIsThumb(!nextValue);
       addToast({ title: "点赞失败，请稍后重试", color: "danger" });
     }
@@ -67,8 +77,15 @@ const MusicThumb = () => {
 
   const handleTriple = useCallback(async () => {
     if (!playItem?.bvid) return;
+    const issue = playlistWriteIssue("一键三连");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     try {
       const res = await postWebInterfaceArchiveLikeTriple({ aid: Number(playItem.aid) });
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code === 0) {
         setIsThumb(res.data.like);
         setIsFav(res.data.fav);
@@ -76,6 +93,7 @@ const MusicThumb = () => {
         addToast({ title: "一键三连失败，请稍后重试", color: "danger" });
       }
     } catch {
+      if (session !== usePlaylistSession.getState()) return;
       addToast({ title: "一键三连失败，请稍后重试", color: "danger" });
     }
   }, [playItem?.aid, playItem?.bvid, setIsFav, setIsThumb]);

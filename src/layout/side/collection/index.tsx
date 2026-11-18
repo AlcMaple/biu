@@ -32,6 +32,7 @@ import SortableMenuItem from "@/layout/side/collection/sortable-menu-item";
 import { postFavFolderDel } from "@/service/fav-folder-del";
 import { postFavFolderUnfav } from "@/service/fav-folder-unfav";
 import { getUserVideoArchivesList } from "@/service/user-video-archives-list";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useFavoritesStore, type FavoriteItem } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
@@ -61,6 +62,7 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
   const clearLocalFolder = useLocalFavItemsStore(s => s.clearFolder);
   const localFolderItems = useLocalFavItemsStore(s => s.folderItems);
   const user = useUser(state => state.user);
+  const playlistReady = usePlaylistSession(s => s.ready);
   const createdFavorites = useFavoritesStore(state => state.createdFavorites);
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
   const updateCreatedFavorites = useFavoritesStore(state => state.updateCreatedFavorites);
@@ -140,13 +142,11 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
   );
 
   useEffect(() => {
-    if (!user?.mid) {
-      return;
-    }
+    if (!user?.mid || !playlistReady) return;
 
     updateCreatedFavorites(user.mid);
     updateCollectedFavorites(user.mid);
-  }, [updateCreatedFavorites, updateCollectedFavorites, user?.mid]);
+  }, [updateCreatedFavorites, updateCollectedFavorites, user?.mid, playlistReady]);
 
   const handlePlayFavorite = useCallback(async (favoriteId: number, title?: string, isLocal?: boolean) => {
     try {
@@ -268,9 +268,11 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
             return true;
           }
 
+          const session = usePlaylistSession.getState();
           try {
             const res = await postFavFolderDel({ media_ids: String(favorite.id) });
 
+            if (session !== usePlaylistSession.getState()) return true;
             if (res.code === 0 && res.data === 0) {
               rmCreatedFavorite(Number(favorite.id));
               addToast({ title: "删除成功", color: "success" });
@@ -294,9 +296,11 @@ const Collection = ({ isCollapsed, onOpenAddFavorite, onOpenEditFavorite }: Prop
       onOpenConfirmModal({
         title: favorite.title ? `确认取消收藏「${favorite.title}」吗？` : "确认取消收藏吗？",
         onConfirm: async () => {
+          const session = usePlaylistSession.getState();
           try {
             const res = await postFavFolderUnfav({ media_id: favorite.id, platform: "web" });
 
+            if (session !== usePlaylistSession.getState()) return true;
             if (res.code === 0) {
               rmCollectedFavorite(Number(favorite.id));
               addToast({ title: "已取消收藏", color: "success" });

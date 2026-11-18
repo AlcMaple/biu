@@ -88,10 +88,6 @@ const UserCard = ({ onDropdownOpenChange }: UserCardProps) => {
         hiddenMenuKeys: [],
       });
       usePlayList.getState().clear();
-      useFavoritesStore.setState({
-        createdFavorites: [],
-        collectedFavorites: [],
-      });
       usePlayProgress.setState({
         currentTime: 0,
       });

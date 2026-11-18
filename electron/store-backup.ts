@@ -42,7 +42,7 @@ const hasLocalFavorites = (favoritesPath: string): boolean => {
 const pruneOldBackups = (backupRoot: string) => {
   const dirs = fs
     .readdirSync(backupRoot, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
+    .filter(entry => entry.isDirectory() && /^\d{8}-\d{6}$/.test(entry.name))
     .map(entry => entry.name)
     .sort(); // 时间戳命名，字典序即时间序
 
@@ -51,34 +51,29 @@ const pruneOldBackups = (backupRoot: string) => {
   }
 };
 
-/**
- * 把本地数据文件快照到 userData/data-backups/<时间戳>/。
- * 任何失败都只记日志、不抛出，绝不影响启动。
- * @param sourceDir 本地数据目录（store.ts 的 localDataPath）
- */
 export const backupLocalData = (sourceDir: string) => {
   try {
-    const favoritesPath = path.join(sourceDir, "local-favorites.json");
-    if (!hasLocalFavorites(favoritesPath)) {
-      log.info("[backup] 本地收藏夹为空，跳过快照");
-      return;
-    }
-
+    const scoped = path.join(sourceDir, "accounts");
+    const folders = fs.existsSync(scoped)
+      ? fs
+          .readdirSync(scoped, { withFileTypes: true })
+          .filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name))
+          .map(entry => path.join("accounts", entry.name))
+      : [];
+    const sources = ["", ...folders].filter(folder => hasLocalFavorites(path.join(sourceDir, folder, BACKUP_FILES[0])));
+    if (!sources.length) return;
     const backupRoot = path.join(app.getPath("userData"), "data-backups");
-    fs.mkdirSync(backupRoot, { recursive: true });
-
-    const dest = path.join(backupRoot, timestamp(new Date()));
-    fs.mkdirSync(dest, { recursive: true });
-
-    for (const file of BACKUP_FILES) {
-      const src = path.join(sourceDir, file);
-      if (fs.existsSync(src)) {
-        fs.copyFileSync(src, path.join(dest, file));
+    const snapshot = path.join(backupRoot, timestamp(new Date()));
+    for (const folder of sources) {
+      const dest = path.join(snapshot, folder);
+      fs.mkdirSync(dest, { recursive: true });
+      for (const file of BACKUP_FILES) {
+        const src = path.join(sourceDir, folder, file);
+        if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dest, file));
       }
     }
-
     pruneOldBackups(backupRoot);
-    log.info(`[backup] 已生成快照：${dest}`);
+    log.info(`[backup] 已生成快照：${snapshot}`);
   } catch (err) {
     log.warn("[backup] 快照失败：", err);
   }

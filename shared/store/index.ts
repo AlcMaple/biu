@@ -18,3 +18,8 @@ export enum StoreNameMap {
   /** 个人听歌排行：每首歌的播放次数与最近播放时间戳，纯设备本地统计 */
   PlayCounts = "play-counts",
 }
+
+export const playlistStoreNames = [StoreNameMap.LocalFavorites, StoreNameMap.LocalFavItems, StoreNameMap.Tags] as const;
+export type PlaylistStoreName = (typeof playlistStoreNames)[number];
+export const isPlaylistStore = (name: StoreName): name is PlaylistStoreName =>
+  playlistStoreNames.some(store => store === name);

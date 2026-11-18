@@ -1,3 +1,4 @@
+import { usePlaylistSession } from "@/store/playlist-session";
 import { extractSongInfo, titleIncludesSong } from "@/components/lyrics/auto-match";
 import { getWebInterfaceWbiSearchType, type SearchVideoItem } from "@/service/web-interface-search-type";
 import { type LocalFavItem, type ReplaceLog, useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -205,9 +206,11 @@ export const removeInvalidItem = (folderId: number, log: ReplaceLog) => {
 
 /** 「换一个」/「重试」：候选耗尽时还原成失效项，交给用户自己搜索；搜索出错时抛出，由调用方展示原因 */
 export const findAnother = async (folderId: number, log: ReplaceLog) => {
+  const session = usePlaylistSession.getState();
   const finder = createCandidateFinder(log.original, folderId, log.tried);
   if (log.current?.bvid) finder.seen.add(log.current.bvid);
   const cand = await finder.next();
+  if (session !== usePlaylistSession.getState()) return false;
   if (!cand) {
     toPending(folderId, log, "没有更多可信的候选，可以自己搜索", [...finder.seen]);
     return false;
@@ -218,6 +221,7 @@ export const findAnother = async (folderId: number, log: ReplaceLog) => {
 
 /** 打开歌单时对新发现的失效视频各尝试一次；遇到搜索错误立即停手，不继续打接口 */
 export const autoReplaceFolder = async (folderId: number) => {
+  const session = usePlaylistSession.getState();
   const state = useLocalFavItemsStore.getState();
   state.pruneReplaceLogs(folderId);
   const logged = new Set((useLocalFavItemsStore.getState().replaceLogs?.[folderId] ?? []).map(l => l.id));
@@ -229,12 +233,14 @@ export const autoReplaceFolder = async (folderId: number) => {
     const log = newLog(item);
     try {
       const cand = await createCandidateFinder(item, folderId, []).next();
+      if (session !== usePlaylistSession.getState()) return;
       if (cand) {
         applyReplacement(folderId, log, cand, "auto");
       } else {
         useLocalFavItemsStore.getState().upsertReplaceLog(folderId, { ...log, reason: "没有找到可信的同名视频" });
       }
     } catch (err) {
+      if (session !== usePlaylistSession.getState()) return;
       useLocalFavItemsStore.getState().upsertReplaceLog(folderId, {
         ...log,
         status: "error",

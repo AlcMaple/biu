@@ -92,24 +92,9 @@ export const heartbeatSessionStore = new Store<{ active: boolean; sessionIds: st
 /** 本地收藏夹/歌曲/标签数据目录（用户可将其放进网盘同步目录实现跨端同步） */
 export const localDataPath = path.join(app.getPath("documents"), "Biu");
 
-export const localFavoritesStore = new Store<Record<string, any>>({
-  name: StoreNameMap.LocalFavorites,
-  cwd: localDataPath,
-});
-
-export const localFavItemsStore = new Store<Record<string, any>>({
-  name: StoreNameMap.LocalFavItems,
-  cwd: localDataPath,
-});
-
-export const tagsStore = new Store<Record<string, any>>({
-  name: StoreNameMap.Tags,
-  cwd: localDataPath,
-});
-
 /** 本地歌单云同步的记账信息（每 mid 的已同步版本号/快照），纯设备本地状态，放应用数据目录即可 */
 export const playlistSyncMetaStore = new Store<PlaylistSyncMetaData>({
-  name: StoreNameMap.PlaylistSyncMeta,
+  name: "playlist-sync-meta-accounts",
   cwd: getUserDataPath(),
   defaults: {},
 });
@@ -119,4 +104,10 @@ export const playlistSyncBackupsStore = new Store<PlaylistSyncBackupsData>({
   name: StoreNameMap.PlaylistSyncBackups,
   cwd: getUserDataPath(),
   defaults: {},
+});
+
+// 2.7.0 的基线描述的是整台设备的共用数据。新账本从首次合并开始，旧账本保留供迁移判断和恢复。
+export const legacyPlaylistSyncMeta = new Store<PlaylistSyncMetaData>({
+  name: StoreNameMap.PlaylistSyncMeta,
+  cwd: getUserDataPath(),
 });

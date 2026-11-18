@@ -8,6 +8,7 @@ import { CollectionType } from "@/common/constants/collection";
 import { isDefaultFav } from "@/common/utils/fav";
 import { postFavFolderDel } from "@/service/fav-folder-del";
 import { useFavoritesStore } from "@/store/favorite";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useModalStore } from "@/store/modal";
 
 import DownloadSelectModal from "../download-select-modal";
@@ -91,10 +92,12 @@ const Menu = ({ type, isCreatedBySelf, mediaCount, attr, onClearInvalid, onShare
           title: "确认删除当前收藏夹吗？",
           type: "danger",
           onConfirm: async () => {
+            const session = usePlaylistSession.getState();
             const res = await postFavFolderDel({
               media_ids: id as string,
             });
 
+            if (session !== usePlaylistSession.getState()) return true;
             if (res.code === 0 && res.data === 0) {
               useFavoritesStore.getState().rmCreatedFavorite(Number(id));
               navigate("/empty");

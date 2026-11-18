@@ -314,6 +314,13 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
       }
 
       let credential = await tokenCache.get(session, controller.signal);
+      const expectedMid =
+        route.kind === "sync" || route.kind === "share" ? request.headers["x-biu-playlist-mid"] : undefined;
+      const matchesAccount = () => expectedMid === undefined || expectedMid === credential.mid;
+      if (!matchesAccount()) {
+        jsonResponse(response, 409, { error: "歌单账号已变化" });
+        return true;
+      }
       if (route.kind === "session") {
         jsonResponse(response, 200, { code: 0, data: { mid: credential.mid }, message: "0" });
         return true;
@@ -341,6 +348,10 @@ export function createBiuSyncProxyHandler(options: BiuSyncProxyHandlerOptions = 
         await upstream.body?.cancel();
         tokenCache.invalidate(session.sessionId);
         credential = await tokenCache.get(session, controller.signal);
+        if (!matchesAccount()) {
+          jsonResponse(response, 409, { error: "歌单账号已变化" });
+          return true;
+        }
         upstream = await requestSyncService(target, {
           body,
           headers: requestHeaders(request, credential.token, body),

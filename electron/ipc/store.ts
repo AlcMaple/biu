@@ -2,24 +2,24 @@ import { ipcMain } from "electron";
 import log from "electron-log";
 
 import { updateRankingLocal, type RankingLocalAction } from "@shared/play-ranking";
-import { StoreNameMap } from "@shared/store";
+import { isPlaylistStore, StoreNameMap } from "@shared/store";
 
 import {
   appSettingsStore,
   heartbeatFavSeedsStore,
   heartbeatServedStore,
   heartbeatSessionStore,
-  localFavItemsStore,
-  localFavoritesStore,
+  localDataPath,
+  legacyPlaylistSyncMeta,
   lyricsCacheStore,
   playCountsStore,
   playRankingSyncStore,
   playlistSyncBackupsStore,
   playlistSyncMetaStore,
   shortcutKeyStore,
-  tagsStore,
   userStore,
 } from "../store";
+import { DesktopPlaylistAccounts } from "../playlist-accounts";
 import { channel } from "./channel";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -43,8 +43,8 @@ async function setStoreWithRetry(name: string, store: { set: (value: any) => voi
 
   const delays = [0, 200, 500, 1000, 2000];
   for (let i = 0; i < delays.length; i++) {
-    if (writeSeq.get(name) !== seq) return;
     if (delays[i]) await sleep(delays[i]);
+    if (writeSeq.get(name) !== seq) return;
     try {
       store.set(value);
       return;
@@ -56,6 +56,42 @@ async function setStoreWithRetry(name: string, store: { set: (value: any) => voi
 }
 
 export function registerStoreHandlers() {
+  const lastLoginMid = userStore.get("mid");
+  const readHistory = () => {
+    const meta = legacyPlaylistSyncMeta.store;
+    const owners = [
+      lastLoginMid,
+      ...Object.keys(meta).map(Number),
+      ...Object.keys(playlistSyncBackupsStore.store).map(Number),
+    ];
+    return { owners, meta };
+  };
+  let accounts: DesktopPlaylistAccounts | undefined;
+  const getAccounts = () => (accounts ??= new DesktopPlaylistAccounts(localDataPath, readHistory));
+  const assertOwner = (owner?: number): number => {
+    if (
+      !owner ||
+      !Number.isSafeInteger(owner) ||
+      owner <= 0 ||
+      !userStore.get("isLogin") ||
+      userStore.get("mid") !== owner
+    )
+      throw new Error("歌单账号已切换，请重新打开");
+    return owner;
+  };
+  // 读盘和认领须等此前已接收的写入结束，包括被网盘锁住后正在等待重试的写入。
+  let playlistQueue = Promise.resolve();
+  function enqueue<T>(operation: () => T | Promise<T>): Promise<T> {
+    const next = playlistQueue.then(operation);
+    playlistQueue = next.then(
+      () => undefined,
+      error => log.error("[store:playlists]", error),
+    );
+    return next;
+  }
+  ipcMain.handle(channel.store.preparePlaylistAccount, (_, mid: number, claim?: boolean) =>
+    enqueue(() => getAccounts().prepare(assertOwner(mid), claim === true)),
+  );
   let rankingQueue: Promise<unknown> = Promise.resolve();
   ipcMain.handle(channel.store.rankingLocal, (_event, action: RankingLocalAction) => {
     const run = rankingQueue.then(async () => {
@@ -68,7 +104,11 @@ export function registerStoreHandlers() {
     rankingQueue = run.catch(() => undefined);
     return run;
   });
-  ipcMain.handle(channel.store.get, async (_, name: StoreName) => {
+  ipcMain.handle(channel.store.get, async (_, name: StoreName, owner?: number) => {
+    if (isPlaylistStore(name)) {
+      if (!owner) return undefined;
+      return enqueue(() => getAccounts().accountStore(assertOwner(owner), name).store);
+    }
     if (name === StoreNameMap.AppSettings) {
       return appSettingsStore.store;
     }
@@ -83,18 +123,6 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.LyricsCache) {
       return lyricsCacheStore.store;
-    }
-
-    if (name === StoreNameMap.LocalFavorites) {
-      return localFavoritesStore.store;
-    }
-
-    if (name === StoreNameMap.LocalFavItems) {
-      return localFavItemsStore.store;
-    }
-
-    if (name === StoreNameMap.Tags) {
-      return tagsStore.store;
     }
 
     if (name === StoreNameMap.HeartbeatServed) {
@@ -122,7 +150,12 @@ export function registerStoreHandlers() {
     }
   });
 
-  ipcMain.handle(channel.store.set, async (_, name: StoreName, value: any) => {
+  ipcMain.handle(channel.store.set, async (_, name: StoreName, value: unknown, owner?: number) => {
+    if (isPlaylistStore(name)) {
+      if (!owner) return;
+      const mid = assertOwner(owner);
+      return enqueue(() => setStoreWithRetry(String(mid) + ":" + name, getAccounts().accountStore(mid, name), value));
+    }
     try {
       // 确保 value 是有效对象，防止 electron-store 报错
       if (value === null || value === undefined) {
@@ -144,18 +177,6 @@ export function registerStoreHandlers() {
 
       if (name === StoreNameMap.LyricsCache) {
         await setStoreWithRetry(name, lyricsCacheStore, value);
-      }
-
-      if (name === StoreNameMap.LocalFavorites) {
-        await setStoreWithRetry(name, localFavoritesStore, value);
-      }
-
-      if (name === StoreNameMap.LocalFavItems) {
-        await setStoreWithRetry(name, localFavItemsStore, value);
-      }
-
-      if (name === StoreNameMap.Tags) {
-        await setStoreWithRetry(name, tagsStore, value);
       }
 
       if (name === StoreNameMap.HeartbeatServed) {
@@ -183,15 +204,22 @@ export function registerStoreHandlers() {
       }
     } catch (err) {
       log.error(`[store:set] Error setting store ${String(name)}:`, err);
+      throw err;
     }
   });
 
-  ipcMain.handle(channel.store.clear, async (_, name: StoreName) => {
+  ipcMain.handle(channel.store.clear, async (_, name: StoreName, owner?: number) => {
+    if (isPlaylistStore(name)) {
+      if (!owner) return;
+      const mid = assertOwner(owner);
+      return enqueue(() => getAccounts().accountStore(mid, name).clear());
+    }
     if (name === StoreNameMap.AppSettings) {
       appSettingsStore.clear();
     }
 
     if (name === StoreNameMap.UserLoginInfo) {
+      writeSeq.set(name, (writeSeq.get(name) ?? 0) + 1);
       userStore.clear();
     }
 
@@ -201,18 +229,6 @@ export function registerStoreHandlers() {
 
     if (name === StoreNameMap.LyricsCache) {
       lyricsCacheStore.clear();
-    }
-
-    if (name === StoreNameMap.LocalFavorites) {
-      localFavoritesStore.clear();
-    }
-
-    if (name === StoreNameMap.LocalFavItems) {
-      localFavItemsStore.clear();
-    }
-
-    if (name === StoreNameMap.Tags) {
-      tagsStore.clear();
     }
 
     if (name === StoreNameMap.HeartbeatServed) {

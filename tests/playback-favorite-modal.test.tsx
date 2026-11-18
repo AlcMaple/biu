@@ -5,6 +5,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const viewRequest = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock("@/service/fav-folder-created-list-all", () => ({
+  getFavFolderCreatedListAll: async () => ({ data: { list: [] } }),
+}));
 vi.mock("@/service/request", () => ({ apiRequest: { get: viewRequest.get } }));
 
 vi.mock("@heroui/react", () => {
@@ -46,7 +49,7 @@ vi.mock("@heroui/react", () => {
     }) => <input type="checkbox" checked={isSelected} onChange={onChange} onClick={onClick} aria-label={label} />,
   };
 });
-// 这里测的是弹窗本身；网页版未登录不能收藏的拦截另有用例
+// 两端共用收藏弹窗，这里以已登录且歌单就绪的账号操作。
 vi.mock("@/platform", async importOriginal => ({ ...(await importOriginal<object>()), isWeb: false }));
 vi.mock("@/common/hooks/use-responsive", () => ({ useIsMobileLayout: () => false }));
 vi.mock("@/components/scroll-container", () => ({
@@ -67,6 +70,8 @@ import { useLocalFavItemsStore, type LocalFavItem } from "@/store/local-fav-item
 import { useModalStore } from "@/store/modal";
 import { useSettings } from "@/store/settings";
 import { useTagStore, getItemTagKey } from "@/store/tags";
+import { usePlaylistSession } from "@/store/playlist-session";
+import { createTestUser } from "@/common/constants/test-account";
 import { useUser } from "@/store/user";
 
 let root: Root;
@@ -84,7 +89,8 @@ const item: LocalFavItem = {
 
 beforeEach(() => {
   viewRequest.get.mockReset();
-  useUser.setState({ user: null });
+  useUser.setState({ user: createTestUser() });
+  usePlaylistSession.setState({ mid: 1, ready: true });
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div");
   document.body.append(container);
@@ -193,4 +199,12 @@ test("失败明确提示且仅手动重试，不把未知分集当成单集", as
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(container.querySelector('input[aria-label="已有"]')).toBeInTheDocument();
   expect(viewRequest.get).toHaveBeenCalledTimes(2);
+});
+
+test("桌面游客点收藏时保留播放页面，收藏弹窗不会打开", async () => {
+  useUser.setState({ user: null });
+  usePlaylistSession.setState({ mid: null, ready: false });
+  await act(async () => openOnline("guest"));
+  expect(useModalStore.getState().isFavSelectModalOpen).toBe(false);
+  expect(viewRequest.get).not.toHaveBeenCalled();
 });
