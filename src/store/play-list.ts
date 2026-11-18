@@ -11,7 +11,13 @@ import { getAudioUrl, getDashUrl, isResourceGoneCode, isUrlValid } from "@/commo
 import { resumeAudioGraph } from "@/common/utils/audio-graph";
 import { BILI_RATE_LIMIT_MESSAGE, isBiliRateLimitError, isBiliRateLimitStatus } from "@/common/utils/bili-rate-limit";
 import { tryBv2av } from "@/common/utils/bv";
-import { attachMediaSourceAudio, shouldUseMediaSource, type MediaSourceController } from "@/common/utils/media-source";
+import {
+  attachMediaSourceAudio,
+  isAppleMobileWebKit,
+  MediaFetchError,
+  shouldUseMediaSource,
+  type MediaSourceController,
+} from "@/common/utils/media-source";
 import { beginPlayReport, endPlayReport, reportHeartbeat } from "@/common/utils/play-report";
 import { isSamePlaybackUrl, normalizePlaybackUrl, sanitizePersistedPlaybackUrls } from "@/common/utils/playback-url";
 import { stripHtml } from "@/common/utils/str";
@@ -506,21 +512,65 @@ let mseDownloadedBytes = 0;
  * 因此单独记一份逻辑地址，供「是否已是当前源」的判断使用。
  */
 let currentSourceUrl = "";
+let sourceNeedsReload = false;
+let recoveringDirect = false;
+let resetStallWatchdog: (() => void) | undefined;
+let metadataSeek: { time: number; apply: () => void } | undefined;
+const cancelMetadataSeek = () => {
+  if (metadataSeek) audio.removeEventListener("loadedmetadata", metadataSeek.apply);
+  metadataSeek = undefined;
+};
 const isSameCurrentSource = (url?: string) =>
-  isSamePlaybackUrl(currentSourceUrl, url) || isSamePlaybackUrl(audio.src, url);
+  !sourceNeedsReload && (isSamePlaybackUrl(currentSourceUrl, url) || isSamePlaybackUrl(audio.src, url));
 
-/** MSE 下 seek 必须等 loadedmetadata：刚挂载时时长未知，提前写 currentTime 会被丢弃 */
+// 原生直连必须等 metadata 才能定位；MSE 的定位由喂流器负责。
 const seekOnMetadata = (resumeTime: number) => {
+  cancelMetadataSeek();
   if (!resumeTime || resumeTime <= 0) return;
   const seek = () => {
-    audio.removeEventListener("loadedmetadata", seek);
+    cancelMetadataSeek();
     try {
       audio.currentTime = resumeTime;
     } catch {
       /* noop */
     }
   };
+  metadataSeek = { time: resumeTime, apply: seek };
   audio.addEventListener("loadedmetadata", seek);
+};
+
+const interruptedPosition = () =>
+  pendingSeekDisplayTime ??
+  metadataSeek?.time ??
+  (audio.readyState === 0 && !audio.currentTime ? currentMountStartTime : audio.currentTime);
+
+const pauseInterruptedSource = (position: number) => {
+  resetStallWatchdog?.();
+  sourceNeedsReload = true;
+  cancelMetadataSeek();
+  audio.pause();
+  updatePlaybackState();
+  usePlayList.setState({ isPlaying: false });
+  usePlayProgress.getState().setCurrentTime(position);
+};
+
+const recoverMseAsDirect = () => {
+  if (!activeMediaSourceController) return;
+  const position = interruptedPosition();
+  if (audio.paused) {
+    pauseInterruptedSource(position);
+    return;
+  }
+  resetStallWatchdog?.();
+  activeMediaSourceController.abort();
+  activeMediaSourceController = undefined;
+  recoveringDirect = position > 0;
+  currentMountStartTime = position;
+  log.warn("iOS 分段播放中断，保留断点切到直连", { position });
+  seekOnMetadata(position);
+  audio.src = currentSourceUrl;
+  audio.load();
+  void playAudioSafely();
 };
 
 /**
@@ -543,6 +593,10 @@ const setAudioSource = (
 ) => {
   // 换源/切歌作废掉还没执行的跳转重挂，避免它稍后把刚设好的源又顶掉
   cancelPendingRemountSeek();
+  cancelMetadataSeek();
+  resetStallWatchdog?.();
+  sourceNeedsReload = false;
+  recoveringDirect = false;
   activeMediaSourceController?.abort();
   activeMediaSourceController = undefined;
   mseDownloadedBytes = 0;
@@ -586,14 +640,15 @@ const setAudioSource = (
       onProgress: received => {
         mseDownloadedBytes = received;
       },
-      onError: () => {
-        // MSE 失败：回退直连（iOS 上通常也会失败，但会走进既有的 onerror→换源/跳过链路）
-        if (activeMediaSourceController?.url !== url) return;
-        activeMediaSourceController = undefined;
-        seekOnMetadata(opts.resumeTime ?? 0);
-        audio.src = url;
-        audio.load();
-        void playAudioSafely();
+      onError: error => {
+        if (!controller || activeMediaSourceController !== controller) return;
+        if (error instanceof MediaFetchError && (isBiliRateLimitStatus(error.status) || error.status >= 500)) {
+          pauseInterruptedSource(interruptedPosition());
+          if (isBiliRateLimitStatus(error.status)) enterRateLimitHold(`media HTTP ${error.status}`);
+          else toastError(`播放源暂时不可用（HTTP ${error.status}），请稍后再点播放`);
+          return;
+        }
+        recoverMseAsDirect();
       },
     });
     if (controller) {
@@ -613,11 +668,11 @@ const setAudioSource = (
 const updatePositionState = () => {
   if ("mediaSession" in navigator) {
     const dur = audio.duration;
-    if (!Number.isNaN(dur) && dur !== Infinity) {
+    if (Number.isFinite(dur) && dur > 0) {
       navigator.mediaSession.setPositionState({
         duration: dur,
         playbackRate: audio.playbackRate,
-        position: audio.currentTime,
+        position: Math.min(Math.max(0, audio.currentTime), dur),
       });
     }
   }
@@ -675,6 +730,7 @@ async function probeMediaResponse(url: string): Promise<Record<string, unknown>>
       cache: "no-store",
       credentials: "same-origin",
       headers: { Range: "bytes=0-65535" },
+      signal: AbortSignal.timeout(8000),
       method: "GET",
     });
     let bytes = 0;
@@ -951,24 +1007,43 @@ export const usePlayList = create<State & Action>()(
             // 最多再宽限 6 轮 ≈ 72s。手机隧道网络下慢，12s 一刀切容易误杀正常但慢的源；
             // 期间源一直正常就不误杀，真正的坏源探测会失败、照常换源/跳过。
             const MAX_STALL_GRACE = 6;
+            // 开播后字节可能在涨、解码却停了。只额外等两轮，播放位置真走了才重置。
+            const MAX_PLAYING_BUFFER_GRACE = 2;
+            resetStallWatchdog?.();
+            let watchClock = false;
+            let watchGeneration = 0;
             let stallGraceUsed = 0;
             let stallWatchdog: ReturnType<typeof setTimeout> | undefined;
             const clearStallWatchdog = () => {
+              watchGeneration += 1;
               if (stallWatchdog) {
                 clearTimeout(stallWatchdog);
                 stallWatchdog = undefined;
               }
             };
+            resetStallWatchdog = () => {
+              clearStallWatchdog();
+              watchClock = false;
+              stallGraceUsed = 0;
+            };
             const armStallWatchdog = () => {
               if (stallWatchdog) return;
               const playId = get().playId;
               if (!playId) return;
+              const generation = watchGeneration;
               const positionAtArm = audio.currentTime;
               const bufferedAtArm = bufferedEnd();
               const mseBytesAtArm = mseDownloadedBytes;
               stallWatchdog = setTimeout(() => {
                 stallWatchdog = undefined;
-                if (get().playId !== playId || audio.paused) return;
+                if (generation !== watchGeneration || get().playId !== playId || audio.ended) return;
+                if (audio.paused) {
+                  if (watchClock && get().isPlaying) {
+                    set({ isPlaying: false });
+                    updatePlaybackState();
+                  }
+                  return;
+                }
                 // 关键修复：不只看播放位置，也看缓冲是否在增长。
                 // 移动端初始缓冲期 currentTime 长时间停在 0，但 buffered 一直在涨——
                 // 这是「慢」不是「卡死」，只看 currentTime 会误判并触发无谓换源，
@@ -978,9 +1053,23 @@ export const usePlayList = create<State & Action>()(
                 // iOS MSE 起播前（首段还没喂入）buffered 恒为 0，但只要下载字节还在涨，
                 // 就是「下载慢」不是「卡死」，同样重新计时，避免误杀正在拉流的源。
                 const advancedDownload = mseDownloadedBytes > mseBytesAtArm;
-                if (advancedPlayback || advancedBuffer || advancedDownload) {
-                  stallGraceUsed = 0; // 有真实进度，宽限额度归零
+                if (
+                  advancedPlayback ||
+                  ((advancedBuffer || advancedDownload) && (!watchClock || stallGraceUsed < MAX_PLAYING_BUFFER_GRACE))
+                ) {
+                  stallGraceUsed = watchClock && !advancedPlayback ? stallGraceUsed + 1 : 0;
                   armStallWatchdog();
+                  return;
+                }
+                // 已开播的 iOS 即使解码停摆也可能既不报错也不派发 waiting。
+                // 分段流只转一次原生直连；直连仍不动就停在本曲，等新的用户手势。
+                if (watchClock) {
+                  log.warn("iOS 播放进度停滞", describeAudioState());
+                  if (activeMediaSourceController) recoverMseAsDirect();
+                  else {
+                    pauseInterruptedSource(interruptedPosition());
+                    toastError("播放中断，点击播放从断点继续");
+                  }
                   return;
                 }
                 // 无可见进度：先探一次真实 HTTP 状态。iOS 原生加载器在缓冲大文件时
@@ -990,7 +1079,11 @@ export const usePlayList = create<State & Action>()(
                 const stalledSrc = currentSourceUrl || audio.src;
                 void probeMediaResponse(stalledSrc)
                   .then(probe => {
-                    if (get().playId !== playId || audio.paused) return;
+                    if (generation !== watchGeneration || get().playId !== playId || audio.paused) return;
+                    if (audio.currentTime !== positionAtArm) {
+                      armStallWatchdog();
+                      return;
+                    }
                     const stillLoading = audio.networkState === NETWORK_LOADING && !audio.error;
                     const sourceHealthy = probe.probeStatus === 200 || probe.probeStatus === 206;
                     if (stillLoading && sourceHealthy && stallGraceUsed < MAX_STALL_GRACE) {
@@ -1011,6 +1104,7 @@ export const usePlayList = create<State & Action>()(
                     });
                   })
                   .catch(() => {
+                    if (generation !== watchGeneration || get().playId !== playId || audio.paused) return;
                     void handlePlaybackFailure(playId, stalledSrc, { message: "stall watchdog timeout" });
                   });
               }, STALL_TIMEOUT_MS);
@@ -1109,7 +1203,7 @@ export const usePlayList = create<State & Action>()(
             audio.ontimeupdate = () => {
               const currentTime = Math.round(audio.currentTime * 100) / 100;
               // 跳转还在重新取流：进度条停在用户跳到的位置，别被旧位置的 timeupdate 拉回去
-              if (pendingSeekDisplayTime === undefined) {
+              if (pendingSeekDisplayTime === undefined && !metadataSeek && !sourceNeedsReload) {
                 usePlayProgress.getState().setCurrentTime(currentTime);
               }
               const playItem = get().getPlayItem?.();
@@ -1120,24 +1214,38 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onseeked = () => {
+              if (sourceNeedsReload) return;
               // 定位真正落实（含 MSE 数据到位后补的那一下）：交还进度条控制权
               clearPendingSeekDisplay();
               usePlayProgress.getState().setCurrentTime(Math.round(audio.currentTime * 100) / 100);
               updatePositionState();
             };
 
-            // 缓冲事件驱动卡死看门狗：长时间无进度时换源自救
+            // 起播前监听缓冲事件；iOS 真正开播后持续检查播放时钟。
             audio.onwaiting = armStallWatchdog;
             audio.onstalled = armStallWatchdog;
-            audio.onplaying = () => clearStallWatchdog();
+            const watchIosPlayback = () => {
+              if (!watchClock) {
+                clearStallWatchdog();
+                stallGraceUsed = 0;
+                watchClock = true;
+              }
+              armStallWatchdog();
+            };
+            audio.onplaying = () => {
+              if (isAppleMobileWebKit()) watchIosPlayback();
+              else clearStallWatchdog();
+            };
 
             audio.onratechange = () => {
               updatePositionState();
             };
 
             audio.onplay = () => {
-              // 播放是用户手势：借机恢复可能被浏览器自动挂起的音频图，确保音量增强生效
+              if (audio.paused || sourceNeedsReload) return;
+              // 开始播放时恢复可能被浏览器挂起的音频图。
               resumeAudioGraph();
+              if (recoveringDirect) watchIosPlayback();
               consecutiveErrorCount = 0; // 成功开始播放，重置失败计数
               rateLimitHold = false;
               set({ isPlaying: true });
@@ -1150,7 +1258,8 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onpause = () => {
-              clearStallWatchdog();
+              if (!audio.paused) return;
+              resetStallWatchdog?.();
               set({ isPlaying: false });
               updatePlaybackState();
               updatePositionState();
@@ -1161,6 +1270,7 @@ export const usePlayList = create<State & Action>()(
             };
 
             audio.onended = () => {
+              resetStallWatchdog?.();
               if (consumeSleepTimerOnEnded()) {
                 const playItem = get().getPlayItem?.();
                 if (shouldReportPlayRecord(playItem)) {
@@ -1189,13 +1299,14 @@ export const usePlayList = create<State & Action>()(
             // 时不会触发 ended，导致 UI 卡住不动；这里补齐失败路径。
             audio.onerror = () => {
               // src 被清空（clear() 会触发）/ 已无当前播放项：忽略
-              if (!audio.getAttribute("src")) return;
+              if (!audio.getAttribute("src") || sourceNeedsReload) return;
               const playId = get().playId;
               if (!playId) return;
               const err = audio.error;
               // ABORTED(1) 是用户主动中止（切歌时旧请求被打断），不算播放失败
               if (!err || err.code === MediaError.MEDIA_ERR_ABORTED) return;
 
+              resetStallWatchdog?.();
               const erroredSrc = currentSourceUrl || audio.src;
               void handlePlaybackFailure(playId, erroredSrc, { code: err.code, message: err.message });
             };
@@ -2201,7 +2312,6 @@ async function tryFailoverAudioSource(playId: string, failedSrc: string, httpSta
       failoverTriedUrls.add(normalizePlaybackUrl(currentSourceUrl));
       toastInfo("播放卡顿，正在重新获取播放源…");
       // refreshCurrentAudioSource 已经把源设置好（含 seek），这里直接播
-      seekOnMetadata(resumeTime);
       void playAudioSafely();
       return true;
     }
@@ -2374,6 +2484,7 @@ function resetAudioAndPlay(url: string) {
   setAudioSource(url, {
     audioCodecs: item?.audioCodecs,
     audioBandwidth: item?.audioBandwidth,
+    duration: item?.duration,
     isDolby: item?.isDolby,
     isLossless: item?.isLossless,
   });

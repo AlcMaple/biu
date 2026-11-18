@@ -154,6 +154,12 @@ export const findFragmentStart = (chunk: Uint8Array): number | undefined => {
   return undefined;
 };
 
+export class MediaFetchError extends Error {
+  constructor(readonly status: number) {
+    super(`media fetch failed: ${status}`);
+  }
+}
+
 export interface MediaSourceController {
   /** 中止本次加载并释放资源（切歌/换源时调用） */
   abort(): void;
@@ -203,6 +209,7 @@ export function attachMediaSourceAudio(
   };
 
   const cleanup = () => {
+    if (aborted) return;
     aborted = true;
     controller.abort();
     try {
@@ -317,7 +324,11 @@ export function attachMediaSourceAudio(
       signal: controller.signal,
     });
     // 服务端忽略 Range 直接回 200 时，拿到的字节和我们算的偏移对不上，必须放弃快路径
-    if (response.status !== 206) return undefined;
+    if (!response.ok) throw new MediaFetchError(response.status);
+    if (response.status !== 206) {
+      void response.body?.cancel();
+      return undefined;
+    }
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
       totalSize: parseTotalSize(response.headers.get("content-range")),
@@ -364,7 +375,7 @@ export function attachMediaSourceAudio(
         totalSize: head.totalSize ?? scan.totalSize,
       };
     } catch (error) {
-      if ((error as { name?: string })?.name === "AbortError") throw error;
+      if (error instanceof MediaFetchError || (error as { name?: string })?.name === "AbortError") throw error;
       log.warn("[mse] 定位目标片段失败，退回顺序喂", { error: String(error) });
       return undefined;
     }
@@ -376,6 +387,9 @@ export function attachMediaSourceAudio(
       log.warn("[mse] sourceopen，开始分段流式喂流（bilibili 式：先起播，后台续下）", { mime });
       sourceBuffer = mediaSource.addSourceBuffer(mime);
       const sb = sourceBuffer;
+      // 部分分片 MP4 的文件头没有总时长。WebKit 会把最后一段缓存的末尾当作歌尾，
+      // 断流时提前派发 ended，连恢复断点的机会都没有。正常 EOS 仍以实际尾段为准。
+      if (opts.duration && Number.isFinite(opts.duration) && opts.duration > 0) mediaSource.duration = opts.duration;
 
       // ---- 定位：需要从中间开始播时，先取 init 段并把目标时间换算成字节偏移 ----
       const startTime = Math.max(0, opts.startTime ?? 0);
@@ -440,7 +454,7 @@ export function attachMediaSourceAudio(
               signal: controller.signal,
             });
             if ((!response.ok && response.status !== 206) || !response.body) {
-              throw new Error(`media fetch failed: ${response.status}`);
+              throw new MediaFetchError(response.status);
             }
             return response.body.getReader();
           })();
@@ -549,7 +563,11 @@ export function attachMediaSourceAudio(
     } catch (error) {
       // AbortError 是我们自己在切歌时中止的，不算失败
       if ((error as { name?: string })?.name === "AbortError") return;
-      log.warn("[mse] 音频 MSE 加载失败", { url, error: String(error) });
+      log.warn("[mse] 音频 MSE 加载失败", {
+        currentTime: audio.currentTime,
+        paused: audio.paused,
+        error: String(error),
+      });
       fail(error);
     }
   };
