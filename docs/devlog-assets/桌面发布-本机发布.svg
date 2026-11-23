@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="908" height="570" viewBox="0 0 908 570" role="img" aria-labelledby="title desc">
+  <title id="title">在自己的电脑发布 Biu</title>
+  <desc id="desc">首次发布前装好项目依赖并登录 GitHub，将本次改动提交并推送到自己的公开仓库。发布者从项目目录运行一条命令。Windows 和 Mac 分别在本机打包，安装包上传到自己 GitHub 仓库的草稿，齐备后公开。图中还说明上传中断、旧版迁移及手动更新的处理。</desc>
+  <style>
+    text { font-family: -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif; }
+    .title { font-size: 19px; font-weight: 700; fill: #282529; }
+    .sub { font-size: 12.5px; fill: #756f73; }
+    .section { font-size: 14px; font-weight: 700; fill: #282529; }
+    .card-title { font-size: 12.5px; font-weight: 700; }
+    .body { font-size: 11px; }
+    .axis { font-size: 11px; font-weight: 700; fill: #756f73; }
+    .neutral { fill: #4a4450; }
+    .blue { fill: #36566d; }
+    .green { fill: #316247; }
+    .red { fill: #96434f; }
+    .amber { fill: #7a6234; }
+  </style>
+
+  <rect x="1" y="1" width="906" height="568" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+  <text x="24" y="35" class="title">在自己的电脑发布 Biu</text>
+  <text x="24" y="58" class="sub">一条命令把当前平台的安装包发到自己的 GitHub 仓库。发布后可以关电脑，用户仍能下载。</text>
+  <g class="blue">
+    <rect x="24" y="72" width="860" height="36" rx="9" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="38" y="95" class="card-title">首次发布前</text>
+    <path d="M121 81v18m343-18v18m174-18v18" stroke="#91adc1"/>
+    <text x="133" y="95" class="body">推荐 Node 26 LTS，已装 pnpm 10.24.0 和项目依赖</text>
+    <text x="477" y="95" class="body">已用 GitHub CLI 登录</text>
+    <text x="651" y="95" class="body">改动已提交并推送到自己的公开仓库</text>
+  </g>
+  <path d="M24 117H884" stroke="#e2dcdf"/>
+
+  <text x="24" y="143" class="section">从输入命令到可以下载，中间会经历什么？</text>
+  <text x="24" y="202" class="axis">发布者</text>
+  <text x="24" y="219" class="axis">看到的</text>
+  <g class="neutral">
+    <rect x="99" y="160" width="245" height="82" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+    <text x="113" y="184" class="card-title">在项目目录打开终端</text>
+    <text x="113" y="206" class="body">pnpm release:desktop</text>
+    <text x="113" y="225" class="body">Windows 和 Mac 用同一条命令。</text>
+
+    <rect x="369" y="160" width="245" height="82" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+    <text x="383" y="184" class="card-title">等待本机打包并上传</text>
+    <text x="383" y="206" class="body">Windows 电脑发布 Windows 包。</text>
+    <text x="383" y="225" class="body">Mac 电脑发布 Mac 包。</text>
+  </g>
+  <g fill="none" stroke="#a299a3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M349 201h14m-4-4 4 4-4 4"/>
+    <path d="M619 201h14m-4-4 4 4-4 4"/>
+  </g>
+  <g class="green">
+    <rect x="639" y="160" width="245" height="82" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text x="653" y="184" class="card-title">拿到本次发行页的链接</text>
+    <text x="653" y="206" class="body">把链接发给用户，打开 Assets 就能</text>
+    <text x="653" y="225" class="body">按电脑架构选择安装包。</text>
+  </g>
+
+  <text x="24" y="295" class="axis">背后</text>
+  <text x="24" y="312" class="axis">发生的</text>
+  <g class="blue">
+    <rect x="99" y="255" width="245" height="82" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="113" y="279" class="card-title">确认发布对象</text>
+    <text x="113" y="301" class="body">核对公开仓库、账号的写权限，</text>
+    <text x="113" y="320" class="body">以及准备发布的代码是否已推送。</text>
+
+    <rect x="369" y="255" width="245" height="82" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="383" y="279" class="card-title">准备当前平台的文件</text>
+    <text x="383" y="301" class="body">Windows 在本机签署更新清单。</text>
+    <text x="383" y="320" class="body">Mac 打包磁盘映像供手动安装。</text>
+
+    <rect x="639" y="255" width="245" height="82" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text x="653" y="279" class="card-title">这个平台的文件齐全才公开</text>
+    <text x="653" y="301" class="body">所有附件上传成功后，草稿才公开。</text>
+    <text x="653" y="320" class="body">另一平台有自己的发行页。</text>
+  </g>
+
+  <text x="24" y="376" class="section">上传中断怎么处理？已经安装的用户怎么升级？</text>
+  <g class="red">
+    <rect x="24" y="394" width="272" height="107" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+    <text x="38" y="418" class="card-title">文件未传完</text>
+    <text x="38" y="442" class="body">未传完的版本不会出现在公开下载页。</text>
+    <text x="38" y="461" class="body">按终端报错处理后，在同一提交上</text>
+    <text x="38" y="480" class="body">重新运行发布命令。</text>
+  </g>
+  <g class="amber">
+    <rect x="318" y="394" width="272" height="107" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+    <text x="332" y="418" class="card-title">Windows 安装版</text>
+    <text x="332" y="442" class="body">同一渠道可在设置中点「检查更新」。</text>
+    <text x="332" y="461" class="body">从旧更新站迁来的用户，先从新发行页</text>
+    <text x="332" y="480" class="body">手动覆盖安装一次，以后即可应用内更新。</text>
+  </g>
+  <g class="neutral">
+    <rect x="612" y="394" width="272" height="107" rx="10" fill="#f4f2f5" stroke="#c3bcc6"/>
+    <text x="626" y="418" class="card-title">Mac 和 Windows 便携版</text>
+    <text x="626" y="442" class="body">从对应平台的发行页下载新版，退出 Biu。</text>
+    <text x="626" y="461" class="body">Mac 把新版拖进「应用程序」并替换。</text>
+    <text x="626" y="480" class="body">便携版下次打开新下载的程序。</text>
+  </g>
+
+  <path d="M24 520H884" stroke="#e2dcdf"/>
+  <text x="24" y="546" class="body neutral">日常只需准备新版本并运行发布命令。第一次在 Windows 发布后，备份本机的更新签名私钥，换发布电脑时用它接续更新。</text>
+</svg>

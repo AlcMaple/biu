@@ -7,7 +7,7 @@ import zlib from "node:zlib";
 
 import pkg from "../package.json";
 import { ELECTRON_OUT_DIRNAME, ELECTRON_ICON_BASE_PATH } from "../shared/path";
-import { UPDATE_SIGNING_KEY_ID } from "../shared/update-signing-public-key.js";
+import { getDesktopUpdateBuildConfig } from "./desktop-update-config";
 
 function getElectronCacheDir() {
   if (process.env.ELECTRON_CACHE) return process.env.ELECTRON_CACHE;
@@ -97,8 +97,9 @@ function purgeCorruptElectronCache() {
 
 export async function buildElectron() {
   purgeCorruptElectronCache();
+  const update = getDesktopUpdateBuildConfig();
   await electronBuild({
-    publish: "onTag",
+    publish: update && !update.repository ? "onTag" : "never",
     config: {
       appId: "com.biu.wood3n",
       productName: "Biu",
@@ -107,7 +108,7 @@ export async function buildElectron() {
       buildVersion: pkg.version,
       extraMetadata: {
         // 运行时仅在内置 Ed25519 公钥与此标识匹配时启用自动更新。
-        biuUpdateTrust: { keyId: UPDATE_SIGNING_KEY_ID, mode: "ed25519" },
+        biuUpdateTrust: update?.trust ? { keyId: update.trust.keyId, mode: "ed25519" } : null,
       },
       asar: true,
       electronCompile: false,
@@ -174,10 +175,7 @@ export async function buildElectron() {
         artifactName: "${productName}-${version}-linux-${arch}.${ext}",
         extraResources: [{ from: "electron/ffmpeg/ffmpeg-linux", to: "electron/ffmpeg/ffmpeg-linux" }],
       },
-      publish: {
-        provider: "generic",
-        url: "https://biu.alcmaple.cn/biu/updates/",
-      },
+      publish: update ? { provider: "generic", url: update.url } : null,
     },
   })
     .then(result => {

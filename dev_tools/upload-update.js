@@ -7,18 +7,17 @@
  * BIU_UPDATE_PUBLIC_ORIGIN，以及 BIU_UPDATE_PUBLISH_KEY 或 SSH_AUTH_SOCK
  */
 
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "ssh2";
 
-import { createWindowsUpdateMetadata, getWindowsUpdateManifestFilename } from "../shared/update-signing.js";
+import { writeSignedWindowsManifest } from "./update-artifacts.js";
 import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
 import { loadUpdateEnvironment } from "./update-env.js";
 import { replaceRemoteFile } from "./update-sftp.js";
-import { loadUpdateSigningPrivateKey, signUpdateMetadata } from "./update-signature.js";
+import { loadUpdateSigningPrivateKey } from "./update-signature.js";
 
 loadUpdateEnvironment();
 
@@ -132,16 +131,6 @@ function makeMetadataCopy(filename, sourcePath) {
   return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), path: tempPath };
 }
 
-function calculateSha512(filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = createHash("sha512");
-    const stream = fs.createReadStream(filePath);
-    stream.once("error", reject);
-    stream.on("data", chunk => hash.update(chunk));
-    stream.once("end", () => resolve(hash.digest("base64")));
-  });
-}
-
 async function createSignedWindowsManifests(files) {
   const privateKey = loadUpdateSigningPrivateKey();
   const releaseDate = new Date().toISOString();
@@ -154,19 +143,16 @@ async function createSignedWindowsManifests(files) {
       const installer = files.find(file => file.platform === "win" && file.filename === filename);
       if (!installer) continue;
 
-      const metadata = createWindowsUpdateMetadata({
+      const manifest = await writeSignedWindowsManifest({
         arch,
-        filename,
+        directory,
+        installerPath: installer.fullPath,
         releaseDate,
         releaseNotes,
-        sha512: await calculateSha512(installer.fullPath),
-        size: fs.statSync(installer.fullPath).size,
+        signer: { privateKey },
         version,
       });
-      const manifestName = getWindowsUpdateManifestFilename(arch);
-      const manifestPath = path.join(directory, manifestName);
-      fs.writeFileSync(manifestPath, signUpdateMetadata(metadata, privateKey), "utf8");
-      manifests.push({ filename: manifestName, fullPath: manifestPath });
+      manifests.push(manifest);
     }
 
     if (manifests.length === 0) {

@@ -7,6 +7,7 @@ import esbuild from "rollup-plugin-esbuild";
 import tsconfigPaths from "rollup-plugin-tsconfig-paths";
 
 import { ELECTRON_OUT_DIR, ICONS_DST_DIR } from "../shared/path";
+import { getDesktopUpdateBuildConfig } from "./desktop-update-config";
 
 const MAIN_ENTRY = path.resolve(process.cwd(), "electron/main.ts");
 const PRELOAD_ENTRY = path.resolve(process.cwd(), "electron/preload.ts");
@@ -26,6 +27,7 @@ function createRollupOptions(input: string): RollupOptions {
       }),
       esbuild({
         platform: "node",
+        define: input === MAIN_ENTRY ? { __BIU_DESKTOP_UPDATE__: JSON.stringify(getDesktopUpdateBuildConfig()) } : {},
         target: "node18",
         tsconfig: "tsconfig.json",
         sourceMap: false,

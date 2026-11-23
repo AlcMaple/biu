@@ -10,7 +10,7 @@
 </p>
 <p align="center">
   <a href="https://biu.alcmaple.cn/biu/">
-    <img src="https://img.shields.io/badge/下载-最新版本-17C964" alt="Download" />
+    <img src="https://img.shields.io/badge/下载-AlcMaple_版-17C964" alt="下载 AlcMaple 版" />
   </a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg" alt="License" /></a>
 </p>
@@ -69,7 +69,7 @@
 - ♻️ 安装包支持自动检测更新，始终保持最新体验
 
 ## 下载和使用
-- 下载页面：[biu.alcmaple.cn/biu](https://biu.alcmaple.cn/biu/)（安装包由自建服务器分发，不使用 GitHub Releases）
+- 使用本机发布的版本，在当前 GitHub 仓库首页打开 **Releases**，选标有 **Windows** 或 **macOS** 的最新版本，在 **Assets** 中下载。AlcMaple 版另有[原下载站](https://biu.alcmaple.cn/biu/)。
 - 提供的安装包（`<version>` 为版本号）：
 
 | 系统 | 安装包 | 文件名示例 | 说明 |
@@ -81,7 +81,7 @@
   - Windows：设置 → 系统 → 关于 → “系统类型”（ARM 设备选 `arm64`，其余多为 `x64`）
   - macOS：Apple 芯片选 `arm64`，Intel 芯片选 `x64`
 - 自动更新说明
-  - 应用会定期检查自建更新服务器，下载并安装新版本。
+  - Windows 安装版会定期检查打包时配置的更新源，找到新版后可在应用内下载并安装。
 - 使用注意
   - 部分音频清晰度与解析可能需要登录或大会员权限。
   - 请遵循 Bilibili 使用条款，合理合规使用。
@@ -89,8 +89,9 @@
 ## 🛠️ 本地开发与测试
 
 ### 环境要求
-- Node.js 22.x
-- pnpm 10.x
+
+- 默认使用 Node.js 26 LTS。安装时也接受 22.12.0 起的 22.x 和 24.0.0 及以上版本。新环境优先选择 LTS 分支的最新补丁。[项目默认版本](.nvmrc)
+- pnpm 10.24.0
 
 ### 安装依赖
 ```bash
@@ -118,6 +119,8 @@ pnpm start:web
 ```bash
 pnpm build                 # 桌面端
 ```
+
+维护自己的 fork 时，可以直接从 Windows 或 macOS 电脑把安装包发布到自己的 GitHub Releases。第一次发布从[桌面应用发布指南](docs/release/README.md)开始。
 
 ### 测试
 ```bash

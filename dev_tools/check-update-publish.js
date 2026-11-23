@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ssh2 from "ssh2";
 
+import { getDesktopReleaseArtifacts } from "./update-artifacts.js";
 import { loadUpdatePublishConfig, resolveSshAuth } from "./update-deploy-config.js";
 import { loadUpdateEnvironment } from "./update-env.js";
 import { loadUpdateSigningPrivateKey } from "./update-signature.js";
@@ -31,7 +32,7 @@ try {
   }
   if (missing.length)
     throw new Error(
-      `缺少配置：${missing.join("、")}。请填写用户目录 .config/biu/production.env；工具会自动读取，配置说明见 docs/release/README.md。`,
+      `缺少配置：${missing.join("、")}。请填写用户目录 .config/biu/production.env，配置说明见 docs/release/服务器首次配置.md。`,
     );
   loadUpdatePublishConfig();
   const auth = resolveSshAuth();
@@ -47,25 +48,7 @@ try {
   if (!args.includes("--config-only")) {
     const { version } = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
     const metadataName = mac ? "latest-mac.yml" : "latest.yml";
-    const required = ["x64", "arm64"].flatMap(arch =>
-      mac
-        ? [`Biu-${version}-mac-${arch}.dmg`, `Biu-${version}-mac-${arch}.zip`]
-        : [`Biu-${version}-win-setup-${arch}.exe`, `Biu-${version}-win-setup-${arch}.exe.blockmap`],
-    );
-    required.push(metadataName);
-    const directory = path.join(root, "dist", "artifacts");
-    const absent = required.filter(name => {
-      const file = path.join(directory, name);
-      return !fs.existsSync(file) || !fs.statSync(file).isFile() || fs.statSync(file).size === 0;
-    });
-    if (absent.length)
-      throw new Error(`缺少当前版本产物：${absent.join("、")}。请先在对应系统执行 pnpm build 并确认成功。`);
-    const yaml = fs.readFileSync(path.join(directory, metadataName), "utf8");
-    const metadataVersion = yaml
-      .match(/^version:\s*([^\r\n]+)/m)?.[1]
-      .trim()
-      .replace(/^["']|["']$/g, "");
-    if (metadataVersion !== version) throw new Error(`${metadataName} 版本与 package.json 不一致，请重新构建。`);
+    getDesktopReleaseArtifacts(path.join(root, "dist", "artifacts"), version, mac ? "mac" : "win");
     console.log(`${mac ? "macOS" : "Windows"} ${version} 双架构发布产物与 ${metadataName} 已齐备。`);
   }
   console.log("仅完成本机预检，未连接服务器、未上传；服务器登录权限和真实客户端升级仍需验证。");
