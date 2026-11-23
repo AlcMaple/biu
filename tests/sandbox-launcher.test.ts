@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -60,12 +60,16 @@ function parse(args: string[]) {
 }
 
 function launch(args: string[], env: Record<string, string> = {}) {
-  const result = spawnSync(process.execPath, ["--import", preload, join(root, "scripts/sandbox.mjs"), ...args], {
-    cwd: root,
-    env: { ...process.env, ...env },
-    encoding: "utf8",
-    timeout: 10000,
-  });
+  const result = spawnSync(
+    process.execPath,
+    ["--import", pathToFileURL(preload).href, join(root, "scripts/sandbox.mjs"), ...args],
+    {
+      cwd: root,
+      env: { ...process.env, ...env },
+      encoding: "utf8",
+      timeout: 10000,
+    },
+  );
   const children = result.stdout
     .split("\n")
     .filter(line => line.startsWith("[captured-child]"))
@@ -117,7 +121,7 @@ describe("沙箱启动参数", () => {
       bilibiliPort: 3010,
       syncPort: 3012,
       alignPort: 3013,
-      dataRoot: "/fixture/home/.biu-sandbox",
+      dataRoot: join("/fixture/home", ".biu-sandbox"),
       reset: false,
       help: false,
     });
@@ -139,7 +143,7 @@ describe("沙箱启动参数", () => {
       bilibiliPort: 47003,
       syncPort: 47004,
       alignPort: 47002,
-      dataRoot: "/fixture/repo/my fixture data",
+      dataRoot: resolve("/fixture/repo", "my fixture data"),
     });
   });
   it.each(["0", "65536", "-1", "47001x", "1.5"])("拒绝不完整整数端口%s", value => {
@@ -216,8 +220,10 @@ describe("真实CLI的启动边界（仅替换子进程边界）", () => {
       DATA_DIR: join(data, "align-data"),
       WORK_DIR: join(data, "align-work"),
     });
-    expect(align.args).toEqual(["pnpm", "exec", "tsx", "src/index.ts", "--mock"]);
-    expect(web.args).toEqual(["pnpm", "exec", "rsbuild", "dev", "--host", "127.0.0.1", "--port", String(port)]);
+    expect(align.command).toBe(process.platform === "win32" ? "pnpm.cmd" : "pnpm");
+    expect(align.args).toEqual(["exec", "tsx", "src/index.ts", "--mock"]);
+    expect(web.command).toBe(align.command);
+    expect(web.args).toEqual(["exec", "rsbuild", "dev", "--host", "127.0.0.1", "--port", String(port)]);
     expect(web.env).toMatchObject({
       BIU_TARGET: "sandbox",
       BIU_SANDBOX_UPSTREAM_ORIGIN: upstream,

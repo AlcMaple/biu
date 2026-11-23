@@ -5,12 +5,16 @@ import electronUpdater, { type UpdateDownloadedEvent } from "electron-updater";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { UPDATE_SIGNING_KEY_ID } from "../../shared/update-signing-public-key.js";
 import { channel } from "../ipc/channel";
 import { SignedUpdateProvider } from "./signed-provider";
 
 const { autoUpdater } = electronUpdater;
-const UPDATE_PUBLIC_ORIGIN = "https://biu.alcmaple.cn/biu/updates/";
+declare const __BIU_DESKTOP_UPDATE__: {
+  url: string;
+  repository?: string;
+  trust: { keyId: string; publicKeyBase64: string } | null;
+} | null;
+const updateChannel = __BIU_DESKTOP_UPDATE__;
 
 let checkForUpdatesInterval: NodeJS.Timeout | null = null;
 let automaticUpdateDisabledReason: string | null = null;
@@ -22,6 +26,7 @@ function getAutomaticUpdateBuildReason() {
   if (process.env.PORTABLE_EXECUTABLE_DIR || process.env.PORTABLE_EXECUTABLE_FILE) {
     return "便携版不支持自动安装更新，请下载新的安装版。";
   }
+  if (!updateChannel?.trust) return "此构建未配置自动更新，请从发布者提供的下载地址手动升级。";
   if (isDev) return null;
 
   try {
@@ -29,12 +34,12 @@ function getAutomaticUpdateBuildReason() {
       biuUpdateTrust?: { keyId?: unknown; mode?: unknown };
     };
     if (
-      packageMetadata.biuUpdateTrust?.mode === "ed25519" &&
-      packageMetadata.biuUpdateTrust.keyId === UPDATE_SIGNING_KEY_ID
+      packageMetadata.biuUpdateTrust?.mode !== "ed25519" ||
+      packageMetadata.biuUpdateTrust.keyId !== updateChannel.trust.keyId
     ) {
-      return null;
+      return "当前安装包不含免费安全更新验证信息，请手动安装官方最新安装包。";
     }
-    return "当前安装包不含免费安全更新验证信息，请手动安装官方最新安装包。";
+    return null;
   } catch (error) {
     log.error("[updater] Unable to read packaged update security metadata", error);
     return "无法验证当前安装包的更新安全信息，已关闭自动更新。";
@@ -74,7 +79,7 @@ function setupAutoUpdater({ getMainWindow }: { getMainWindow: () => BrowserWindo
   try {
     const signedProviderConfig = {
       provider: "custom",
-      url: UPDATE_PUBLIC_ORIGIN,
+      ...updateChannel,
       updateProvider: SignedUpdateProvider,
     } as const;
     autoUpdater.setFeedURL(signedProviderConfig as Parameters<typeof autoUpdater.setFeedURL>[0]);

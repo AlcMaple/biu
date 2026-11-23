@@ -2,11 +2,12 @@
  * 三个本地歌单 store 的数据结构和同步协议要求的"扁平 id -> entry"结构不一样，
  * 这里做双向转换。每个 store 的 encode/decode 必须互为逆操作（decode(encode(x)) 语义上等价于 x）。
  */
+import { LIKED_FOLDER_ID, LIKED_FOLDER_TITLE } from "@/common/constants/heartbeat";
 import type { FavoriteItem } from "@/store/favorite";
 import type { LocalFavItem } from "@/store/local-fav-items";
 import type { Tag } from "@/store/tags";
 
-import type { FlatSnapshot, LiveSnapshot, StoreEntry, SyncOp } from "./types";
+import type { FlatSnapshot, LiveSnapshot, StoreEntry, SyncOp, SyncStoreName } from "./types";
 
 function liveEntries(flat: FlatSnapshot): [string, unknown][] {
   return Object.entries(flat)
@@ -120,10 +121,20 @@ export function diffSnapshots(prev: FlatSnapshot, next: LiveSnapshot, now: numbe
  * 云端为空是"这是这台设备第一次同步"，本地缺失是"另一台设备已经同步过、这台还没见过"。
  * 两种情况都不能被解读成"删除"，否则老用户数据或者别的设备已同步的数据会被冲掉。
  */
-export function diffForMigration(remote: FlatSnapshot, local: LiveSnapshot, now: number): SyncOp[] {
+export function diffForMigration(
+  remote: FlatSnapshot,
+  local: LiveSnapshot,
+  now: number,
+  store?: SyncStoreName,
+): SyncOp[] {
   const ops: SyncOp[] = [];
   for (const [id, entry] of Object.entries(local)) {
     const remoteEntry = remote[id];
+    if (store === "favorites" && id === String(LIKED_FOLDER_ID) && remoteEntry && !remoteEntry.__deleted) {
+      const liked = entry.payload as FavoriteItem;
+      // 新账号目录会先创建默认红心歌单，首次拉取应保留云端已经设置的封面和简介。
+      if (liked.isDefault && liked.title === LIKED_FOLDER_TITLE && !liked.cover && !liked.intro) continue;
+    }
     if (
       !remoteEntry ||
       remoteEntry.__deleted ||

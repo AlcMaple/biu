@@ -3,15 +3,18 @@ import { useLocation, useNavigate } from "react-router";
 
 import { RiStarFill, RiStarLine } from "@remixicon/react";
 
+import { isOfflineDemo } from "@/common/offline-demo";
 import { toPlaybackFavoriteModalData } from "@/common/utils/fav";
 import IconButton from "@/components/icon-button";
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { useModalStore } from "@/store/modal";
 import { useMusicFavStore } from "@/store/music-fav";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { usePlayList } from "@/store/play-list";
 
 const MusicFavButton = () => {
+  const session = usePlaylistSession();
   const location = useLocation();
   const navigate = useNavigate();
   const list = usePlayList(s => s.list);
@@ -23,9 +26,12 @@ const MusicFavButton = () => {
   const setIsFav = useMusicFavStore(s => s.setIsFav);
 
   useEffect(() => {
-    refreshIsFav();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playItem]);
+    if (!session.ready && !isOfflineDemo) {
+      useMusicFavStore.setState({ isFav: false, isThumb: false });
+      return;
+    }
+    void refreshIsFav();
+  }, [playItem, session, refreshIsFav]);
 
   const handleOpen = () => {
     if (!playItem) return;

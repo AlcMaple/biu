@@ -137,6 +137,16 @@ describe("Web local-playlist sync BFF", () => {
     await Promise.all([close(appServer), close(syncServer)]);
   });
 
+  it("拒绝把上一账号的歌单请求转发给当前会话", async () => {
+    const response = await fetch(appOrigin + "/__biu_sync/sync/favorites", {
+      method: "POST", headers: { Cookie: issuedCookie, "X-Biu-Playlist-Mid": "99", "Content-Type": "application/json" },
+      body: JSON.stringify({ baseVersion: 0, ops: [] }),
+    });
+    expect(response.status).toBe(409);
+    expect(syncCalls).toBe(0);
+    expect(upstreamRequests.some(r => r.path === "/api/sync/favorites")).toBe(false);
+  });
+
   it("exchanges the server-held Bilibili session and never exposes its sync JWT", async () => {
     const status = await fetch(`${appOrigin}/__biu_sync/session`, {
       headers: { Authorization: "Bearer browser-supplied-token", Cookie: issuedCookie },

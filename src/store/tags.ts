@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { randomTagColor } from "@/common/constants/tag-colors";
-import platform from "@/platform";
+import { clearPlaylistStore, mergePlaylistState, readPlaylistState, writePlaylistStore } from "./playlist-session";
 import { StoreNameMap } from "@shared/store";
 
 export interface Tag {
@@ -115,18 +115,16 @@ export const useTagStore = create<State & Action>()(
     }),
     {
       name: "tags",
+      merge: mergePlaylistState,
       storage: {
-        getItem: async () => {
-          const store = await platform.getStore(StoreNameMap.Tags);
-          return store ? { state: store } : null;
-        },
+        getItem: () => readPlaylistState(StoreNameMap.Tags),
         setItem: async (_, value) => {
           if (value.state) {
-            await platform.setStore(StoreNameMap.Tags, value.state);
+            await writePlaylistStore(StoreNameMap.Tags, value.state);
           }
         },
         removeItem: async () => {
-          await platform.clearStore(StoreNameMap.Tags);
+          await clearPlaylistStore(StoreNameMap.Tags);
         },
       },
       partialize: state => ({ tags: state.tags, itemTags: state.itemTags }),

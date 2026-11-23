@@ -90,7 +90,7 @@ run("同步服务", "npx", ["tsx", "src/index.ts"], {
   env: { ...baseEnv, PORT: String(SYNC_PORT), JWT_SECRET: jwtSecret, DATA_DIR: join(DATA_ROOT, "sync-data") },
 });
 
-run("对齐服务", "corepack", ["pnpm", "exec", "tsx", "src/index.ts", "--mock"], {
+run("对齐服务", "pnpm", ["exec", "tsx", "src/index.ts", "--mock"], {
   cwd: join(ROOT, "biu-align-server"),
   env: {
     ...baseEnv,
@@ -103,7 +103,7 @@ run("对齐服务", "corepack", ["pnpm", "exec", "tsx", "src/index.ts", "--mock"
   },
 });
 
-run("Web", "corepack", ["pnpm", "exec", "rsbuild", "dev", "--host", "127.0.0.1", "--port", String(port)], {
+run("Web", "pnpm", ["exec", "rsbuild", "dev", "--host", "127.0.0.1", "--port", String(port)], {
   cwd: ROOT,
   env: {
     ...baseEnv,

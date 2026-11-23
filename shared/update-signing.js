@@ -1,4 +1,4 @@
-import { createPublicKey, sign, verify } from "node:crypto";
+import { createHash, createPublicKey, sign, verify } from "node:crypto";
 
 import {
   UPDATE_SIGNING_ALGORITHM,
@@ -56,6 +56,15 @@ function decodeCanonicalBase64(value, field) {
 function assertSha512(value, field) {
   const decoded = decodeCanonicalBase64(value, field);
   if (decoded.length !== 64) fail(`${field} 必须是 SHA-512`);
+}
+
+export function getUpdateSigningTrust(publicKeyBase64) {
+  const der = decodeCanonicalBase64(publicKeyBase64, "publicKey");
+  const publicKey = createPublicKey({ key: der, format: "der", type: "spki" });
+  if (publicKey.asymmetricKeyType !== "ed25519" || !der.equals(publicKey.export({ format: "der", type: "spki" }))) {
+    fail("需要 Ed25519 公钥");
+  }
+  return { keyId: `ed25519-${createHash("sha256").update(der).digest("hex").slice(0, 16)}`, publicKeyBase64 };
 }
 
 function assertVersion(value) {

@@ -18,6 +18,7 @@ import VideoPagesDownloadSelectModal from "@/components/video-pages-download-sel
 import PlayBar from "@/layout/playbar";
 import { isWeb, log } from "@/platform";
 import { initLocalPlaylistSync } from "@/service/sync";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useUser } from "@/store/user";
 
 import Navbar from "./navbar";
@@ -29,6 +30,7 @@ const SandboxIdentitySwitcher =
   process.env.BIU_SANDBOX === "true" ? lazy(() => import("@/components/sandbox-identity")) : null;
 
 const Layout = () => {
+  const account = usePlaylistSession(s => s.mid);
   const updateUser = useUser(state => state.updateUser);
   const location = useLocation();
   const isMobileLayout = useIsMobileLayout();
@@ -91,7 +93,7 @@ const Layout = () => {
           })}
         >
           <div className={clx("flex w-full flex-1", { "min-h-0": !documentScroll })}>
-            <SideNav isDrawerOpen={isSideDrawerOpen} onDrawerOpenChange={setSideDrawerOpen} />
+            <SideNav key={account} isDrawerOpen={isSideDrawerOpen} onDrawerOpenChange={setSideDrawerOpen} />
             <div className={clx("flex min-w-0 flex-1 flex-col", { "min-h-0": !documentScroll })}>
               <div
                 className={clx("w-full flex-none", {
@@ -126,7 +128,7 @@ const Layout = () => {
           </div>
         </div>
       </SideDrawerContext.Provider>
-      <FavoritesSelectModal />
+      <FavoritesSelectModal key={account} />
       <ConfirmModal />
       <VideoPagesDownloadSelectModal />
       <ReleaseNoteModal />

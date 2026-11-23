@@ -1,2 +1,1 @@
-provider: generic
-url: https://biu.alcmaple.cn/biu/updates/
+updaterCacheDirName: biu-dev-updater

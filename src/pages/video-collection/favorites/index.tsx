@@ -23,6 +23,8 @@ import { getFavResourceList, type FavMedia } from "@/service/fav-resource";
 import { postFavResourceBatchDel } from "@/service/fav-resource-batch-del";
 import { postFavResourceClean } from "@/service/fav-resource-clean";
 import { useFavFolderItemsStore } from "@/store/fav-folder-items";
+import { playlistWriteIssue } from "@/store/playlist-write";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useFavoritesStore } from "@/store/favorite";
 import { useHeartbeat } from "@/store/heartbeat";
 import { useModalStore } from "@/store/modal";
@@ -445,6 +447,12 @@ const Favorites = () => {
   };
 
   const toggleFavorite = async () => {
+    const issue = playlistWriteIssue("收藏");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     if (isFavorite) {
       // 取消收藏
       const res = await postFavFolderUnfav({
@@ -452,6 +460,7 @@ const Favorites = () => {
         platform: "web",
       });
 
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code === 0) {
         rmCollectedFavorite(Number(favFolderId));
         await new Promise(resolve =>
@@ -468,6 +477,7 @@ const Favorites = () => {
         platform: "web",
       });
 
+      if (session !== usePlaylistSession.getState()) return;
       if (res.code === 0) {
         addCollectedFavorite({
           id: favInfo?.id as number,

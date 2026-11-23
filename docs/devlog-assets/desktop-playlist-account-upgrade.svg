@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1070" height="429" viewBox="0 0 1070 429" role="img" aria-labelledby="title desc">
+<title id="title">桌面版 2.8.0 的歌单归属</title>
+<desc id="desc">上半部分说明升级时如何判断旧歌单归属，下半部分说明游客与切换账号时的操作边界。</desc>
+<g font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<rect x="1" y="1" width="1068" height="427" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+<text x="26" y="37" font-size="19" font-weight="700" fill="#282529">桌面版 2.8.0 的歌单归属</text>
+<text x="26" y="60" font-size="12.5" font-weight="400" fill="#756f73">已有歌单保留原件。能核实归属的自动迁入，其余由用户选择接收账号。</text>
+<text x="26" y="95" font-size="14" font-weight="700" fill="#282529">升级时，旧歌单会放到哪里？</text>
+<rect x="26" y="109" width="494" height="105" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="40" y="134" font-size="12.5" font-weight="700" fill="#316247">只发现一个旧账号，且同步记录能逐项核对</text>
+<text x="40" y="158" font-size="11" font-weight="400" fill="#316247">登录这个账号后，歌单、歌曲和标签会自动迁入。</text>
+<text x="40" y="177" font-size="11" font-weight="400" fill="#316247">其他账号即使先登录，也只能看到自己的歌单。</text>
+<rect x="534" y="109" width="510" height="105" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+<text x="548" y="134" font-size="12.5" font-weight="700" fill="#7a6234">用过多个账号，或旧内容缺少归属证据</text>
+<text x="548" y="158" font-size="11" font-weight="400" fill="#7a6234">各账号先恢复自己的云端歌单。需要旧数据时，打开「设置 → 常规设置」，</text>
+<text x="548" y="177" font-size="11" font-weight="400" fill="#7a6234">点「认领升级前的本地歌单」，核对昵称和 UID，再点「认领到此账号」。</text>
+<text x="548" y="196" font-size="11" font-weight="400" fill="#7a6234">最后一次登录只说明谁用过电脑，无法证明每首歌都属于这个人。</text>
+<text x="26" y="251" font-size="14" font-weight="700" fill="#282529">日常使用，切账号时会看到什么？</text>
+<rect x="26" y="265" width="320" height="104" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+<text x="40" y="290" font-size="12.5" font-weight="700" fill="#36566d">游客听歌</text>
+<text x="40" y="314" font-size="11" font-weight="400" fill="#36566d">可以浏览和播放。点击收藏时提示</text>
+<text x="40" y="333" font-size="11" font-weight="400" fill="#36566d">「登录后才能收藏」，建歌单也要先登录。</text>
+<rect x="361" y="265" width="333" height="104" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+<text x="375" y="290" font-size="12.5" font-weight="700" fill="#316247">从 A 切换到 B</text>
+<text x="375" y="314" font-size="11" font-weight="400" fill="#316247">A 的歌单先从界面移除。B 的文件读完后，</text>
+<text x="375" y="333" font-size="11" font-weight="400" fill="#316247">才开放收藏并同步。A 的迟到结果会丢弃。</text>
+<rect x="709" y="265" width="335" height="104" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+<text x="723" y="290" font-size="12.5" font-weight="700" fill="#96434f">读取或认领中断</text>
+<text x="723" y="314" font-size="11" font-weight="400" fill="#96434f">文件读取失败时暂停编辑和同步。已确认</text>
+<text x="723" y="333" font-size="11" font-weight="400" fill="#96434f">认领后中断，下次由同一账号接着合并。</text>
+<text x="26" y="404" font-size="12.5" font-weight="400" fill="#756f73">平时重新登录，直接打开当前账号的歌单。只有升级时留下归属不清的数据，才会出现认领入口。</text>
+</g>
+</svg>

@@ -25,6 +25,7 @@ vi.mock("@/service/sync/client", () => ({
   pushOps: (s: string, b: number, o: SyncOp[], a?: boolean, mid?: string) => pushOps(s, b, o, a, mid),
 }));
 
+const account = { mid: 12345, ready: true };
 const { StoreSyncController } = await import("@/service/sync/engine");
 const { SYNC_DEBOUNCE_MS, SYNC_META_EPOCH } = await import("@/service/sync/config");
 const { StoreNameMap } = await import("@shared/store");
@@ -35,8 +36,9 @@ const A: LiveSnapshot = { "1:1": entry(1) };
 let local: LiveSnapshot;
 let applied: FlatSnapshot | undefined;
 
-function controller() {
+function controller(getAccount = () => account) {
   return new StoreSyncController({
+    getAccount,
     store: "fav-items",
     waitReady: async () => {},
     encodeNow: () => local,
@@ -112,7 +114,13 @@ describe("三个 store 共用同步记录", () => {
     store[StoreNameMap.PlaylistSyncMeta] = {};
     pullSnapshot.mockImplementation(async s => ({ version: s === "tags" ? 5 : 9, updatedAt: 0, data: {} }));
     const make = (name: "tags" | "fav-items") =>
-      new StoreSyncController({ store: name, waitReady: async () => {}, encodeNow: () => ({}), applyRemote: () => {} });
+      new StoreSyncController({
+        getAccount: () => account,
+        store: name,
+        waitReady: async () => {},
+        encodeNow: () => ({}),
+        applyRemote: () => {},
+      });
     const a = make("tags");
     const b = make("fav-items");
     a.syncNow();
@@ -121,4 +129,38 @@ describe("三个 store 共用同步记录", () => {
     const meta = store[StoreNameMap.PlaylistSyncMeta] as PlaylistSyncMetaData;
     expect(meta["12345"].versions).toEqual({ tags: 5, "fav-items": 9 });
   });
+});
+
+it("A 的云端回包晚于 B 登录，不改 B 的内存，也不记作同步成功", async () => {
+  let current = account;
+  let done!: (value: Envelope) => void;
+  pushOps.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        done = resolve;
+      }),
+  );
+  local = { ...A, "1:2": entry(2) };
+  const c = controller(() => current);
+  c.syncNow();
+  await vi.advanceTimersByTimeAsync(50);
+  expect(pushOps).toHaveBeenCalledWith("fav-items", 1, expect.any(Array), false, "12345");
+  current = { mid: 67890, ready: true };
+  const b = { "1:7": entry(7) };
+  local = b;
+  done({ version: 2, updatedAt: 1, data: A });
+  await settle();
+  expect(local).toBe(b);
+  expect(applied).toBeUndefined();
+  expect(c.hasSynced(2)).toBe(false);
+});
+
+it("同步凭证与本地歌单的账号不同，首次同步也不读写", async () => {
+  store[StoreNameMap.PlaylistSyncMeta] = {};
+  const other = { mid: 999, ready: true };
+  controller(() => other).syncNow();
+  await settle();
+  expect(pushOps).not.toHaveBeenCalled();
+  expect(pullSnapshot).not.toHaveBeenCalled();
+  expect(applied).toBeUndefined();
 });

@@ -1,3 +1,4 @@
+import { usePlaylistSession } from "@/store/playlist-session";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -74,7 +75,7 @@ const durationToSeconds = (d: number | string | undefined): number => {
 };
 
 // 本次启动内已后台检测过失效状态的收藏夹，避免来回切换页面时反复请求
-const invalidCheckedFolders = new Set<number>();
+const invalidCheckedFolders = new Set<string>();
 const EMPTY_LOCAL_FAV_ITEMS: LocalFavItem[] = [];
 
 const getLocalItemTagTarget = (item: LocalFavItem) => ({
@@ -98,6 +99,7 @@ const getLocalItemMenus = (isBiliItem: boolean, invalid?: boolean) => [
 ];
 
 const LocalFavorites = () => {
+  const session = usePlaylistSession();
   const { id: folderIdStr } = useParams();
   const folderId = Number(folderIdStr);
   const navigate = useNavigate();
@@ -218,15 +220,20 @@ const LocalFavorites = () => {
   // 打开收藏夹时后台检测 B 站资源失效状态并打标记，顺带补全缺失的播放量和时长
   // （二者共用同一批 infos 请求；每次启动每个收藏夹只检测一次）
   useEffect(() => {
-    if (!folderId || invalidCheckedFolders.has(folderId)) return;
+    const key = String(session.mid) + ":" + folderId;
+    if (!folderId || invalidCheckedFolders.has(key)) return;
     const allItems = useLocalFavItemsStore.getState().folderItems[folderId];
     if (!allItems?.length) return;
-    invalidCheckedFolders.add(folderId);
+    invalidCheckedFolders.add(key);
     detectInvalidLocalFavItems(allItems)
       .then(({ checked, invalid, playByRid, durationByRid }) => {
+        if (session !== usePlaylistSession.getState()) {
+          invalidCheckedFolders.delete(key);
+          return;
+        }
         // 一个都没检测成功（如断网）时允许下次进入重试
         if (!checked.size) {
-          invalidCheckedFolders.delete(folderId);
+          invalidCheckedFolders.delete(key);
           return;
         }
         updateInvalidFlags(folderId, invalid, checked);
@@ -236,8 +243,8 @@ const LocalFavorites = () => {
         updateDurations(folderId, durationByRid);
         return autoReplaceFolder(folderId);
       })
-      .catch(() => invalidCheckedFolders.delete(folderId));
-  }, [folderId, updateInvalidFlags, updatePlayCounts, updateDurations]);
+      .catch(() => invalidCheckedFolders.delete(key));
+  }, [folderId, session, updateInvalidFlags, updatePlayCounts, updateDurations]);
 
   const handleSort = useCallback((key: MusicListSortKey) => {
     setSortKey(prev => {
@@ -359,6 +366,7 @@ const LocalFavorites = () => {
     }
 
     const { invalid } = await detectInvalidLocalFavItems(allItems);
+    if (session !== usePlaylistSession.getState()) return;
     // 本次检测到的失效项 + 之前后台检测已打标的失效项
     const invalidRids = allItems.filter(i => invalid.has(String(i.rid)) || i.invalid).map(i => i.rid);
 
@@ -369,7 +377,7 @@ const LocalFavorites = () => {
 
     invalidRids.forEach(rid => removeItem(folderId, rid));
     addToast({ title: `已清除 ${invalidRids.length} 个失效内容`, color: "success" });
-  }, [folderId, removeItem]);
+  }, [folderId, removeItem, session]);
 
   const handleDeleteFolder = useCallback(() => {
     if (folder?.isDefault) {
@@ -710,4 +718,7 @@ const LocalFavorites = () => {
   );
 };
 
-export default LocalFavorites;
+export default function AccountLocalFavorites() {
+  const account = usePlaylistSession(s => s.mid);
+  return <LocalFavorites key={account} />;
+}

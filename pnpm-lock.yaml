@@ -150,6 +150,9 @@ importers:
         specifier: ^5.0.8
         version: 5.0.8(@types/react@19.2.7)(immer@10.2.0)(react@19.1.1)(use-sync-external-store@1.6.0(react@19.1.1))
     devDependencies:
+      7zip-bin:
+        specifier: 5.2.0
+        version: 5.2.0
       '@commitlint/cli':
         specifier: ^20.1.0
         version: 20.1.0(@types/node@24.10.6)(typescript@5.9.3)

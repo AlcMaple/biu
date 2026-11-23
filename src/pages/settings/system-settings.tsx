@@ -35,6 +35,9 @@ import { DEFAULT_ALIGN_SERVER_URL } from "@shared/lyrics-align";
 import ColorSettings from "./color-settings";
 import ImportExport from "./export-import";
 import FancyPlayerImageAlbum from "./fancy-player-image-album";
+import { usePlaylistSession } from "@/store/playlist-session";
+import { isOfflineDemo } from "@/common/offline-demo";
+import LegacyPlaylists from "./legacy-playlists";
 import TagSettings from "./tag-settings";
 
 type SystemSettingsTabProps = {
@@ -55,6 +58,7 @@ export const SystemSettingsTab = ({
   setValue,
 }: SystemSettingsTabProps) => {
   const isMobileLayout = useIsMobileLayout();
+  const session = usePlaylistSession();
   const rowCls = isMobileLayout
     ? "flex w-full flex-col items-stretch gap-2"
     : "flex w-full items-center justify-between";
@@ -497,7 +501,8 @@ export const SystemSettingsTab = ({
           <ImportExport />
         </>
       )}
-      <TagSettings />
+      {!isWeb && session.mid && <LegacyPlaylists key={session.mid} />}
+      {(session.ready || isOfflineDemo) && <TagSettings key={session.mid} />}
     </Form>
   );
 };

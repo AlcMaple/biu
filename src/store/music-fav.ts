@@ -6,6 +6,7 @@ import { getWebInterfaceArchiveRelation } from "@/service/web-interface-archive-
 import { useFavoritesStore } from "@/store/favorite";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
 import { usePlayList } from "@/store/play-list";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useUser } from "@/store/user";
 
 interface State {
@@ -29,6 +30,7 @@ export const useMusicFavStore = create<State & Action>()(set => ({
     set({ isThumb: value });
   },
   refreshIsFav: async () => {
+    const session = usePlaylistSession.getState();
     const user = useUser.getState().user;
     const playItem = usePlayList.getState().getPlayItem();
 
@@ -67,6 +69,7 @@ export const useMusicFavStore = create<State & Action>()(set => ({
       if (playItem.type === "mv" && playItem.bvid) {
         const res = await getWebInterfaceArchiveRelation({ bvid: playItem.bvid });
 
+        if (usePlaylistSession.getState() !== session) return;
         if (res.code === 0) {
           set({ isFav: isInAnyLocalFolder || Boolean(res.data.favorite), isThumb: Boolean(res.data.like) });
         } else {
@@ -79,6 +82,7 @@ export const useMusicFavStore = create<State & Action>()(set => ({
           type: 12,
         });
 
+        if (usePlaylistSession.getState() !== session) return;
         if (res.code === 0) {
           set({ isFav: isInAnyLocalFolder || Boolean(res.data), isThumb: false });
         } else {
@@ -88,6 +92,7 @@ export const useMusicFavStore = create<State & Action>()(set => ({
         set({ isFav: isInAnyLocalFolder });
       }
     } catch {
+      if (usePlaylistSession.getState() !== session) return;
       set({ isFav: isInAnyLocalFolder });
     }
   },

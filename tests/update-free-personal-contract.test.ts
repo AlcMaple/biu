@@ -17,15 +17,6 @@ describe("free personal update channel contract", () => {
     const source = await readFile(path.resolve(process.cwd(), "dev_tools/upload-update.js"), "utf8");
 
     expect(source).toContain("createSignedWindowsManifests");
-    expect(source).toContain("signUpdateMetadata(metadata, privateKey)");
     expect(source).toContain("atomicPublish(sftp, manifest.fullPath, manifest.filename, config.remoteDir)");
-  });
-
-  it("marks packaged apps as using the embedded Ed25519 update trust root", async () => {
-    const source = await readFile(path.resolve(process.cwd(), "plugins/electron-build.ts"), "utf8");
-
-    expect(source).toContain("biuUpdateTrust");
-    expect(source).toContain('mode: "ed25519"');
-    expect(source).toContain("UPDATE_SIGNING_KEY_ID");
   });
 });

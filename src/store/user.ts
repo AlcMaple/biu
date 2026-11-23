@@ -29,6 +29,8 @@ const updateBrowserMonitoringUser = (user: UserInfo | null) => {
   );
 };
 
+let userRequest = 0;
+
 export const useUser = create<UserState & Action>()(
   persist(
     (set, get) => ({
@@ -36,17 +38,21 @@ export const useUser = create<UserState & Action>()(
       updateUser: async () => {
         // 测试账号没有 B 站登录态，启动时的刷新会把它当成未登录清掉
         if (isTestAccount(get().user)) return;
+        const request = ++userRequest;
         const res = await getUserInfo();
+        if (request !== userRequest) return;
         const user = res.code === 0 && res.data?.isLogin ? res.data : null;
 
         set(() => ({ user }));
         updateBrowserMonitoringUser(user);
       },
       loginAsTestAccount: () => {
+        userRequest++;
         const user = createTestUser();
         set(() => ({ user }));
       },
       clear: () => {
+        userRequest++;
         set(() => ({
           user: null,
         }));
@@ -69,6 +75,8 @@ export const useUser = create<UserState & Action>()(
         setItem: async (_, value) => {
           if (value.state) {
             await platform.setStore(StoreNameMap.UserLoginInfo, value.state);
+          } else {
+            await platform.clearStore(StoreNameMap.UserLoginInfo);
           }
         },
 

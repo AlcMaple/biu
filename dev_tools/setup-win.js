@@ -67,11 +67,17 @@ log("============================================");
 
 // ---- [1/6] 前置工具 ----
 section("[1/6] 检查 Node / Git / pnpm...");
-if (!has("node")) die("未找到 node，请先安装 Node.js 22.23.4");
+if (!has("node")) die(`未找到 node，请先安装 Node.js ${fs.readFileSync(path.join(ROOT, ".nvmrc"), "utf8").trim()}`);
 if (!has("git")) die("未找到 git");
 if (!has("pnpm")) {
-  log("    未检测到 pnpm，通过 corepack 启用...");
-  if (run("corepack", ["enable"]) !== 0) die("corepack enable 失败，请手动 npm i -g pnpm");
+  const { packageManager } = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  if (has("corepack")) {
+    log("    未检测到 pnpm，通过 corepack 启用...");
+    if (run("corepack", ["enable"]) !== 0) die(`corepack enable 失败，请运行 npm install --global ${packageManager}`);
+  } else {
+    log(`    未检测到 pnpm，正在安装 ${packageManager}...`);
+    if (run("npm", ["install", "--global", packageManager]) !== 0) die(`请运行 npm install --global ${packageManager}`);
+  }
 }
 log(`    node: ${capture("node", ["-v"]).stdout}`);
 log(`    pnpm: ${capture("pnpm", ["-v"]).stdout}`);

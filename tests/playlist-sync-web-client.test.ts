@@ -28,10 +28,10 @@ describe("Web playlist sync client", () => {
     const { getCurrentMid, pullSnapshot } = await import("@/service/sync/client");
 
     await expect(getCurrentMid()).resolves.toBe("42");
-    await expect(pullSnapshot("favorites")).resolves.toMatchObject({ version: 1 });
+    await expect(pullSnapshot("favorites", "42")).resolves.toMatchObject({ version: 1 });
     expect(mocks.getCookie).not.toHaveBeenCalled();
     expect(mocks.get).toHaveBeenNthCalledWith(1, "/session");
-    expect(mocks.get).toHaveBeenNthCalledWith(2, "/sync/favorites", { headers: undefined });
+    expect(mocks.get).toHaveBeenNthCalledWith(2, "/sync/favorites", { headers: { "X-Biu-Playlist-Mid": "42" } });
   });
 
   it("binds ranking batches to the expected account and never retries them under another account", async () => {
@@ -47,6 +47,16 @@ describe("Web playlist sync client", () => {
     invalidateSyncToken();
     mocks.get.mockResolvedValueOnce({ code: 0, data: { mid: "99" } });
     await expect(pushRankingEvents("42", "device", [])).rejects.toThrow("账号已变化");
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("旧账号的收藏遇到 401 后不能拿新账号的凭证重发", async () => {
+    mocks.get
+      .mockResolvedValueOnce({ code: 0, data: { mid: "42" } })
+      .mockResolvedValueOnce({ code: 0, data: { mid: "99" } });
+    mocks.post.mockRejectedValueOnce({ response: { status: 401 } });
+    const { pushOps } = await import("@/service/sync/client");
+    await expect(pushOps("tags", 2, [], false, "42")).rejects.toThrow("账号已变化");
     expect(mocks.post).toHaveBeenCalledTimes(1);
   });
 

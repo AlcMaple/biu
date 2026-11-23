@@ -36,7 +36,10 @@ function updateUserMeta(
   return operation;
 }
 
+type SyncAccount = { mid: number | null; ready: boolean };
+
 export interface SyncBinding {
+  getAccount: () => SyncAccount;
   store: SyncStoreName;
   /**
    * 等这个 store 的持久化数据 rehydrate 完成。
@@ -95,6 +98,18 @@ export class StoreSyncController {
 
   /** 本机最近一次成功同步到的版本，用来跳过自己造成的通知回声 */
   private lastSyncedVersion = -1;
+  private account: SyncAccount | null = null;
+  private observeAccount() {
+    const current = this.binding.getAccount();
+    if (this.account !== current) {
+      this.account = current;
+      this.lastSyncedVersion = -1;
+      this.witnessedNonEmpty = false;
+      this.remoteVersionHint = null;
+      this.retriedOnce = false;
+    }
+    return current;
+  }
 
   constructor(private binding: SyncBinding) {}
 
@@ -105,6 +120,7 @@ export class StoreSyncController {
    * 携带的正是本机刚写上去的版本号，再同步一轮纯属多打一个请求。
    */
   hasSynced(version: number): boolean {
+    this.observeAccount();
     return this.lastSyncedVersion >= version;
   }
 
@@ -177,6 +193,7 @@ export class StoreSyncController {
    * 后续变更，再等一个防抖窗口纯属白白增加跨设备延迟（实测这一层就占了 800ms）。
    */
   syncNow(remoteVersionHint: number | null = null): void {
+    this.observeAccount();
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -227,13 +244,16 @@ export class StoreSyncController {
 
   /** @returns false 表示传输层失败（拉取/推送没成功），调用方据此决定要不要补一次重试 */
   private async syncOnce(): Promise<boolean> {
+    const account = this.observeAccount();
+    if (!account.mid || !account.ready) return true;
     const mid = await getCurrentMid();
-    if (!mid) return true; // 未登录，本地歌单同步依附登录态，跳过不算失败
+    if (mid !== String(account.mid) || account !== this.binding.getAccount()) return true;
 
     // 必须在任何 encodeNow 之前：读盘没完成时的空状态不能进入 diff（见 SyncBinding.waitReady）
     await this.binding.waitReady();
 
     const meta = await readMeta();
+    if (account !== this.binding.getAccount()) return true;
     const userMeta = meta[mid] ?? { versions: {}, snapshots: {} };
     // 世代号对不上 = 从有已知缺陷的旧版本升上来，基线不可信：作废一次，走只增不删的迁移
     const baselineUsable = userMeta.epoch === SYNC_META_EPOCH;
@@ -244,7 +264,7 @@ export class StoreSyncController {
     }
 
     if (!hasSyncedBefore) {
-      return this.migrate(mid, userMeta);
+      return this.migrate(mid, userMeta, account);
     }
 
     const baseline = (userMeta.snapshots[this.binding.store] ?? {}) as FlatSnapshot;
@@ -281,7 +301,8 @@ export class StoreSyncController {
       // 推送前留一份本地现状：这是数据被意外清空后唯一能回溯到"最近状态"的地方
       await pushLocalBackup(mid, this.binding.store, localFlat);
 
-      const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe);
+      if (account !== this.binding.getAccount()) return true;
+      const pushed = await pushOps(this.binding.store, baseVersion, ops, isEmptyWipe, mid);
       if (!pushed) return false; // 网络/鉴权失败：由 runSync 补一次重试
       envelope = pushed;
     } else {
@@ -290,12 +311,13 @@ export class StoreSyncController {
       if (this.remoteVersionHint !== null && this.remoteVersionHint <= baseVersion) {
         return true; // 云端不比基线新，无事可做
       }
-      const pulled = await pullSnapshot(this.binding.store);
+      const pulled = await pullSnapshot(this.binding.store, mid);
       if (!pulled) return false;
       if (pulled.version === baseVersion) return true; // 两边都没动，不写回本地，避免空转
       envelope = pulled;
     }
 
+    if (account !== this.binding.getAccount()) return true;
     this.applyRemoteKeepingEdits(localFlat, envelope.data);
     await this.persistMeta(mid, envelope.version, envelope.data);
     return true;
@@ -306,8 +328,9 @@ export class StoreSyncController {
    * 也可能已经有别的设备同步过的数据。两种情况都不能互相覆盖——本地数据要迁移上云，
    * 云端已有数据要合并进本地，谁都不能因为"对面没见过"就被当成删除。
    */
-  private async migrate(mid: string, userMeta: PlaylistSyncMetaData[string]): Promise<boolean> {
-    const remote = await pullSnapshot(this.binding.store);
+  private async migrate(mid: string, userMeta: PlaylistSyncMetaData[string], account: SyncAccount): Promise<boolean> {
+    const remote = await pullSnapshot(this.binding.store, mid);
+    if (account !== this.binding.getAccount()) return true;
     if (!remote) return false; // 拉取失败：绝不能在没见过云端数据的情况下就往上推
 
     const localFlat = this.binding.encodeNow();
@@ -328,15 +351,17 @@ export class StoreSyncController {
 
     await pushLocalBackup(mid, this.binding.store, localFlat);
 
-    const migrationOps = diffForMigration(remote.data, localFlat, Date.now());
+    const migrationOps = diffForMigration(remote.data, localFlat, Date.now(), this.binding.store);
 
     let finalEnvelope = remote;
     if (migrationOps.length > 0) {
-      const pushed = await pushOps(this.binding.store, remote.version, migrationOps);
+      if (account !== this.binding.getAccount()) return true;
+      const pushed = await pushOps(this.binding.store, remote.version, migrationOps, false, mid);
       if (!pushed) return false; // 推送失败：不落地"已迁移"标记，下次会完整重试这套迁移流程
       finalEnvelope = pushed;
     }
 
+    if (account !== this.binding.getAccount()) return true;
     this.applyRemoteKeepingEdits(localFlat, finalEnvelope.data);
     await this.persistMeta(mid, finalEnvelope.version, finalEnvelope.data);
     return true;

@@ -8,25 +8,13 @@
 
 ## 文件位置
 
-### macOS
+2.8.0 起每个 B 站账号使用独立目录。macOS 位于 `~/Documents/Biu/accounts/<UID>/`，Windows 位于系统「文档」下的 `Biu\accounts\<UID>`。
 
-```
-~/Documents/Biu/
-├── local-favorites.json   # 收藏夹列表（名称、封面、排序等）
-└── local-fav-items.json   # 各收藏夹中的内容
-```
+- `local-favorites.json` 保存收藏夹名称、封面和排序。
+- `local-fav-items.json` 保存各收藏夹的歌曲和失效记录。
+- `tags.json` 保存标签和歌曲的标签关联。
 
-在 Finder 中打开：**前往 → 个人文件夹 → Documents → Biu**
-
-### Windows
-
-```
-C:\Users\<用户名>\Documents\Biu\
-├── local-favorites.json
-└── local-fav-items.json
-```
-
-在文件资源管理器地址栏输入 `%USERPROFILE%\Documents\Biu` 回车即可打开。
+2.7.0 及以前的三个文件保留在 `Biu` 根目录。升级时如果只有一个可识别的旧账号，且旧歌单、歌曲和标签都与它的同步记录相符，会在该账号登录时自动迁入。仅有上次登录记录时需要手动认领。如果归属不清，登录后可到「设置 → 常规设置 → 认领升级前的本地歌单」确认接收账号。`playlist-upgrade-2.8.json` 记录迁移归属，随整目录备份。
 
 ---
 
@@ -40,7 +28,7 @@ C:\Users\<用户名>\Documents\Biu\
 ## 还原
 
 1. 完全退出 Biu
-2. 将备份的 `local-favorites.json` 和 `local-fav-items.json` 放入对应目录，覆盖原有文件
+2. 将备份的三个 JSON 文件放入同一 UID 的账号目录，覆盖原有文件
 3. 重新启动 Biu，本地收藏夹即恢复
 
 ---
@@ -50,5 +38,5 @@ C:\Users\<用户名>\Documents\Biu\
 1. 在原设备上按上述步骤备份
 2. 在新设备上安装 Biu 并启动一次（自动创建 `Documents/Biu/` 目录）
 3. 完全退出 Biu
-4. 将两个 JSON 文件复制到新设备对应目录，覆盖原有文件
+4. 将账号目录复制到新设备的 `Biu/accounts/` 下，保留 UID 目录名，覆盖原有文件
 5. 重新启动 Biu

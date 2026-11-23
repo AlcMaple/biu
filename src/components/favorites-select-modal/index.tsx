@@ -26,6 +26,8 @@ import { postFavFolderDeal } from "@/service/fav-folder-deal";
 import { getAudioCreatedFavList } from "@/service/medialist-gateway-base-created";
 import { postCollResourceDeal } from "@/service/medialist-gateway-coll-resource-deal";
 import { getCachedVideoPages, getVideoPages } from "@/service/web-interface-view";
+import { playlistWriteIssue } from "@/store/playlist-write";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useFavoritesStore } from "@/store/favorite";
 import { useHeartbeat } from "@/store/heartbeat";
 import { useLocalFavItemsStore } from "@/store/local-fav-items";
@@ -239,6 +241,12 @@ const FavoritesSelectModal = () => {
   };
 
   const handleConfirm = async () => {
+    const issue = playlistWriteIssue("收藏");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     if (!rid) return;
 
     // 区分 B站 收藏夹 ID（正数）和本地收藏夹 ID（负数）
@@ -305,6 +313,7 @@ const FavoritesSelectModal = () => {
         }
       }
 
+      if (usePlaylistSession.getState() !== session) return;
       // 处理本地收藏夹
       for (const folderId of localToAdd) {
         if (itemInfo) {

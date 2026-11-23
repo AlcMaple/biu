@@ -41,6 +41,6 @@ export function loadUpdateSigningPrivateKey({ environment = process.env, fileSys
   return privateKey;
 }
 
-export function signUpdateMetadata(metadata, privateKey) {
-  return createSignedUpdateEnvelope(metadata, privateKey);
+export function signUpdateMetadata(metadata, privateKey, options = {}) {
+  return createSignedUpdateEnvelope(metadata, privateKey, options);
 }

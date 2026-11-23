@@ -1,5 +1,6 @@
 export const channel = {
   store: {
+    preparePlaylistAccount: "store:prepare-playlist-account",
     rankingLocal: "store:ranking-local",
     getSettings: "settings:get",
     setSettings: "settings:set",

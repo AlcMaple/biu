@@ -21,6 +21,8 @@ import ImageUpload from "@/components/image-upload";
 import { postFavFolderAdd } from "@/service/fav-folder-add";
 import { postFavFolderEdit } from "@/service/fav-folder-edit";
 import { getFavFolderInfo, type FavFolderInfoData } from "@/service/fav-folder-info";
+import { playlistWriteIssue } from "@/store/playlist-write";
+import { usePlaylistSession } from "@/store/playlist-session";
 import { useFavoritesStore } from "@/store/favorite";
 
 import ScrollContainer from "../scroll-container";
@@ -115,6 +117,12 @@ const FavoritesEditModal = ({ mid, isLocal, isOpen, onOpenChange, onSuccess }: P
   }, [isOpen, mid, isLocal, reset]);
 
   const onSubmit = async (values: FormValues) => {
+    const issue = playlistWriteIssue(mid ? "修改收藏夹" : "创建收藏夹");
+    if (issue) {
+      addToast({ title: issue, color: "warning" });
+      return;
+    }
+    const session = usePlaylistSession.getState();
     try {
       if (mid) {
         if (isLocal) {
@@ -136,6 +144,7 @@ const FavoritesEditModal = ({ mid, isLocal, isOpen, onOpenChange, onSuccess }: P
             cover: values.cover,
           });
 
+          if (session !== usePlaylistSession.getState()) return;
           if (res?.code === 0 && res.data?.id) {
             modifyCreatedFavorite({
               id: res.data.id,
@@ -181,6 +190,7 @@ const FavoritesEditModal = ({ mid, isLocal, isOpen, onOpenChange, onSuccess }: P
             privacy: values.isPublic ? 0 : 1,
             cover: values.cover,
           });
+          if (session !== usePlaylistSession.getState()) return;
           if (res?.code === 0 && res.data?.id) {
             addCreatedFavorite({
               id: res.data.id,
