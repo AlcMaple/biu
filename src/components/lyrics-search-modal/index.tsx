@@ -46,12 +46,15 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   const [providerCandidates, setProviderCandidates] = useState<ProviderLyricsCandidate[]>([]);
   const [providerLoading, setProviderLoading] = useState(false);
   const [providerError, setProviderError] = useState<string>();
-  const keywordRef = useRef("");
+  const keywordRef = useRef<{ value: string; fallbackTitles?: string[] }>({ value: "" });
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const suggestionsRef = useRef<string[]>([]);
-  suggestionsRef.current = suggestions;
   // 换来源 / 再搜 / 切歌都换一代，慢的旧结果回来时直接丢掉
   const searchRef = useRef(0);
+
+  const updateKeyword = useCallback((value: string, fallbackTitles?: string[]) => {
+    keywordRef.current = { value, fallbackTitles };
+    setKeyword(value);
+  }, []);
 
   const clearResults = useCallback(() => {
     searchRef.current += 1;
@@ -65,32 +68,30 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   }, []);
 
   const resetState = useCallback(() => {
-    setKeyword("");
+    updateKeyword("");
     setActiveTab("netease");
     clearResults();
-  }, [clearResults]);
+  }, [clearResults, updateKeyword]);
 
   useEffect(() => {
     if (!isOpen) return;
     const playItem = getPlayItem();
     if (playItem) {
       const rawTitle = (playItem.pageTitle || playItem.title).trim();
-      setKeyword(extractSongInfo(rawTitle).title);
       // 自动提取的歌名有时会选错；把其他候选、UP 主和完整原标题摆出来，点一下就搜，不用退出去查歌名
-      setSuggestions(
-        [...new Set([...extractTitleCandidates(rawTitle), playItem.ownerName?.trim() ?? "", rawTitle])].filter(Boolean),
-      );
+      const candidates = [
+        ...new Set([...extractTitleCandidates(rawTitle), playItem.ownerName?.trim() ?? "", rawTitle]),
+      ].filter(Boolean);
+      updateKeyword(extractSongInfo(rawTitle).title, candidates);
+      setSuggestions(candidates);
       clearResults();
     }
-  }, [playId, isOpen, getPlayItem, clearResults]);
-
-  useEffect(() => {
-    keywordRef.current = keyword;
-  }, [keyword]);
+  }, [playId, isOpen, getPlayItem, clearResults, updateKeyword]);
 
   const handleSubmit = useCallback(
-    async (tab: SearchTab = activeTab) => {
-      const query = keywordRef.current.trim();
+    async (tab: SearchTab) => {
+      const submitted = keywordRef.current;
+      const query = submitted.value.trim();
       if (query === "") return;
       const search = ++searchRef.current;
 
@@ -127,10 +128,10 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
 
           if (search !== searchRef.current) return;
           let songs = res?.result?.songs ?? [];
-          // 标题「歌名 - 歌手」「歌手 - 歌名」两种顺序都常见，默认关键词可能是歌手：
-          // 结果里没有一首歌名对得上，就换下一个候选搜一次，选出歌名真正对得上的那个
-          if (songs.length && !songsMatchTitle(songs, query)) {
-            for (const alt of suggestionsRef.current.filter(s => s !== query).slice(0, 2)) {
+          // 只有未编辑的默认词才需要纠正歌名和歌手的顺序，手选或手输的词以用户为准。
+          if (submitted.fallbackTitles && songs.length && !songsMatchTitle(songs, query)) {
+            for (const alt of submitted.fallbackTitles.filter(s => s !== query).slice(0, 2)) {
+              if (keywordRef.current !== submitted) break;
               const altRes = await platform.searchNeteaseSongs({
                 s: alt,
                 type: NETEASE_TYPE_SONG,
@@ -138,20 +139,22 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
                 offset: 0,
               });
               if (search !== searchRef.current) return;
+              if (keywordRef.current !== submitted) break;
               const altSongs = altRes?.result?.songs ?? [];
               if (altSongs.length && songsMatchTitle(altSongs, alt)) {
                 songs = altSongs;
-                setKeyword(alt);
+                updateKeyword(alt);
                 break;
               }
             }
           }
           setNeteaseSongs(songs);
         } catch {
+          if (search !== searchRef.current) return;
           setNeteaseSongs([]);
           addToast({ title: "网易云搜索失败", color: "danger" });
         } finally {
-          setNeteaseLoading(false);
+          if (search === searchRef.current) setNeteaseLoading(false);
         }
       } else {
         setNeteaseLoading(false);
@@ -161,21 +164,16 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           if (search !== searchRef.current) return;
           setLrclibSongs(res ?? []);
         } catch {
+          if (search !== searchRef.current) return;
           setLrclibSongs([]);
           addToast({ title: "LrcLib 搜索失败", color: "danger" });
         } finally {
-          setLrclibLoading(false);
+          if (search === searchRef.current) setLrclibLoading(false);
         }
       }
     },
-    [activeTab],
+    [updateKeyword],
   );
-
-  useEffect(() => {
-    if (isOpen) {
-      void handleSubmit(activeTab);
-    }
-  }, [isOpen, activeTab, handleSubmit]);
 
   const saveLyrics = useCallback(
     async (
@@ -263,10 +261,14 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           <div className="flex gap-2">
             <Input
               value={keyword}
-              onValueChange={setKeyword}
+              onValueChange={value => updateKeyword(value)}
               placeholder="请输入歌曲或歌手名称"
               onKeyDown={e => {
-                if (e.key === "Enter") handleSubmit(activeTab);
+                // Safari 确认输入法候选时可能已清掉 isComposing，但仍会报告 229。
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                  e.preventDefault();
+                  void handleSubmit(activeTab);
+                }
               }}
             />
             <Button color="primary" onPress={() => handleSubmit(activeTab)}>
@@ -286,8 +288,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
                   className="max-w-[22rem] cursor-pointer"
                   classNames={{ content: "truncate" }}
                   onClick={() => {
-                    keywordRef.current = text;
-                    setKeyword(text);
+                    updateKeyword(text);
                     void handleSubmit(activeTab);
                   }}
                 >
@@ -299,8 +300,11 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={key => {
-              setActiveTab(key as SearchTab);
+              const tab = key as SearchTab;
+              if (tab === activeTab) return;
+              setActiveTab(tab);
               clearResults();
+              void handleSubmit(tab);
             }}
             classNames={{
               panel: "py-0",
