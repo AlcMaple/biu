@@ -140,6 +140,10 @@ interface MusicLyrics {
   offset?: number;
   lyrics?: string;
   tLyrics?: string;
+  // 用户主动标记当前播放版本为纯音乐，和自动搜索无结果分开。
+  instrumental?: true;
+  // 用户采用了来源未返回歌词的版本；不代表这首歌是纯音乐。
+  noLyrics?: true;
   /**
    * 歌词来源：manual=用户手动采用（永不被自动结果覆盖）；缺省视为 manual（兼容旧缓存）；
    * aligned=用户自己选的歌词的逐字对齐结果（同样不被覆盖）；approved=对所有人生效的版本（自动对齐 / 审核通过的上传 / 管理员发布，有新版本时自动更新）

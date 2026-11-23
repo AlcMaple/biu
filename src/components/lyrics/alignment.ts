@@ -2,8 +2,8 @@ import type { LyricLine } from "@/store/lyrics-state";
 
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
-import platform from "@/platform";
-import { StoreNameMap } from "@shared/store";
+
+import { emptySelectionOf, updateLyricsEntry } from "./cache";
 
 type PlayItemLike = { source?: string; id?: string; bvid?: string; cid?: string | number } | undefined | null;
 
@@ -73,64 +73,83 @@ export type AlignedSource = "aligned" | "approved";
 
 export const isUserChosen = (entry: MusicLyrics | undefined) =>
   Boolean(
-    entry && (entry.lyrics || entry.tLyrics) && (entry.source ?? "manual") !== "auto" && entry.source !== "approved",
+    entry &&
+    (emptySelectionOf(entry) || entry.lyrics || entry.tLyrics) &&
+    (entry.source ?? "manual") !== "auto" &&
+    entry.source !== "approved",
   );
 
 // 采用对齐结果：写进歌词缓存（Electron 的 electron-store / Web 的 IndexedDB 都走 platform.setStore）。
 // 第一次采用时把原来的歌词留进 preAlign，之后可以还原；连续采用不覆盖它，否则还原只能回到上一次对齐结果。
 // 偏移一并归零：手动调的偏移是在补原歌词的时间误差，对齐后的时间已经准了，留着反而错位；原值存进 preAlign，还原时带回来
-export async function adoptAlignment(key: string, alignment: LyricsAlignment, source: AlignedSource) {
-  const store = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
-  const prev = store[key] ?? {};
-  const preAlign =
-    prev.preAlign ??
-    (prev.lyrics || prev.tLyrics
-      ? {
-          lyrics: prev.lyrics,
-          tLyrics: prev.tLyrics,
-          source: prev.source,
-          autoVersion: prev.autoVersion,
-          offset: prev.offset,
-        }
-      : undefined);
-  const base = preAlign ?? prev;
+export async function adoptAlignment(
+  key: string,
+  alignment: LyricsAlignment,
+  source: AlignedSource,
+  canAdopt: (previous?: MusicLyrics) => boolean = () => true,
+) {
   const lines = alignmentToLines(alignment.lines);
   const ownTranslation = alignmentTrack(alignment.lines, "translation");
-  const tLines = ownTranslation.length
-    ? ownTranslation
-    : retimeTranslation(parseLrc(base.lyrics), parseLrc(base.tLyrics), lines);
-  const next: MusicLyrics = {
-    ...prev,
-    lyrics: toLineLrc(lines),
-    tLyrics: tLines.length ? toLineLrc(tLines) : undefined,
-    source,
-    autoVersion: undefined,
-    alignment: { lyricsHash: alignment.lyricsHash, lines: alignment.lines },
-    preAlign,
-    offset: 0,
-    noAutoAlign: undefined,
+  let tLines = ownTranslation;
+  const next = await updateLyricsEntry(key, previous => {
+    if (!canAdopt(previous)) return;
+    const prev = previous ?? {};
+    const preAlign =
+      prev.preAlign ??
+      (prev.lyrics || prev.tLyrics
+        ? {
+            lyrics: prev.lyrics,
+            tLyrics: prev.tLyrics,
+            source: prev.source,
+            autoVersion: prev.autoVersion,
+            offset: prev.offset,
+          }
+        : undefined);
+    const base = preAlign ?? prev;
+    tLines = ownTranslation.length
+      ? ownTranslation
+      : retimeTranslation(parseLrc(base.lyrics), parseLrc(base.tLyrics), lines);
+    return {
+      ...prev,
+      lyrics: toLineLrc(lines),
+      tLyrics: tLines.length ? toLineLrc(tLines) : undefined,
+      instrumental: undefined,
+      noLyrics: undefined,
+      source,
+      autoVersion: undefined,
+      alignment: { lyricsHash: alignment.lyricsHash, lines: alignment.lines },
+      preAlign,
+      offset: 0,
+      noAutoAlign: undefined,
+    };
+  });
+  if (!next) return;
+  return {
+    lines,
+    tLines,
+    rLines: alignmentTrack(alignment.lines, "romanization"),
+    hasPreAlign: Boolean(next.preAlign),
+    screenOrigin: next.screenOrigin,
   };
-  await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
-  return { lines, tLines, rLines: alignmentTrack(alignment.lines, "romanization"), hasPreAlign: Boolean(preAlign) };
 }
 
 // byUser：用户点「还原」，标成手动选择，否则打开时会再被生效版本覆盖、自动对齐又换回来，点了等于没点。
 // 否则是生效版本被管理员下线了，退回对齐前的样子，来源也照旧（自动匹配的还是自动匹配）
 export async function restorePreAlign(key: string, { byUser = true }: { byUser?: boolean } = {}) {
-  const store = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
-  const prev = store[key];
-  if (!prev?.alignment || !prev.preAlign) return undefined;
-  const next: MusicLyrics = {
-    ...prev,
-    alignment: undefined,
-    preAlign: undefined,
-    lyrics: prev.preAlign?.lyrics,
-    tLyrics: prev.preAlign?.tLyrics,
-    source: byUser ? "manual" : prev.preAlign?.source,
-    autoVersion: byUser ? undefined : prev.preAlign?.autoVersion,
-    ...(byUser ? { noAutoAlign: true as const } : {}),
-    offset: prev.preAlign?.offset ?? 0,
-  };
-  await platform.setStore(StoreNameMap.LyricsCache, { ...store, [key]: next });
+  const next = await updateLyricsEntry(key, prev => {
+    if (!prev?.alignment || !prev.preAlign || emptySelectionOf(prev)) return;
+    return {
+      ...prev,
+      alignment: undefined,
+      preAlign: undefined,
+      lyrics: prev.preAlign.lyrics,
+      tLyrics: prev.preAlign.tLyrics,
+      source: byUser ? "manual" : prev.preAlign.source,
+      autoVersion: byUser ? undefined : prev.preAlign.autoVersion,
+      ...(byUser ? { noAutoAlign: true as const } : {}),
+      offset: prev.preAlign.offset ?? 0,
+    };
+  });
+  if (!next) return;
   return { entry: next, lines: linesOfEntry(next), tLines: parseLrc(next.tLyrics), offset: next.offset ?? 0 };
 }

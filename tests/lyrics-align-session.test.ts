@@ -166,6 +166,49 @@ describe("automatic alignment while listening", () => {
     expect(cache()[KEY].alignment).toBeUndefined();
   });
 
+  it.each(["instrumental", "missing"] as const)(
+    "skips a scheduled alignment for %s and aligns newly selected lyrics",
+    async selection => {
+      const session = useLyricsAlignSession.getState();
+      session.auto(LYRICS, { userChosen: false });
+      cache()[KEY] =
+        selection === "instrumental" ? { source: "manual", instrumental: true } : { source: "manual", noLyrics: true };
+      session.resetForLyricsChange();
+      useLyricsState.getState().setEmptySelection(selection);
+      session.auto(LYRICS, { userChosen: true, immediate: true });
+      await settle(6000);
+      expect(h.createAlignJob).not.toHaveBeenCalled();
+
+      const replacement = `${LYRICS}\n[00:04]新歌词`;
+      cache()[KEY] = { source: "manual", lyrics: replacement };
+      useLyricsState.getState().setEmptySelection(null);
+      h.createAlignJob.mockResolvedValue({ id: null, state: "done", alignment });
+      session.auto(replacement, { userChosen: true, immediate: true });
+      await settle(10);
+      expect(h.createAlignJob).toHaveBeenCalledExactlyOnceWith({ bvid: "BV1aaaaaaaaa", cid: "1", lyrics: replacement });
+      expect(cache()[KEY]).toMatchObject({ source: "aligned", alignment: { lyricsHash: "h1" } });
+      expect(cache()[KEY].instrumental).toBeUndefined();
+    },
+  );
+
+  it("ignores an alignment result already in flight when a song is marked instrumental", async () => {
+    let finish!: (value: unknown) => void;
+    h.createAlignJob.mockReturnValue(new Promise(resolve => (finish = resolve)));
+    const session = useLyricsAlignSession.getState();
+    session.auto(LYRICS, { userChosen: false, immediate: true });
+    await settle(10);
+    expect(h.createAlignJob).toHaveBeenCalledTimes(1);
+
+    cache()[KEY] = { source: "manual", instrumental: true };
+    useLyricsState.getState().setEmptySelection("instrumental");
+    session.resetForLyricsChange();
+    finish({ id: null, state: "done", alignment });
+    await settle(10);
+    expect(cache()[KEY]).toEqual({ source: "manual", instrumental: true });
+    expect(useLyricsState.getState()).toMatchObject({ emptySelection: "instrumental", lyrics: [], preview: null });
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
+  });
+
   it("stays quiet about failures the listener can't act on, shows the rest without retrying", async () => {
     h.createAlignJob.mockResolvedValueOnce({
       id: null,
@@ -240,6 +283,14 @@ describe("admin re-align drafts", () => {
     h.adminListeners.forEach(fn => fn({ isAdmin: true }, { isAdmin: false }));
     await settle(10);
     expect(useLyricsAlignSession.getState().phase).toMatchObject({ kind: "preview", restored: true });
+  });
+
+  it("does not restore a saved trial for a track marked as instrumental before the player state has hydrated", async () => {
+    cache()[KEY] = { source: "manual", instrumental: true };
+    h.getAlignDraft.mockResolvedValue({ draft: { lyricsHash: "h1", alignment, createdAt: 1 } });
+    await useLyricsAlignSession.getState().restoreDraft();
+    expect(useLyricsAlignSession.getState().phase.kind).toBe("idle");
+    expect(useLyricsState.getState().preview).toBeNull();
   });
 
   it("adoptAndPublish adopts here and publishes in one step", async () => {

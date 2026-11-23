@@ -16,7 +16,9 @@ import clsx from "classnames";
 import { debounce } from "es-toolkit";
 
 import { lyricsCacheKey, restorePreAlign } from "@/components/lyrics/alignment";
+import { emptySelectionOf, updateLyricsEntry } from "@/components/lyrics/cache";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
+import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
 import platform, { isElectron } from "@/platform";
 import { useAlignReview } from "@/store/align-review";
 import { useFullScreenPlayerSettings } from "@/store/full-screen-player-settings";
@@ -100,6 +102,7 @@ const Lyrics = ({
   const showTranslation = useFullScreenPlayerSettings(s => s.showTranslation);
   const showRomanization = useFullScreenPlayerSettings(s => s.showRomanization);
   const isLoading = useLyricsState(s => s.isLoading);
+  const emptySelection = useLyricsState(s => s.emptySelection);
   const screenStatus = useLyricsState(s => s.screenStatus);
 
   // Reset fontSize when track changes
@@ -166,24 +169,13 @@ const Lyrics = ({
     () =>
       debounce(async (playItem: PlayItem, nextOffset?: number, nextFontSize?: number) => {
         try {
-          const key =
-            playItem?.source === "local"
-              ? `local-${playItem?.id}`
-              : playItem?.bvid && playItem?.cid
-                ? `${playItem.bvid}-${playItem.cid}`
-                : null;
+          const key = lyricsCacheKey(playItem);
           if (!key) return;
-          const store = await platform.getStore(StoreNameMap.LyricsCache);
-          const prev = store?.[key] || {};
-
-          await platform.setStore(StoreNameMap.LyricsCache, {
-            ...(store || {}),
-            [key]: {
-              ...prev,
-              offset: nextOffset ?? 0,
-              fontSize: nextFontSize ?? 0,
-            },
-          });
+          await updateLyricsEntry(key, previous => ({
+            ...previous,
+            offset: emptySelectionOf(previous) ? 0 : (nextOffset ?? 0),
+            fontSize: nextFontSize ?? 0,
+          }));
         } catch {
           addToast({ color: "danger", title: "保存失败" });
         }
@@ -256,6 +248,7 @@ const Lyrics = ({
     ? ALIGN_MENU.filter(
         item =>
           (!item.admin || isAdmin) &&
+          (!emptySelection || item.key === "edit") &&
           (item.key !== "restore" || Boolean(menuEntry?.alignment && menuEntry.preAlign)) &&
           (item.key !== "report" || Boolean(menuEntry?.alignment)),
       )
@@ -267,11 +260,22 @@ const Lyrics = ({
   }, [showControls]);
 
   const handleLyricsAdopted = useCallback(
-    (nextLyrics?: string, nextTLyrics?: string, lines?: LyricLine[]) => {
+    (entry: MusicLyrics) => {
       onCloseSearch();
-      if (nextLyrics) {
-        useLyricsState.getState().setLyrics(lines ?? parseLrc(nextLyrics), nextTLyrics ? parseLrc(nextTLyrics) : []);
-        useLyricsAlignSession.getState().auto(nextLyrics, { userChosen: true, immediate: true });
+      const state = useLyricsState.getState();
+      const align = useLyricsAlignSession.getState();
+      align.resetForLyricsChange();
+      const selectedEmpty = emptySelectionOf(entry);
+      state.setEmptySelection(selectedEmpty);
+      if (selectedEmpty) {
+        addToast({ title: selectedEmpty === "instrumental" ? "已采用纯音乐" : "已采用无歌词版本", color: "success" });
+        return;
+      }
+      state.setLyrics(linesOfEntry(entry), parseLrc(entry.tLyrics));
+      state.setScreenOrigin(null);
+      state.setScreenStatus(null);
+      if (entry.lyrics) {
+        align.auto(entry.lyrics, { userChosen: true, immediate: true });
       }
     },
     [onCloseSearch],
@@ -299,6 +303,7 @@ const Lyrics = ({
         setEditor(alignInputOf(entry));
         return;
       }
+      if (emptySelectionOf(entry)) return;
       if (action === "report") {
         setReport(entry?.alignment ?? null);
         return;
@@ -460,13 +465,17 @@ const Lyrics = ({
             </div>
           ) : (
             <div className="text-foreground/70 flex h-full items-center justify-center">
-              {screenStatus?.kind === "working"
-                ? "正在从视频画面识别歌词…"
-                : screenStatus?.kind === "failed"
-                  ? screenStatus.message
-                  : isLoading
-                    ? "歌词加载中..."
-                    : "暂无歌词"}
+              {emptySelection === "instrumental"
+                ? "纯音乐"
+                : emptySelection === "missing"
+                  ? "暂无歌词"
+                  : screenStatus?.kind === "working"
+                    ? "正在从视频画面识别歌词…"
+                    : screenStatus?.kind === "failed"
+                      ? screenStatus.message
+                      : isLoading
+                        ? "歌词加载中..."
+                        : "暂无歌词"}
             </div>
           )}
         </div>
@@ -512,7 +521,7 @@ const Lyrics = ({
                       </div>
                     )}
                     <FontSizeControl value={fontSize} onChange={handleFontSizeChange} />
-                    <OffsetControl value={offset} onChange={handleOffsetChange} />
+                    {!emptySelection && <OffsetControl value={offset} onChange={handleOffsetChange} />}
                     {translatedLyrics.length > 0 && (
                       <div className="flex items-center justify-between px-3 py-2 text-sm">
                         <span>显示译文</span>

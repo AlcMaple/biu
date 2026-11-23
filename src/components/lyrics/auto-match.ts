@@ -2,6 +2,7 @@ import type { LyricsProvider } from "@shared/lyrics-format";
 import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
 
 import platform from "@/platform";
+import { classifyLyricText } from "@shared/instrumental-lyrics";
 
 import { parseLrc } from "./parse-lrc";
 import { buildProviderAdoption, PROVIDER_LABELS } from "./provider-lyrics";
@@ -285,7 +286,7 @@ const fromNetease = async (
     if (isCanceled()) return null;
     const lrc = await platform.getNeteaseLyrics({ id: song.id! });
     const text = lrc?.lrc?.lyric?.trim() || "";
-    if (parseLrc(text).length < 3) continue;
+    if (classifyLyricText(text) !== "text" || parseLrc(text).length < 3) continue;
     return { lyrics: text, tLyrics: lrc?.tlyric?.lyric?.trim() || undefined, from: "netease" as const };
   }
   return null;
@@ -322,7 +323,7 @@ const fromLrclib = async (
       if (shortTitle && !hasArtistEvidence([x.artistName ?? ""], rawNorm) && !themeHit) continue;
       const diff = Math.abs(x.duration - duration);
       if (diff > MAX_DURATION_DIFF) continue;
-      if (parseLrc(x.syncedLyrics).length < 3) continue;
+      if (classifyLyricText(x.syncedLyrics) !== "text" || parseLrc(x.syncedLyrics).length < 3) continue;
       if (!best || diff < best.diff) best = { text: x.syncedLyrics, diff };
     }
     if (best) return { lyrics: best.text, from: "lrclib" as const };
@@ -431,6 +432,7 @@ const fromProvider = async (
       stopProvider(provider, res.error);
       return "incomplete";
     }
+    if (res.data.instrumental) continue;
     const adoption = buildProviderAdoption(res.data, candidate);
     const lines = parseLrc(adoption.lyrics);
     if (lines.length < 3) continue;

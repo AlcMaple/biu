@@ -2,16 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, Chip, Input, Modal, ModalBody, ModalContent, ModalHeader, Tab, Tabs, addToast } from "@heroui/react";
 
-import type { LyricLine } from "@/store/lyrics-state";
 import type { LyricsProvider } from "@shared/lyrics-format";
 import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
 
+import { lyricsCacheKey } from "@/components/lyrics/alignment";
 import { extractSongInfo, extractTitleCandidates, songsMatchTitle } from "@/components/lyrics/auto-match";
-import { PROVIDER_LABELS, describeProviderError, linesOfEntry } from "@/components/lyrics/provider-lyrics";
+import { type EmptyLyricsSelection, updateLyricsEntry } from "@/components/lyrics/cache";
+import { PROVIDER_LABELS, describeProviderError } from "@/components/lyrics/provider-lyrics";
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
-import { StoreNameMap } from "@shared/store";
 
+import type { AdoptEmptyLyricsHandler } from "./lyrics-preview-modal";
 import type { AdoptLyricsHandler } from "./netease-tab";
 import type { AdoptProviderLyricsHandler } from "./provider-tab";
 
@@ -23,6 +24,14 @@ const NETEASE_TYPE_SONG = 1;
 const DEFAULT_LIMIT = 20;
 
 type SearchTab = "netease" | "lrclib" | LyricsProvider;
+type LyricsSelection =
+  | { empty: EmptyLyricsSelection }
+  | {
+      lyrics?: string;
+      tLyrics?: string;
+      origin?: LyricsOrigin;
+      nativeTiming?: NativeLyricsTiming;
+    };
 
 const PROVIDER_TABS: LyricsProvider[] = ["qq", "kugou", "amll"];
 
@@ -31,11 +40,12 @@ const isProviderTab = (tab: SearchTab): tab is LyricsProvider => tab !== "neteas
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onLyricsAdopted?: (lyricsText?: string, tLyricsText?: string, lines?: LyricLine[]) => void;
+  onLyricsAdopted?: (entry: MusicLyrics) => void;
 }
 
 const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => {
   const playId = usePlayList(state => state.playId);
+  const cacheKey = usePlayList(state => lyricsCacheKey(state.getPlayItem()));
   const getPlayItem = usePlayList(state => state.getPlayItem);
   const [keyword, setKeyword] = useState("");
   const [activeTab, setActiveTab] = useState<SearchTab>("netease");
@@ -86,7 +96,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
       setSuggestions(candidates);
       clearResults();
     }
-  }, [playId, isOpen, getPlayItem, clearResults, updateKeyword]);
+  }, [playId, cacheKey, isOpen, getPlayItem, clearResults, updateKeyword]);
 
   const handleSubmit = useCallback(
     async (tab: SearchTab) => {
@@ -176,72 +186,50 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
   );
 
   const saveLyrics = useCallback(
-    async (
-      lyricsText: string | undefined,
-      tLyricsText: string | undefined,
-      extra: Pick<MusicLyrics, "origin" | "nativeTiming">,
-    ) => {
-      if (!lyricsText && !tLyricsText) return false;
-
-      const current = getPlayItem();
-      if (!current) {
-        addToast({ title: "当前播放信息缺失，无法保存歌词", color: "warning" });
+    async (selection: LyricsSelection) => {
+      if (!("empty" in selection) && !selection.lyrics && !selection.tLyrics) return false;
+      if (!cacheKey) {
+        addToast({ title: "当前曲目还没加载完成，稍后再试", color: "warning" });
         return false;
       }
-
-      let key: string;
-      if (current.source === "local") {
-        key = `local-${current.id}`;
-      } else {
-        const cid = current.cid ? Number(current.cid) : undefined;
-        if (!current.bvid || cid === undefined || Number.isNaN(cid)) {
-          addToast({ title: "当前播放信息缺失，无法保存歌词", color: "warning" });
-          return false;
-        }
-        key = `${current.bvid}-${current.cid}`;
-      }
-
-      const nextLyrics: MusicLyrics = {
-        lyrics: lyricsText,
-        tLyrics: tLyricsText,
-        source: "manual",
-        autoVersion: undefined,
-        // 换了一份歌词，旧的逐字时间轴和对齐前备份都不再对应它
-        alignment: undefined,
-        preAlign: undefined,
-        // 主动换了一份歌词，之前点「还原」留下的「别再自动对齐」不再适用
-        noAutoAlign: undefined,
-        // 网易云 / LrcLib 采用时显式清掉，免得上一份平台歌词的来源和逐字时间挂在新歌词上
-        origin: extra.origin,
-        nativeTiming: extra.nativeTiming,
-        screenOrigin: undefined,
-      };
+      const isCurrent = () => lyricsCacheKey(getPlayItem()) === cacheKey;
 
       try {
-        const store = await platform.getStore(StoreNameMap.LyricsCache);
-        const prev = store?.[key] || {};
-        const nextStore = { ...(store ?? {}), [key]: { ...prev, ...nextLyrics } };
-        await platform.setStore(StoreNameMap.LyricsCache, nextStore);
-        onLyricsAdopted?.(lyricsText, tLyricsText, linesOfEntry(nextLyrics));
+        const entry = await updateLyricsEntry(cacheKey, previous => {
+          if (!isCurrent()) return;
+          // 换歌词时不继承旧的时间轴、来源或跳过对齐的设置。
+          const preferences = { fontSize: previous?.fontSize, offset: previous?.offset };
+          if ("empty" in selection) {
+            return selection.empty === "instrumental"
+              ? { ...preferences, source: "manual", instrumental: true, offset: 0 }
+              : { ...preferences, source: "manual", noLyrics: true, offset: 0 };
+          }
+          return { ...preferences, source: "manual", ...selection };
+        });
+        if (!entry) {
+          addToast({ title: "已切到另一首歌，请重新选择", color: "warning" });
+          return false;
+        }
+        if (isCurrent()) onLyricsAdopted?.(entry);
         return true;
       } catch {
-        addToast({ title: "歌词保存失败", color: "danger" });
+        addToast({ title: "empty" in selection ? "无歌词选项保存失败" : "歌词保存失败", color: "danger" });
         return false;
       }
     },
-    [getPlayItem, onLyricsAdopted],
+    [cacheKey, getPlayItem, onLyricsAdopted],
   );
 
   const handleAdoptLyrics = useCallback<AdoptLyricsHandler>(
-    (lyricsText, tLyricsText) => saveLyrics(lyricsText, tLyricsText, { origin: undefined, nativeTiming: undefined }),
+    (lyrics, tLyrics) => saveLyrics({ lyrics, tLyrics }),
     [saveLyrics],
   );
 
   const handleAdoptProviderLyrics = useCallback<AdoptProviderLyricsHandler>(
-    adoption =>
-      saveLyrics(adoption.lyrics, adoption.tLyrics, { origin: adoption.origin, nativeTiming: adoption.nativeTiming }),
+    adoption => saveLyrics(adoption),
     [saveLyrics],
   );
+  const handleAdoptEmpty = useCallback<AdoptEmptyLyricsHandler>(empty => saveLyrics({ empty }), [saveLyrics]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -255,7 +243,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
 
   return (
     <Modal isOpen={isOpen} onOpenChange={handleOpenChange} scrollBehavior="inside" size="4xl" disableAnimation>
-      <ModalContent>
+      <ModalContent key={cacheKey ?? playId}>
         <ModalHeader className="flex flex-col gap-1">搜索歌词</ModalHeader>
         <ModalBody className="pb-6">
           <div className="flex gap-2">
@@ -317,9 +305,19 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
             ))}
           </Tabs>
           {activeTab === "netease" ? (
-            <NeteaseTab songs={neteaseSongs} loading={neteaseLoading} onAdoptLyrics={handleAdoptLyrics} />
+            <NeteaseTab
+              songs={neteaseSongs}
+              loading={neteaseLoading}
+              onAdoptLyrics={handleAdoptLyrics}
+              onAdoptEmpty={handleAdoptEmpty}
+            />
           ) : activeTab === "lrclib" ? (
-            <LrclibTab songs={lrclibSongs} loading={lrclibLoading} onAdoptLyrics={handleAdoptLyrics} />
+            <LrclibTab
+              songs={lrclibSongs}
+              loading={lrclibLoading}
+              onAdoptLyrics={handleAdoptLyrics}
+              onAdoptEmpty={handleAdoptEmpty}
+            />
           ) : (
             <ProviderTab
               provider={activeTab}
@@ -327,6 +325,7 @@ const LyricsSearchModal = ({ isOpen, onOpenChange, onLyricsAdopted }: Props) => 
               loading={providerLoading}
               error={providerError}
               onAdopt={handleAdoptProviderLyrics}
+              onAdoptEmpty={handleAdoptEmpty}
             />
           )}
         </ModalBody>

@@ -5,6 +5,7 @@
 
 import SparkMD5 from "spark-md5";
 
+import { classifyLyricText } from "./instrumental-lyrics.js";
 import {
   LyricsFormatError,
   parseKrcText,
@@ -67,13 +68,15 @@ export interface ProviderLyricsGetParams {
   artist?: string;
 }
 
-export interface ProviderLyricsDocument {
+interface ProviderLyricsBase {
   provider: LyricsProvider;
   /** 平台内这份歌词文件自己的 ID（酷狗是歌词 ID，不是歌曲 Hash） */
   sourceId: string;
-  lyrics: NormalizedLyrics;
   author?: string;
 }
+
+export type TimedProviderLyrics = ProviderLyricsBase & { instrumental?: false; lyrics: NormalizedLyrics };
+export type ProviderLyricsDocument = TimedProviderLyrics | (ProviderLyricsBase & { instrumental: true });
 
 export type ProviderResult<T> = { ok: true; data: T } | { ok: false; error: ProviderLyricsError };
 
@@ -183,6 +186,15 @@ function decodeBase64Utf8(value: string) {
   return new TextDecoder().decode(base64Bytes(value));
 }
 
+const missingLyrics = (provider: LyricsProvider, code?: number): never =>
+  fail("not_found", `${PROVIDER_NAMES[provider]}没有返回这个版本的歌词`, { code });
+
+function readLyricsText(provider: LyricsProvider, raw: string) {
+  const kind = classifyLyricText(raw);
+  if (kind === "empty") missingLyrics(provider);
+  return kind;
+}
+
 // ---------- QQ ----------
 
 interface QqSearchResponse {
@@ -277,11 +289,15 @@ async function getQq(transport: ProviderTransport, params: ProviderLyricsGetPara
   url.searchParams.set("pcachetime", String(Date.now()));
   const text = await send("qq", transport, { method: "GET", url, headers: { Referer: "https://y.qq.com/" } });
   const data = parseJson<QqLyricResponse>("qq", text);
+  const qqCode = Number(data.code) || Number(data.retcode);
+  if (qqCode === -1901 && !data.lyric?.trim()) missingLyrics("qq", qqCode);
   if (Number(data.code) !== 0 || Number(data.retcode) !== 0) {
     fail("business", `QQ 音乐取词异常（业务码 ${data.code ?? data.retcode ?? "缺失"}）`, { code: data.code });
   }
-  if (!data.lyric) fail("not_found", "QQ 音乐没有这首歌的歌词");
+  if (!data.lyric?.trim()) return missingLyrics("qq");
   const lyric = decodeBase64Utf8(data.lyric);
+  if (readLyricsText("qq", lyric) === "instrumental")
+    return { provider: "qq", sourceId: params.id, instrumental: true };
   const trans = data.trans ? decodeBase64Utf8(data.trans) : undefined;
   return { provider: "qq", sourceId: params.id, lyrics: parseLyrics(() => parseLrcText(lyric, trans)) };
 }
@@ -456,6 +472,7 @@ async function getKugou(
     headers: kugouHeaders(),
   });
   const found = parseJson<KugouLyricSearchResponse>("kugou", searchText);
+  if (found.status === 404) fail("not_found", "酷狗没有返回这个版本的歌词", { code: 404 });
   if (found.status !== 200)
     fail("business", `酷狗歌词检索异常（业务码 ${found.status ?? "缺失"}）`, { code: found.status });
   const candidate = found.candidates?.find(item => item.id && item.accesskey);
@@ -481,20 +498,26 @@ async function getKugou(
     headers: kugouHeaders(clienttime),
   });
   const download = parseJson<KugouDownloadResponse>("kugou", downloadText);
-  if (download.status !== 200 || !download.content) {
+  if (download.status !== 200) {
     fail("business", `酷狗歌词下载异常（业务码 ${download.error_code ?? download.status ?? "缺失"}）`, {
       code: download.error_code,
     });
   }
+  if (!download.content?.trim()) return missingLyrics("kugou");
   let krc: string;
   try {
-    krc = await decodeKrc(download.content!);
+    krc = await decodeKrc(download.content);
   } catch (error) {
     if (error instanceof LyricsFormatError) fail("invalid_response", error.message);
     throw error;
   }
-  const lyrics = parseLyrics(() => parseKrcText(krc));
-  return { provider: "kugou", sourceId: String(candidate.id), lyrics, author: candidate.nickname || undefined };
+  const source = {
+    provider: "kugou" as const,
+    sourceId: String(candidate.id),
+    author: candidate.nickname || undefined,
+  };
+  if (readLyricsText("kugou", krc) === "instrumental") return { ...source, instrumental: true };
+  return { ...source, lyrics: parseLyrics(() => parseKrcText(krc)) };
 }
 
 // ---------- AMLL ----------
@@ -555,14 +578,20 @@ async function getAmll(transport: ProviderTransport, params: ProviderLyricsGetPa
   url.searchParams.set("id", params.id);
   const text = await send("amll", transport, { method: "GET", url, headers: { Accept: "application/json" } });
   const data = parseJson<AmllGetResponse>("amll", text, quoteAmllIds);
-  if (data.status !== 200 || !data.data?.lyrics) {
+  if (data.status === 404) return missingLyrics("amll", data.status);
+  if (data.status !== 200 || !data.data) {
     fail("business", `AMLL 取词异常（状态 ${data.status ?? "缺失"}）`, { code: data.status });
   }
   if (data.data.format && data.data.format !== "ttml")
     fail("unsupported_format", `AMLL 歌词格式 ${data.data.format} 不支持`);
   const ttml = data.data.lyrics;
+  if (!ttml?.trim()) return missingLyrics("amll");
   const author = Array.isArray(data.data.authorUsernames) ? data.data.authorUsernames[0] : undefined;
-  return { provider: "amll", sourceId: params.id, lyrics: parseLyrics(() => parseTtmlText(ttml)), author };
+  const source = { provider: "amll" as const, sourceId: params.id, author };
+  const lyrics = parseLyrics(() => parseTtmlText(ttml));
+  const vocalText = lyrics.lines.flatMap(line => [line.text, line.background?.text ?? ""]).join("\n");
+  if (readLyricsText("amll", vocalText) === "instrumental") return { ...source, instrumental: true };
+  return { ...source, lyrics };
 }
 
 // ---------- 入口 ----------

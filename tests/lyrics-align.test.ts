@@ -13,6 +13,7 @@ vi.mock("@/platform", () => ({
 }));
 
 import { adoptAlignment, isUserChosen, restorePreAlign } from "@/components/lyrics/alignment";
+import { updateLyricsEntry } from "@/components/lyrics/cache";
 import { findActiveIndex } from "@/components/lyrics/playback-clock";
 import { matchAlignRoute, normalizeAlignServerUrl } from "@shared/lyrics-align";
 import { StoreNameMap } from "@shared/store";
@@ -81,8 +82,18 @@ describe("adopting and restoring an alignment", () => {
     };
   });
 
+  it("keeps an instrumental mark when another whole-cache update is concurrent", async () => {
+    const trackEntry = "BV13LFNzmEHG-1";
+    await Promise.all([
+      updateLyricsEntry(trackEntry, () => ({ source: "manual", instrumental: true })),
+      updateLyricsEntry("an-unrelated-track", () => ({ lyrics: "[00:01]另一首歌" })),
+    ]);
+    expect(cache()[trackEntry]).toEqual({ source: "manual", instrumental: true });
+    expect(cache()["an-unrelated-track"].lyrics).toBe("[00:01]另一首歌");
+  });
+
   it("keeps the original for restore and moves translations to the aligned times", async () => {
-    const { lines, tLines } = await adoptAlignment(
+    const result = await adoptAlignment(
       "BV13LFNzmEHG-1",
       alignment([
         [10.3, "第一句"],
@@ -90,6 +101,8 @@ describe("adopting and restoring an alignment", () => {
       ]),
       "aligned",
     );
+    expect(result).toBeDefined();
+    const { lines, tLines } = result!;
     expect(lines.map(l => l.time)).toEqual([10300, 15420]);
     expect(lines[1].words?.[1]).toEqual({ text: "二", time: 15620 });
     expect(tLines).toEqual([

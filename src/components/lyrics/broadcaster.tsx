@@ -13,6 +13,7 @@ import {
   type AutoLyricsResult,
   type AutoMatchOutcome,
 } from "@/components/lyrics/auto-match";
+import { emptySelectionOf, updateLyricsEntry } from "@/components/lyrics/cache";
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { readPlaybackMs, useActiveLyricIndex } from "@/components/lyrics/playback-clock";
 import { linesOfEntry } from "@/components/lyrics/provider-lyrics";
@@ -91,7 +92,8 @@ const LyricsBroadcaster = () => {
   // Load lyrics whenever the track changes
   useEffect(() => {
     let canceled = false;
-    const { setLyrics, setOffset, setIsLoading, setScreenOrigin, reset } = useLyricsState.getState();
+    const { setLyrics, setOffset, setIsLoading, setScreenOrigin, setEmptySelection, reset } = useLyricsState.getState();
+    const stopped = () => canceled || Boolean(useLyricsState.getState().emptySelection);
 
     reset();
 
@@ -112,9 +114,14 @@ const LyricsBroadcaster = () => {
       try {
         const cacheKey = isLocal ? `local-${playItem.id}` : `${playItem.bvid}-${playItem.cid}`;
         const store = await platform.getStore(StoreNameMap.LyricsCache);
-        if (canceled) return;
+        if (stopped()) return;
         let staleAuto = false;
         const cached = store && typeof store === "object" ? store[cacheKey] : undefined;
+        const emptySelection = emptySelectionOf(cached);
+        if (emptySelection) {
+          setEmptySelection(emptySelection);
+          return;
+        }
         if (cached) {
           setOffset(typeof cached.offset === "number" ? cached.offset : DEFAULT_OFFSET);
           setScreenOrigin(cached.screenOrigin ?? null);
@@ -133,24 +140,28 @@ const LyricsBroadcaster = () => {
         let entry = cached;
         if (!isLocal) {
           const published = await fetchPublished(playItem.bvid, String(playItem.cid));
-          if (canceled) return;
+          if (stopped()) return;
           // 管理员上次重跑、还没发布的结果：切歌回来接着试听，不用重新对齐
           void useLyricsAlignSession.getState().restoreDraft();
           if (published && !isUserChosen(entry)) {
             if (entry?.source === "approved" && entry.alignment?.lyricsHash === published.lyricsHash) return;
-            const latest = (await platform.getStore(StoreNameMap.LyricsCache))?.[cacheKey];
-            if (canceled || isUserChosen(latest)) return;
-            const { lines, tLines, rLines } = await adoptAlignment(cacheKey, published, "approved");
-            if (canceled) return;
+            const result = await adoptAlignment(
+              cacheKey,
+              published,
+              "approved",
+              latest => !stopped() && !isUserChosen(latest),
+            );
+            if (!result || stopped()) return;
+            const { lines, tLines, rLines } = result;
             setLyrics(lines, tLines, rLines);
             setOffset(0);
-            setScreenOrigin(latest?.screenOrigin ?? null);
+            setScreenOrigin(result.screenOrigin ?? null);
             return;
           }
           // 本地还挂着生效版本，服务器上却没了：被管理员确认有误下线了，退回对齐前的歌词
           if (published === null && entry?.source === "approved" && entry.alignment) {
             const restored = await restorePreAlign(cacheKey, { byUser: false });
-            if (canceled) return;
+            if (stopped()) return;
             if (restored) {
               entry = restored.entry;
               setLyrics(restored.lines, restored.tLines);
@@ -169,7 +180,7 @@ const LyricsBroadcaster = () => {
           if (!staleAuto) return;
         }
 
-        if (canceled) return;
+        if (stopped()) return;
         if (!staleAuto) setLyrics([]);
 
         // 成功靠缓存复用，只记正常完成的空结果；取消也算已尝试的话，切回来会整首没歌词
@@ -177,14 +188,14 @@ const LyricsBroadcaster = () => {
         // 防抖：快速连切歌时，停留不足该时长的歌不发起任何请求（effect 清理会置 canceled）
         // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- 取消由 canceled 标志处理
         await new Promise(resolve => setTimeout(resolve, AUTO_MATCH_DEBOUNCE_MS));
-        if (canceled) return;
+        if (stopped()) return;
         const bvid = playItem.bvid;
         const title = playItem.pageTitle || playItem.title;
         const tianci = !isLocal && looksLikeTianci(title);
         // 缓存里是旧算法按标题配上的歌词，填词歌多半是原曲的，识别期间不显示
         if (tianci && staleAuto) setLyrics([]);
         const shared = isLocal ? undefined : await fetchRecognized(bvid, String(playItem.cid));
-        if (canceled) return;
+        if (stopped()) return;
         // 版本低于当前算法的服务端结果不用，自己重新匹配后会覆盖它
         const fresh = (shared?.v ?? 0) >= AUTO_MATCH_VERSION;
         let hit: Omit<AutoLyricsResult, "from"> | null = null;
@@ -204,8 +215,8 @@ const LyricsBroadcaster = () => {
           return;
         } else {
           const outcome: AutoMatchOutcome = { exhausted: false };
-          const matched = tianci ? null : await autoMatchLyrics(title, playItem.duration, () => canceled, outcome);
-          if (canceled) return;
+          const matched = tianci ? null : await autoMatchLyrics(title, playItem.duration, stopped, outcome);
+          if (stopped()) return;
           hit = matched;
           from = matched?.from;
           if (!tianci && !hit && outcome.exhausted && !staleAuto && !isLocal && bvid) {
@@ -214,8 +225,8 @@ const LyricsBroadcaster = () => {
           // 只有填词歌才识别画面：普通视频按标题搜不到就是暂无歌词，画面上的说话字幕（采访、小剧场）
           // 和歌词长得一样，识别了只会给人看假歌词。识别任务自己会在服务端记「查无歌词」
           if (!hit && !isLocal && bvid && tianci) {
-            const screen = await recognizeFromScreen(bvid, String(playItem.cid), AUTO_MATCH_VERSION, () => canceled);
-            if (canceled) return;
+            const screen = await recognizeFromScreen(bvid, String(playItem.cid), AUTO_MATCH_VERSION, stopped);
+            if (stopped()) return;
             if (screen) {
               hit = { lyrics: screen.lyrics, tLyrics: screen.tLyrics };
               screenOrigin = screenOriginOf(screen.kind, screen.lyrics);
@@ -227,24 +238,24 @@ const LyricsBroadcaster = () => {
           autoMissed.add(cacheKey);
           return;
         }
-        const latest = (await platform.getStore(StoreNameMap.LyricsCache)) ?? {};
-        // 匹配期间用户可能已手动采用歌词，自动结果不得覆盖
-        const now = latest[cacheKey];
-        if (canceled || (now?.source !== "auto" && (now?.lyrics || now?.tLyrics))) return;
-        // 来源信息随歌词一起换：网易云 / LrcLib 命中要清掉上一份歌词遗留的平台来源与逐字时间
-        const entryOfHit = {
-          ...(latest[cacheKey] || {}),
-          lyrics: hit.lyrics,
-          tLyrics: hit.tLyrics,
-          source: "auto" as const,
-          autoVersion: AUTO_MATCH_VERSION,
-          origin: hit.origin,
-          nativeTiming: hit.nativeTiming,
-          screenOrigin,
-        };
+        const matched = hit;
+        const entryOfHit = await updateLyricsEntry(cacheKey, now => {
+          // 用户可能在匹配期间手动换词或标记纯音乐。
+          if (stopped() || emptySelectionOf(now) || (now?.source !== "auto" && (now?.lyrics || now?.tLyrics))) return;
+          return {
+            ...now,
+            lyrics: matched.lyrics,
+            tLyrics: matched.tLyrics,
+            source: "auto",
+            autoVersion: AUTO_MATCH_VERSION,
+            origin: matched.origin,
+            nativeTiming: matched.nativeTiming,
+            screenOrigin,
+          };
+        });
+        if (!entryOfHit || stopped()) return;
         setLyrics(linesOfEntry(entryOfHit), parseLrc(hit.tLyrics));
         setScreenOrigin(screenOrigin ?? null);
-        await platform.setStore(StoreNameMap.LyricsCache, { ...latest, [cacheKey]: entryOfHit });
         if (!fromServer && !isLocal && bvid && from) {
           void reportRecognized({
             bvid,
@@ -255,12 +266,12 @@ const LyricsBroadcaster = () => {
             from,
           });
         }
-        if (!canceled && !isLocal && hit.lyrics) {
+        if (!stopped() && !isLocal && hit.lyrics) {
           useLyricsAlignSession.getState().auto(hit.lyrics, { userChosen: false });
         }
       } catch (err) {
         log.warn("[lyrics] 加载歌词出错", err);
-        if (!canceled) setLyrics([]);
+        if (!stopped()) setLyrics([]);
       } finally {
         if (!canceled) setIsLoading(false);
       }

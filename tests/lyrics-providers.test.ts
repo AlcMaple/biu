@@ -84,7 +84,10 @@ describe("QQ", () => {
     );
 
     const got = await getProviderLyrics(transport, { provider: "qq", id: "0039MnYb0qxYhV" });
-    expect(got.ok && got.data.lyrics.lines[0]).toMatchObject({ text: "故事的小黄花", translation: "译" });
+    expect(got.ok && !got.data.instrumental && got.data.lyrics.lines[0]).toMatchObject({
+      text: "故事的小黄花",
+      translation: "译",
+    });
   });
 });
 
@@ -122,6 +125,25 @@ describe("酷狗", () => {
       durationMs: 1000,
     });
     expect(result).toEqual({ ok: false, error: expect.objectContaining({ kind: "not_found" }) });
+    expect(requests).toHaveLength(1);
+  });
+
+  it("酷狗预览业务码 404 表示该版本未返回歌词，不继续下载", async () => {
+    const { transport, requests } = scripted({ body: { status: 404, candidates: [] } });
+    const result = await getProviderLyrics(transport, {
+      provider: "kugou",
+      id: "B3A52A7A958BF0AED0EBFBA2E9A818B7",
+      durationMs: 175_000,
+      title: "欲しいものすべて",
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        kind: "not_found",
+        code: 404,
+        message: "酷狗没有返回这个版本的歌词",
+      }),
+    });
     expect(requests).toHaveLength(1);
   });
 
@@ -186,5 +208,53 @@ describe("通用错误", () => {
       error: { kind: "bad_request" },
     });
     expect(transport).not.toHaveBeenCalled();
+  });
+});
+
+describe("预览纯音乐兼容", () => {
+  it("QQ 的 -1901 无取词正文仍是缺词，不返回纯音乐结论", async () => {
+    const { transport } = scripted({ body: { code: -1901, retcode: -1901, lyric: "" } });
+    const result = await getProviderLyrics(transport, { provider: "qq", id: "FixtureQQ123" });
+    expect(result).toEqual({ ok: false, error: expect.objectContaining({ kind: "not_found", code: -1901 }) });
+  });
+
+  it("QQ 把明确的说明作为纯音乐结果，不生成歌词", async () => {
+    const { transport } = scripted({
+      body: { code: 0, retcode: 0, lyric: b64("[ti:片段]\n[00:00.00]此歌曲为没有填词的纯音乐，请您欣赏") },
+    });
+    const result = await getProviderLyrics(transport, { provider: "qq", id: "FixtureQQ123" });
+    expect(result).toEqual({ ok: true, data: { provider: "qq", sourceId: "FixtureQQ123", instrumental: true } });
+  });
+
+  it("有正常人声正文时不被一句纯音乐说明吞掉", async () => {
+    const { transport } = scripted({
+      body: { code: 0, retcode: 0, lyric: b64("[00:00.00]纯音乐\n[00:01.00]这一行是人声") },
+    });
+    const result = await getProviderLyrics(transport, { provider: "qq", id: "FixtureQQ123" });
+    expect(result.ok && !result.data.instrumental && result.data.lyrics.lines).toHaveLength(2);
+  });
+
+  it("酷狗 KRC 和 AMLL TTML 的纯音乐说明不进入歌词时间轴", async () => {
+    const kugou = scripted(
+      { body: { status: 200, candidates: [{ id: "1", accesskey: "AK" }] } },
+      { body: { status: 200, content: encodeKrc("[id:abc]\n[0,500]<0,500,0>純音樂，請欣賞") } },
+    );
+    const amll = scripted({
+      body: {
+        status: 200,
+        data: { lyrics: '<tt><body><div><p begin="0s" end="1s">Instrumental</p></div></body></tt>', format: "ttml" },
+      },
+    });
+    expect(
+      await getProviderLyrics(kugou.transport, {
+        provider: "kugou",
+        id: "B3A52A7A958BF0AED0EBFBA2E9A818B7",
+        durationMs: 175000,
+      }),
+    ).toMatchObject({ ok: true, data: { instrumental: true } });
+    expect(await getProviderLyrics(amll.transport, { provider: "amll", id: "111" })).toMatchObject({
+      ok: true,
+      data: { instrumental: true },
+    });
   });
 });

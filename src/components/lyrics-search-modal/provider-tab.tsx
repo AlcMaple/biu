@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Chip, Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 
+import type { EmptyLyricsSelection } from "@/components/lyrics/cache";
 import type { LyricsProvider } from "@shared/lyrics-format";
 import type { ProviderLyricsCandidate } from "@shared/lyrics-providers";
 
@@ -15,7 +16,7 @@ import {
 import platform from "@/platform";
 import { usePlayList } from "@/store/play-list";
 
-import LyricsPreviewModal from "./lyrics-preview-modal";
+import LyricsPreviewModal, { INSTRUMENTAL_PREVIEW_NOTE, type AdoptEmptyLyricsHandler } from "./lyrics-preview-modal";
 
 export type AdoptProviderLyricsHandler = (adoption: ProviderAdoption) => Promise<boolean>;
 
@@ -25,17 +26,19 @@ interface ProviderTabProps {
   loading: boolean;
   error?: string;
   onAdopt: AdoptProviderLyricsHandler;
+  onAdoptEmpty?: AdoptEmptyLyricsHandler;
 }
 
 const TIMING_LABEL = { word: "逐字", line: "逐行" } as const;
 
-const ProviderTab = ({ provider, candidates, loading, error, onAdopt }: ProviderTabProps) => {
+const ProviderTab = ({ provider, candidates, loading, error, onAdopt, onAdoptEmpty }: ProviderTabProps) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [meta, setMeta] = useState("");
   const [adoption, setAdoption] = useState<ProviderAdoption | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [emptySelection, setEmptySelection] = useState<EmptyLyricsSelection>();
   // 每次点选 / 关闭都换一代：慢的旧请求回来时代数不对就丢掉，不会把上一首的歌词塞进当前预览
   const requestRef = useRef(0);
   // 打开预览时在播的那首；采用时已经切歌就拒绝，免得把歌词存到别的歌上
@@ -53,6 +56,7 @@ const ProviderTab = ({ provider, candidates, loading, error, onAdopt }: Provider
     setMeta("");
     setAdoption(null);
     setPreviewError("");
+    setEmptySelection(undefined);
     setIsPreviewOpen(true);
     setPreviewLoading(true);
 
@@ -67,6 +71,12 @@ const ProviderTab = ({ provider, candidates, loading, error, onAdopt }: Provider
       if (request !== requestRef.current) return;
       if (!result.ok) {
         setPreviewError(describeProviderError(result.error));
+        setEmptySelection(result.error.kind === "not_found" ? "missing" : undefined);
+        return;
+      }
+      if (result.data.instrumental) {
+        setMeta(INSTRUMENTAL_PREVIEW_NOTE);
+        setEmptySelection("instrumental");
         return;
       }
       const next = buildProviderAdoption(result.data, candidate);
@@ -102,6 +112,19 @@ const ProviderTab = ({ provider, candidates, loading, error, onAdopt }: Provider
     }
     if (await onAdopt(adoption)) handleOpenChange(false);
   }, [adoption, onAdopt, handleOpenChange]);
+  const handleAdoptEmpty = useCallback<AdoptEmptyLyricsHandler>(
+    async selection => {
+      if (usePlayList.getState().playId !== playIdRef.current) {
+        setPreviewError("已经切到别的歌了，请重新搜索");
+        setEmptySelection(undefined);
+        return false;
+      }
+      if (!(await onAdoptEmpty?.(selection))) return false;
+      handleOpenChange(false);
+      return true;
+    },
+    [onAdoptEmpty, handleOpenChange],
+  );
 
   const renderBody = () => {
     if (loading) {
@@ -164,11 +187,13 @@ const ProviderTab = ({ provider, candidates, loading, error, onAdopt }: Provider
         onOpenChange={handleOpenChange}
         title={title}
         meta={previewError || meta}
-        metaTone={previewError ? "danger" : "default"}
+        metaTone={previewError ? (emptySelection ? "warning" : "danger") : "default"}
         lyrics={adoption?.lyrics ?? ""}
         tlyrics={adoption?.tLyrics}
-        loading={previewLoading || !adoption}
+        loading={previewLoading}
         onAdopt={handleAdopt}
+        emptySelection={emptySelection}
+        onAdoptEmpty={onAdoptEmpty ? handleAdoptEmpty : undefined}
       />
     </div>
   );

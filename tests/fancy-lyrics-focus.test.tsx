@@ -37,12 +37,29 @@ beforeEach(() => {
   root = createRoot(host);
   Element.prototype.scrollTo = vi.fn();
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  useLyricsState.getState().reset();
   useLyricsState.getState().setLyrics([
     { time: 0, text: "第一句歌词" },
     { time: 5000, text: "ThisLongUnbrokenLineMustKeepItsSizeWhenHighlighted" },
     { time: 10000, text: "第三句歌词" },
   ]);
   usePlayProgress.setState({ currentTime: 1 });
+});
+
+it.each([
+  ["instrumental", "纯音乐"],
+  ["missing", "暂无歌词"],
+] as const)("displays %s using only its own label", async (selection, label) => {
+  await act(async () => root.render(<Lyrics />));
+  expect(host.querySelectorAll("[data-lyric-state]")).toHaveLength(3);
+  await act(async () => {
+    useLyricsState.getState().setScreenStatus({ kind: "working" });
+    useLyricsState.getState().setEmptySelection(selection);
+  });
+  expect(host).toHaveTextContent(label);
+  expect(host.querySelectorAll("[data-lyric-state]")).toHaveLength(0);
+  expect(host).not.toHaveTextContent(selection === "instrumental" ? "暂无歌词" : "纯音乐");
+  expect(host).not.toHaveTextContent("正在从视频画面识别歌词");
 });
 afterEach(async () => {
   await act(async () => root.unmount());

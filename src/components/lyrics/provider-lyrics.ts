@@ -1,6 +1,6 @@
 import type { LyricLine } from "@/store/lyrics-state";
 import type { NormalizedLyrics } from "@shared/lyrics-format";
-import type { ProviderLyricsCandidate, ProviderLyricsDocument, ProviderLyricsError } from "@shared/lyrics-providers";
+import type { ProviderLyricsCandidate, ProviderLyricsError, TimedProviderLyrics } from "@shared/lyrics-providers";
 
 import { parseLrc } from "@/components/lyrics/parse-lrc";
 import { toLrc } from "@shared/lyrics-format";
@@ -15,7 +15,7 @@ export interface ProviderAdoption {
 }
 
 export function buildProviderAdoption(
-  document: ProviderLyricsDocument,
+  document: TimedProviderLyrics,
   candidate: ProviderLyricsCandidate,
   now = Date.now(),
 ): ProviderAdoption {

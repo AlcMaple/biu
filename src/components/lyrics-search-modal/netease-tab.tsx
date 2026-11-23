@@ -1,11 +1,15 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, addToast } from "@heroui/react";
 
-import { formatDuration } from "@/common/utils/time";
-import platform from "@/platform";
+import type { EmptyLyricsSelection } from "@/components/lyrics/cache";
 
-import LyricsPreviewModal from "./lyrics-preview-modal";
+import { formatDuration } from "@/common/utils/time";
+import { parseLrc } from "@/components/lyrics/parse-lrc";
+import platform from "@/platform";
+import { classifyLyricText } from "@shared/instrumental-lyrics";
+
+import LyricsPreviewModal, { INSTRUMENTAL_PREVIEW_NOTE, type AdoptEmptyLyricsHandler } from "./lyrics-preview-modal";
 
 export type AdoptLyricsHandler = (lyricsText: string, tLyricsText?: string) => Promise<boolean>;
 
@@ -13,14 +17,18 @@ interface NeteaseTabProps {
   songs: NeteaseSong[];
   loading: boolean;
   onAdoptLyrics: AdoptLyricsHandler;
+  onAdoptEmpty: AdoptEmptyLyricsHandler;
 }
 
-const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
+const NeteaseTab = ({ songs, loading, onAdoptLyrics, onAdoptEmpty }: NeteaseTabProps) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [lyricsTitle, setLyricsTitle] = useState<string>("");
   const [lyrics, setLyrics] = useState<string>("");
   const [tlyrics, setTlyrics] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [emptySelection, setEmptySelection] = useState<EmptyLyricsSelection>();
+  const requestRef = useRef(0);
 
   const renderDuration = (value?: number) => {
     const seconds = value ? Math.round(value / 1000) : undefined;
@@ -42,31 +50,51 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
       addToast({ title: "缺少歌曲 ID，无法预览", color: "warning" });
       return;
     }
+    const request = ++requestRef.current;
     setLyrics("");
     setTlyrics("");
-    setLyricsTitle("");
+    setLyricsTitle(`${song.name || "未知歌曲"}-${renderArtists(song.artists)}`);
+    setPreviewError("");
+    setEmptySelection(undefined);
     setIsPreviewOpen(true);
     setPreviewLoading(true);
 
     try {
       const res = await platform.getNeteaseLyrics({ id });
-      const text = res?.lrc?.lyric?.trim() || res?.klyric?.lyric?.trim() || "";
+      if (request !== requestRef.current) return;
+      if (!res) {
+        setPreviewError("网易云没有返回歌词数据。可以换个来源。");
+        return;
+      }
       const translation = res?.tlyric?.lyric?.trim() || "";
+      if (res?.code !== undefined && res.code !== 200) {
+        setPreviewError(`网易云歌词请求失败（业务码 ${res.code}）。可以换个来源。`);
+        return;
+      }
+      const candidates = [res?.lrc?.lyric, res?.klyric?.lyric].map(raw => ({
+        text: raw?.trim(),
+        kind: classifyLyricText(raw),
+      }));
+      const text = candidates.find(value => value.kind === "text" && parseLrc(value.text).length)?.text;
 
       if (!text) {
-        addToast({ title: "未找到歌词内容", color: "warning" });
-        setIsPreviewOpen(false);
+        const hasText = candidates.some(value => value.kind === "text");
+        if (!hasText) {
+          setEmptySelection(candidates.some(value => value.kind === "instrumental") ? "instrumental" : "missing");
+        }
+        setPreviewError(
+          hasText ? "网易云没有返回带时间轴的歌词。可以换个来源。" : "网易云没有返回这个版本的歌词。可以换个来源。",
+        );
         return;
       }
 
-      setLyricsTitle(`${song.name || "未知歌曲"}-${renderArtists(song.artists)}`);
       setLyrics(text);
       setTlyrics(translation);
     } catch {
-      addToast({ title: "获取歌词失败", color: "danger" });
-      setIsPreviewOpen(false);
+      if (request !== requestRef.current) return;
+      setPreviewError("网易云歌词请求失败。可以稍后再试，或换个来源。");
     } finally {
-      setPreviewLoading(false);
+      if (request === requestRef.current) setPreviewLoading(false);
     }
   }, []);
 
@@ -79,6 +107,14 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
       }
     },
     [onAdoptLyrics],
+  );
+  const handleAdoptEmpty = useCallback<AdoptEmptyLyricsHandler>(
+    async selection => {
+      if (!(await onAdoptEmpty(selection))) return false;
+      setIsPreviewOpen(false);
+      return true;
+    },
+    [onAdoptEmpty],
   );
 
   return (
@@ -95,7 +131,7 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
             <TableColumn width={200}>歌手</TableColumn>
             <TableColumn width={90}>时长</TableColumn>
           </TableHeader>
-          <TableBody emptyContent="暂无数据" items={songs}>
+          <TableBody emptyContent="网易云没搜到匹配的曲目" items={songs}>
             {song => (
               <TableRow key={song.id} onClick={() => handleSelect(song)} className="cursor-pointer">
                 <TableCell>{song.name || "--"}</TableCell>
@@ -110,12 +146,19 @@ const NeteaseTab = ({ songs, loading, onAdoptLyrics }: NeteaseTabProps) => {
 
       <LyricsPreviewModal
         isOpen={isPreviewOpen}
-        onOpenChange={setIsPreviewOpen}
+        onOpenChange={open => {
+          if (!open) requestRef.current += 1;
+          setIsPreviewOpen(open);
+        }}
         title={lyricsTitle}
+        meta={emptySelection === "instrumental" ? INSTRUMENTAL_PREVIEW_NOTE : previewError}
+        metaTone={emptySelection === "instrumental" ? "default" : "warning"}
         lyrics={lyrics}
         tlyrics={tlyrics}
         loading={previewLoading}
         onAdopt={handleAdopt}
+        emptySelection={emptySelection}
+        onAdoptEmpty={handleAdoptEmpty}
       />
     </div>
   );

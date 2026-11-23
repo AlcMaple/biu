@@ -102,6 +102,7 @@ export async function recognizeFromScreen(
     if (job.state === "failed") return fail(job.error?.message ?? "识别视频画面失败，请稍后再试。");
 
     const hit = await readScreenResult(bvid, cid, v);
+    if (isCanceled()) return null;
     setScreenStatus(null);
     return hit;
   } catch (err) {

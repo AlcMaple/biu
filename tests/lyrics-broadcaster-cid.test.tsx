@@ -604,3 +604,47 @@ it("maps rate limiting to the dedicated message", async () => {
   await advance();
   expect(useLyricsState.getState().screenStatus).toEqual({ kind: "failed", message: "识别请求太频繁，请稍后再试。" });
 });
+
+it.each(["instrumental", "missing"] as const)(
+  "loads a saved %s selection without fetching or aligning, and clears it on the next song",
+  async selection => {
+    const first = track();
+    const second = track();
+    cache[cacheKey(first)] =
+      selection === "instrumental" ? { source: "manual", instrumental: true } : { source: "manual", noLyrics: true };
+    cache[cacheKey(second)] = { source: "manual", lyrics: "[00:01]隔壁曲目的歌词" };
+    await act(async () => root.render(<LyricsBroadcaster />));
+    await select(first);
+    await advance(10000);
+    expect(useLyricsState.getState()).toMatchObject({ emptySelection: selection, isLoading: false, lyrics: [] });
+    expect(mocks.getPublishedLyrics).not.toHaveBeenCalled();
+    expect(mocks.autoMatchLyrics).not.toHaveBeenCalled();
+    expect(mocks.autoAlign).not.toHaveBeenCalled();
+
+    await select(second);
+    expect(useLyricsState.getState().emptySelection).toBeNull();
+    expect(useLyricsState.getState().lyrics[0].text).toBe("隔壁曲目的歌词");
+    expect(mocks.autoAlign).toHaveBeenCalledTimes(1);
+
+    await select(first);
+    expect(useLyricsState.getState()).toMatchObject({ emptySelection: selection, lyrics: [] });
+    expect(mocks.autoAlign).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("a lyric match already in flight never replaces an instrumental mark", async () => {
+  const pending = deferred<AutoLyricsResult>();
+  mocks.autoMatchLyrics.mockReturnValue(pending.promise);
+  await act(async () => root.render(<LyricsBroadcaster />));
+  const item = track();
+  await select(item);
+  await advance();
+  expect(mocks.autoMatchLyrics).toHaveBeenCalledTimes(1);
+
+  cache[cacheKey(item)] = { source: "manual", instrumental: true };
+  await act(async () => pending.resolve(hit));
+  expect(cache[cacheKey(item)]).toEqual({ source: "manual", instrumental: true });
+  expect(mocks.setStore).not.toHaveBeenCalled();
+  expect(mocks.autoAlign).not.toHaveBeenCalled();
+  expect(useLyricsState.getState().lyrics).toEqual([]);
+});

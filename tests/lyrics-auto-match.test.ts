@@ -335,14 +335,17 @@ describe("QQ / 酷狗 / AMLL 兜底", () => {
     for (const t of sentAt) expect(sentAt.filter(x => x <= t && x > t - 60_000).length).toBeLessThanOrEqual(12);
   });
 
-  it("取词返回无有效正文时换下一个候选", async () => {
+  it.each([false, true])("取词返回无有效正文或纯音乐时换下一个候选（纯音乐=%s）", async instrumental => {
     mocks.searchProviderLyrics.mockImplementation(async p => ({
       ok: true,
       data: p.provider === "qq" ? [cand("qq", { id: "a" }), cand("qq", { id: "b", durationMs: 181000 })] : [],
     }));
     mocks.getProviderLyrics.mockImplementation(async p => ({
       ok: true,
-      data: doc("qq", p.id === "a" ? "[00:01.00]纯音乐" : body),
+      data:
+        p.id === "a" && instrumental
+          ? { provider: "qq", sourceId: "no-vocals", instrumental: true }
+          : doc("qq", p.id === "a" ? "[00:01.00]纯音乐" : body),
     }));
     expect(await match("周杰伦 - 晴天", 180)).toMatchObject({ from: "qq" });
     expect(mocks.getProviderLyrics).toHaveBeenCalledTimes(2);

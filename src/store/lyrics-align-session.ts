@@ -2,6 +2,7 @@ import { addToast } from "@heroui/react";
 import { create } from "zustand";
 
 import { type AlignedSource, adoptAlignment, lyricsCacheKey, previewAlignment } from "@/components/lyrics/alignment";
+import { emptySelectionOf } from "@/components/lyrics/cache";
 import platform, { log } from "@/platform";
 import {
   AlignApiError,
@@ -53,6 +54,7 @@ interface AlignSessionState {
   start: (lyrics: string) => Promise<void>;
   rerun: () => Promise<void>;
   restoreDraft: () => Promise<void>;
+  resetForLyricsChange: () => void;
   resume: () => void;
   adopt: () => Promise<void>;
   discard: () => void;
@@ -72,7 +74,7 @@ export const currentAlignTarget = (): AlignTarget | null => {
 
 // 已经对齐过时用对齐前的原歌词：原歌词的时间用来给对齐失败的行划重对齐窗口，比拿对齐结果再对一遍可靠
 export const alignInputOf = (entry?: MusicLyrics) =>
-  (entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "";
+  emptySelectionOf(entry) ? "" : (entry?.alignment && entry.preAlign?.lyrics) || entry?.lyrics || "";
 
 const message = (err: unknown) => (err instanceof AlignApiError ? err.message : String(err));
 
@@ -87,6 +89,7 @@ const autoTried = new Set<string>();
 
 // 每次开始 / 放弃 / 切歌都换一代，上一代的计时器和轮询回来时发现代数不对就丢掉
 let generation = 0;
+let lyricsRevision = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const stop = () => {
@@ -103,11 +106,22 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
   const isCurrent = (target: AlignTarget) => currentAlignTarget()?.cacheKey === target.cacheKey;
 
   // 自动对齐好了直接换上。等待期间用户可能换了歌词：缓存里的已不是送去对齐的那份，就不覆盖
-  const applyAuto = async (target: AlignTarget, alignment: LyricsAlignment, input: string, source: AlignedSource) => {
-    const entry = (await platform.getStore(StoreNameMap.LyricsCache))?.[target.cacheKey];
-    if (!isCurrent(target) || alignInputOf(entry).trim() !== input) return;
-    const { lines, tLines, rLines } = await adoptAlignment(target.cacheKey, alignment, source);
-    if (!isCurrent(target)) return;
+  const applyAuto = async (
+    target: AlignTarget,
+    alignment: LyricsAlignment,
+    input: string,
+    source: AlignedSource,
+    gen: number,
+  ) => {
+    const current = () => gen === generation && isCurrent(target) && !useLyricsState.getState().emptySelection;
+    const result = await adoptAlignment(
+      target.cacheKey,
+      alignment,
+      source,
+      entry => current() && alignInputOf(entry).trim() === input,
+    );
+    if (!result || !current()) return;
+    const { lines, tLines, rLines } = result;
     const lyricsState = useLyricsState.getState();
     lyricsState.setLyrics(lines, tLines, rLines);
     lyricsState.setOffset(0);
@@ -139,7 +153,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       return;
     }
     set(idle);
-    applyAuto(target, view.alignment, input, source).catch(err =>
+    applyAuto(target, view.alignment, input, source, gen).catch(err =>
       addToast({ title: `逐字歌词保存失败：${message(err)}`, color: "danger" }),
     );
   };
@@ -205,7 +219,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       const target = currentAlignTarget();
       const text = lyrics.trim();
       // 对齐要登录：token 是拿 B 站登录换的；没登录的人照样能用别人对齐好的版本
-      if (!target || !text || !useUser.getState().user?.isLogin) return;
+      if (!target || !text || !useUser.getState().user?.isLogin || useLyricsState.getState().emptySelection) return;
       const { mode, phase, target: running } = get();
       // 管理员手动的那轮还没结束，不让自动对齐把它的进度和试听冲掉
       if (mode === "manual" && phase.kind !== "idle" && running?.cacheKey === target.cacheKey) return;
@@ -218,7 +232,7 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       set({ target, mode: "auto", input: text, draftHash: null, phase: { kind: "idle" }, hidden: false });
       timer = setTimeout(
         () => {
-          if (gen !== generation || !isCurrent(target)) return;
+          if (gen !== generation || !isCurrent(target) || useLyricsState.getState().emptySelection) return;
           autoTried.add(tryKey);
           // 自动对齐不出提示条：每首新歌都挂两分钟「排队中」只是打扰，好了歌词自己变成逐字的；只有需要用户处理的失败才露面
           set({ phase: { kind: "working" }, hidden: true });
@@ -267,7 +281,8 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
     // 管理员切歌回来（或换了设备）时接着上次的试听，不用再等一遍对齐。草稿已采用到本机的，直接回到「待发布」
     restoreDraft: async () => {
       const target = currentAlignTarget();
-      if (!target || !useAlignReview.getState().isAdmin) return;
+      if (!target || !useAlignReview.getState().isAdmin || useLyricsState.getState().emptySelection) return;
+      const revision = lyricsRevision;
       const busy = () => {
         const { target: running, phase } = get();
         return running?.cacheKey === target.cacheKey && phase.kind !== "idle" && get().mode === "manual";
@@ -281,9 +296,9 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
         log.warn(`[lyrics-align] ${target.cacheKey} 查询未发布的对齐结果失败`, err);
         return;
       }
-      if (!draft || !isCurrent(target) || busy()) return;
+      if (!draft || revision !== lyricsRevision || !isCurrent(target) || busy()) return;
       const entry = (await platform.getStore(StoreNameMap.LyricsCache))?.[target.cacheKey];
-      if (!isCurrent(target) || busy()) return;
+      if (revision !== lyricsRevision || emptySelectionOf(entry) || !isCurrent(target) || busy()) return;
       stop();
       const base = { target, mode: "manual" as const, input: "", draftHash: draft.lyricsHash };
       if (sameLines(entry?.alignment?.lines, draft.alignment.lines)) {
@@ -293,6 +308,13 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       const { lyrics, translatedLyrics, setPreview } = useLyricsState.getState();
       setPreview(previewAlignment(draft.alignment, lyrics, translatedLyrics));
       set({ ...base, ...show({ kind: "preview", alignment: draft.alignment, restored: true }) });
+    },
+
+    resetForLyricsChange: () => {
+      lyricsRevision += 1;
+      stop();
+      useLyricsState.getState().setPreview(null);
+      set({ ...idle, input: "" });
     },
 
     resume: () => {
@@ -312,8 +334,13 @@ export const useLyricsAlignSession = create<AlignSessionState>((set, get) => {
       const { target, phase } = get();
       if (!target || phase.kind !== "preview") return;
       try {
-        const { lines, tLines, rLines } = await adoptAlignment(target.cacheKey, phase.alignment, "aligned");
+        const gen = generation;
+        const current = () => gen === generation && isCurrent(target) && get().phase === phase;
+        const result = await adoptAlignment(target.cacheKey, phase.alignment, "aligned", current);
+        if (!result || !current()) return;
+        const { lines, tLines, rLines } = result;
         const lyricsState = useLyricsState.getState();
+        lyricsState.setEmptySelection(null);
         lyricsState.setLyrics(lines, tLines, rLines);
         lyricsState.setOffset(0);
         lyricsState.setPreview(null);
