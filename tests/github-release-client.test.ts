@@ -20,6 +20,7 @@ import {
 const packageApp = vi.hoisted(() => vi.fn());
 vi.mock("electron-builder", () => ({ build: packageApp }));
 vi.mock("@rsbuild/core", () => ({ logger: { success: vi.fn() } }));
+vi.mock("../plugins/win-code-sign", () => ({ prepareWinCodeSign: vi.fn() }));
 
 const repository = "Example-Owner/my_biu";
 const keys = generateKeyPairSync("ed25519");

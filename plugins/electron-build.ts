@@ -8,6 +8,7 @@ import zlib from "node:zlib";
 import pkg from "../package.json";
 import { ELECTRON_OUT_DIRNAME, ELECTRON_ICON_BASE_PATH } from "../shared/path";
 import { getDesktopUpdateBuildConfig } from "./desktop-update-config";
+import { prepareWinCodeSign } from "./win-code-sign";
 
 function getElectronCacheDir() {
   if (process.env.ELECTRON_CACHE) return process.env.ELECTRON_CACHE;
@@ -96,6 +97,7 @@ function purgeCorruptElectronCache() {
 }
 
 export async function buildElectron() {
+  if (process.platform === "win32") await prepareWinCodeSign();
   purgeCorruptElectronCache();
   const update = getDesktopUpdateBuildConfig();
   await electronBuild({

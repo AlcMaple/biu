@@ -74,6 +74,7 @@ Windows 安装版的用户从第二版起可以在设置中「检查更新」，
 
 - **终端提示找不到 `package.json` 或 `dev_tools`。** 确认终端已进入项目文件夹。Windows 可在文件资源管理器打开项目文件夹，在地址栏输入 `cmd` 并回车。
 - **仓库、权限或提交检查失败。** 用 `git remote get-url origin` 核对仓库，用 `gh auth status` 核对登录账号。确认本次提交已推送到该仓库，并且账号有发布权限。
+- **提示无法准备 Windows 打包工具 `winCodeSign`。** 首次 Windows 打包会从 GitHub 下载并校验这份工具。检查能否访问 GitHub Releases，连通后用同一提交重新运行。成功下载后会复用缓存。
 - **上传中断。** 在同一提交下重新运行发布命令。附件传齐后，这个平台的版本才会公开。已公开版本如需修正，更新版本号后重新发布。[GitHub CLI 的附件发布流程](https://cli.github.com/manual/gh_release_create)
 
 已经运营自己的 HTTPS 下载站、要继续通过 SFTP 上传，可按[自建更新站](服务器首次配置.md)操作。
