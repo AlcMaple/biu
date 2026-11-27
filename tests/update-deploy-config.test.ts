@@ -6,14 +6,13 @@ describe("update deployment configuration", () => {
   const baseEnvironment = {
     BIU_UPDATE_PUBLIC_ORIGIN: "https://updates.example.com/updates/",
     BIU_UPDATE_PUBLISH_HOST: "updates.example.com",
-    BIU_UPDATE_PUBLISH_USER: "biu-update-publisher",
-    BIU_UPDATE_REMOTE_DIR: "/updates",
   };
 
   it("requires HTTPS and a safe absolute remote directory", () => {
     expect(loadUpdatePublishConfig(baseEnvironment)).toMatchObject({
       publicOrigin: "https://updates.example.com/updates",
       remoteDir: "/updates/",
+      user: "biu-update-publisher",
     });
     expect(() =>
       loadUpdatePublishConfig({ ...baseEnvironment, BIU_UPDATE_PUBLIC_ORIGIN: "http://updates.example.com" }),
@@ -21,6 +20,16 @@ describe("update deployment configuration", () => {
     expect(() => loadUpdatePublishConfig({ ...baseEnvironment, BIU_UPDATE_REMOTE_DIR: "/updates/../other" })).toThrow(
       /绝对 POSIX 路径/,
     );
+  });
+
+  it("uses explicit SFTP account and directory overrides", () => {
+    expect(
+      loadUpdatePublishConfig({
+        ...baseEnvironment,
+        BIU_UPDATE_PUBLISH_USER: "publisher",
+        BIU_UPDATE_REMOTE_DIR: "/custom",
+      }),
+    ).toMatchObject({ user: "publisher", remoteDir: "/custom/" });
   });
 
   it("allows only key or SSH-agent authentication and rejects unsafe filenames", () => {

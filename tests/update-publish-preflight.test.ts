@@ -20,8 +20,6 @@ const run = (args: string[], config = {}) =>
   });
 const config = {
   BIU_UPDATE_PUBLISH_HOST: "updates.example.com",
-  BIU_UPDATE_PUBLISH_USER: "publisher",
-  BIU_UPDATE_REMOTE_DIR: "/updates",
   BIU_UPDATE_PUBLIC_ORIGIN: "https://updates.example.com/updates/",
   BIU_UPDATE_PUBLISH_KEY: key,
   BIU_UPDATE_SIGNING_KEY: path.join(directory, "absent.pem"),
@@ -30,7 +28,8 @@ it("reports all missing connection fields before touching artifacts", () => {
   const result = run(["--win", "--config-only"]);
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("BIU_UPDATE_PUBLISH_HOST");
-  expect(result.stderr).toContain("BIU_UPDATE_PUBLISH_USER");
+  expect(result.stderr).toContain("BIU_UPDATE_PUBLIC_ORIGIN");
+  expect(result.stderr).not.toContain("BIU_UPDATE_PUBLISH_USER");
 });
 it("permits Mac-only configuration without a Windows signing key", () => {
   const result = run(["--mac", "--config-only"], config);

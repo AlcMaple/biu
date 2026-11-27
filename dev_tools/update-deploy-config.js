@@ -61,8 +61,8 @@ export function loadUpdatePublishConfig(environment = process.env) {
   return {
     host: parseHost(requiredEnv("BIU_UPDATE_PUBLISH_HOST", environment), "BIU_UPDATE_PUBLISH_HOST"),
     publicOrigin: parsePublicOrigin(requiredEnv("BIU_UPDATE_PUBLIC_ORIGIN", environment)),
-    remoteDir: parseRemoteDirectory(requiredEnv("BIU_UPDATE_REMOTE_DIR", environment)),
-    user: parseUser(requiredEnv("BIU_UPDATE_PUBLISH_USER", environment), "BIU_UPDATE_PUBLISH_USER"),
+    remoteDir: parseRemoteDirectory(environment.BIU_UPDATE_REMOTE_DIR?.trim() || "/updates/"),
+    user: parseUser(environment.BIU_UPDATE_PUBLISH_USER?.trim() || "biu-update-publisher", "BIU_UPDATE_PUBLISH_USER"),
   };
 }
 

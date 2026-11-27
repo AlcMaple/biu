@@ -23,6 +23,44 @@ function sftpCall(sftp, method, ...args) {
   return promisify(sftp[method].bind(sftp))(...args);
 }
 
+function transferRate(bytesPerSecond) {
+  return bytesPerSecond < 1024 ** 2
+    ? `${(bytesPerSecond / 1024).toFixed(1)} KiB/s`
+    : `${(bytesPerSecond / 1024 ** 2).toFixed(1)} MiB/s`;
+}
+
+export async function putFile(sftp, localPath, remotePath, showProgress = false) {
+  const started = performance.now();
+  const tty = process.stdout.isTTY;
+  let lastUpdate = started;
+  let previousWidth = 0;
+  let uploaded = 0;
+  const mib = bytes => (bytes / 1024 ** 2).toFixed(1);
+  const step = (transferred, _chunk, total) => {
+    uploaded = transferred;
+    const now = performance.now();
+    if (transferred === total || now - lastUpdate < (tty ? 1000 : 10000)) return;
+    lastUpdate = now;
+    const speed = transferred / ((now - started) / 1000);
+    const remaining = Math.ceil((total - transferred) / speed);
+    const eta = remaining < 60 ? `${remaining} 秒` : `${Math.floor(remaining / 60)} 分 ${remaining % 60} 秒`;
+    const line = `  ${Math.floor((transferred / total) * 100)}%  ${mib(transferred)} / ${mib(total)} MiB  均速 ${transferRate(speed)}  预计剩余 ${eta}`;
+    process.stdout.write(tty ? `\r${line.padEnd(previousWidth)}` : `${line}\n`);
+    previousWidth = line.length;
+  };
+
+  // ssh2 会把超出服务端单次写入上限的大块拆开并逐段等待确认。沿用 fastPut 的 64 路 32 KiB 小块流水线。
+  try {
+    await sftpCall(sftp, "fastPut", localPath, remotePath, showProgress ? { step } : {});
+  } finally {
+    if (tty && previousWidth) process.stdout.write("\n");
+  }
+  if (showProgress) {
+    const seconds = Math.max((performance.now() - started) / 1000, 0.001);
+    console.log(`  已传 ${mib(uploaded)} MiB，用时 ${seconds.toFixed(1)} 秒，均速 ${transferRate(uploaded / seconds)}`);
+  }
+}
+
 export async function checkRemotePublishDirectory(sftp, directory) {
   const stat = await sftpCall(sftp, "stat", directory);
   if (!stat.isDirectory()) throw new Error("SFTP 发布路径必须是目录。");

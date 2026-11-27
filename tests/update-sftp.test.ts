@@ -1,7 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { checkRemoteUpdateVersion, replaceRemoteFile, withRemotePublishLock } from "../dev_tools/update-sftp.js";
+import {
+  checkRemoteUpdateVersion,
+  putFile,
+  replaceRemoteFile,
+  withRemotePublishLock,
+} from "../dev_tools/update-sftp.js";
 import { UPDATE_ENVELOPE_MAX_BYTES } from "../shared/update-signing.js";
+
+it("reports acknowledged bytes, low upload speed and time remaining without logging every chunk", async () => {
+  const clock = vi.spyOn(performance, "now").mockReturnValue(0);
+  const output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+  const summary = vi.spyOn(console, "log").mockImplementation(() => {});
+  const fastPut = vi.fn((_local, _remote, { step }, done) => {
+    step(1024, 1024, 1024 ** 2);
+    clock.mockReturnValue(10_000);
+    step(256 * 1024, 255 * 1024, 1024 ** 2);
+    clock.mockReturnValue(40_000);
+    step(1024 ** 2, 768 * 1024, 1024 ** 2);
+    done(null);
+  });
+  try {
+    await putFile({ fastPut }, "installer", "temporary", true);
+    expect(output.mock.calls.map(([line]) => String(line)).filter(line => line.includes("%"))).toEqual([
+      expect.stringContaining("25%  0.3 / 1.0 MiB  均速 25.6 KiB/s  预计剩余 30 秒"),
+    ]);
+    expect(summary).toHaveBeenCalledWith(expect.stringContaining("已传 1.0 MiB，用时 40.0 秒，均速 25.6 KiB/s"));
+  } finally {
+    clock.mockRestore();
+    output.mockRestore();
+    summary.mockRestore();
+  }
+});
 
 describe("atomic SFTP metadata replacement", () => {
   it("replaces an existing destination through the POSIX extension", async () => {

@@ -21,6 +21,7 @@ import { loadUpdateEnvironment } from "./update-env.js";
 import {
   checkRemotePublishDirectory,
   checkRemoteUpdateVersion,
+  putFile,
   replaceRemoteFile,
   withRemotePublishLock,
 } from "./update-sftp.js";
@@ -96,29 +97,6 @@ function openSftp(client) {
   });
 }
 
-function putFile(sftp, localPath, remotePath) {
-  const total = fs.statSync(localPath).size;
-  return new Promise((resolve, reject) => {
-    sftp.fastPut(
-      localPath,
-      remotePath,
-      {
-        chunkSize: 1024 * 512,
-        concurrency: 4,
-        step: transferred => {
-          const percent = Math.round((transferred / total) * 100);
-          process.stdout.write(`\r  ${percent}%  (${(transferred / 1024 / 1024).toFixed(1)} MB)`);
-        },
-      },
-      error => {
-        if (error) return reject(error);
-        process.stdout.write(`\r  100%  (${(total / 1024 / 1024).toFixed(1)} MB)         \n`);
-        resolve();
-      },
-    );
-  });
-}
-
 function publicFileUrl(publicOrigin, filename) {
   const base = publicOrigin.endsWith("/") ? publicOrigin : `${publicOrigin}/`;
   return new URL(filename, base).toString();
@@ -172,10 +150,10 @@ async function createSignedWindowsManifests(files, privateKey) {
   }
 }
 
-async function atomicPublish(sftp, localPath, filename, remoteDir) {
+async function atomicPublish(sftp, localPath, filename, remoteDir, showProgress = false) {
   const temporaryPath = remoteFile(remoteDir, `${filename}.${randomUUID()}.tmp`);
   try {
-    await putFile(sftp, localPath, temporaryPath);
+    await putFile(sftp, localPath, temporaryPath, showProgress);
     await replaceRemoteFile(sftp, temporaryPath, remoteFile(remoteDir, filename));
   } catch (error) {
     try {
@@ -208,11 +186,12 @@ async function publishUpdates(sftp, config, files, signingKey) {
   const signedWindowsManifests = signingKey ? await createSignedWindowsManifests(files, signingKey) : null;
 
   try {
-    log(`Biu v${version} 更新发布`);
+    const totalBytes = binaries.reduce((sum, file) => sum + fs.statSync(file.fullPath).size, 0);
+    log(`待上传 ${binaries.length} 个文件，共 ${(totalBytes / 1024 ** 2).toFixed(1)} MiB，传齐后发布更新清单。`);
     // 客户端读到新清单时，其中的安装包必须已经可以完整下载。
-    for (const file of binaries) {
-      log(`上传 ${file.filename}`);
-      await atomicPublish(sftp, file.fullPath, file.filename, config.remoteDir);
+    for (const [index, file] of binaries.entries()) {
+      log(`[${index + 1}/${binaries.length}] ${file.filename}`);
+      await atomicPublish(sftp, file.fullPath, file.filename, config.remoteDir, true);
     }
 
     for (const file of metadata) {
@@ -255,7 +234,7 @@ try {
   const checkVersion = () => checkRemoteUpdateVersion(sftp, config.remoteDir, pending, version);
   if (checkOnly) {
     await checkVersion();
-    log(`自建更新站 SFTP 连接和 ${version} 版本检查通过。`);
+    log(`已登录 SFTP 并读取发布目录，目标版本 ${version} 通过版本检查。`);
   } else {
     await withRemotePublishLock(sftp, config.remoteDir, async () => {
       await checkVersion();
