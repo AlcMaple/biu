@@ -7,16 +7,23 @@
  * BIU_UPDATE_PUBLIC_ORIGIN，以及 BIU_UPDATE_PUBLISH_KEY 或 SSH_AUTH_SOCK
  */
 
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { Client } from "ssh2";
 
 import { writeSignedWindowsManifest } from "./update-artifacts.js";
 import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
 import { loadUpdateEnvironment } from "./update-env.js";
-import { replaceRemoteFile } from "./update-sftp.js";
+import {
+  checkRemotePublishDirectory,
+  checkRemoteUpdateVersion,
+  replaceRemoteFile,
+  withRemotePublishLock,
+} from "./update-sftp.js";
 import { loadUpdateSigningPrivateKey } from "./update-signature.js";
 
 loadUpdateEnvironment();
@@ -30,7 +37,8 @@ const releaseNotes = fs.existsSync(RELEASE_NOTES_FILE) ? fs.readFileSync(RELEASE
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, "package.json"), "utf8"));
 const version = pkg.version;
 
-const args = process.argv.slice(2);
+const checkOnly = process.argv.includes("--check");
+const args = process.argv.slice(2).filter(arg => arg !== "--check");
 if (args.includes("--install-key")) {
   throw new Error("请由管理员通过私有运行手册为受限发布账户登记公钥");
 }
@@ -131,8 +139,7 @@ function makeMetadataCopy(filename, sourcePath) {
   return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), path: tempPath };
 }
 
-async function createSignedWindowsManifests(files) {
-  const privateKey = loadUpdateSigningPrivateKey();
+async function createSignedWindowsManifests(files, privateKey) {
   const releaseDate = new Date().toISOString();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "biu-signed-update-"));
   const manifests = [];
@@ -166,75 +173,101 @@ async function createSignedWindowsManifests(files) {
 }
 
 async function atomicPublish(sftp, localPath, filename, remoteDir) {
-  const temporaryName = `${filename}.${process.pid}.tmp`;
-  await putFile(sftp, localPath, remoteFile(remoteDir, temporaryName));
-  await replaceRemoteFile(sftp, remoteFile(remoteDir, temporaryName), remoteFile(remoteDir, filename));
-}
-
-if (!fs.existsSync(ARTIFACTS_DIR)) {
-  throw new Error("未找到 dist/artifacts/；请先完成构建");
-}
-
-const filesToUpload = [];
-for (const [platform, enabled] of Object.entries(platforms)) {
-  if (!enabled) continue;
-  for (const filename of fileGroups[platform]) {
-    const fullPath = path.join(ARTIFACTS_DIR, filename);
-    if (fs.existsSync(fullPath)) filesToUpload.push({ filename, fullPath, platform });
+  const temporaryPath = remoteFile(remoteDir, `${filename}.${randomUUID()}.tmp`);
+  try {
+    await putFile(sftp, localPath, temporaryPath);
+    await replaceRemoteFile(sftp, temporaryPath, remoteFile(remoteDir, filename));
+  } catch (error) {
+    try {
+      await promisify(sftp.unlink.bind(sftp))(temporaryPath);
+    } catch (cleanupError) {
+      if (cleanupError.code !== 2) log(`清理上传临时文件失败：${cleanupError.message}`);
+    }
+    throw error;
   }
 }
 
-if (filesToUpload.length === 0) {
-  throw new Error(`dist/artifacts/ 中没有当前版本 ${version} 的可上传文件`);
+function collectArtifacts() {
+  if (!fs.existsSync(ARTIFACTS_DIR)) throw new Error("未找到 dist/artifacts/；请先完成构建");
+
+  const files = [];
+  for (const [platform, enabled] of Object.entries(platforms)) {
+    if (!enabled) continue;
+    for (const filename of fileGroups[platform]) {
+      const fullPath = path.join(ARTIFACTS_DIR, filename);
+      if (fs.existsSync(fullPath)) files.push({ filename, fullPath, platform });
+    }
+  }
+  if (!files.length) throw new Error(`dist/artifacts/ 中没有当前版本 ${version} 的可上传文件`);
+  return files;
 }
 
-const config = loadUpdatePublishConfig();
-const auth = resolveSshAuth();
-const binaries = filesToUpload.filter(file => !file.filename.endsWith(".yml"));
-const metadata = filesToUpload.filter(file => file.filename.endsWith(".yml"));
-const signedWindowsManifests = platforms.win ? await createSignedWindowsManifests(filesToUpload) : null;
+async function publishUpdates(sftp, config, files, signingKey) {
+  const binaries = files.filter(file => !file.filename.endsWith(".yml"));
+  const metadata = files.filter(file => file.filename.endsWith(".yml"));
+  const signedWindowsManifests = signingKey ? await createSignedWindowsManifests(files, signingKey) : null;
 
-log(`Biu v${version} 更新发布`);
-log(
-  `待上传文件：${[...filesToUpload.map(file => file.filename), ...(signedWindowsManifests?.manifests ?? []).map(file => file.filename)].join(", ")}`,
-);
-log("认证：SSH 私钥或 agent（不允许密码认证）");
+  try {
+    log(`Biu v${version} 更新发布`);
+    // 客户端读到新清单时，其中的安装包必须已经可以完整下载。
+    for (const file of binaries) {
+      log(`上传 ${file.filename}`);
+      await atomicPublish(sftp, file.fullPath, file.filename, config.remoteDir);
+    }
+
+    for (const file of metadata) {
+      const copy = makeMetadataCopy(file.filename, file.fullPath);
+      try {
+        log(`原子发布 ${file.filename}`);
+        await atomicPublish(sftp, copy.path, file.filename, config.remoteDir);
+      } finally {
+        copy.cleanup();
+      }
+    }
+
+    for (const manifest of signedWindowsManifests?.manifests ?? []) {
+      log(`原子发布受签名更新清单 ${manifest.filename}`);
+      await atomicPublish(sftp, manifest.fullPath, manifest.filename, config.remoteDir);
+    }
+
+    log("已上传，更新地址如下。");
+    for (const file of metadata) log(`  ${publicFileUrl(config.publicOrigin, file.filename)}`);
+    for (const manifest of signedWindowsManifests?.manifests ?? []) {
+      log(`  ${publicFileUrl(config.publicOrigin, manifest.filename)}`);
+    }
+  } finally {
+    signedWindowsManifests?.cleanup();
+  }
+}
 
 let client;
 try {
+  const config = loadUpdatePublishConfig();
+  const auth = resolveSshAuth();
+  const signingKey = platforms.win ? loadUpdateSigningPrivateKey() : null;
+  const files = checkOnly ? [] : collectArtifacts();
+  const pending = checkOnly
+    ? Object.keys(platforms).filter(platform => platforms[platform])
+    : [...new Set(files.map(file => file.platform))];
   client = await connect(config, auth);
   const sftp = await openSftp(client);
-
-  // 先上传二进制与 blockmap，最后原子替换 metadata。这样客户端不会收到指向不存在文件的版本清单。
-  for (const file of binaries) {
-    log(`上传 ${file.filename}`);
-    await putFile(sftp, file.fullPath, remoteFile(config.remoteDir, file.filename));
-  }
-
-  for (const file of metadata) {
-    const copy = makeMetadataCopy(file.filename, file.fullPath);
-    try {
-      log(`原子发布 ${file.filename}`);
-      await atomicPublish(sftp, copy.path, file.filename, config.remoteDir);
-    } finally {
-      copy.cleanup();
-    }
-  }
-
-  for (const manifest of signedWindowsManifests?.manifests ?? []) {
-    log(`原子发布受签名更新清单 ${manifest.filename}`);
-    await atomicPublish(sftp, manifest.fullPath, manifest.filename, config.remoteDir);
-  }
-
-  log("发布完成。验证地址：");
-  for (const file of metadata) log(`  ${publicFileUrl(config.publicOrigin, file.filename)}`);
-  for (const manifest of signedWindowsManifests?.manifests ?? []) {
-    log(`  ${publicFileUrl(config.publicOrigin, manifest.filename)}`);
+  await checkRemotePublishDirectory(sftp, config.remoteDir);
+  const checkVersion = () => checkRemoteUpdateVersion(sftp, config.remoteDir, pending, version);
+  if (checkOnly) {
+    await checkVersion();
+    log(`自建更新站 SFTP 连接和 ${version} 版本检查通过。`);
+  } else {
+    await withRemotePublishLock(sftp, config.remoteDir, async () => {
+      await checkVersion();
+      await publishUpdates(sftp, config, files, signingKey);
+    });
   }
 } catch (error) {
-  const detail = error instanceof Error ? error.message : String(error);
-  throw new Error(`更新发布失败：${detail}`);
+  const detail = /before handshake|waiting for handshake/i.test(error.message)
+    ? "连接在 SSH 握手完成前中断。请检查当前网络到更新服务器的 SSH 连接。"
+    : error.message;
+  console.error(`自建更新站${checkOnly ? "预检" : "上传"}失败。${detail}`);
+  process.exitCode = 1;
 } finally {
   client?.end();
-  signedWindowsManifests?.cleanup();
 }

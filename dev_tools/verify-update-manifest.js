@@ -1,28 +1,39 @@
 #!/usr/bin/env node
-/** Verify the public, Ed25519-signed Windows update manifest without downloading an installer. */
+import { parseArgs } from "node:util";
+
 import {
   UPDATE_ENVELOPE_MAX_BYTES,
   getWindowsUpdateManifestFilename,
   normalizeUpdateOrigin,
+  resolveTrustedUpdateInstallerUrl,
   verifySignedUpdateEnvelope,
 } from "../shared/update-signing.js";
+import { readUpdateYamlVersion } from "./update-artifacts.js";
 import { loadUpdateEnvironment } from "./update-env.js";
 
 loadUpdateEnvironment();
-const args = new Set(process.argv.slice(2));
-if ([...args].some(arg => arg !== "--arm64" && arg !== "--x64")) {
-  throw new Error("只支持 --x64 或 --arm64");
-}
-if (args.has("--arm64") && args.has("--x64")) {
-  throw new Error("一次只能验证一种 Windows 架构");
-}
+const { values } = parseArgs({
+  options: {
+    x64: { type: "boolean" },
+    arm64: { type: "boolean" },
+    mac: { type: "boolean" },
+    version: { type: "string" },
+  },
+});
+if ([values.x64, values.arm64, values.mac].filter(Boolean).length > 1)
+  throw new Error("一次只能指定 --x64、--arm64 或 --mac 中的一项。");
 
 const origin = normalizeUpdateOrigin(process.env.BIU_UPDATE_PUBLIC_ORIGIN || "");
-const arch = args.has("--arm64") ? "arm64" : "x64";
-const manifestUrl = new URL(getWindowsUpdateManifestFilename(arch), origin);
+const arch = values.arm64 ? "arm64" : "x64";
+const manifest = values.mac ? "latest-mac.yml" : getWindowsUpdateManifestFilename(arch);
+const manifestUrl = new URL(manifest, origin);
 manifestUrl.searchParams.set("noCache", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-const response = await fetch(manifestUrl, { cache: "no-store", redirect: "error" });
+const response = await fetch(manifestUrl, {
+  cache: "no-store",
+  redirect: "error",
+  signal: AbortSignal.timeout(15_000),
+});
 if (!response.ok) throw new Error(`更新清单请求失败：HTTP ${response.status}`);
 const declaredLength = Number(response.headers.get("content-length"));
 if (Number.isFinite(declaredLength) && declaredLength > UPDATE_ENVELOPE_MAX_BYTES) {
@@ -44,7 +55,23 @@ for (;;) {
   chunks.push(value);
 }
 const rawManifest = Buffer.concat(chunks).toString("utf8");
-const metadata = verifySignedUpdateEnvelope(rawManifest);
-if (metadata.arch !== arch) throw new Error("更新清单架构与请求架构不一致");
+const metadata = values.mac ? null : verifySignedUpdateEnvelope(rawManifest);
+if (metadata && metadata.arch !== arch) throw new Error("更新清单架构与请求架构不一致");
+const version = metadata?.version ?? readUpdateYamlVersion(rawManifest);
+if (!version) throw new Error(`公开更新清单 ${manifest} 缺少版本号。`);
+if (values.version !== undefined && version !== values.version)
+  throw new Error(`公开更新清单 ${manifest} 为 ${version}，期望 ${values.version}。`);
 
-console.log(`已验证 Ed25519 更新清单：v${metadata.version} (${metadata.arch}) → ${metadata.path}`);
+if (metadata && values.version !== undefined) {
+  const installer = await fetch(resolveTrustedUpdateInstallerUrl(origin, metadata.path), {
+    method: "HEAD",
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!installer.ok) throw new Error(`安装包 ${metadata.path} 请求失败：HTTP ${installer.status}`);
+  const size = installer.headers.get("content-length");
+  if (size !== null && Number(size) !== metadata.files[0].size)
+    throw new Error(`安装包 ${metadata.path} 大小与签名清单不一致。`);
+}
+
+console.log(`已验证 ${manifest}：v${version}`);

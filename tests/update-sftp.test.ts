@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { replaceRemoteFile } from "../dev_tools/update-sftp.js";
+import { checkRemoteUpdateVersion, replaceRemoteFile, withRemotePublishLock } from "../dev_tools/update-sftp.js";
+import { UPDATE_ENVELOPE_MAX_BYTES } from "../shared/update-signing.js";
 
 describe("atomic SFTP metadata replacement", () => {
   it("replaces an existing destination through the POSIX extension", async () => {
@@ -37,5 +38,102 @@ describe("atomic SFTP metadata replacement", () => {
     const error = new Error("permission denied");
     const sftp = { ext_openssh_rename: (_from: string, _to: string, done: (error: Error) => void) => done(error) };
     await expect(replaceRemoteFile(sftp, "staged", "latest")).rejects.toMatchObject({ cause: error });
+  });
+});
+
+describe("self-hosted release preflight", () => {
+  const missing = Object.assign(new Error("No such file"), { code: 2 });
+
+  function readServerFiles(
+    files: Record<string, string>,
+    close: (handle: Buffer, done: (error: Error | null) => void) => void = (_handle, done) => done(null),
+  ) {
+    return {
+      open(filename: string, _flags: string, done: (error: Error | null, handle?: Buffer) => void) {
+        if (!(filename in files)) {
+          done(missing);
+          return;
+        }
+        done(null, Buffer.from(filename));
+      },
+      read(
+        handle: Buffer,
+        buffer: Buffer,
+        offset: number,
+        length: number,
+        position: number,
+        done: (error: null, bytes: number) => void,
+      ) {
+        const contents = Buffer.from(files[handle.toString()]);
+        done(null, contents.copy(buffer, offset, position, position + length));
+      },
+      close,
+    };
+  }
+
+  it("accepts a first release and orders versions numerically", async () => {
+    await expect(checkRemoteUpdateVersion(readServerFiles({}), "/updates/", ["win"], "2.8.0")).resolves.toBeUndefined();
+    const sftp = readServerFiles({ "/updates/latest.yml": 'version: "2.9.0"\n' });
+    await expect(checkRemoteUpdateVersion(sftp, "/updates/", ["win"], "2.10.0")).resolves.toBeUndefined();
+  });
+
+  it("protects an existing installer by blocking its version and older versions", async () => {
+    const sftp = readServerFiles({ "/updates/latest.yml": "version: 2.8.0\n" });
+    for (const version of ["2.7.0", "2.8.0", "2.8.0-beta.1"]) {
+      await expect(checkRemoteUpdateVersion(sftp, "/updates/", ["win"], version)).rejects.toThrow(/已使用 2.8.0/);
+    }
+  });
+
+  it("rejects a damaged signed manifest in either architecture", async () => {
+    const sftp = readServerFiles({ "/updates/latest-arm64.json": "{}" });
+    await expect(checkRemoteUpdateVersion(sftp, "/updates/", ["win"], "2.8.0")).rejects.toThrow(/更新清单无效/);
+  });
+
+  it("waits for the remote handle to close before finishing the preflight", async () => {
+    let closed = false;
+    const sftp = readServerFiles({ "/updates/latest.yml": "version: 2.7.0\n" }, (_handle, done) => {
+      setImmediate(() => {
+        closed = true;
+        done(null);
+      });
+    });
+    await checkRemoteUpdateVersion(sftp, "/updates/", ["win"], "2.8.0");
+    expect(closed).toBe(true);
+  });
+
+  it("closes a manifest handle when the byte limit is exceeded", async () => {
+    const close = vi.fn((_handle, done) => done(null));
+    const sftp = readServerFiles({ "/updates/latest.yml": "x".repeat(UPDATE_ENVELOPE_MAX_BYTES + 1) }, close);
+    await expect(checkRemoteUpdateVersion(sftp, "/updates/", ["win"], "2.8.0")).rejects.toThrow(/响应过大/);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks another publishing computer and releases the lock after a failed upload", async () => {
+    let locked = false;
+    const sftp = {
+      mkdir: vi.fn((_name, done) => {
+        if (locked) {
+          done(new Error("already exists"));
+          return;
+        }
+        locked = true;
+        done(null);
+      }),
+      rmdir: vi.fn((_name, done) => {
+        locked = false;
+        done(null);
+      }),
+    };
+    const upload = vi.fn().mockResolvedValue(undefined);
+    await expect(
+      withRemotePublishLock(sftp, "/updates/", async () => {
+        await expect(withRemotePublishLock(sftp, "/updates/", upload)).rejects.toThrow(/无法锁定/);
+        expect(upload).not.toHaveBeenCalled();
+        throw new Error("network lost");
+      }),
+    ).rejects.toThrow("network lost");
+    await withRemotePublishLock(sftp, "/updates/", upload);
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(sftp.rmdir).toHaveBeenCalledTimes(2);
   });
 });

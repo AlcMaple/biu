@@ -105,7 +105,7 @@ function buildDesktop(platform, repository, signer) {
 export async function releaseDesktop(args, system = process.platform) {
   if (args.includes("--help")) {
     console.log(
-      "pnpm release:desktop          构建并发布当前电脑平台到自己的 GitHub Releases\npnpm release:desktop --check  只检查发版条件",
+      "pnpm release:desktop:github          构建并发布当前电脑平台到自己的 GitHub Releases\npnpm release:desktop:github --check  只检查发版条件",
     );
     return;
   }
@@ -145,7 +145,7 @@ export async function releaseDesktop(args, system = process.platform) {
         })
       : null;
   if (checkOnly) {
-    console.log("发布条件检查通过。要开始构建并上传，请运行 pnpm release:desktop。");
+    console.log("发布条件检查通过。要开始构建并上传，请运行 pnpm release:desktop:github。");
     return;
   }
   buildDesktop(platform, repository, signer);

@@ -291,6 +291,9 @@ importers:
       rollup-plugin-tsconfig-paths:
         specifier: ^1.5.2
         version: 1.5.2(rollup@4.55.1)(typescript@5.9.3)
+      semver:
+        specifier: ^7.7.3
+        version: 7.7.3
       ssh2:
         specifier: ^1.17.0
         version: 1.17.0
