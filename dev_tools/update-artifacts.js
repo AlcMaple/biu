@@ -61,5 +61,5 @@ export async function writeSignedWindowsManifest({
   const filename = getWindowsUpdateManifestFilename(arch);
   const fullPath = path.join(directory, filename);
   fs.writeFileSync(fullPath, signUpdateMetadata(metadata, signer.privateKey, { keyId: signer.keyId }), "utf8");
-  return { filename, fullPath };
+  return { filename, fullPath, installerSha512: metadata.sha512 };
 }

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 
+import { readBlockMapResponse, verifyInstallerBlockMap } from "../shared/update-blockmap.js";
+import { UPDATE_SIGNING_PUBLIC_KEY_BASE64 } from "../shared/update-signing-public-key.js";
 import {
   UPDATE_ENVELOPE_MAX_BYTES,
   getWindowsUpdateManifestFilename,
@@ -18,6 +20,7 @@ const { values } = parseArgs({
     arm64: { type: "boolean" },
     mac: { type: "boolean" },
     version: { type: "string" },
+    blockmap: { type: "boolean" },
   },
 });
 if ([values.x64, values.arm64, values.mac].filter(Boolean).length > 1)
@@ -72,6 +75,21 @@ if (metadata && values.version !== undefined) {
   const size = installer.headers.get("content-length");
   if (size !== null && Number(size) !== metadata.files[0].size)
     throw new Error(`安装包 ${metadata.path} 大小与签名清单不一致。`);
+}
+
+if (values.blockmap) {
+  if (!metadata) throw new Error("分块索引仅适用于 Windows 安装包");
+  const installer = resolveTrustedUpdateInstallerUrl(origin, metadata.path);
+  const response = await fetch(`${installer.href}.blockmap.signed`, {
+    redirect: "error",
+    signal: AbortSignal.timeout(30_000),
+  });
+  const signedMap = await readBlockMapResponse(response);
+  if (
+    !signedMap ||
+    !verifyInstallerBlockMap(signedMap, UPDATE_SIGNING_PUBLIC_KEY_BASE64, metadata.sha512, metadata.files[0].size)
+  )
+    throw new Error(`安装包 ${metadata.path} 缺少对应的签名分块索引`);
 }
 
 console.log(`已验证 ${manifest}：v${version}`);

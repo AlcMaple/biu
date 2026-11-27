@@ -6,15 +6,19 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { channel } from "../ipc/channel";
+import { SelfHostedUpdater } from "./self-hosted-updater";
 import { SignedUpdateProvider } from "./signed-provider";
 
-const { autoUpdater } = electronUpdater;
 declare const __BIU_DESKTOP_UPDATE__: {
   url: string;
   repository?: string;
   trust: { keyId: string; publicKeyBase64: string } | null;
 } | null;
 const updateChannel = __BIU_DESKTOP_UPDATE__;
+const autoUpdater =
+  process.platform === "win32" && updateChannel?.trust && !updateChannel.repository
+    ? new SelfHostedUpdater(updateChannel.trust.publicKeyBase64)
+    : electronUpdater.autoUpdater;
 
 let checkForUpdatesInterval: NodeJS.Timeout | null = null;
 let automaticUpdateDisabledReason: string | null = null;
@@ -65,9 +69,8 @@ function setupAutoUpdater({ getMainWindow }: { getMainWindow: () => BrowserWindo
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.autoRunAppAfterInstall = true;
   autoUpdater.allowPrerelease = true;
-  // 免费个人通道不信任服务器上的 latest.yml 和差分 blockmap：
-  // 只接受内置 Ed25519 公钥验证过的 JSON 清单，并对完整安装包校验 SHA-512。
-  autoUpdater.disableDifferentialDownload = true;
+  // 自建通道只复用签名索引确认的本地字节；其他通道禁用原生 blockmap 差分。
+  autoUpdater.disableDifferentialDownload = !(autoUpdater instanceof SelfHostedUpdater);
   autoUpdater.disableWebInstaller = true;
 
   if (isDev) {

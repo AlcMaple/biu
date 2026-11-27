@@ -8,7 +8,7 @@ describe("free personal update channel contract", () => {
 
     expect(source).toContain('provider: "custom"');
     expect(source).toContain("updateProvider: SignedUpdateProvider");
-    expect(source).toContain("autoUpdater.disableDifferentialDownload = true");
+    expect(source).toContain("autoUpdater.disableDifferentialDownload = !(autoUpdater instanceof SelfHostedUpdater)");
     expect(source).toContain("autoUpdater.disableWebInstaller = true");
     expect(source).not.toContain("BIU_SIGNED_AUTO_UPDATE");
   });

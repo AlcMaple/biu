@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { Client } from "ssh2";
 
+import { signInstallerBlockMap } from "../shared/update-blockmap.js";
 import { writeSignedWindowsManifest } from "./update-artifacts.js";
 import { loadUpdatePublishConfig, remoteFile, resolveSshAuth } from "./update-deploy-config.js";
 import { loadUpdateEnvironment } from "./update-env.js";
@@ -121,6 +122,7 @@ async function createSignedWindowsManifests(files, privateKey) {
   const releaseDate = new Date().toISOString();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "biu-signed-update-"));
   const manifests = [];
+  const blockMaps = [];
 
   try {
     for (const arch of ["x64", "arm64"]) {
@@ -138,12 +140,25 @@ async function createSignedWindowsManifests(files, privateKey) {
         version,
       });
       manifests.push(manifest);
+      const mapName = `${filename}.blockmap.signed`;
+      const fullPath = path.join(directory, mapName);
+      const compressedMap = fs.readFileSync(`${installer.fullPath}.blockmap`);
+      fs.writeFileSync(
+        fullPath,
+        signInstallerBlockMap(
+          compressedMap,
+          manifest.installerSha512,
+          fs.statSync(installer.fullPath).size,
+          privateKey,
+        ),
+      );
+      blockMaps.push({ filename: mapName, fullPath });
     }
 
     if (manifests.length === 0) {
       throw new Error("缺少 Windows NSIS 安装包；免费自动更新只能发布 win-setup-*.exe");
     }
-    return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), manifests };
+    return { cleanup: () => fs.rmSync(directory, { force: true, recursive: true }), manifests, blockMaps };
   } catch (error) {
     fs.rmSync(directory, { force: true, recursive: true });
     throw error;
@@ -186,6 +201,7 @@ async function publishUpdates(sftp, config, files, signingKey) {
   const signedWindowsManifests = signingKey ? await createSignedWindowsManifests(files, signingKey) : null;
 
   try {
+    binaries.push(...(signedWindowsManifests?.blockMaps ?? []));
     const totalBytes = binaries.reduce((sum, file) => sum + fs.statSync(file.fullPath).size, 0);
     log(`待上传 ${binaries.length} 个文件，共 ${(totalBytes / 1024 ** 2).toFixed(1)} MiB，传齐后发布更新清单。`);
     // 客户端读到新清单时，其中的安装包必须已经可以完整下载。

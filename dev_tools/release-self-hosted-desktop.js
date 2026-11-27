@@ -48,7 +48,7 @@ export function releaseSelfHostedDesktop(args, system = process.platform) {
   run("upload-update", platform);
   console.log("[验证] 正在读取线上更新清单");
   for (const target of windows ? ["--x64", "--arm64"] : ["--mac"]) {
-    run("verify-update-manifest", target, "--version", version);
+    run("verify-update-manifest", target, "--version", version, ...(windows ? ["--blockmap"] : []));
   }
   console.log(`Biu ${version} 已发布到自建更新站，线上更新清单验证通过。`);
 }

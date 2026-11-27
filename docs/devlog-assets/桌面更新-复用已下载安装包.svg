@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="890" height="354" viewBox="0 0 890 354" role="img" aria-labelledby="title desc">
+  <title id="title">Windows 更新要下载多少？</title>
+  <desc id="desc">本机用两个真实的 x64 安装包模拟更新，复用了旧包中的相同内容。完整包为 140.92 MB，实际传输 2.18 MB。缺少可复用的旧包或签名索引时会下载完整包。</desc>
+  <style>
+    text {font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;fill:#282529}
+    .title{font-size:19px;font-weight:700}.sub{font-size:12.5px;fill:#756f73}.section{font-size:14px;font-weight:700}.label{font-size:12.5px;font-weight:700}.body{font-size:11px}
+    .green text{fill:#316247}.blue text{fill:#36566d}.red text{fill:#96434f}.yellow text{fill:#7a6234}
+  </style>
+  <rect x="1" y="1" width="888" height="352" rx="14" fill="#fbfafb" stroke="#e2dcdf"/>
+  <text class="title" x="24" y="34">Windows 更新要下载多少？</text>
+  <text class="sub" x="24" y="57">本机 x64 实测：完整包 140.92 MB，复用旧包后传输 2.18 MB，减少 98.45%（包含两个签名索引）。</text>
+  <text class="section" x="24" y="89">从点击下载到可以安装</text>
+  <g class="blue">
+    <rect x="24" y="102" width="260" height="92" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text class="label" x="38" y="127">点击「下载更新」</text>
+    <text class="body" x="38" y="151">核对本机缓存的旧安装包，</text>
+    <text class="body" x="38" y="170">从已签名的索引找出相同内容。</text>
+  </g>
+  <path d="M288 148h15m-5-4 5 4-5 4m280-4h15m-5-4 5 4-5 4" fill="none" stroke="#91888f" stroke-width="1.5"/>
+  <g class="blue">
+    <rect x="310" y="102" width="267" height="92" rx="10" fill="#eef4f8" stroke="#91adc1"/>
+    <text class="label" x="324" y="127">「正在下载」</text>
+    <text class="body" x="324" y="151">相同内容从本机复制，变化部分分段下载。</text>
+    <text class="body" x="324" y="170">进度条按需要下载的安装包字节计算。</text>
+  </g>
+  <g class="green">
+    <rect x="600" y="102" width="266" height="92" rx="10" fill="#edf7f1" stroke="#7fad91"/>
+    <text class="label" x="614" y="127">「退出并安装更新」</text>
+    <text class="body" x="614" y="151">合成后的完整包通过 SHA-512 校验，</text>
+    <text class="body" x="614" y="170">客户端才会显示安装按钮。</text>
+  </g>
+  <text class="section" x="24" y="225">什么情况下体验会不同？</text>
+  <g class="yellow">
+    <rect x="24" y="238" width="413" height="72" rx="10" fill="#fff8e8" stroke="#d9bd85"/>
+    <text class="label" x="38" y="262">缓存缺失，或旧版本没有签名索引</text>
+    <text class="body" x="38" y="286">自动下载完整包。旧客户端首次升级也沿用完整包下载。</text>
+  </g>
+  <g class="red">
+    <rect x="453" y="238" width="413" height="72" rx="10" fill="#fdeef0" stroke="#d99aa5"/>
+    <text class="label" x="467" y="262">校验失败，或更新站限流</text>
+    <text class="body" x="467" y="286">下载停止，更新弹窗显示原因；当前版本仍可继续使用。</text>
+  </g>
+  <text class="sub" x="24" y="335">样本为 2.8.0 到本次本地测试构建。每次更新的下载量取决于两个安装包实际有多少内容相同。</text>
+</svg>

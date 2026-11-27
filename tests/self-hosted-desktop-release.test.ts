@@ -46,8 +46,8 @@ it("builds for the original site and verifies both published Windows architectur
     checkServer,
     ["/d", "/c", "pnpm run build"],
     upload,
-    ["dev_tools/verify-update-manifest.js", "--x64", "--version", pkg.version],
-    ["dev_tools/verify-update-manifest.js", "--arm64", "--version", pkg.version],
+    ["dev_tools/verify-update-manifest.js", "--x64", "--version", pkg.version, "--blockmap"],
+    ["dev_tools/verify-update-manifest.js", "--arm64", "--version", pkg.version, "--blockmap"],
   ]);
   expect(checkArtifacts).toHaveBeenCalledWith(expect.any(String), pkg.version, "win");
   expect(checkArtifacts.mock.invocationCallOrder[0]).toBeGreaterThan(run.mock.invocationCallOrder[2]);
